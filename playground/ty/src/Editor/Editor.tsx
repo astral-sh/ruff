@@ -148,6 +148,7 @@ class PlaygroundServer
     languages.TypeDefinitionProvider,
     languages.DeclarationProvider,
     languages.DefinitionProvider,
+    languages.ReferenceProvider,
     editor.ICodeEditorOpener,
     languages.HoverProvider,
     languages.InlayHintsProvider,
@@ -160,6 +161,7 @@ class PlaygroundServer
   private typeDefinitionProviderDisposable: IDisposable;
   private declarationProviderDisposable: IDisposable;
   private definitionProviderDisposable: IDisposable;
+  private referenceProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
   private inlayHintsDisposable: IDisposable;
@@ -179,6 +181,8 @@ class PlaygroundServer
       monaco.languages.registerDeclarationProvider("python", this);
     this.definitionProviderDisposable =
       monaco.languages.registerDefinitionProvider("python", this);
+    this.referenceProviderDisposable =
+      monaco.languages.registerReferenceProvider("python", this);
     this.hoverDisposable = monaco.languages.registerHoverProvider(
       "python",
       this,
@@ -582,6 +586,35 @@ class PlaygroundServer
     return mapNavigationTargets(links);
   }
 
+  provideReferences(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    context: languages.ReferenceContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Location[]> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoReferences(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return mapNavigationTargets(links);
+  }
+
   openCodeEditor(
     source: editor.ICodeEditor,
     resource: Uri,
@@ -667,6 +700,7 @@ class PlaygroundServer
     this.typeDefinitionProviderDisposable.dispose();
     this.declarationProviderDisposable.dispose();
     this.definitionProviderDisposable.dispose();
+    this.referenceProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
     this.rangeSemanticTokensDisposable.dispose();

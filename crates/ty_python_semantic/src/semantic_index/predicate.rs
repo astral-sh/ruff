@@ -116,13 +116,25 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update)]
+pub(crate) enum ClassPatternKind {
+    Irrefutable,
+    Refutable,
+}
+
+impl ClassPatternKind {
+    pub(crate) fn is_irrefutable(self) -> bool {
+        matches!(self, ClassPatternKind::Irrefutable)
+    }
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>),
+    Class(Expression<'db>, ClassPatternKind),
     Unsupported,
 }
 
@@ -138,6 +150,9 @@ pub(crate) struct PatternPredicate<'db> {
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
+
+    /// A reference to the pattern of the previous match case
+    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.

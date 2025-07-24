@@ -9,7 +9,7 @@ use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -18,14 +18,17 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
     SubDiagnostic, UnifiedFile,
 };
 
 use azure::AzureRenderer;
+use concise::ConciseRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
+mod concise;
+mod full;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -104,48 +107,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
             DiagnosticFormat::Concise => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                for diag in self.diagnostics {
-                    let (severity, severity_style) = match diag.severity() {
-                        Severity::Info => ("info", stylesheet.info),
-                        Severity::Warning => ("warning", stylesheet.warning),
-                        Severity::Error => ("error", stylesheet.error),
-                        Severity::Fatal => ("fatal", stylesheet.error),
-                    };
-                    write!(
-                        f,
-                        "{severity}[{id}]",
-                        severity = fmt_styled(severity, severity_style),
-                        id = fmt_styled(diag.id(), stylesheet.emphasis)
-                    )?;
-                    if let Some(span) = diag.primary_span() {
-                        write!(
-                            f,
-                            " {path}",
-                            path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
-                        )?;
-                        if let Some(range) = span.range() {
-                            let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                            let start = diagnostic_source
-                                .as_source_code()
-                                .line_column(range.start());
-
-                            write!(
-                                f,
-                                ":{line}:{col}",
-                                line = fmt_styled(start.line, stylesheet.emphasis),
-                                col = fmt_styled(start.column, stylesheet.emphasis),
-                            )?;
-                        }
-                        write!(f, ":")?;
-                    }
-                    writeln!(f, " {message}", message = diag.concise_message())?;
-                }
+                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
                 let stylesheet = if self.config.color {
@@ -256,7 +218,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    severity: Severity,
+    level: AnnotateLevel,
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
@@ -281,7 +243,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         let id = Some(diag.inner.id.to_string());
         let message = diag.inner.message.as_str().to_string();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id,
             message,
             annotations,
@@ -304,7 +266,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
@@ -371,7 +333,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            severity: self.severity,
+            level: self.level,
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
@@ -459,7 +421,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    severity: Severity,
+    level: AnnotateLevel,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -478,7 +440,6 @@ struct RenderableDiagnostic<'r> {
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
     fn to_annotate(&self) -> AnnotateMessage<'_> {
-        let level = self.severity.to_annotate();
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -486,7 +447,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = level.title(self.message);
+        let mut message = self.level.title(self.message);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -862,9 +823,12 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
 #[cfg(test)]
 mod tests {
 
-    use ruff_diagnostics::{Edit, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
 
-    use crate::diagnostic::{Annotation, DiagnosticId, SecondaryCode, Severity, Span};
+    use crate::diagnostic::{
+        Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
+        SubDiagnosticSeverity,
+    };
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
@@ -1548,7 +1512,7 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -1577,15 +1541,15 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "another helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "and another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "and another helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -2307,6 +2271,27 @@ watermelon
             self.config = config;
         }
 
+        /// Hide diagnostic severity when rendering.
+        pub(super) fn hide_severity(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.hide_severity(yes);
+            self.config = config;
+        }
+
+        /// Show fix availability when rendering.
+        pub(super) fn show_fix_status(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// The lowest fix applicability to show when rendering.
+        pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.fix_applicability(applicability);
+            self.config = config;
+        }
+
         /// Add a file with the given path and contents to this environment.
         pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
@@ -2370,7 +2355,7 @@ watermelon
         /// sub-diagnostic with "error" severity and canned values for
         /// its identifier and message.
         fn sub_warn(&mut self) -> SubDiagnosticBuilder<'_> {
-            self.sub_builder(Severity::Warning, "sub-diagnostic message")
+            self.sub_builder(SubDiagnosticSeverity::Warning, "sub-diagnostic message")
         }
 
         /// Returns a builder for tersely constructing diagnostics.
@@ -2391,7 +2376,11 @@ watermelon
         }
 
         /// Returns a builder for tersely constructing sub-diagnostics.
-        fn sub_builder(&mut self, severity: Severity, message: &str) -> SubDiagnosticBuilder<'_> {
+        fn sub_builder(
+            &mut self,
+            severity: SubDiagnosticSeverity,
+            message: &str,
+        ) -> SubDiagnosticBuilder<'_> {
             let subdiag = SubDiagnostic::new(severity, message);
             SubDiagnosticBuilder { env: self, subdiag }
         }
@@ -2492,6 +2481,12 @@ watermelon
         /// Set the noqa offset on the diagnostic.
         fn noqa_offset(mut self, noqa_offset: TextSize) -> DiagnosticBuilder<'e> {
             self.diag.set_noqa_offset(noqa_offset);
+            self
+        }
+
+        /// Adds a "help" sub-diagnostic with the given message.
+        fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+            self.diag.help(message);
             self
         }
     }
@@ -2600,7 +2595,8 @@ def fibonacci(n):
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("fib.py", "1:7", "1:9", "Remove unused import: `os`")
+                .primary("fib.py", "1:7", "1:9", "")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(0),
@@ -2613,12 +2609,8 @@ def fibonacci(n):
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "fib.py",
-                "6:4",
-                "6:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("fib.py", "6:4", "6:5", "")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -2665,6 +2657,25 @@ if call(foo
     }
 
     /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    ///
+    /// The concatenated cells look like this:
+    ///
+    /// ```python
+    /// # cell 1
+    /// import os
+    /// # cell 2
+    /// import math
+    ///
+    /// print('hello world')
+    /// # cell 3
+    /// def foo():
+    ///     print()
+    ///     x = 1
+    /// ```
+    ///
+    /// The first diagnostic is on the unused `os` import with location cell 1, row 2, column 8
+    /// (`cell 1:2:8`). The second diagnostic is the unused `math` import at `cell 2:2:8`, and the
+    /// third diagnostic is an unfixable unused variable at `cell 3:4:5`.
     #[allow(
         dead_code,
         reason = "This is currently only used for JSON but will be needed soon for other formats"
@@ -2720,7 +2731,8 @@ if call(foo
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("notebook.ipynb", "2:7", "2:9", "Remove unused import: `os`")
+                .primary("notebook.ipynb", "2:7", "2:9", "")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(9),
@@ -2733,12 +2745,8 @@ if call(foo
                 Severity::Error,
                 "`math` imported but unused",
             )
-            .primary(
-                "notebook.ipynb",
-                "4:7",
-                "4:11",
-                "Remove unused import: `math`",
-            )
+            .primary("notebook.ipynb", "4:7", "4:11", "")
+            .help("Remove unused import: `math`")
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -2751,12 +2759,8 @@ if call(foo
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "notebook.ipynb",
-                "10:4",
-                "10:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("notebook.ipynb", "10:4", "10:5", "")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(94),

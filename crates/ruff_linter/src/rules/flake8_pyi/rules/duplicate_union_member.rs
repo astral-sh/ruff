@@ -64,6 +64,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     let mut diagnostics = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
+    let mut optional_present = false;
     // Adds a member to `literal_exprs` if it is a `Literal` annotation
     let mut check_for_duplicate_members = |expr: &'a Expr, parent: &'a Expr| {
         if matches!(parent, Expr::BinOp(_)) {
@@ -74,6 +75,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
             && is_optional_type(checker, expr)
         {
             // If the union member is an `Optional`, add a virtual `None` literal.
+            optional_present = true;
             &VIRTUAL_NONE_LITERAL
         } else {
             expr
@@ -87,7 +89,7 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 DuplicateUnionMember {
                     duplicate_name: checker.generator().expr(virtual_expr),
                 },
-                // Use the real expression's range for diagnostics,
+                // Use the real expression's range for diagnostics.
                 expr.range(),
             ));
         }
@@ -101,6 +103,13 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
     }
 
     if diagnostics.is_empty() {
+        return;
+    }
+
+    // Do not reduce `Union[None, ... None]` to avoid introducing a `TypeError` unintentionally
+    // e.g. `isinstance(None, Union[None, None])`, if reduced to `isinstance(None, None)`, causes
+    // `TypeError: isinstance() arg 2 must be a type, a tuple of types, or a union` to throw.
+    if unique_nodes.iter().all(|expr| expr.is_none_literal_expr()) && !optional_present {
         return;
     }
 

@@ -75,7 +75,7 @@ static_assert(is_singleton(_NoDefaultType))
 ### All Python versions
 
 The type of the builtin symbol `Ellipsis` is the same as the type of an ellipsis literal (`...`).
-The type is not actually exposed from the standard library on Python \<3.10, but we still recognise
+The type is not actually exposed from the standard library on Python \<3.10, but we still recognize
 the type as a singleton on any Python version.
 
 ```toml
@@ -93,7 +93,7 @@ static_assert(is_singleton((...).__class__))
 ### Python 3.10+
 
 On Python 3.10+, the standard library exposes the type of `...` as `types.EllipsisType`, and we also
-recognise this as a singleton type when it is referenced directly:
+recognize this as a singleton type when it is referenced directly:
 
 ```toml
 [environment]

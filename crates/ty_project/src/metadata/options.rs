@@ -12,7 +12,7 @@ use ordermap::OrderMap;
 use ruff_db::RustDoc;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
-    Span, SubDiagnostic,
+    Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -318,7 +318,7 @@ impl Options {
 
             if self.environment.or_default().root.is_some() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "The `src.root` setting was ignored in favor of the `environment.root` setting",
                 ));
             }
@@ -811,7 +811,7 @@ fn build_include_filter(
                 Severity::Warning,
             )
             .sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "Remove the `include` option to match all files or add a pattern to match specific files",
             ));
 
@@ -853,13 +853,13 @@ fn build_include_filter(
                                     ))
                             } else {
                                 diagnostic.sub(SubDiagnostic::new(
-                                    Severity::Info,
+                                    SubDiagnosticSeverity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.include_name()),
                                 ))
                             }
                         }
                         ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
                         ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
@@ -883,7 +883,7 @@ fn build_include_filter(
             Severity::Error,
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
@@ -936,13 +936,13 @@ fn build_exclude_filter(
                                     ))
                             } else {
                                 diagnostic.sub(SubDiagnostic::new(
-                                    Severity::Info,
+                                    SubDiagnosticSeverity::Info,
                                     format!("The pattern is defined in the `{}` option in your configuration file", context.exclude_name()),
                                 ))
                             }
                         }
                         ValueSource::Cli => diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
                         ValueSource::PythonVSCodeExtension => unreachable!(
@@ -960,7 +960,7 @@ fn build_exclude_filter(
             Severity::Error,
         );
         Box::new(diagnostic.sub(SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Please open an issue on the ty repository and share the patterns that caused the error.",
         )))
     })
@@ -1197,26 +1197,26 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = if self.rules.is_none() {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `rules` table",
                 ));
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "Add a `[overrides.rules]` table...",
                 ))
             } else {
                 diagnostic = diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "The rules table is empty",
                 ));
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "Add a rule to `[overrides.rules]` to override specific rules...",
                 ))
             };
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "or remove the `[[overrides]]` section if there's nothing to override",
             ));
 
@@ -1251,23 +1251,23 @@ impl RangedValue<OverrideOptions> {
 
             diagnostic = if self.exclude.is_none() {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `include` or `exclude` option restricting the files",
                 ))
             } else {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     "It has no `include` option and `exclude` is empty",
                 ))
             };
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "Restrict the files by adding a pattern to `include` or `exclude`...",
             ));
 
             diagnostic = diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "or remove the `[[overrides]]` section and merge the configuration into the root `[rules]` table if the configuration should apply to all files",
             ));
 

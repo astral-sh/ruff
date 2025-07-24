@@ -187,7 +187,7 @@ impl SpecialFormType {
     ) -> Option<Self> {
         let candidate = Self::from_str(symbol_name).ok()?;
         candidate
-            .check_module(file_to_module(db, file)?.known()?)
+            .check_module(file_to_module(db, file)?.known(db)?)
             .then_some(candidate)
     }
 

@@ -102,7 +102,7 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
-                write!(f, "<module '{}'>", module.module(self.db).name())
+                write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
                 write!(f, "<class '{}'>", class.name(self.db))

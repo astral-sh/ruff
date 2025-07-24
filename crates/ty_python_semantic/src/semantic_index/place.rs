@@ -41,7 +41,16 @@ impl PlaceExprSubSegment {
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub struct PlaceExpr {
     root_name: Name,
-    sub_segments: SmallVec<[PlaceExprSubSegment; 1]>,
+    #[get_size(size_fn=sub_segments_size)]
+    sub_segments: thin_vec::ThinVec<PlaceExprSubSegment>,
+}
+
+fn sub_segments_size(segments: &thin_vec::ThinVec<PlaceExprSubSegment>) -> usize {
+    segments.capacity() * std::mem::size_of::<PlaceExprSubSegment>()
+        + segments
+            .iter()
+            .map(get_size2::GetSize::get_heap_size)
+            .sum::<usize>()
 }
 
 impl std::fmt::Display for PlaceExpr {
@@ -162,10 +171,10 @@ impl TryFrom<ast::ExprRef<'_>> for PlaceExpr {
 }
 
 impl PlaceExpr {
-    pub(crate) const fn name(name: Name) -> Self {
+    pub(crate) fn name(name: Name) -> Self {
         Self {
             root_name: name,
-            sub_segments: SmallVec::new_const(),
+            sub_segments: thin_vec::ThinVec::new(),
         }
     }
 
@@ -652,6 +661,8 @@ pub struct PlaceTable {
 impl PlaceTable {
     fn shrink_to_fit(&mut self) {
         self.places.shrink_to_fit();
+        self.place_set
+            .shrink_to_fit(|id| PlaceTable::hash_place_expr(&self.places[*id].expr));
     }
 
     pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
@@ -775,7 +786,7 @@ impl std::fmt::Debug for PlaceTable {
 pub(super) struct PlaceTableBuilder {
     table: PlaceTable,
 
-    associated_place_ids: IndexVec<ScopedPlaceId, Vec<ScopedPlaceId>>,
+    associated_place_ids: IndexVec<ScopedPlaceId, SmallVec<[ScopedPlaceId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -794,14 +805,17 @@ impl PlaceTableBuilder {
 
                 let id = self.table.places.push(symbol);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 (id, true)
             }
         }
     }
 
-    pub(super) fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> (ScopedPlaceId, bool) {
+    pub(super) fn add_place(
+        &mut self,
+        mut place_expr: PlaceExprWithFlags,
+    ) -> (ScopedPlaceId, bool) {
         let hash = PlaceTable::hash_place_expr(&place_expr.expr);
         let entry = self.table.place_set.entry(
             hash,
@@ -812,9 +826,10 @@ impl PlaceTableBuilder {
         match entry {
             Entry::Occupied(entry) => (*entry.get(), false),
             Entry::Vacant(entry) => {
+                place_expr.expr.sub_segments.shrink_to_fit();
                 let id = self.table.places.push(place_expr);
                 entry.insert(id);
-                let new_id = self.associated_place_ids.push(vec![]);
+                let new_id = self.associated_place_ids.push(SmallVec::new_const());
                 debug_assert_eq!(new_id, id);
                 for root in self.table.places[id].expr.root_exprs() {
                     if let Some(root_id) = self.table.place_id_by_expr(root) {

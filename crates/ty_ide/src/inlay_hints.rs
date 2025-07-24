@@ -156,9 +156,8 @@ mod tests {
     };
     use ruff_text_size::TextSize;
 
-    use crate::db::tests::TestDb;
-
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ty_project::ProjectMetadata;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -167,7 +166,10 @@ mod tests {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
-        let mut db = TestDb::new();
+        let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+            "test".into(),
+            SystemPathBuf::from("/"),
+        ));
 
         let start = source.find(START);
         let end = source
@@ -205,7 +207,7 @@ mod tests {
     }
 
     pub(super) struct InlayHintTest {
-        pub(super) db: TestDb,
+        pub(super) db: ty_project::TestDb,
         pub(super) file: File,
         pub(super) range: TextRange,
     }

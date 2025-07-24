@@ -2734,7 +2734,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.4"
+version = "0.12.5"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2985,7 +2985,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.4"
+version = "0.12.5"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3317,7 +3317,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.4"
+version = "0.12.5"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -4211,6 +4211,7 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.9.1",
  "insta",
+ "itertools 0.14.0",
  "regex",
  "ruff_db",
  "ruff_python_ast",
@@ -4219,11 +4220,10 @@ dependencies = [
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
- "salsa",
  "smallvec",
  "tracing",
+ "ty_project",
  "ty_python_semantic",
- "ty_vendored",
 ]
 
 [[package]]
@@ -4257,7 +4257,6 @@ dependencies = [
  "thiserror 2.0.12",
  "toml 0.9.2",
  "tracing",
- "ty_ide",
  "ty_python_semantic",
  "ty_vendored",
 ]
@@ -4305,6 +4304,7 @@ dependencies = [
  "strum_macros",
  "tempfile",
  "test-case",
+ "thin-vec",
  "thiserror 2.0.12",
  "tracing",
  "ty_python_semantic",
@@ -4320,10 +4320,13 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.1",
  "crossbeam",
+ "dunce",
+ "insta",
  "jod-thread",
  "libc",
  "lsp-server",
  "lsp-types",
+ "regex",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
@@ -4334,12 +4337,14 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "tempfile",
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
+ "ty_server",
  "ty_vendored",
 ]
 

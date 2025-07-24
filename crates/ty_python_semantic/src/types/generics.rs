@@ -194,7 +194,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = UnionType::from_elements(db, tuple.tuple(db).all_elements());
+        let element_type = tuple.tuple(db).homogeneous_element_type(db);
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 

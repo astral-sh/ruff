@@ -230,6 +230,21 @@ impl TestCase {
     fn system_file(&self, path: impl AsRef<SystemPath>) -> Result<File, FileError> {
         system_path_to_file(self.db(), path.as_ref())
     }
+
+    fn module<'c>(&'c self, name: &str) -> Module<'c> {
+        resolve_module(self.db(), &ModuleName::new(name).unwrap()).expect("module to be present")
+    }
+
+    fn sorted_submodule_names(&self, parent_module_name: &str) -> Vec<String> {
+        let mut names = self
+            .module(parent_module_name)
+            .all_submodules(self.db())
+            .iter()
+            .map(|name| name.as_str().to_string())
+            .collect::<Vec<String>>();
+        names.sort();
+        names
+    }
 }
 
 trait MatchEvent {
@@ -1398,7 +1413,7 @@ mod unix {
         let baz = resolve_module(case.db(), &ModuleName::new_static("bar.baz").unwrap())
             .expect("Expected bar.baz to exist in site-packages.");
         let baz_project = case.project_path("bar/baz.py");
-        let baz_file = baz.file().unwrap();
+        let baz_file = baz.file(case.db()).unwrap();
 
         assert_eq!(source_text(case.db(), baz_file).as_str(), "def baz(): ...");
         assert_eq!(
@@ -1473,7 +1488,7 @@ mod unix {
 
         let baz = resolve_module(case.db(), &ModuleName::new_static("bar.baz").unwrap())
             .expect("Expected bar.baz to exist in site-packages.");
-        let baz_file = baz.file().unwrap();
+        let baz_file = baz.file(case.db()).unwrap();
         let bar_baz = case.project_path("bar/baz.py");
 
         let patched_bar_baz = case.project_path("patched/bar/baz.py");
@@ -1594,7 +1609,10 @@ mod unix {
             "def baz(): ..."
         );
         assert_eq!(
-            baz.file().unwrap().path(case.db()).as_system_path(),
+            baz.file(case.db())
+                .unwrap()
+                .path(case.db())
+                .as_system_path(),
             Some(&*baz_original)
         );
 
@@ -1891,19 +1909,9 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 #[test]
 fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
-    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
-    let get_submodules = |db: &dyn Db, module: &Module| {
-        let mut names = module
-            .all_submodules(db)
-            .iter()
-            .map(|name| name.as_str().to_string())
-            .collect::<Vec<String>>();
-        names.sort();
-        names.join("\n")
-    };
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @"foo",
     );
 
@@ -1912,7 +1920,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @r"
     foo
     wazoo
@@ -1932,19 +1940,9 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
         ("bar/foo.py", ""),
         ("bar/wazoo.py", ""),
     ])?;
-    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
-    let get_submodules = |db: &dyn Db, module: &Module| {
-        let mut names = module
-            .all_submodules(db)
-            .iter()
-            .map(|name| name.as_str().to_string())
-            .collect::<Vec<String>>();
-        names.sort();
-        names.join("\n")
-    };
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @r"
     foo
     wazoo
@@ -1956,7 +1954,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @"foo",
     );
 
@@ -1968,19 +1966,9 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 #[test]
 fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
-    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
-    let get_submodules = |db: &dyn Db, module: &Module| {
-        let mut names = module
-            .all_submodules(db)
-            .iter()
-            .map(|name| name.as_str().to_string())
-            .collect::<Vec<String>>();
-        names.sort();
-        names.join("\n")
-    };
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @"foo",
     );
 
@@ -1993,7 +1981,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
     case.apply_changes(changes, None);
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @"foo",
     );
 
@@ -2006,19 +1994,9 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 #[test]
 fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
-    let module = resolve_module(case.db(), &ModuleName::new("bar").unwrap()).expect("`bar` module");
-    let get_submodules = |db: &dyn Db, module: &Module| {
-        let mut names = module
-            .all_submodules(db)
-            .iter()
-            .map(|name| name.as_str().to_string())
-            .collect::<Vec<String>>();
-        names.sort();
-        names.join("\n")
-    };
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @"foo",
     );
 
@@ -2029,7 +2007,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     case.apply_changes(changes, None);
 
     insta::assert_snapshot!(
-        get_submodules(case.db(), &module),
+        case.sorted_submodule_names("bar").join("\n"),
         @r"
     foo
     wazoo

@@ -974,6 +974,8 @@ PYI016.py:143:61: PYI016 [*] Duplicate union member `complex`
 143     |-field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
     143 |+field48: typing.Union[typing.Optional[complex], complex]
 144 144 | field49: typing.Optional[complex | complex] | complex
+145 145 | 
+146 146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
 
 PYI016.py:144:36: PYI016 [*] Duplicate union member `complex`
     |
@@ -981,6 +983,8 @@ PYI016.py:144:36: PYI016 [*] Duplicate union member `complex`
 143 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 144 | field49: typing.Optional[complex | complex] | complex
     |                                    ^^^^^^^ PYI016
+145 |
+146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
     |
     = help: Remove duplicate union member `complex`
 
@@ -990,3 +994,15 @@ PYI016.py:144:36: PYI016 [*] Duplicate union member `complex`
 143 143 | field48: typing.Union[typing.Optional[typing.Union[complex, complex]], complex]
 144     |-field49: typing.Optional[complex | complex] | complex
     144 |+field49: typing.Optional[complex] | complex
+145 145 | 
+146 146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
+147 147 | # Should throw duplicate union member but not fix
+
+PYI016.py:148:37: PYI016 Duplicate union member `None`
+    |
+146 | # Regression test for https://github.com/astral-sh/ruff/issues/19403
+147 | # Should throw duplicate union member but not fix
+148 | isinstance(None, typing.Union[None, None])
+    |                                     ^^^^ PYI016
+    |
+    = help: Remove duplicate union member `None`

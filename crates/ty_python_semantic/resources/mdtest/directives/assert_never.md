@@ -119,8 +119,6 @@ def match_singletons_success(obj: Literal[1, "a"] | None):
         case None:
             pass
         case _ as obj:
-            # TODO: Ideally, we would not emit an error here
-            # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
             assert_never(obj)
 
 def match_singletons_error(obj: Literal[1, "a"] | None):

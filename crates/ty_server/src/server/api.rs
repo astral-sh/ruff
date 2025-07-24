@@ -56,6 +56,9 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::HoverRequestHandler::METHOD => background_document_request_task::<
             requests::HoverRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::ReferencesRequestHandler::METHOD => background_document_request_task::<
+            requests::ReferencesRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::InlayHintRequestHandler::METHOD => background_document_request_task::<
             requests::InlayHintRequestHandler,
         >(req, BackgroundSchedule::Worker),

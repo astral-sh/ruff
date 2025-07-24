@@ -87,7 +87,7 @@ pub(super) fn diagnostic_to_json<'a>(
 
     let fix = diagnostic.fix().map(|fix| JsonFix {
         applicability: fix.applicability(),
-        message: diagnostic.suggestion(),
+        message: diagnostic.first_help_text(),
         edits: ExpandedEdits {
             edits: fix.edits(),
             notebook_index,

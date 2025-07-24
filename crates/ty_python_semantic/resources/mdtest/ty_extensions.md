@@ -1,4 +1,4 @@
-# Type API (`ty_extensions`)
+# `ty_extensions`
 
 This document describes the internal `ty_extensions` API for creating and manipulating types as well
 as testing various type system properties.
@@ -264,6 +264,34 @@ back to the default message:
 shouted_message = "A custom message".upper()
 # error: "Static assertion error: argument evaluates to `False`"
 static_assert(False, shouted_message)
+```
+
+## Diagnostic snapshots
+
+<!-- snapshot-diagnostics -->
+
+```py
+from ty_extensions import static_assert
+import secrets
+
+# a passing assert
+static_assert(1 < 2)
+
+# evaluates to False
+# error: [static-assert-error]
+static_assert(1 > 2)
+
+# evaluates to False, with a message as the second argument
+# error: [static-assert-error]
+static_assert(1 > 2, "with a message")
+
+# evaluates to something falsey
+# error: [static-assert-error]
+static_assert("")
+
+# evaluates to something ambiguous
+# error: [static-assert-error]
+static_assert(secrets.randbelow(2))
 ```
 
 ## Type predicates

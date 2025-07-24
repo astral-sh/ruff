@@ -19,7 +19,6 @@ ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_text_size = { workspace = true }
-ty_ide = { workspace = true }
 ty_python_semantic = { workspace = true, features = ["serde"] }
 ty_vendored = { workspace = true }
 
@@ -53,6 +52,7 @@ deflate = ["ty_vendored/deflate"]
 schemars = ["dep:schemars", "ruff_db/schemars", "ty_python_semantic/schemars"]
 zstd = ["ty_vendored/zstd"]
 format = ["ruff_python_formatter"]
+testing = []
 
 [lints]
 workspace = true

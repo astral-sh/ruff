@@ -238,7 +238,7 @@ fn to_lsp_diagnostic(
     let name = diagnostic.name();
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
-    let suggestion = diagnostic.suggestion();
+    let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));

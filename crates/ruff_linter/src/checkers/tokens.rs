@@ -58,7 +58,7 @@ pub(crate) fn check_tokens(
     }
 
     if context.is_rule_enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(context, comment_ranges, locator);
+        pylint::rules::empty_comments(context, comment_ranges, locator, indexer);
     }
 
     if context.is_rule_enabled(Rule::AmbiguousUnicodeCharacterComment) {

@@ -53,3 +53,16 @@ regex.subn(br"""eak your machine with rm -""", rf"""/""")
 regex.splititer(both, non_literal)
 regex.subf(f, lambda _: r'means', '"format"')
 regex.subfn(fn, f'''a$1n't''', lambda: "'function'")
+
+
+# https://github.com/astral-sh/ruff/issues/16713
+re.compile("\a\f\n\r\t\u27F2\U0001F0A1\v\x41")  # with unsafe fix
+re.compile("\b")  # without fix
+re.compile("\"")  # without fix
+re.compile("\'")  # without fix
+re.compile('\"')  # without fix
+re.compile('\'')  # without fix
+re.compile("\\")  # without fix
+re.compile("\101")  # without fix
+re.compile("a\
+b")  # without fix

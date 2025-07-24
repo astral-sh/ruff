@@ -75,11 +75,12 @@ where
     );
 
     let span = Span::from(file).with_range(range);
-    let mut annotation = Annotation::primary(span);
-    if let Some(suggestion) = suggestion {
-        annotation = annotation.message(suggestion);
-    }
+    let annotation = Annotation::primary(span);
     diagnostic.annotate(annotation);
+
+    if let Some(suggestion) = suggestion {
+        diagnostic.help(suggestion);
+    }
 
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);

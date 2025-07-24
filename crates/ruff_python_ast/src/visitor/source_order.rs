@@ -235,12 +235,7 @@ impl TraversalSignal {
 }
 
 pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
-    let node = AnyNodeRef::from(expr);
-    if visitor.enter_node(node).is_traverse() {
-        visitor.visit_expr(expr);
-    }
-
-    visitor.leave_node(node);
+    visitor.visit_expr(expr);
 }
 
 pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)
