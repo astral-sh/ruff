@@ -94,7 +94,7 @@ except Exception:
     logging.error("...", exc_info=True)
 
 
-from logging import error, exception
+from logging import critical, error, exception
 
 try:
     pass
@@ -117,6 +117,23 @@ except Exception:
 try:
     pass
 except Exception:
+    critical("...")
+
+
+try:
+    pass
+except Exception:
+    critical("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    critical("...", exc_info=None)
+
+try:
+    pass
+except Exception:
     exception("...")
 
 
@@ -124,6 +141,13 @@ try:
     pass
 except Exception:
     error("...", exc_info=True)
+
+
+try:
+    pass
+except Exception:
+    critical("...", exc_info=True)
+
 
 try:
     ...
