@@ -423,7 +423,7 @@ RUF033.py:121:27: RUF033 [*] `__post_init__` method with argument defaults
     = help: Use `dataclasses.InitVar` instead
 
 ℹ Unsafe fix
-116 116 | def dafuq():
+116 116 | def fun_with_python_syntax():
 117 117 |     @dataclass
 118 118 |     class Foo:
     119 |+        bar: InitVar[int] = (yield from range(5))
