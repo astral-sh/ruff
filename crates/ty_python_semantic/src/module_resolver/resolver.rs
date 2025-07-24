@@ -52,7 +52,7 @@ impl ModuleResolveMode {
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
 #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn resolve_module_query<'db>(
+fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: ModuleNameIngredient<'db>,
 ) -> Option<Module<'db>> {
