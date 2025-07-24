@@ -41,6 +41,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("whitespace.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
     #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TC001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("init_var.py"))]
