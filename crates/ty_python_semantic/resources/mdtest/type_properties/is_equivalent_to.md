@@ -13,8 +13,16 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ### Fully static
 
 ```py
-from typing_extensions import Literal, LiteralString, Never
+from typing_extensions import Literal, LiteralString, Protocol, Never
 from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class Single(Enum):
+    VALUE = 1
 
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
@@ -24,6 +32,26 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 0]))
 static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
+
+static_assert(is_equivalent_to(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_equivalent_to(Literal[Answer.NO, Answer.YES], Answer))
+static_assert(is_equivalent_to(Literal[Answer.YES, Answer.NO], Answer))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Literal[Answer.NO]))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))
+
+static_assert(is_equivalent_to(Literal[Single.VALUE], Single))
+static_assert(is_equivalent_to(Single, Literal[Single.VALUE]))
+static_assert(is_equivalent_to(Literal[Single.VALUE], Literal[Single.VALUE]))
+
+static_assert(is_equivalent_to(tuple[Single] | int | str, str | int | tuple[Literal[Single.VALUE]]))
+
+class Protocol1(Protocol):
+    a: Single
+
+class Protocol2(Protocol):
+    a: Literal[Single.VALUE]
+
+static_assert(is_equivalent_to(Protocol1, Protocol2))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))
@@ -57,8 +85,9 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 ## Unions and intersections
 
 ```py
-from typing import Any
+from typing import Any, Literal
 from ty_extensions import Intersection, Not, Unknown, is_equivalent_to, static_assert
+from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
 static_assert(is_equivalent_to(str | int | Any, str | int | Unknown))
@@ -99,6 +128,11 @@ static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
 static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
 static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
 static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
 ```
 
 ## Tuples
@@ -298,6 +332,20 @@ def f13(a: int = 2) -> None: ...
 
 static_assert(not is_equivalent_to(CallableTypeOf[f12], CallableTypeOf[f13]))
 static_assert(not is_equivalent_to(CallableTypeOf[f13], CallableTypeOf[f12]))
+```
+
+### Unions containing `Callable`s
+
+Two unions containing different `Callable` types are equivalent even if the unions are differently
+ordered:
+
+```py
+from ty_extensions import CallableTypeOf, Unknown, is_equivalent_to, static_assert
+
+def f(x): ...
+def g(x: Unknown): ...
+
+static_assert(is_equivalent_to(CallableTypeOf[f] | int | str, str | int | CallableTypeOf[g]))
 ```
 
 ### Unions containing `Callable`s containing unions
@@ -539,6 +587,56 @@ static_assert(not is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f5]))
 def f6(a, /): ...
 
 static_assert(not is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f6]))
+```
+
+## Module-literal types
+
+Two "copies" of a single-file module are considered equivalent types, even if the different copies
+were originally imported in different first-party modules:
+
+`module.py`:
+
+```py
+import typing
+```
+
+`main.py`:
+
+```py
+import typing
+from module import typing as other_typing
+from ty_extensions import TypeOf, static_assert, is_equivalent_to
+
+static_assert(is_equivalent_to(TypeOf[typing], TypeOf[other_typing]))
+static_assert(is_equivalent_to(TypeOf[typing] | int | str, str | int | TypeOf[other_typing]))
+```
+
+We currently do not consider module-literal types to be equivalent if the underlying module is a
+package and the different "copies" of the module were originally imported in different modules. This
+is because we might consider submodules to be available as attributes on one copy but not on the
+other, depending on whether those submodules were explicitly imported in the original importing
+module:
+
+`module2.py`:
+
+```py
+import importlib
+import importlib.abc
+```
+
+`main2.py`:
+
+```py
+import importlib
+from module2 import importlib as other_importlib
+from ty_extensions import TypeOf, static_assert, is_equivalent_to
+
+# error: [unresolved-attribute] "Type `<module 'importlib'>` has no attribute `abc`"
+reveal_type(importlib.abc)  # revealed: Unknown
+
+reveal_type(other_importlib.abc)  # revealed: <module 'importlib.abc'>
+
+static_assert(not is_equivalent_to(TypeOf[importlib], TypeOf[other_importlib]))
 ```
 
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize

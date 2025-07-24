@@ -1,6 +1,5 @@
 use crate::server::Result;
-use crate::server::api::LSPResult;
-use crate::server::api::diagnostics::publish_diagnostics;
+use crate::server::api::diagnostics::{publish_diagnostics, publish_settings_diagnostics};
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -45,7 +44,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 }
             };
 
-            let Some(db) = session.project_db_for_path(system_path.as_std_path()) else {
+            let Some(db) = session.project_db_for_path(&system_path) else {
                 tracing::trace!(
                     "Ignoring change event for `{system_path}` because it's not in any workspace"
                 );
@@ -89,12 +88,8 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
 
-            // SAFETY: Only paths that are part of the workspace are registered for file watching.
-            // So, virtual paths and paths that are outside of a workspace does not trigger this
-            // notification.
-            let db = session.project_db_for_path_mut(&*root).unwrap();
-
-            let result = db.apply_changes(changes, None);
+            let result = session.apply_changes(&AnySystemPath::System(root.clone()), changes);
+            publish_settings_diagnostics(session, client, root);
 
             project_changed |= result.project_changed();
         }
@@ -102,27 +97,22 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         let client_capabilities = session.client_capabilities();
 
         if project_changed {
-            if client_capabilities.diagnostics_refresh {
-                client
-                    .send_request::<types::request::WorkspaceDiagnosticRefresh>(
-                        session,
-                        (),
-                        |_, ()| {},
-                    )
-                    .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+            if client_capabilities.supports_workspace_diagnostic_refresh() {
+                client.send_request::<types::request::WorkspaceDiagnosticRefresh>(
+                    session,
+                    (),
+                    |_, ()| {},
+                );
             } else {
                 for key in session.text_document_keys() {
-                    publish_diagnostics(session, &key, client)?;
+                    publish_diagnostics(session, &key, client);
                 }
             }
-
             // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
         }
 
-        if client_capabilities.inlay_refresh {
-            client
-                .send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {})
-                .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+        if client_capabilities.supports_inlay_hint_refresh() {
+            client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});
         }
 
         Ok(())

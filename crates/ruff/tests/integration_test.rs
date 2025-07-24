@@ -1067,7 +1067,7 @@ fn show_statistics_syntax_errors() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1		syntax-error
+    1		invalid-syntax
     Found 1 error.
 
     ----- stderr -----
@@ -1080,7 +1080,7 @@ fn show_statistics_syntax_errors() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1		syntax-error
+    1		invalid-syntax
     Found 1 error.
 
     ----- stderr -----
@@ -1093,7 +1093,7 @@ fn show_statistics_syntax_errors() {
     success: false
     exit_code: 1
     ----- stdout -----
-    1		syntax-error
+    1		invalid-syntax
     Found 1 error.
 
     ----- stderr -----
@@ -2246,8 +2246,7 @@ fn pyproject_toml_stdin_syntax_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: invalid table header
-    expected `.`, `]`
+    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: unclosed table, expected `]`
       |
     1 | [project
       |         ^ RUF200

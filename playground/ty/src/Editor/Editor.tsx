@@ -20,8 +20,10 @@ import { Theme } from "shared";
 import {
   Position as TyPosition,
   Range as TyRange,
+  SemanticToken,
   Severity,
   type Workspace,
+  CompletionKind,
 } from "ty_wasm";
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
@@ -123,6 +125,7 @@ export default function Editor({
         roundedSelection: false,
         scrollBeyondLastLine: false,
         contextmenu: true,
+        "semanticHighlighting.enabled": true,
       }}
       language={fileName.endsWith(".pyi") ? "python" : undefined}
       path={fileName}
@@ -143,18 +146,30 @@ interface PlaygroundServerProps {
 class PlaygroundServer
   implements
     languages.TypeDefinitionProvider,
+    languages.DeclarationProvider,
+    languages.DefinitionProvider,
+    languages.ReferenceProvider,
     editor.ICodeEditorOpener,
     languages.HoverProvider,
     languages.InlayHintsProvider,
     languages.DocumentFormattingEditProvider,
-    languages.CompletionItemProvider
+    languages.CompletionItemProvider,
+    languages.DocumentSemanticTokensProvider,
+    languages.DocumentRangeSemanticTokensProvider,
+    languages.SignatureHelpProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
+  private declarationProviderDisposable: IDisposable;
+  private definitionProviderDisposable: IDisposable;
+  private referenceProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
   private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
   private completionDisposable: IDisposable;
+  private semanticTokensDisposable: IDisposable;
+  private rangeSemanticTokensDisposable: IDisposable;
+  private signatureHelpDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -162,6 +177,12 @@ class PlaygroundServer
   ) {
     this.typeDefinitionProviderDisposable =
       monaco.languages.registerTypeDefinitionProvider("python", this);
+    this.declarationProviderDisposable =
+      monaco.languages.registerDeclarationProvider("python", this);
+    this.definitionProviderDisposable =
+      monaco.languages.registerDefinitionProvider("python", this);
+    this.referenceProviderDisposable =
+      monaco.languages.registerReferenceProvider("python", this);
     this.hoverDisposable = monaco.languages.registerHoverProvider(
       "python",
       this,
@@ -174,12 +195,77 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.semanticTokensDisposable =
+      monaco.languages.registerDocumentSemanticTokensProvider("python", this);
+    this.rangeSemanticTokensDisposable =
+      monaco.languages.registerDocumentRangeSemanticTokensProvider(
+        "python",
+        this,
+      );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
     this.formatDisposable =
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
+    this.signatureHelpDisposable =
+      monaco.languages.registerSignatureHelpProvider("python", this);
   }
 
   triggerCharacters: string[] = ["."];
+  signatureHelpTriggerCharacters: string[] = ["(", ","];
+  signatureHelpRetriggerCharacters: string[] = [")"];
+
+  getLegend(): languages.SemanticTokensLegend {
+    return {
+      tokenTypes: SemanticToken.kinds(),
+      tokenModifiers: SemanticToken.modifiers(),
+    };
+  }
+
+  provideDocumentSemanticTokens(
+    model: editor.ITextModel,
+  ): languages.SemanticTokens | null {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return null;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return null;
+    }
+
+    const tokens = this.props.workspace.semanticTokens(selectedHandle);
+    return generateMonacoTokens(tokens, model);
+  }
+
+  releaseDocumentSemanticTokens() {}
+
+  provideDocumentRangeSemanticTokens(
+    model: editor.ITextModel,
+    range: Range,
+  ): languages.SemanticTokens | null {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return null;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return null;
+    }
+
+    const tyRange = monacoRangeToTyRange(range);
+
+    const tokens = this.props.workspace.semanticTokensInRange(
+      selectedHandle,
+      tyRange,
+    );
+
+    return generateMonacoTokens(tokens, model);
+  }
 
   provideCompletionItems(
     model: editor.ITextModel,
@@ -209,7 +295,10 @@ class PlaygroundServer
       suggestions: completions.map((completion, i) => ({
         label: completion.name,
         sortText: String(i).padStart(digitsLength, "0"),
-        kind: CompletionItemKind.Variable,
+        kind:
+          completion.kind == null
+            ? CompletionItemKind.Variable
+            : mapCompletionKind(completion.kind),
         insertText: completion.name,
         // TODO(micha): It's unclear why this field is required for monaco but not VS Code.
         //  and omitting it works just fine? The LSP doesn't expose this information right now
@@ -220,6 +309,61 @@ class PlaygroundServer
   }
 
   resolveCompletionItem: undefined;
+
+  provideSignatureHelp(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context: languages.SignatureHelpContext,
+  ): languages.ProviderResult<languages.SignatureHelpResult> {
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const signatureHelp = this.props.workspace.signatureHelp(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    if (signatureHelp == null) {
+      return undefined;
+    }
+
+    return {
+      dispose() {},
+      value: {
+        signatures: signatureHelp.signatures.map((sig) => ({
+          label: sig.label,
+          documentation: sig.documentation
+            ? { value: sig.documentation }
+            : undefined,
+          parameters: sig.parameters.map((param) => ({
+            label: param.label,
+            documentation: param.documentation
+              ? { value: param.documentation }
+              : undefined,
+          })),
+          activeParameter: sig.active_parameter,
+        })),
+        activeSignature: signatureHelp.active_signature ?? 0,
+        activeParameter:
+          signatureHelp.active_signature != null
+            ? (signatureHelp.signatures[signatureHelp.active_signature]
+                ?.active_parameter ?? 0)
+            : 0,
+      },
+    };
+  }
 
   provideInlayHints(
     _model: editor.ITextModel,
@@ -385,29 +529,90 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return (
-      links
-        .map((link) => {
-          const targetSelection =
-            link.selection_range == null
-              ? undefined
-              : tyRangeToMonacoRange(link.selection_range);
+    return mapNavigationTargets(links);
+  }
 
-          const originSelection =
-            link.origin_selection_range == null
-              ? undefined
-              : tyRangeToMonacoRange(link.origin_selection_range);
+  provideDeclaration(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
+    const workspace = this.props.workspace;
 
-          return {
-            uri: Uri.parse(link.path),
-            range: tyRangeToMonacoRange(link.full_range),
-            targetSelectionRange: targetSelection,
-            originSelectionRange: originSelection,
-          } as languages.LocationLink;
-        })
-        // Filter out vendored files because they aren't open in the editor.
-        .filter((link) => link.uri.scheme !== "vendored")
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoDeclaration(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
     );
+
+    return mapNavigationTargets(links);
+  }
+
+  provideDefinition(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoDefinition(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return mapNavigationTargets(links);
+  }
+
+  provideReferences(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    context: languages.ReferenceContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Location[]> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoReferences(
+      selectedHandle,
+      new TyPosition(position.lineNumber, position.column),
+    );
+
+    return mapNavigationTargets(links);
   }
 
   openCodeEditor(
@@ -493,9 +698,15 @@ class PlaygroundServer
     this.hoverDisposable.dispose();
     this.editorOpenerDisposable.dispose();
     this.typeDefinitionProviderDisposable.dispose();
+    this.declarationProviderDisposable.dispose();
+    this.definitionProviderDisposable.dispose();
+    this.referenceProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
+    this.rangeSemanticTokensDisposable.dispose();
+    this.semanticTokensDisposable.dispose();
     this.completionDisposable.dispose();
+    this.signatureHelpDisposable.dispose();
   }
 }
 
@@ -513,4 +724,115 @@ function monacoRangeToTyRange(range: IRange): TyRange {
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),
   );
+}
+
+function generateMonacoTokens(
+  semantic: SemanticToken[],
+  model: editor.ITextModel,
+): languages.SemanticTokens {
+  const result = [];
+
+  let prevLine = 0;
+  let prevChar = 0;
+
+  for (const token of semantic) {
+    // Convert from 1-based to 0-based indexing for Monaco
+    const line = token.range.start.line - 1;
+    const char = token.range.start.column - 1;
+
+    const length = model.getValueLengthInRange(
+      tyRangeToMonacoRange(token.range),
+    );
+
+    result.push(
+      line - prevLine,
+      prevLine === line ? char - prevChar : char,
+      length,
+      token.kind,
+      token.modifiers,
+    );
+
+    prevLine = line;
+    prevChar = char;
+  }
+
+  return { data: Uint32Array.from(result) };
+}
+
+function mapNavigationTargets(links: any[]): languages.LocationLink[] {
+  return links
+    .map((link) => {
+      const targetSelection =
+        link.selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.selection_range);
+
+      const originSelection =
+        link.origin_selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.origin_selection_range);
+
+      return {
+        uri: Uri.parse(link.path),
+        range: tyRangeToMonacoRange(link.full_range),
+        targetSelectionRange: targetSelection,
+        originSelectionRange: originSelection,
+      } as languages.LocationLink;
+    })
+    .filter((link) => link.uri.scheme !== "vendored");
+}
+
+function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
+  switch (kind) {
+    case CompletionKind.Text:
+      return CompletionItemKind.Text;
+    case CompletionKind.Method:
+      return CompletionItemKind.Method;
+    case CompletionKind.Function:
+      return CompletionItemKind.Function;
+    case CompletionKind.Constructor:
+      return CompletionItemKind.Constructor;
+    case CompletionKind.Field:
+      return CompletionItemKind.Field;
+    case CompletionKind.Variable:
+      return CompletionItemKind.Variable;
+    case CompletionKind.Class:
+      return CompletionItemKind.Class;
+    case CompletionKind.Interface:
+      return CompletionItemKind.Interface;
+    case CompletionKind.Module:
+      return CompletionItemKind.Module;
+    case CompletionKind.Property:
+      return CompletionItemKind.Property;
+    case CompletionKind.Unit:
+      return CompletionItemKind.Unit;
+    case CompletionKind.Value:
+      return CompletionItemKind.Value;
+    case CompletionKind.Enum:
+      return CompletionItemKind.Enum;
+    case CompletionKind.Keyword:
+      return CompletionItemKind.Keyword;
+    case CompletionKind.Snippet:
+      return CompletionItemKind.Snippet;
+    case CompletionKind.Color:
+      return CompletionItemKind.Color;
+    case CompletionKind.File:
+      return CompletionItemKind.File;
+    case CompletionKind.Reference:
+      return CompletionItemKind.Reference;
+    case CompletionKind.Folder:
+      return CompletionItemKind.Folder;
+    case CompletionKind.EnumMember:
+      return CompletionItemKind.EnumMember;
+    case CompletionKind.Constant:
+      return CompletionItemKind.Constant;
+    case CompletionKind.Struct:
+      return CompletionItemKind.Struct;
+    case CompletionKind.Event:
+      return CompletionItemKind.Event;
+    case CompletionKind.Operator:
+      return CompletionItemKind.Operator;
+    case CompletionKind.TypeParameter:
+      return CompletionItemKind.TypeParameter;
+  }
 }

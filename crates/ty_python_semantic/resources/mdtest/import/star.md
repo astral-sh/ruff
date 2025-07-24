@@ -655,7 +655,7 @@ from b import *
 reveal_type(X)  # revealed: bool
 ```
 
-## Visibility constraints
+## Reachability constraints
 
 If an `importer` module contains a `from exporter import *` statement in its global namespace, the
 statement will *not* necessarily import *all* symbols that have definitions in `exporter.py`'s
@@ -664,13 +664,13 @@ imported by the `*` import if at least one definition for that symbol is visible
 `exporter.py`'s global scope.
 
 For example, say that `exporter.py` contains a symbol `X` in its global scope, and the definition
-for `X` in `exporter.py` has visibility constraints <code>vis<sub>1</sub></code>. The
+for `X` in `exporter.py` has reachability constraints <code>c<sub>1</sub></code>. The
 `from exporter import *` statement in `importer.py` creates a definition for `X` in `importer`, and
-there are visibility constraints <code>vis<sub>2</sub></code> on the import statement in
-`importer.py`. This means that the overall visibility constraints on the `X` definnition created by
-the import statement in `importer.py` will be <code>vis<sub>1</sub> AND vis<sub>2</sub></code>.
+there are reachability constraints <code>c<sub>2</sub></code> on the import statement in
+`importer.py`. This means that the overall reachability constraints on the `X` definition created by
+the import statement in `importer.py` will be <code>c<sub>1</sub> AND c<sub>2</sub></code>.
 
-A visibility constraint in the external module must be understood and evaluated whether or not its
+A reachability constraint in the external module must be understood and evaluated whether or not its
 truthiness can be statically determined.
 
 ### Statically known branches in the external module
@@ -712,11 +712,19 @@ reveal_type(Y)  # revealed: Unknown
 # to be dead code given the `python-version` configuration.
 # Thus this still reveals `Literal[True]`.
 reveal_type(Z)  # revealed: Literal[True]
+
+# Make sure that reachability constraints are also correctly applied
+# for nonlocal lookups:
+def _():
+    reveal_type(X)  # revealed: bool
+    # error: [unresolved-reference]
+    reveal_type(Y)  # revealed: Unknown
+    reveal_type(Z)  # revealed: bool
 ```
 
-### Multiple `*` imports with always-false visibility constraints
+### Multiple `*` imports with always-false reachability constraints
 
-Our understanding of visibility constraints in an external module remains accurate, even if there
+Our understanding of reachability constraints in an external module remains accurate, even if there
 are multiple `*` imports from that module.
 
 ```toml
@@ -745,7 +753,7 @@ from exporter import *
 reveal_type(Z)  # revealed: Literal[True]
 ```
 
-### Ambiguous visibility constraints
+### Ambiguous reachability constraints
 
 Some constraints in the external module may resolve to an "ambiguous truthiness". For these, we
 should emit `possibly-unresolved-reference` diagnostics when they are used in the module in which
@@ -775,7 +783,7 @@ reveal_type(A)  # revealed: Unknown | Literal[1]
 reveal_type(B)  # revealed: Unknown | Literal[2, 3]
 ```
 
-### Visibility constraints in the importing module
+### Reachability constraints in the importing module
 
 `exporter.py`:
 
@@ -796,7 +804,7 @@ if coinflip():
 reveal_type(A)  # revealed: Unknown | Literal[1]
 ```
 
-### Visibility constraints in the exporting module *and* the importing module
+### Reachability constraints in the exporting module *and* the importing module
 
 ```toml
 [environment]
@@ -1287,16 +1295,19 @@ reveal_type(Nope)  # revealed: Unknown
 
 ## `global` statements in non-global scopes
 
-A `global` statement in a nested function scope, combined with a definition in the same function
-scope of the name that was declared `global`, can add a symbol to the global namespace.
+Python allows `global` statements in function bodies to add new variables to the global scope, but
+we require a matching global binding or declaration. We lint on unresolved `global` statements, and
+we don't include the symbols they might define in `*` imports:
 
 `a.py`:
 
 ```py
 def f():
+    # error: [unresolved-global] "Invalid global declaration of `g`: `g` has no declarations or bindings in the global scope"
+    # error: [unresolved-global] "Invalid global declaration of `h`: `h` has no declarations or bindings in the global scope"
     global g, h
 
-    g: bool = True
+    g = True
 
 f()
 ```
@@ -1308,16 +1319,12 @@ from a import *
 
 reveal_type(f)  # revealed: def f() -> Unknown
 
-# TODO: we're undecided about whether we should consider this a false positive or not.
-# Mutating the global scope to add a symbol from an inner scope will not *necessarily* result
-# in the symbol being bound from the perspective of other modules (the function that creates
-# the inner scope, and adds the symbol to the global scope, might never be called!)
-# See discussion in https://github.com/astral-sh/ruff/pull/16959
-#
+# This could be considered a false positive, since this use of `g` isn't a runtime error, but we're
+# being conservative.
 # error: [unresolved-reference]
 reveal_type(g)  # revealed: Unknown
 
-# this diagnostic is accurate, though!
+# However, this is a true positive: `h` is unbound at runtime.
 # error: [unresolved-reference]
 reveal_type(h)  # revealed: Unknown
 ```

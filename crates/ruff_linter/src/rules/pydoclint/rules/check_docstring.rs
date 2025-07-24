@@ -238,6 +238,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// ## Example
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///
@@ -256,6 +259,9 @@ impl Violation for DocstringExtraneousYields {
 ///
 /// Use instead:
 /// ```python
+/// class FasterThanLightError(ArithmeticError): ...
+///
+///
 /// def calculate_speed(distance: float, time: float) -> float:
 ///     """Calculate speed as distance divided by time.
 ///

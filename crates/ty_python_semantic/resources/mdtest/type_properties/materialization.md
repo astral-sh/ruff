@@ -80,6 +80,11 @@ The top / bottom (and only) materialization of any fully static type is just its
 ```py
 from typing import Any, Literal
 from ty_extensions import TypeOf, bottom_materialization, top_materialization
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
 
 reveal_type(top_materialization(int))  # revealed: int
 reveal_type(bottom_materialization(int))  # revealed: int
@@ -92,6 +97,9 @@ reveal_type(bottom_materialization(Literal[True]))  # revealed: Literal[True]
 
 reveal_type(top_materialization(Literal["abc"]))  # revealed: Literal["abc"]
 reveal_type(bottom_materialization(Literal["abc"]))  # revealed: Literal["abc"]
+
+reveal_type(top_materialization(Literal[Answer.YES]))  # revealed: Literal[Answer.YES]
+reveal_type(bottom_materialization(Literal[Answer.YES]))  # revealed: Literal[Answer.YES]
 
 reveal_type(top_materialization(int | str))  # revealed: int | str
 reveal_type(bottom_materialization(int | str))  # revealed: int | str

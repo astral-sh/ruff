@@ -11,7 +11,7 @@
 Most types in Python are *nominal* types: a fully static nominal type `X` is only a subtype of
 another fully static nominal type `Y` if the class `X` is a subclass of the class `Y`.
 `typing.Protocol` (or its backport, `typing_extensions.Protocol`) can be used to define *structural*
-types, on the other hand: a type which is defined by its properties and behaviour.
+types, on the other hand: a type which is defined by its properties and behavior.
 
 ## Defining a protocol
 
@@ -160,9 +160,9 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
-# but mypy does (and has an explicit test for this behaviour). Mypy was the
-# reference implementation for PEP-544, and its behaviour also matches the CPython
-# runtime, so we choose to follow its behaviour here rather than that of the other
+# but mypy does (and has an explicit test for this behavior). Mypy was the
+# reference implementation for PEP-544, and its behavior also matches the CPython
+# runtime, so we choose to follow its behavior here rather than that of the other
 # type checkers.
 class Fine(Protocol, object): ...
 
@@ -468,7 +468,7 @@ class AlsoNotAProtocol(NotAProtocol, object): ...
 get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
 ```
 
-The original class object must be passed to the function; a specialised version of a generic version
+The original class object must be passed to the function; a specialized version of a generic version
 does not suffice:
 
 ```py
@@ -533,7 +533,13 @@ class FooSubclassOfAny:
     x: SubclassOfAny
 
 static_assert(not is_subtype_of(FooSubclassOfAny, HasX))
-static_assert(not is_assignable_to(FooSubclassOfAny, HasX))
+
+# `FooSubclassOfAny` is assignable to `HasX` for the following reason. The `x` attribute on `FooSubclassOfAny`
+# is accessible on the class itself. When accessing `x` on an instance, the descriptor protocol is invoked, and
+# `__get__` is looked up on `SubclassOfAny`. Every member access on `SubclassOfAny` yields `Any`, so `__get__` is
+# also available, and calling `Any` also yields `Any`. Thus, accessing `x` on an instance of `FooSubclassOfAny`
+# yields `Any`, which is assignable to `int` and vice versa.
+static_assert(is_assignable_to(FooSubclassOfAny, HasX))
 
 class FooWithY(Foo):
     y: int
@@ -880,7 +886,7 @@ class AlsoHasX(Protocol):
 static_assert(is_equivalent_to(HasX, AlsoHasX))
 ```
 
-And unions containing equivalent protocols are recognised as equivalent, even when the order is not
+And unions containing equivalent protocols are recognized as equivalent, even when the order is not
 identical:
 
 ```py
@@ -962,6 +968,121 @@ static_assert(is_disjoint_from(FinalNominal, HasX))
 def _(arg1: Intersection[HasX, NotFinalNominal], arg2: Intersection[HasX, FinalNominal]):
     reveal_type(arg1)  # revealed: HasX & NotFinalNominal
     reveal_type(arg2)  # revealed: Never
+```
+
+The disjointness of a single protocol member with the type of an attribute on another type is enough
+to make the whole protocol disjoint from the other type, even if all other members on the protocol
+are satisfied by the other type. This applies to both `@final` types and non-final types:
+
+```py
+class Proto(Protocol):
+    x: int
+    y: str
+    z: bytes
+
+class Foo:
+    x: int
+    y: str
+    z: None
+
+static_assert(is_disjoint_from(Proto, Foo))
+
+@final
+class FinalFoo:
+    x: int
+    y: str
+    z: None
+
+static_assert(is_disjoint_from(Proto, FinalFoo))
+```
+
+## Intersections of protocols with types that have possibly unbound attributes
+
+Note that if a `@final` class has a possibly unbound attribute corresponding to the protocol member,
+instance types and class-literal types referring to that class cannot be a subtype of the protocol
+but will also not be disjoint from the protocol:
+
+`a.py`:
+
+```py
+from typing import final, ClassVar, Protocol
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+def who_knows() -> bool:
+    return False
+
+@final
+class Foo:
+    if who_knows():
+        x: ClassVar[int] = 42
+
+class HasReadOnlyX(Protocol):
+    @property
+    def x(self) -> int: ...
+
+static_assert(not is_subtype_of(Foo, HasReadOnlyX))
+static_assert(not is_assignable_to(Foo, HasReadOnlyX))
+static_assert(not is_disjoint_from(Foo, HasReadOnlyX))
+
+static_assert(not is_subtype_of(type[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(type[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(type[Foo], HasReadOnlyX))
+
+static_assert(not is_subtype_of(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[Foo], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[Foo], HasReadOnlyX))
+```
+
+A similar principle applies to module-literal types that have possibly unbound attributes:
+
+`b.py`:
+
+```py
+def who_knows() -> bool:
+    return False
+
+if who_knows():
+    x: int = 42
+```
+
+`c.py`:
+
+```py
+import b
+from a import HasReadOnlyX
+from ty_extensions import TypeOf, static_assert, is_subtype_of, is_disjoint_from, is_assignable_to
+
+static_assert(not is_subtype_of(TypeOf[b], HasReadOnlyX))
+static_assert(not is_assignable_to(TypeOf[b], HasReadOnlyX))
+static_assert(not is_disjoint_from(TypeOf[b], HasReadOnlyX))
+```
+
+If the possibly unbound attribute's type is disjoint from the type of the protocol member, though,
+it is still disjoint from the protocol. This applies to both `@final` types and non-final types:
+
+`d.py`:
+
+```py
+from a import HasReadOnlyX, who_knows
+from typing import final, ClassVar, Protocol
+from ty_extensions import static_assert, is_disjoint_from, TypeOf
+
+class Proto(Protocol):
+    x: int
+
+class Foo:
+    def __init__(self):
+        if who_knows():
+            self.x: None = None
+
+@final
+class FinalFoo:
+    def __init__(self):
+        if who_knows():
+            self.x: None = None
+
+static_assert(is_disjoint_from(Foo, Proto))
+static_assert(is_disjoint_from(FinalFoo, Proto))
 ```
 
 ## Satisfying a protocol's interface
@@ -1197,14 +1318,14 @@ getter, can be satisfied by a mutable attribute of any type bounded by the upper
 getter-returned type and the lower bound of the setter-accepted type.
 
 This follows from the principle that a type `X` can only be a subtype of a given protocol if the
-`X`'s behaviour is a superset of the behaviour specified by the interface declared by the protocol.
-In the below example, the behaviour of an instance of `XAttr` is a superset of the behaviour
-specified by the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x`
-attribute on the instance must resolve to an instance of `int` or a subclass thereof, and `XAttr`
-satisfies this requirement. The protocol also specifies that you must be able to assign instances of
-`MyInt` to the `x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you
-can assign *any* instance of `int` to the `x` attribute, and thus by extension you can assign any
-instance of `IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
+`X`'s behavior is a superset of the behavior specified by the interface declared by the protocol. In
+the below example, the behavior of an instance of `XAttr` is a superset of the behavior specified by
+the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x` attribute on the
+instance must resolve to an instance of `int` or a subclass thereof, and `XAttr` satisfies this
+requirement. The protocol also specifies that you must be able to assign instances of `MyInt` to the
+`x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you can assign *any*
+instance of `int` to the `x` attribute, and thus by extension you can assign any instance of
+`IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
 
 ```py
 class HasAsymmetricXProperty(Protocol):
@@ -1355,8 +1476,7 @@ class P1(Protocol):
 class P2(Protocol):
     def x(self, y: int) -> None: ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(P1, P2))  # error: [static-assert-error]
+static_assert(is_equivalent_to(P1, P2))
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -1366,8 +1486,7 @@ differently ordered unions:
 class A: ...
 class B: ...
 
-# TODO: this should pass
-static_assert(is_equivalent_to(A | B | P1, P2 | B | A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 ```
 
 ## Narrowing of protocols
@@ -1376,7 +1495,7 @@ static_assert(is_equivalent_to(A | B | P1, P2 | B | A))  # error: [static-assert
 
 By default, a protocol class cannot be used as the second argument to `isinstance()` or
 `issubclass()`, and a type checker must emit an error on such calls. However, we still narrow the
-type inside these branches (this matches the behaviour of other type checkers):
+type inside these branches (this matches the behavior of other type checkers):
 
 ```py
 from typing_extensions import Protocol, reveal_type
@@ -1471,11 +1590,7 @@ def g(a: Truthy, b: FalsyFoo, c: FalsyFooSubclass):
     reveal_type(bool(c))  # revealed: Literal[False]
 ```
 
-It is not sufficient for a protocol to have a callable `__bool__` instance member that returns
-`Literal[True]` for it to be considered always truthy. Dunder methods are looked up on the class
-rather than the instance. If a protocol `X` has an instance-attribute `__bool__` member, it is
-unknowable whether that attribute can be accessed on the type of an object that satisfies `X`'s
-interface:
+The same works with a class-level declaration of `__bool__`:
 
 ```py
 from typing import Callable
@@ -1484,7 +1599,7 @@ class InstanceAttrBool(Protocol):
     __bool__: Callable[[], Literal[True]]
 
 def h(obj: InstanceAttrBool):
-    reveal_type(bool(obj))  # revealed: bool
+    reveal_type(bool(obj))  # revealed: Literal[True]
 ```
 
 ## Callable protocols
@@ -1559,7 +1674,7 @@ static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
 It *might* be possible to have a singleton protocol-instance type...?
 
 For example, `WeirdAndWacky` in the following snippet only has a single possible inhabitant: `None`!
-It is thus a singleton type. However, going out of our way to recognise it as such is probably not
+It is thus a singleton type. However, going out of our way to recognize it as such is probably not
 worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
@@ -1717,7 +1832,8 @@ def _(r: Recursive):
     reveal_type(r.direct)  # revealed: Recursive
     reveal_type(r.union)  # revealed: None | Recursive
     reveal_type(r.intersection1)  # revealed: C & Recursive
-    reveal_type(r.intersection2)  # revealed: C & ~Recursive
+    # revealed: @Todo(map_with_boundness: intersections with negative contributions) | (C & ~Recursive)
+    reveal_type(r.intersection2)
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
@@ -1744,6 +1860,21 @@ class Bar(Protocol):
 static_assert(is_equivalent_to(Foo, Bar))
 ```
 
+### Disjointness of recursive protocol and recursive final type
+
+```py
+from typing import Protocol
+from ty_extensions import is_disjoint_from, static_assert
+
+class Proto(Protocol):
+    x: "Proto"
+
+class Nominal:
+    x: "Nominal"
+
+static_assert(not is_disjoint_from(Proto, Nominal))
+```
+
 ### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
@@ -1761,6 +1892,86 @@ obj = something_unresolvable  # error: [unresolved-reference]
 reveal_type(obj)  # revealed: Unknown
 if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
+```
+
+### Protocols that use `Self`
+
+`Self` is a `TypeVar` with an upper bound of the class in which it is defined. This means that
+`Self` annotations in protocols can also be tricky to handle without infinite recursion and stack
+overflows.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Protocol, Self
+from ty_extensions import static_assert
+
+class _HashObject(Protocol):
+    def copy(self) -> Self: ...
+
+class Foo: ...
+
+# Attempting to build this union caused us to overflow on an early version of
+# <https://github.com/astral-sh/ruff/pull/18659>
+x: Foo | _HashObject
+```
+
+Some other similar cases that caused issues in our early `Protocol` implementation:
+
+`a.py`:
+
+```py
+from typing_extensions import Protocol, Self
+
+class PGconn(Protocol):
+    def connect(self) -> Self: ...
+
+class Connection:
+    pgconn: PGconn
+
+def is_crdb(conn: PGconn) -> bool:
+    return isinstance(conn, Connection)
+```
+
+and:
+
+`b.py`:
+
+```py
+from typing_extensions import Protocol
+
+class PGconn(Protocol):
+    def connect[T: PGconn](self: T) -> T: ...
+
+class Connection:
+    pgconn: PGconn
+
+def f(x: PGconn):
+    isinstance(x, Connection)
+```
+
+### Recursive protocols used as the first argument to `cast()`
+
+These caused issues in an early version of our `Protocol` implementation due to the fact that we use
+a recursive function in our `cast()` implementation to check whether a type contains `Unknown` or
+`Todo`. Recklessly recursing into a type causes stack overflows if the type is recursive:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast, Protocol
+
+class Iterator[T](Protocol):
+    def __iter__(self) -> Iterator[T]: ...
+
+def f(value: Iterator):
+    cast(Iterator, value)  # error: [redundant-cast]
 ```
 
 ## TODO

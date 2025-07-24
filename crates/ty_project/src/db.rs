@@ -1,18 +1,19 @@
+use std::fmt::Formatter;
 use std::panic::{AssertUnwindSafe, RefUnwindSafe};
 use std::sync::Arc;
 use std::{cmp, fmt};
 
+pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
 use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
-use crate::{Project, ProjectMetadata, Reporter};
+use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::Event;
 use salsa::plumbing::ZalsaDatabase;
-use ty_ide::Db as IdeDb;
+use salsa::{Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -80,15 +81,23 @@ impl ProjectDatabase {
         Ok(db)
     }
 
-    /// Checks all open files in the project and its dependencies.
+    /// Checks the files in the project and its dependencies as per the project's check mode.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
         let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn Reporter);
+        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
         self.project().check(self, reporter)
     }
 
-    /// Checks all open files in the project and its dependencies, using the given reporter.
-    pub fn check_with_reporter(&self, reporter: &mut dyn Reporter) -> Vec<Diagnostic> {
+    /// Checks the files in the project and its dependencies, using the given reporter.
+    ///
+    /// Use [`set_check_mode`] to update the check mode.
+    ///
+    /// [`set_check_mode`]: ProjectDatabase::set_check_mode
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
         let reporter = AssertUnwindSafe(reporter);
         self.project().check(self, reporter)
     }
@@ -96,6 +105,12 @@ impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         self.project().check_file(self, file)
+    }
+
+    /// Set the check mode for the project.
+    pub fn set_check_mode(&mut self, mode: CheckMode) {
+        tracing::debug!("Updating project to check {mode}");
+        self.project().set_check_mode(self).to(mode);
     }
 
     /// Returns a mutable reference to the system.
@@ -142,6 +157,38 @@ impl ProjectDatabase {
             total_memo_metadata,
             ingredients,
             memos,
+        }
+    }
+}
+
+impl std::fmt::Debug for ProjectDatabase {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ProjectDatabase")
+            .field("project", &self.project)
+            .field("files", &self.files)
+            .field("system", &self.system)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(serde::Serialize))]
+pub enum CheckMode {
+    /// Checks the open files in the project.
+    OpenFiles,
+
+    /// Checks all files in the project, ignoring the open file set.
+    ///
+    /// This includes virtual files, such as those opened in an editor.
+    #[default]
+    AllFiles,
+}
+
+impl fmt::Display for CheckMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CheckMode::OpenFiles => write!(f, "open files"),
+            CheckMode::AllFiles => write!(f, "all files"),
         }
     }
 }
@@ -297,8 +344,8 @@ impl SalsaMemoryDump {
         struct DisplayShort<'a>(&'a SalsaMemoryDump);
 
         fn round_memory(total: usize) -> usize {
-            // Round the number to the nearest power of 1.1. This gives us a
-            // 5% threshold before the memory usage number is considered to have
+            // Round the number to the nearest power of 1.05. This gives us a
+            // 2.5% threshold before the memory usage number is considered to have
             // changed.
             //
             // TODO: Small changes in memory usage may cause the number to be rounded
@@ -307,7 +354,7 @@ impl SalsaMemoryDump {
             // over time that are unrelated to the current change. Ideally we could compare
             // the exact numbers across runs and compute the difference, but we don't have
             // the infrastructure for that currently.
-            const BASE: f64 = 1.1;
+            const BASE: f64 = 1.05;
             BASE.powf(bytes_to_mb(total).log(BASE).round()) as usize
         }
 
@@ -357,16 +404,10 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
-impl IdeDb for ProjectDatabase {}
-
-#[salsa::db]
 impl SemanticDb for ProjectDatabase {
-    fn is_file_open(&self, file: File) -> bool {
-        let Some(project) = &self.project else {
-            return false;
-        };
-
-        project.is_file_open(self, file)
+    fn should_check_file(&self, file: File) -> bool {
+        self.project
+            .is_some_and(|project| project.should_check_file(self, file))
     }
 
     fn rule_selection(&self, file: File) -> &RuleSelection {
@@ -423,7 +464,7 @@ mod format {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
@@ -442,7 +483,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     #[derive(Clone)]
-    pub(crate) struct TestDb {
+    pub struct TestDb {
         storage: salsa::Storage<Self>,
         events: Events,
         files: Files,
@@ -452,7 +493,7 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        pub(crate) fn new(project: ProjectMetadata) -> Self {
+        pub fn new(project: ProjectMetadata) -> Self {
             let events = Events::default();
             let mut db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
@@ -477,7 +518,7 @@ pub(crate) mod tests {
 
     impl TestDb {
         /// Takes the salsa events.
-        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)
@@ -515,7 +556,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
-        fn is_file_open(&self, file: ruff_db::files::File) -> bool {
+        fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }
 

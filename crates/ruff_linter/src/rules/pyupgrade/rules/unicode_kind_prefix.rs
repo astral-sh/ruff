@@ -42,9 +42,28 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 pub(crate) fn unicode_kind_prefix(checker: &Checker, string: &StringLiteral) {
     if string.flags.prefix().is_unicode() {
         let mut diagnostic = checker.report_diagnostic(UnicodeKindPrefix, string.range);
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
-            string.start(),
-            TextSize::from(1),
-        ))));
+
+        let prefix_range = TextRange::at(string.start(), TextSize::new(1));
+        let locator = checker.locator();
+        let content = locator
+            .slice(TextRange::new(prefix_range.end(), string.end()))
+            .to_owned();
+
+        // If the preceding character is equivalent to the quote character, insert a space to avoid a
+        // syntax error. For example, when removing the `u` prefix in `""u""`, rewrite to `"" ""`
+        // instead of `""""`.
+        // see https://github.com/astral-sh/ruff/issues/18895
+        let edit = if locator
+            .slice(TextRange::up_to(prefix_range.start()))
+            .chars()
+            .last()
+            .is_some_and(|char| content.starts_with(char))
+        {
+            Edit::range_replacement(" ".to_string(), prefix_range)
+        } else {
+            Edit::range_deletion(prefix_range)
+        };
+
+        diagnostic.set_fix(Fix::safe_edit(edit));
     }
 }

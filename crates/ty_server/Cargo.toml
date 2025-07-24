@@ -13,14 +13,17 @@ license = { workspace = true }
 [dependencies]
 ruff_db = { workspace = true, features = ["os"] }
 ruff_notebook = { workspace = true }
+ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 ty_ide = { workspace = true }
 ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }
+ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bitflags = { workspace = true }
 crossbeam = { workspace = true }
 jod-thread = { workspace = true }
 lsp-server = { workspace = true }
@@ -30,10 +33,20 @@ salsa = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["chrono"] }
 
 [dev-dependencies]
+ty_server = { workspace = true, features = ["testing"] }
+
+dunce = { workspace = true }
+insta = { workspace = true, features = ["filters", "json"] }
+regex = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+testing = []
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }

@@ -1,0 +1,60 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - gitlab
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "check_name": "F401",
+    "description": "`os` imported but unused",
+    "fingerprint": "4dbad37161e65c72",
+    "location": {
+      "lines": {
+        "begin": 1,
+        "end": 1
+      },
+      "path": "input.py"
+    },
+    "severity": "major"
+  },
+  {
+    "check_name": "F821",
+    "description": "Undefined name `y`",
+    "fingerprint": "7af59862a085230",
+    "location": {
+      "lines": {
+        "begin": 2,
+        "end": 2
+      },
+      "path": "input.py"
+    },
+    "severity": "major"
+  },
+  {
+    "check_name": "syntax-error",
+    "description": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "fingerprint": "e558cec859bb66e8",
+    "location": {
+      "lines": {
+        "begin": 3,
+        "end": 3
+      },
+      "path": "input.py"
+    },
+    "severity": "major"
+  }
+]
+----- stderr -----

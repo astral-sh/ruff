@@ -290,7 +290,6 @@ mod tests {
     use test_case::test_case;
 
     use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
-    use ruff_text_size::Ranged;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
@@ -658,7 +657,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -686,7 +685,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -716,7 +715,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -744,7 +743,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -766,7 +765,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -786,7 +785,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -802,6 +801,7 @@ mod tests {
     #[test_case(Path::new("existing_import.py"))]
     #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("off.py"))]
+    #[test_case(Path::new("whitespace.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -913,6 +913,7 @@ mod tests {
     #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
+    #[test_case(Path::new("multiple_strings.py"))]
     fn required_imports(path: &Path) -> Result<()> {
         let snapshot = format!("required_imports_{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -1130,7 +1131,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -1155,7 +1156,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -1177,7 +1178,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
@@ -1198,7 +1199,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(&*snapshot, diagnostics);
         Ok(())
     }
@@ -1217,7 +1218,7 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(Ranged::start);
+        diagnostics.sort_by_key(|diagnostic| diagnostic.expect_range().start());
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }

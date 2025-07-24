@@ -4,7 +4,7 @@ References:
 
 - <https://typing.python.org/en/latest/spec/callables.html#callable>
 
-Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
+Note that `typing.Callable` is deprecated at runtime, in favor of `collections.abc.Callable` (see:
 <https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
 `typing.Callable` is not currently planned, and the canonical location of the stub for the symbol in
 typeshed is still `typing.pyi`.
@@ -343,7 +343,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
+    reveal_type(c.__init__)  # revealed: bound method object.__init__() -> None
     reveal_type(c.__class__)  # revealed: type
     reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```

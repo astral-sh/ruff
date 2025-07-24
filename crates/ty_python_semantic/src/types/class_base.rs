@@ -2,7 +2,7 @@ use crate::Db;
 use crate::types::generics::Specialization;
 use crate::types::{
     ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, SpecialFormType,
-    Type, TypeMapping, TypeVisitor, todo_type,
+    Type, TypeMapping, TypeTransformer, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -31,7 +31,11 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
@@ -44,7 +48,12 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoPEP695ParamSpec) => "@Todo",
+            ClassBase::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::TodoPEP695ParamSpec
+                | DynamicType::TodoTypeAlias
+                | DynamicType::TodoTypedDict,
+            ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
         }
@@ -139,6 +148,7 @@ impl<'db> ClassBase<'db> {
             | Type::DataclassTransformer(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::Tuple(_)
@@ -153,7 +163,9 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
-                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -221,7 +233,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                SpecialFormType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
+                SpecialFormType::TypedDict => Some(Self::Dynamic(DynamicType::TodoTypedDict)),
                 SpecialFormType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }

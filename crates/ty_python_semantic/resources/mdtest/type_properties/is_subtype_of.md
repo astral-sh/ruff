@@ -90,6 +90,14 @@ static_assert(is_subtype_of(C, object))
 ```py
 from typing_extensions import Literal, LiteralString
 from ty_extensions import is_subtype_of, static_assert, TypeOf, JustFloat
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class Single(Enum):
+    VALUE = 1
 
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
@@ -115,6 +123,17 @@ static_assert(is_subtype_of(LiteralString, object))
 # Bytes literals
 static_assert(is_subtype_of(Literal[b"foo"], bytes))
 static_assert(is_subtype_of(Literal[b"foo"], object))
+
+# Enum literals
+static_assert(is_subtype_of(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_subtype_of(Literal[Answer.YES], Answer))
+static_assert(is_subtype_of(Literal[Answer.YES, Answer.NO], Answer))
+static_assert(is_subtype_of(Answer, Literal[Answer.YES, Answer.NO]))
+
+static_assert(not is_subtype_of(Literal[Answer.YES], Literal[Answer.NO]))
+
+static_assert(is_subtype_of(Literal[Single.VALUE], Single))
+static_assert(is_subtype_of(Single, Literal[Single.VALUE]))
 ```
 
 ## Heterogeneous tuple types
@@ -536,6 +555,11 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, LiteralString
@@ -573,6 +597,30 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], 
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 # error: [static-assert-error]
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+
+class Length2TupleSubclass(tuple[int, str]): ...
+
+static_assert(is_subtype_of(Length2TupleSubclass, AlwaysTruthy))
+
+class EmptyTupleSubclass(tuple[()]): ...
+
+static_assert(is_subtype_of(EmptyTupleSubclass, AlwaysFalsy))
+
+class TupleSubclassWithAtLeastLength2(tuple[int, *tuple[str, ...], bytes]): ...
+
+static_assert(is_subtype_of(TupleSubclassWithAtLeastLength2, AlwaysTruthy))
+
+class UnknownLength(tuple[int, ...]): ...
+
+static_assert(not is_subtype_of(UnknownLength, AlwaysTruthy))
+static_assert(not is_subtype_of(UnknownLength, AlwaysFalsy))
+
+class Invalid(tuple[int, str]):
+    # TODO: we should emit an error here (Liskov violation)
+    def __bool__(self) -> Literal[False]:
+        return False
+
+static_assert(is_subtype_of(Invalid, AlwaysFalsy))
 ```
 
 ### `TypeGuard` and `TypeIs`
@@ -1806,6 +1854,47 @@ class F(metaclass=MetaWithIntReturn):
 static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[int], F]))
+```
+
+### Subclass of
+
+#### Type of a class with constructor methods
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __new__(cls, x: str) -> "B":
+        return super().__new__(cls)
+
+static_assert(is_subtype_of(type[A], Callable[[int], A]))
+static_assert(not is_subtype_of(type[A], Callable[[str], A]))
+
+static_assert(is_subtype_of(type[B], Callable[[str], B]))
+static_assert(not is_subtype_of(type[B], Callable[[int], B]))
+```
+
+### Dataclasses
+
+Dataclasses synthesize a `__init__` method.
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+from dataclasses import dataclass
+
+@dataclass
+class A:
+    x: "A" | None
+
+static_assert(is_subtype_of(type[A], Callable[[A], A]))
+static_assert(is_subtype_of(type[A], Callable[[None], A]))
+static_assert(is_subtype_of(type[A], Callable[[A | None], A]))
+static_assert(not is_subtype_of(type[A], Callable[[int], A]))
 ```
 
 ### Bound methods

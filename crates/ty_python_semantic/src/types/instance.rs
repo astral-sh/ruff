@@ -4,9 +4,12 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
-use crate::place::{Place, PlaceAndQualifiers};
+use crate::place::PlaceAndQualifiers;
+use crate::types::cyclic::PairVisitor;
+use crate::types::enums::is_single_member_enum;
+use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeVarInstance, TypeVisitor};
+use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -44,7 +47,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &mut TypeVisitor::default(),
+                &mut TypeTransformer::default(),
             ),
         ))
     }
@@ -74,6 +77,14 @@ pub struct NominalInstanceType<'db> {
     _phantom: PhantomData<()>,
 }
 
+pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    nominal: NominalInstanceType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, nominal.class.into());
+}
+
 impl<'db> NominalInstanceType<'db> {
     // Keep this method private, so that the only way of constructing `NominalInstanceType`
     // instances is through the `Type::instance` constructor function.
@@ -84,7 +95,11 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::from_class(self.class.normalized_impl(db, visitor))
     }
 
@@ -105,18 +120,20 @@ impl<'db> NominalInstanceType<'db> {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
         !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         self.class.known(db).is_some_and(KnownClass::is_singleton)
+            || is_single_member_enum(db, self.class.class_literal(db).0)
     }
 
     pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.class
             .known(db)
             .is_some_and(KnownClass::is_single_valued)
+            || is_single_member_enum(db, self.class.class_literal(db).0)
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -158,6 +175,14 @@ pub struct ProtocolInstanceType<'db> {
     // so that the only way of constructing `ProtocolInstanceType` instances
     // is through the `Type::instance` constructor function.
     _phantom: PhantomData<()>,
+}
+
+pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    protocol: ProtocolInstanceType<'db>,
+    visitor: &mut V,
+) {
+    walk_protocol_interface(db, protocol.inner.interface(db), visitor);
 }
 
 impl<'db> ProtocolInstanceType<'db> {
@@ -205,7 +230,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        let mut visitor = TypeVisitor::default();
+        let mut visitor = TypeTransformer::default();
         self.normalized_impl(db, &mut visitor)
     }
 
@@ -215,7 +240,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeVisitor<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Type<'db> {
         let object = KnownClass::Object.to_instance(db);
         if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
@@ -227,15 +252,6 @@ impl<'db> ProtocolInstanceType<'db> {
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
-    }
-
-    /// Return `true` if the types of any of the members match the closure passed in.
-    pub(super) fn any_over_type(
-        self,
-        db: &'db dyn Db,
-        type_fn: &dyn Fn(Type<'db>) -> bool,
-    ) -> bool {
-        self.inner.interface(db).any_over_type(db, type_fn)
     }
 
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
@@ -257,7 +273,14 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
+        if self == other {
+            return true;
+        }
+        let self_normalized = self.normalized(db);
+        if self_normalized == Type::ProtocolInstance(other) {
+            return true;
+        }
+        self_normalized == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -265,21 +288,19 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from(self, _db: &'db dyn Db, _other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(
+        self,
+        _db: &'db dyn Db,
+        _other: Self,
+        _visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         false
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, name),
-            Protocol::Synthesized(synthesized) => synthesized
-                .interface()
-                .member_by_name(db, name)
-                .map(|member| PlaceAndQualifiers {
-                    place: Place::bound(member.ty()),
-                    qualifiers: member.qualifiers(),
-                })
-                .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
+            Protocol::Synthesized(synthesized) => synthesized.interface().instance_member(db, name),
         }
     }
 
@@ -355,7 +376,7 @@ impl<'db> Protocol<'db> {
 
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeVarInstance, TypeVarVariance, TypeVisitor};
+    use crate::types::{TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -376,7 +397,7 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            visitor: &mut TypeVisitor<'db>,
+            visitor: &mut TypeTransformer<'db>,
         ) -> Self {
             Self(interface.normalized_impl(db, visitor))
         }

@@ -2,13 +2,12 @@ use std::fmt::{Display, Formatter};
 use std::num::NonZeroUsize;
 
 use colored::{Color, ColoredString, Colorize, Styles};
-
-use ruff_text_size::{Ranged, TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{OneIndexed, SourceFile};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::message::OldDiagnostic;
 use crate::text_helpers::ShowNonprinting;
 use crate::{Applicability, Fix};
 
@@ -22,13 +21,13 @@ use crate::{Applicability, Fix};
 /// * Compute the diff from the [`Edit`] because diff calculation is expensive.
 pub(super) struct Diff<'a> {
     fix: &'a Fix,
-    source_code: SourceFile,
+    source_code: &'a SourceFile,
 }
 
 impl<'a> Diff<'a> {
-    pub(crate) fn from_message(message: &'a OldDiagnostic) -> Option<Diff<'a>> {
+    pub(crate) fn from_message(message: &'a Diagnostic) -> Option<Diff<'a>> {
         message.fix().map(|fix| Diff {
-            source_code: message.source_file(),
+            source_code: message.expect_ruff_source_file(),
             fix,
         })
     }

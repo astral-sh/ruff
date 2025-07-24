@@ -103,10 +103,29 @@ impl PredicateOrLiteral<'_> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct CallableAndCallExpr<'db> {
+    pub(crate) callable: Expression<'db>,
+    pub(crate) call_expr: Expression<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
+    ReturnsNever(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update)]
+pub(crate) enum ClassPatternKind {
+    Irrefutable,
+    Refutable,
+}
+
+impl ClassPatternKind {
+    pub(crate) fn is_irrefutable(self) -> bool {
+        matches!(self, ClassPatternKind::Irrefutable)
+    }
 }
 
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
@@ -115,7 +134,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>),
+    Class(Expression<'db>, ClassPatternKind),
     Unsupported,
 }
 
@@ -132,7 +151,8 @@ pub(crate) struct PatternPredicate<'db> {
 
     pub(crate) guard: Option<Expression<'db>>,
 
-    count: countme::Count<PatternPredicate<'static>>,
+    /// A reference to the pattern of the previous match case
+    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.

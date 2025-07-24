@@ -124,6 +124,31 @@ static_assert(not is_assignable_to(Literal[b"foo"], Literal["foo"]))
 static_assert(not is_assignable_to(Literal["foo"], Literal[b"foo"]))
 ```
 
+### Enum literals
+
+```py
+from ty_extensions import static_assert, is_assignable_to
+from typing_extensions import Literal
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+static_assert(is_assignable_to(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_assignable_to(Literal[Answer.YES], Answer))
+static_assert(is_assignable_to(Literal[Answer.YES, Answer.NO], Answer))
+static_assert(is_assignable_to(Answer, Literal[Answer.YES, Answer.NO]))
+
+static_assert(not is_assignable_to(Literal[Answer.YES], Literal[Answer.NO]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_assignable_to(Literal[Single.VALUE], Single))
+static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
+```
+
 ### Slice literals
 
 The type of a slice literal is currently inferred as a specialization of `slice`.
@@ -891,6 +916,7 @@ c: Callable[[Any], str] = A().g
 
 ```py
 from typing import Any, Callable
+from ty_extensions import static_assert, is_assignable_to
 
 c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
@@ -911,6 +937,15 @@ class C:
     def __init__(self, x: int) -> None: ...
 
 c: Callable[[int], C] = C
+
+def f(a: Callable[..., Any], b: Callable[[Any], Any]): ...
+
+f(tuple, tuple)
+
+def g(a: Callable[[Any, Any], Any]): ...
+
+# error: [invalid-argument-type] "Argument to function `g` is incorrect: Expected `(Any, Any, /) -> Any`, found `<class 'tuple'>`"
+g(tuple)
 ```
 
 ### Generic class literal types
@@ -1118,6 +1153,37 @@ class A:
 static_assert(is_assignable_to(A, Callable[[int], str]))
 static_assert(not is_assignable_to(A, Callable[[int], int]))
 reveal_type(A()(1))  # revealed: str
+```
+
+### Subclass of
+
+#### Type of a class with constructor methods
+
+```py
+from typing import Callable
+from ty_extensions import static_assert, is_assignable_to
+
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __new__(cls, x: str) -> "B":
+        return super().__new__(cls)
+
+static_assert(is_assignable_to(type[A], Callable[[int], A]))
+static_assert(not is_assignable_to(type[A], Callable[[str], A]))
+
+static_assert(is_assignable_to(type[B], Callable[[str], B]))
+static_assert(not is_assignable_to(type[B], Callable[[int], B]))
+```
+
+#### Type with no generic parameters
+
+```py
+from typing import Callable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+static_assert(is_assignable_to(type, Callable[..., Any]))
 ```
 
 ## Generics

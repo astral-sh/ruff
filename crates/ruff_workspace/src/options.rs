@@ -529,6 +529,24 @@ pub struct LintOptions {
         "#
     )]
     pub typing_extensions: Option<bool>,
+
+    /// Whether to allow rules to add `from __future__ import annotations` in cases where this would
+    /// simplify a fix or enable a new diagnostic.
+    ///
+    /// For example, `TC001`, `TC002`, and `TC003` can move more imports into `TYPE_CHECKING` blocks
+    /// if `__future__` annotations are enabled.
+    ///
+    /// This setting is currently in [preview](https://docs.astral.sh/ruff/preview/) and requires
+    /// preview mode to be enabled to have any effect.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable `from __future__ import annotations` imports
+            future-annotations = true
+        "#
+    )]
+    pub future_annotations: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -1996,7 +2014,8 @@ pub struct Flake8TidyImportsOptions {
 
     /// List of specific modules that may not be imported at module level, and should instead be
     /// imported lazily (e.g., within a function definition, or an `if TYPE_CHECKING:`
-    /// block, or some other nested context).
+    /// block, or some other nested context). This also affects the rule `import-outside-top-level`
+    /// if `banned-module-level-imports` is enabled.
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str]"#,
@@ -3586,7 +3605,7 @@ pub struct FormatOptions {
     /// Setting `skip-magic-trailing-comma = true` changes the formatting to:
     ///
     /// ```python
-    /// # The arguments remain on separate lines because of the trailing comma after `b`
+    /// # The arguments are collapsed to a single line because the trailing comma is ignored
     /// def test(a, b):
     ///     pass
     /// ```
@@ -3824,6 +3843,12 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub detect_string_imports: Option<bool>,
+    /// The minimum number of dots in a string to consider it a valid import.
+    ///
+    /// This setting is only relevant when [`detect-string-imports`](#detect-string-imports) is enabled.
+    /// For example, if this is set to `2`, then only strings with at least two dots (e.g., `"path.to.module"`)
+    /// would be considered valid imports.
+    pub string_imports_min_dots: Option<usize>,
     /// A map from file path to the list of Python or non-Python file paths or globs that should be
     /// considered dependencies of that file, regardless of whether relevant imports are detected.
     #[option(
@@ -3895,6 +3920,7 @@ pub struct LintOptionsWire {
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
     typing_extensions: Option<bool>,
+    future_annotations: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3950,6 +3976,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
+            future_annotations,
         } = value;
 
         LintOptions {
@@ -4006,6 +4033,7 @@ impl From<LintOptionsWire> for LintOptions {
             ruff,
             preview,
             typing_extensions,
+            future_annotations,
         }
     }
 }

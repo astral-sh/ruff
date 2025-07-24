@@ -9,12 +9,14 @@ use itertools::{Itertools, iterate};
 use ruff_linter::linter::FixTable;
 use serde::Serialize;
 
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, SecondaryCode,
+};
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
-    AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, OldDiagnostic, PylintEmitter, RdjsonEmitter,
-    SarifEmitter, SecondaryCode, TextEmitter,
+    Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter, SarifEmitter,
+    TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::settings::flags::{self};
@@ -201,6 +203,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        preview: bool,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -228,16 +231,32 @@ impl Printer {
 
         match self.format {
             OutputFormat::Json => {
-                JsonEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Json)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Rdjson => {
-                RdjsonEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Rdjson)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::JsonLines => {
-                JsonLinesEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::JsonLines)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Junit => {
-                JunitEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Junit)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
@@ -245,6 +264,7 @@ impl Printer {
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.format == OutputFormat::Full)
                     .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -279,10 +299,18 @@ impl Printer {
                 GitlabEmitter::default().emit(writer, &diagnostics.inner, &context)?;
             }
             OutputFormat::Pylint => {
-                PylintEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Pylint)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Azure => {
-                AzureEmitter.emit(writer, &diagnostics.inner, &context)?;
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Azure)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
             }
             OutputFormat::Sarif => {
                 SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
@@ -306,8 +334,7 @@ impl Printer {
             .sorted_by_key(|(code, message)| (*code, message.fixable()))
             .fold(
                 vec![],
-                |mut acc: Vec<((Option<&SecondaryCode>, &OldDiagnostic), usize)>,
-                 (code, message)| {
+                |mut acc: Vec<((Option<&SecondaryCode>, &Diagnostic), usize)>, (code, message)| {
                     if let Some(((prev_code, _prev_message), count)) = acc.last_mut() {
                         if *prev_code == code {
                             *count += 1;

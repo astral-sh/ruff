@@ -6,9 +6,9 @@ use rustc_hash::FxHashMap;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
-use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleUnpacker};
+use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -18,23 +18,18 @@ use super::diagnostic::INVALID_ASSIGNMENT;
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
-    target_scope: ScopeId<'db>,
-    value_scope: ScopeId<'db>,
-    targets: FxHashMap<ScopedExpressionId, Type<'db>>,
+    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
 }
 
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
         target_scope: ScopeId<'db>,
-        value_scope: ScopeId<'db>,
         module: &'ast ParsedModuleRef,
     ) -> Self {
         Self {
             context: InferContext::new(db, target_scope, module),
             targets: FxHashMap::default(),
-            target_scope,
-            value_scope,
         }
     }
 
@@ -53,9 +48,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression()).expression_type(
-            value.scoped_expression_id(self.db(), self.value_scope, self.module()),
-        );
+        let value_type = infer_expression_types(self.db(), value.expression())
+            .expression_type(value.expression().node_ref(self.db(), self.module()));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -70,14 +64,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(
-                    &self.context,
-                    value_type,
-                    value.as_any_node_ref(self.db(), self.module()),
-                );
-                err.fallback_element_type(self.db())
-            }),
+            UnpackKind::Iterable => value_type
+                .try_iterate(self.db())
+                .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_element_type(self.db())
+                }),
             UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(
                     &self.context,
@@ -103,10 +100,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     ) {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.targets.insert(
-                    target.scoped_expression_id(self.db(), self.target_scope),
-                    value_ty,
-                );
+                self.targets.insert(target.into(), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack_inner(value, value_expr, value_ty);
@@ -127,30 +121,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = match ty {
-                        Type::Tuple(tuple_ty) => Cow::Borrowed(tuple_ty.tuple(self.db())),
-                        Type::StringLiteral(string_literal_ty) => {
-                            // We could go further and deconstruct to an array of `StringLiteral`
-                            // with each individual character, instead of just an array of
-                            // `LiteralString`, but there would be a cost and it's not clear that
-                            // it's worth it.
-                            Cow::Owned(Tuple::from_elements(std::iter::repeat_n(
-                                Type::LiteralString,
-                                string_literal_ty.python_len(self.db()),
-                            )))
-                        }
-                        Type::LiteralString => Cow::Owned(Tuple::homogeneous(Type::LiteralString)),
-                        _ => {
-                            // TODO: Update our iterator protocol machinery to return a tuple
-                            // describing the returned values in more detail, when we can.
-                            Cow::Owned(Tuple::homogeneous(
-                                ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                                    err.report_diagnostic(&self.context, ty, value_expr);
-                                    err.fallback_element_type(self.db())
-                                }),
-                            ))
-                        }
-                    };
+                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, ty, value_expr);
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
+                    });
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
                         unpacker
@@ -208,7 +182,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
 #[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackResult<'db> {
-    targets: FxHashMap<ScopedExpressionId, Type<'db>>,
+    targets: FxHashMap<ExpressionNodeKey, Type<'db>>,
     diagnostics: TypeCheckDiagnostics,
 
     /// The fallback type for missing expressions.
@@ -226,16 +200,19 @@ impl<'db> UnpackResult<'db> {
     /// May panic if a scoped expression ID is passed in that does not correspond to a sub-
     /// expression of the target.
     #[track_caller]
-    pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
+    pub(crate) fn expression_type(&self, expr_id: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expr_id).expect(
             "expression should belong to this `UnpackResult` and \
             `Unpacker` should have inferred a type for it",
         )
     }
 
-    pub(crate) fn try_expression_type(&self, expr_id: ScopedExpressionId) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(
+        &self,
+        expr: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
         self.targets
-            .get(&expr_id)
+            .get(&expr.into())
             .copied()
             .or(self.cycle_fallback_type)
     }

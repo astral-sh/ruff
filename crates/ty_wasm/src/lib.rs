@@ -4,21 +4,24 @@ use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRange, system_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
-    SystemPath, SystemPathBuf, SystemVirtualPath,
+    SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
-use ty_project::ProjectMetadata;
+use ty_ide::{
+    MarkupKind, NavigationTargets, RangedValue, goto_declaration, goto_definition, goto_references,
+    goto_type_definition, hover, inlay_hints, signature_help,
+};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
@@ -31,9 +34,32 @@ pub fn version() -> String {
         .to_string()
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
+
+    ruff_db::set_program_version(version()).unwrap();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
     // `set_panic_hook` function at least once during initialization, and then
@@ -73,7 +99,11 @@ impl Workspace {
         let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
             .map_err(into_error)?;
 
-        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+
+        // By default, it will check all files in the project but we only want to check the open
+        // files in the playground.
+        db.set_check_mode(CheckMode::OpenFiles);
 
         Ok(Self {
             db,
@@ -239,32 +269,100 @@ impl Workspace {
             return Ok(Vec::new());
         };
 
-        let source_range = Range::from_text_range(
-            targets.file_range().range(),
-            &index,
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
             &source,
+            &index,
             self.position_encoding,
-        );
+        ))
+    }
 
-        let links: Vec<_> = targets
+    #[wasm_bindgen(js_name = "gotoDeclaration")]
+    pub fn goto_declaration(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoDefinition")]
+    pub fn goto_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
             .into_iter()
             .map(|target| LocationLink {
                 path: target.file().path(&self.db).to_string(),
                 full_range: Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.full_range()),
+                    target.file_range(),
                     self.position_encoding,
                 ),
                 selection_range: Some(Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.focus_range()),
+                    target.file_range(),
                     self.position_encoding,
                 )),
-                origin_selection_range: Some(source_range),
+                origin_selection_range: Some(Range::from_text_range(
+                    ruff_text_size::TextRange::new(offset, offset),
+                    &index,
+                    &source,
+                    self.position_encoding,
+                )),
             })
-            .collect();
-
-        Ok(links)
+            .collect())
     }
 
     #[wasm_bindgen]
@@ -309,6 +407,7 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|completion| Completion {
+                kind: completion.kind(&self.db).map(CompletionKind::from),
                 name: completion.name.into(),
             })
             .collect())
@@ -338,10 +437,134 @@ impl Workspace {
             })
             .collect())
     }
+
+    #[wasm_bindgen(js_name = "semanticTokens")]
+    pub fn semantic_tokens(&self, file_id: &FileHandle) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(&self.db, file_id.file, None);
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "semanticTokensInRange")]
+    pub fn semantic_tokens_in_range(
+        &self,
+        file_id: &FileHandle,
+        range: Range,
+    ) -> Result<Vec<SemanticToken>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let semantic_token = ty_ide::semantic_tokens(
+            &self.db,
+            file_id.file,
+            Some(range.to_text_range(&index, &source, self.position_encoding)?),
+        );
+
+        let result = semantic_token
+            .iter()
+            .map(|token| SemanticToken {
+                kind: token.token_type.into(),
+                modifiers: token.modifiers.bits(),
+                range: Range::from_text_range(token.range, &index, &source, self.position_encoding),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "signatureHelp")]
+    pub fn signature_help(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Option<SignatureHelp>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(signature_help_info) = signature_help(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let signatures = signature_help_info
+            .signatures
+            .into_iter()
+            .map(|sig| {
+                let parameters = sig
+                    .parameters
+                    .into_iter()
+                    .map(|param| ParameterInformation {
+                        label: param.label,
+                        documentation: param.documentation,
+                    })
+                    .collect();
+
+                SignatureInformation {
+                    label: sig.label,
+                    documentation: sig.documentation,
+                    parameters,
+                    active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
+                }
+            })
+            .collect();
+
+        Ok(Some(SignatureHelp {
+            signatures,
+            active_signature: signature_help_info
+                .active_signature
+                .and_then(|s| u32::try_from(s).ok()),
+        }))
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
+}
+
+fn map_targets_to_links(
+    db: &dyn Db,
+    targets: RangedValue<NavigationTargets>,
+    source: &SourceText,
+    index: &LineIndex,
+    position_encoding: PositionEncoding,
+) -> Vec<LocationLink> {
+    let source_range = Range::from_text_range(
+        targets.file_range().range(),
+        index,
+        source,
+        position_encoding,
+    );
+
+    targets
+        .into_iter()
+        .map(|target| LocationLink {
+            path: target.file().path(db).to_string(),
+            full_range: Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.full_range()),
+                position_encoding,
+            ),
+            selection_range: Some(Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.focus_range()),
+                position_encoding,
+            )),
+            origin_selection_range: Some(source_range),
+        })
+        .collect()
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -620,6 +843,69 @@ pub struct Hover {
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
     pub name: String,
+    pub kind: Option<CompletionKind>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionKind {
+    Text,
+    Method,
+    Function,
+    Constructor,
+    Field,
+    Variable,
+    Class,
+    Interface,
+    Module,
+    Property,
+    Unit,
+    Value,
+    Enum,
+    Keyword,
+    Snippet,
+    Color,
+    File,
+    Reference,
+    Folder,
+    EnumMember,
+    Constant,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+impl From<ty_python_semantic::CompletionKind> for CompletionKind {
+    fn from(value: ty_python_semantic::CompletionKind) -> Self {
+        match value {
+            ty_python_semantic::CompletionKind::Text => Self::Text,
+            ty_python_semantic::CompletionKind::Method => Self::Method,
+            ty_python_semantic::CompletionKind::Function => Self::Function,
+            ty_python_semantic::CompletionKind::Constructor => Self::Constructor,
+            ty_python_semantic::CompletionKind::Field => Self::Field,
+            ty_python_semantic::CompletionKind::Variable => Self::Variable,
+            ty_python_semantic::CompletionKind::Class => Self::Class,
+            ty_python_semantic::CompletionKind::Interface => Self::Interface,
+            ty_python_semantic::CompletionKind::Module => Self::Module,
+            ty_python_semantic::CompletionKind::Property => Self::Property,
+            ty_python_semantic::CompletionKind::Unit => Self::Unit,
+            ty_python_semantic::CompletionKind::Value => Self::Value,
+            ty_python_semantic::CompletionKind::Enum => Self::Enum,
+            ty_python_semantic::CompletionKind::Keyword => Self::Keyword,
+            ty_python_semantic::CompletionKind::Snippet => Self::Snippet,
+            ty_python_semantic::CompletionKind::Color => Self::Color,
+            ty_python_semantic::CompletionKind::File => Self::File,
+            ty_python_semantic::CompletionKind::Reference => Self::Reference,
+            ty_python_semantic::CompletionKind::Folder => Self::Folder,
+            ty_python_semantic::CompletionKind::EnumMember => Self::EnumMember,
+            ty_python_semantic::CompletionKind::Constant => Self::Constant,
+            ty_python_semantic::CompletionKind::Struct => Self::Struct,
+            ty_python_semantic::CompletionKind::Event => Self::Event,
+            ty_python_semantic::CompletionKind::Operator => Self::Operator,
+            ty_python_semantic::CompletionKind::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -629,6 +915,103 @@ pub struct InlayHint {
     pub markdown: String,
 
     pub position: Position,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SemanticToken {
+    pub kind: SemanticTokenKind,
+    pub modifiers: u32,
+    pub range: Range,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureHelp {
+    #[wasm_bindgen(getter_with_clone)]
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SignatureInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub parameters: Vec<ParameterInformation>,
+    pub active_parameter: Option<u32>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ParameterInformation {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub documentation: Option<String>,
+}
+
+#[wasm_bindgen]
+impl SemanticToken {
+    pub fn kinds() -> Vec<String> {
+        ty_ide::SemanticTokenType::all()
+            .iter()
+            .map(|ty| ty.as_lsp_concept().to_string())
+            .collect()
+    }
+
+    pub fn modifiers() -> Vec<String> {
+        ty_ide::SemanticTokenModifier::all_names()
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SemanticTokenKind {
+    Namespace,
+    Class,
+    Parameter,
+    SelfParameter,
+    ClsParameter,
+    Variable,
+    Property,
+    Function,
+    Method,
+    Keyword,
+    String,
+    Number,
+    Decorator,
+    BuiltinConstant,
+    TypeParameter,
+}
+
+impl From<ty_ide::SemanticTokenType> for SemanticTokenKind {
+    fn from(value: ty_ide::SemanticTokenType) -> Self {
+        match value {
+            ty_ide::SemanticTokenType::Namespace => Self::Namespace,
+            ty_ide::SemanticTokenType::Class => Self::Class,
+            ty_ide::SemanticTokenType::Parameter => Self::Parameter,
+            ty_ide::SemanticTokenType::SelfParameter => Self::SelfParameter,
+            ty_ide::SemanticTokenType::ClsParameter => Self::ClsParameter,
+            ty_ide::SemanticTokenType::Variable => Self::Variable,
+            ty_ide::SemanticTokenType::Property => Self::Property,
+            ty_ide::SemanticTokenType::Function => Self::Function,
+            ty_ide::SemanticTokenType::Method => Self::Method,
+            ty_ide::SemanticTokenType::Keyword => Self::Keyword,
+            ty_ide::SemanticTokenType::String => Self::String,
+            ty_ide::SemanticTokenType::Number => Self::Number,
+            ty_ide::SemanticTokenType::Decorator => Self::Decorator,
+            ty_ide::SemanticTokenType::BuiltinConstant => Self::BuiltinConstant,
+            ty_ide::SemanticTokenType::TypeParameter => Self::TypeParameter,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -695,6 +1078,10 @@ impl System for WasmSystem {
         None
     }
 
+    fn cache_dir(&self) -> Option<SystemPathBuf> {
+        None
+    }
+
     fn read_directory<'a>(
         &'a self,
         path: &SystemPath,
@@ -713,6 +1100,10 @@ impl System for WasmSystem {
         pattern: &str,
     ) -> Result<Box<dyn Iterator<Item = Result<SystemPathBuf, GlobError>> + '_>, PatternError> {
         Ok(Box::new(self.fs.glob(pattern)?))
+    }
+
+    fn as_writable(&self) -> Option<&dyn WritableSystem> {
+        None
     }
 
     fn as_any(&self) -> &dyn Any {

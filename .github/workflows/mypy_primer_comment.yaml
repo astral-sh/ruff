@@ -45,15 +45,28 @@ jobs:
           if_no_artifact_found: ignore
           allow_forks: true
 
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: "Download mypy_primer memory results"
+        id: download-mypy_primer_memory_diff
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: mypy_primer_memory_diff
+          workflow: mypy_primer.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/mypy_primer_memory_diff
+          workflow_conclusion: completed
+          if_no_artifact_found: ignore
+          allow_forks: true
+
       - name: Generate comment content
         id: generate-comment
-        if: steps.download-mypy_primer_diff.outputs.found_artifact == 'true'
+        if: ${{ steps.download-mypy_primer_diff.outputs.found_artifact == 'true' && steps.download-mypy_primer_memory_diff.outputs.found_artifact == 'true' }}
         run: |
           # Guard against malicious mypy_primer results that symlink to a secret
           # file on this runner
-          if [[ -L pr/mypy_primer_diff/mypy_primer.diff ]]
+          if [[ -L pr/mypy_primer_diff/mypy_primer.diff ]] || [[ -L pr/mypy_primer_memory_diff/mypy_primer_memory.diff ]]
           then
-              echo "Error: mypy_primer.diff cannot be a symlink"
+              echo "Error: mypy_primer.diff and mypy_primer_memory.diff cannot be a symlink"
               exit 1
           fi
 
@@ -72,6 +85,18 @@ jobs:
             echo '</details>' >> comment.txt
           else
             echo 'No ecosystem changes detected ✅' >> comment.txt
+          fi
+
+          if [ -s "pr/mypy_primer_memory_diff/mypy_primer_memory.diff" ]; then
+            echo '<details>' >> comment.txt
+            echo '<summary>Memory usage changes were detected when running on open source projects</summary>' >> comment.txt
+            echo '' >> comment.txt
+            echo '```diff' >> comment.txt
+            cat pr/mypy_primer_memory_diff/mypy_primer_memory.diff >> comment.txt
+            echo '```' >> comment.txt
+            echo '</details>' >> comment.txt
+          else
+            echo 'No memory usage changes detected ✅' >> comment.txt
           fi
 
           echo 'comment<<EOF' >> "$GITHUB_OUTPUT"

@@ -1,4 +1,3 @@
-use lsp_server::ErrorCode;
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
@@ -9,13 +8,14 @@ use rustc_hash::FxHashMap;
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
+use ruff_db::system::SystemPathBuf;
 use ty_project::{Db, ProjectDatabase};
 
-use super::LSPResult;
 use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
-use crate::server::Result;
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use crate::{DocumentSnapshot, PositionEncoding, Session};
+use crate::system::{AnySystemPath, file_to_url};
+use crate::{PositionEncoding, Session};
 
 /// Represents the diagnostics for a text document or a notebook document.
 pub(super) enum Diagnostics {
@@ -46,20 +46,17 @@ impl Diagnostics {
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()> {
+pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) {
     let Some(uri) = key.to_url() else {
         // If we can't convert to URL, we can't clear diagnostics
-        return Ok(());
+        return;
     };
 
-    client
-        .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-            uri,
-            diagnostics: vec![],
-            version: None,
-        })
-        .with_failure_code(ErrorCode::InternalError)?;
-    Ok(())
+    client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+        uri,
+        diagnostics: vec![],
+        version: None,
+    });
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
@@ -68,72 +65,148 @@ pub(super) fn clear_diagnostics(key: &DocumentKey, client: &Client) -> Result<()
 /// This function is a no-op if the client supports pull diagnostics.
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics(
-    session: &Session,
-    key: &DocumentKey,
-    client: &Client,
-) -> Result<()> {
-    if session.client_capabilities().pull_diagnostics {
-        return Ok(());
+pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: &Client) {
+    if session.client_capabilities().supports_pull_diagnostics() {
+        return;
     }
 
     let Some(url) = key.to_url() else {
-        return Ok(());
+        return;
     };
 
-    let path = key.path();
+    let snapshot = session.take_document_snapshot(url.clone());
 
-    let snapshot = session
-        .take_snapshot(url.clone())
-        .ok_or_else(|| anyhow::anyhow!("Unable to take snapshot for document with URL {url}"))
-        .with_failure_code(lsp_server::ErrorCode::InternalError)?;
+    let document = match snapshot.document() {
+        Ok(document) => document,
+        Err(err) => {
+            tracing::debug!("Failed to resolve document for URL `{}`: {}", url, err);
+            return;
+        }
+    };
 
-    let db = session.project_db_or_default(path);
+    let db = session.project_db(key.path());
 
     let Some(diagnostics) = compute_diagnostics(db, &snapshot) else {
-        return Ok(());
+        return;
     };
 
     // Sends a notification to the client with the diagnostics for the document.
     let publish_diagnostics_notification = |uri: Url, diagnostics: Vec<Diagnostic>| {
-        client
-            .send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-                uri,
-                diagnostics,
-                version: Some(snapshot.query().version()),
-            })
-            .with_failure_code(lsp_server::ErrorCode::InternalError)
+        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri,
+            diagnostics,
+            version: Some(document.version()),
+        });
     };
 
     match diagnostics {
         Diagnostics::TextDocument(diagnostics) => {
-            publish_diagnostics_notification(url, diagnostics)?;
+            publish_diagnostics_notification(url, diagnostics);
         }
         Diagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
-                publish_diagnostics_notification(cell_url, diagnostics)?;
+                publish_diagnostics_notification(cell_url, diagnostics);
             }
         }
     }
+}
 
-    Ok(())
+/// Publishes settings diagnostics for all the project at the given path
+/// using the [publish diagnostics notification].
+///
+/// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
+pub(crate) fn publish_settings_diagnostics(
+    session: &mut Session,
+    client: &Client,
+    path: SystemPathBuf,
+) {
+    // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
+    //
+    // Note we DO NOT respect the fact that clients support pulls because these are
+    // files they *specifically* won't pull diagnostics from us for, because we don't
+    // claim to be an LSP for them.
+    let has_workspace_diagnostics = session
+        .workspaces()
+        .for_path(&path)
+        .map(|workspace| workspace.settings().diagnostic_mode().is_workspace())
+        .unwrap_or(false);
+    if has_workspace_diagnostics {
+        return;
+    }
+
+    let session_encoding = session.position_encoding();
+    let state = session.project_state_mut(&AnySystemPath::System(path));
+    let db = &state.db;
+    let project = db.project();
+    let settings_diagnostics = project.check_settings(db);
+
+    // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
+    // These will both almost always be empty so this function will almost always be a no-op.
+    if settings_diagnostics.is_empty() && state.untracked_files_with_pushed_diagnostics.is_empty() {
+        return;
+    }
+
+    // Group diagnostics by URL
+    let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+    for diagnostic in settings_diagnostics {
+        if let Some(span) = diagnostic.primary_span() {
+            let file = span.expect_ty_file();
+            let Some(url) = file_to_url(db, file) else {
+                tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                continue;
+            };
+            diagnostics_by_url.entry(url).or_default().push(diagnostic);
+        }
+    }
+
+    // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
+    // the next time we publish settings diagnostics!
+    let old_untracked = std::mem::replace(
+        &mut state.untracked_files_with_pushed_diagnostics,
+        diagnostics_by_url.keys().cloned().collect(),
+    );
+
+    // Add empty diagnostics for any files that had diagnostics before but don't now.
+    // This will clear them (either the file is no longer relevant to us or fixed!)
+    for url in old_untracked {
+        diagnostics_by_url.entry(url).or_default();
+    }
+    // Send the settings diagnostics!
+    for (url, file_diagnostics) in diagnostics_by_url {
+        // Convert diagnostics to LSP format
+        let lsp_diagnostics = file_diagnostics
+            .into_iter()
+            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding))
+            .collect::<Vec<_>>();
+
+        client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
+            uri: url,
+            diagnostics: lsp_diagnostics,
+            version: None,
+        });
+    }
 }
 
 pub(super) fn compute_diagnostics(
     db: &ProjectDatabase,
     snapshot: &DocumentSnapshot,
 ) -> Option<Diagnostics> {
-    let Some(file) = snapshot.file(db) else {
-        tracing::info!(
-            "No file found for snapshot for `{}`",
-            snapshot.query().file_url()
-        );
+    let document = match snapshot.document() {
+        Ok(document) => document,
+        Err(err) => {
+            tracing::info!("Failed to resolve document for snapshot: {}", err);
+            return None;
+        }
+    };
+
+    let Some(file) = document.file(db) else {
+        tracing::info!("No file found for snapshot for `{}`", document.file_path());
         return None;
     };
 
     let diagnostics = db.check_file(file);
 
-    if let Some(notebook) = snapshot.query().as_notebook() {
+    if let Some(notebook) = document.as_notebook() {
         let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
         // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
@@ -172,7 +245,7 @@ pub(super) fn compute_diagnostics(
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
 /// [`Diagnostic`].
-fn to_lsp_diagnostic(
+pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,

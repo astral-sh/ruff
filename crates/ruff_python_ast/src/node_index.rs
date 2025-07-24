@@ -19,7 +19,8 @@ where
 ///
 /// This type is interiorly mutable to allow assigning node indices
 /// on-demand after parsing.
-#[derive(Default, get_size2::GetSize)]
+#[derive(Default)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {
@@ -47,6 +48,16 @@ pub struct NodeIndex(u32);
 impl NodeIndex {
     pub fn as_usize(self) -> usize {
         self.0 as _
+    }
+
+    pub fn as_u32(self) -> u32 {
+        self.0
+    }
+}
+
+impl From<u32> for NodeIndex {
+    fn from(value: u32) -> Self {
+        NodeIndex(value)
     }
 }
 

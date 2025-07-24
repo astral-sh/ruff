@@ -1,9 +1,10 @@
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
+use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
+    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -25,6 +26,10 @@ pub(crate) enum Ty {
     StringLiteral(&'static str),
     LiteralString,
     BytesLiteral(&'static str),
+    // An enum literal variant, using `uuid.SafeUUID` as base
+    EnumLiteral(&'static str),
+    // A single-member enum literal, using `dataclasses.MISSING`
+    SingleMemberEnumLiteral,
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
     /// Members of the `abc` stdlib module
@@ -55,6 +60,10 @@ pub(crate) enum Ty {
         params: CallableParams,
         returns: Option<Box<Ty>>,
     },
+    /// `unittest.mock.Mock` is interesting because it is a nominal instance type
+    /// where the class has `Any` in its MRO
+    UnittestMockInstance,
+    UnittestMockLiteral,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -131,6 +140,23 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
+            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+                db,
+                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+                    .place
+                    .expect_type()
+                    .expect_class_literal(),
+                Name::new(name),
+            )),
+            Ty::SingleMemberEnumLiteral => {
+                let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
+                    .place
+                    .expect_type();
+                debug_assert!(
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class.class_literal(db).0))
+                );
+                ty
+            }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
@@ -144,6 +170,13 @@ impl Ty {
             Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type(),
+            Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
+                .place
+                .expect_type(),
+            Ty::UnittestMockInstance => Ty::UnittestMockLiteral
+                .into_type(db)
+                .to_instance(db)
+                .unwrap(),
             Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
             Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
             Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
@@ -223,11 +256,13 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
     let bool_lit = Ty::BooleanLiteral(bool::arbitrary(g));
 
     // Update this if new non-fully-static types are added below.
-    let fully_static_index = 3;
+    let fully_static_index = 5;
     let types = &[
         Ty::Any,
         Ty::Unknown,
         Ty::SubclassOfAny,
+        Ty::UnittestMockLiteral,
+        Ty::UnittestMockInstance,
         // Add fully static types below, dynamic types above.
         // Update `fully_static_index` above if adding new dynamic types!
         Ty::Never,
@@ -239,6 +274,10 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::LiteralString,
         Ty::BytesLiteral(""),
         Ty::BytesLiteral("\x00"),
+        Ty::EnumLiteral("safe"),
+        Ty::EnumLiteral("unsafe"),
+        Ty::EnumLiteral("unknown"),
+        Ty::SingleMemberEnumLiteral,
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),
