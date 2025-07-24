@@ -56,7 +56,7 @@ impl ToLink for NavigationTarget {
 
 impl ToLink for ReferenceTarget {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
-        FileRange::new(self.file(), self.range()).to_location(db, encoding)
+        self.file_range().to_location(db, encoding)
     }
 
     fn to_link(

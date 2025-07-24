@@ -131,23 +131,29 @@ pub enum ReferenceKind {
 /// includes information about whether the reference is a read or write operation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ReferenceTarget {
-    file: File,
-    range: TextRange,
+    file_range: FileRange,
     kind: ReferenceKind,
 }
 
 impl ReferenceTarget {
     /// Creates a new `ReferenceTarget`.
     pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
-        Self { file, range, kind }
+        Self {
+            file_range: FileRange::new(file, range),
+            kind,
+        }
     }
 
     pub fn file(&self) -> File {
-        self.file
+        self.file_range.file()
     }
 
     pub fn range(&self) -> TextRange {
-        self.range
+        self.file_range.range()
+    }
+
+    pub fn file_range(&self) -> FileRange {
+        self.file_range
     }
 
     pub fn kind(&self) -> ReferenceKind {
