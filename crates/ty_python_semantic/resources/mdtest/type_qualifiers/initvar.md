@@ -77,6 +77,27 @@ reveal_type(bob.metadata)  # revealed: str
 reveal_type(Person.metadata)  # revealed: str
 ```
 
+## Overwritten `InitVar`
+
+We do not emit an error if an `InitVar` attribute is later overwritten on the instance. In that
+case, we also allow the attribute to be accessed:
+
+```py
+from dataclasses import InitVar, dataclass
+
+@dataclass
+class Person:
+    name: str
+    metadata: InitVar[str]
+
+    def __post_init__(self, metadata: str) -> None:
+        self.metadata = f"Person with name {self.name}"
+
+alice = Person("Alice", "metadata that will be overwritten")
+
+reveal_type(alice.metadata)  # revealed: str
+```
+
 ## Error cases
 
 ### Syntax

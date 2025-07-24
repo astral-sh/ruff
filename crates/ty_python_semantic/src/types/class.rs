@@ -881,7 +881,7 @@ impl MethodDecorator {
     }
 }
 
-/// Meta-information about a dataclass field/attribute.
+/// Metadata regarding a dataclass field/attribute.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DataclassField<'db> {
     /// The declared type of the field
@@ -1897,10 +1897,6 @@ impl<'db> ClassLiteral<'db> {
                         qualifiers,
                     } = class.own_instance_member(db, name)
                     {
-                        if qualifiers.contains(TypeQualifiers::INIT_VAR) {
-                            continue;
-                        }
-
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
 
@@ -2277,6 +2273,17 @@ impl<'db> ClassLiteral<'db> {
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                         declared = Place::Unbound;
+                    }
+
+                    if qualifiers.contains(TypeQualifiers::INIT_VAR) {
+                        // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
+                        // by an implicit assignment in a method
+                        if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                            .place
+                            .is_unbound()
+                        {
+                            return Place::Unbound.into();
+                        }
                     }
 
                     // The attribute is declared in the class body.
