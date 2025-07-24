@@ -7,7 +7,7 @@ use ruff_annotate_snippets::{
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
@@ -379,6 +379,33 @@ impl<'a> ResolvedAnnotation<'a> {
                 OneIndexed::MIN,
             ),
             (Some(range), _) => {
+                // This attempts to "fix up" the span on `SourceCode` in the case where
+                // it's an empty span immediately following a line terminator.
+                //
+                // At present, `annotate-snippets` (both upstream and our vendored copy)
+                // will render annotations of such spans to point to the space immediately
+                // following the previous line. But ideally, this should point to the space
+                // immediately preceding the next line.
+                //
+                // After attempting to fix `annotate-snippets` and giving up after a couple
+                // hours, this routine takes a different tact: it adjusts the span to be
+                // non-empty and it will cover the first codepoint of the following line.
+                // This forces `annotate-snippets` to point to the right place.
+                //
+                // See also: <https://github.com/astral-sh/ruff/issues/15509> and
+                // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
+                // from which this was adapted.
+                let range = if range.is_empty()
+                    && range.start() != TextSize::from(0)
+                    && range.start() < source.text().text_len()
+                    && source.text().as_bytes()[range.start().to_usize() - 1] == b'\n'
+                {
+                    let start = range.start();
+                    let end = ceil_char_boundary(source.text(), start + TextSize::from(1));
+                    TextRange::new(start, end)
+                } else {
+                    range
+                };
                 let line_start = source.line_index(range.start());
                 let mut line_end = source.line_index(range.end());
                 // As a special case, if the *end* of our range comes
@@ -818,6 +845,86 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
         return path.as_str();
     }
     path
+}
+
+/// Finds the closest [`TextSize`] not less than the offset given for which
+/// `is_char_boundary` is `true`. Unless the offset given is greater than
+/// the length of the underlying contents, in which case, the length of the
+/// contents is returned.
+///
+/// Can be replaced with `str::ceil_char_boundary` once it's stable.
+///
+/// # Examples
+///
+/// From `std`:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextLen, TextSize};
+///
+/// let source = "❤️🧡💛💚💙💜";
+/// assert_eq!(source.text_len(), TextSize::from(26));
+/// assert!(!source.is_char_boundary(13));
+///
+/// let closest = ceil_char_boundary(source, TextSize::from(13));
+/// assert_eq!(closest, TextSize::from(14));
+/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
+/// ```
+///
+/// Additional examples:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextRange, TextSize};
+///
+/// let source = "Hello";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(5)),
+///     TextSize::from(5)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(6)),
+///     TextSize::from(5)
+/// );
+///
+/// let source = "α";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(1)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(2)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(3)),
+///     TextSize::from(2)
+/// );
+/// ```
+pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
+    let upper_bound = offset
+        .to_u32()
+        .saturating_add(4)
+        .min(text.text_len().to_u32());
+    (offset.to_u32()..upper_bound)
+        .map(TextSize::from)
+        .find(|offset| text.is_char_boundary(offset.to_usize()))
+        .unwrap_or_else(|| TextSize::from(upper_bound))
 }
 
 #[cfg(test)]

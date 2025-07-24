@@ -6,12 +6,13 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode, ceil_char_boundary,
+};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::Locator;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
@@ -370,9 +371,8 @@ impl<'a> SourceCode<'a> {
         if self.text.as_bytes()[self.annotation_range.start().to_usize() - 1] != b'\n' {
             return self;
         }
-        let locator = Locator::new(&self.text);
         let start = self.annotation_range.start();
-        let end = locator.ceil_char_boundary(start + TextSize::from(1));
+        let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
         SourceCode {
             annotation_range: TextRange::new(start, end),
             ..self
@@ -481,8 +481,8 @@ mod tests {
            |
          7 | #: E112
          8 | if False:
-           |          ^
          9 | print()
+           | ^
         10 | #: E113
         11 | print()
            |
@@ -514,8 +514,8 @@ mod tests {
            |
         12 |     print()
         13 | #: E114 E116
-           |             ^
         14 | mimetype = 'application/x-directory'
+           | ^
         15 |      # 'httpd/unix-directory'
         16 | create_date = False
            |
@@ -525,8 +525,8 @@ mod tests {
            |
         43 | #: E112
         44 | if False:  #
-           |             ^
         45 | print()
+           | ^
         46 | #:
         47 | if False:
            |
