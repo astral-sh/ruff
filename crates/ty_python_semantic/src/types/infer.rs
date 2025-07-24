@@ -3339,6 +3339,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bound,
             default,
         } = node;
+
+        // My kingdom to be able to walk AST parent nodes.
+        let typevar_scope = definition.file_scope(self.db());
+        let mut child_scopes = self.index.child_scopes(typevar_scope);
+        let (_, binding_scope) =
+            (child_scopes.next()).expect("typevar scope should have one child");
+        assert!(
+            child_scopes.next().is_none(),
+            "typevar scope should have one child"
+        );
+        let binding_node = binding_scope.node();
+        let binding_context_key = match binding_node {
+            NodeWithScopeKind::Class(class) => {
+                DefinitionNodeKey::from(class.node(self.context.module()))
+            }
+            NodeWithScopeKind::Function(function) => {
+                DefinitionNodeKey::from(function.node(self.context.module()))
+            }
+            NodeWithScopeKind::TypeAlias(alias) => {
+                DefinitionNodeKey::from(alias.node(self.context.module()))
+            }
+            _ => panic!("typevar scope should be in class or function definition"),
+        };
+        let binding_context = self.index.expect_single_definition(binding_context_key);
+
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
@@ -3378,11 +3403,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )),
             None => None,
         };
+
         let default_ty = self.infer_optional_type_expression(default.as_deref());
+
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             &name.id,
             Some(definition),
+            Some(binding_context),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,

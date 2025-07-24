@@ -700,6 +700,7 @@ impl<'db> Type<'db> {
                     Name::new_static("T_all"),
                     None,
                     None,
+                    None,
                     variance,
                     None,
                     TypeVarKind::Pep695,
@@ -5006,6 +5007,7 @@ impl<'db> Type<'db> {
                     db,
                     Name::new(format!("{}'instance", typevar.name(db))),
                     None,
+                    None,
                     Some(bound_or_constraints),
                     typevar.variance(db),
                     None,
@@ -5173,10 +5175,12 @@ impl<'db> Type<'db> {
                     let instance = Type::ClassLiteral(class).to_instance(db).expect(
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
+                    let class_definition = class.definition(db);
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
-                        Some(class.definition(db)),
+                        Some(class_definition),
+                        Some(class_definition),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
@@ -6460,6 +6464,10 @@ pub struct TypeVarInstance<'db> {
     /// The type var's definition (None if synthesized)
     pub definition: Option<Definition<'db>>,
 
+    /// The definition of the generic class, function, or type alias that binds this typevar. This
+    /// is `None` for a legacy typevar outside of a context that can bind it.
+    binding_context: Option<Definition<'db>>,
+
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
@@ -6518,6 +6526,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.normalized_impl(db, visitor)),
             self.variance(db),
@@ -6531,6 +6540,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.materialize(db, variance)),
             self.variance(db),
