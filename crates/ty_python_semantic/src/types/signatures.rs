@@ -1784,7 +1784,7 @@ mod tests {
             a_annotated_ty.unwrap().display(&db).to_string(),
             "Unknown | A | B"
         );
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]
@@ -1829,7 +1829,7 @@ mod tests {
         assert_eq!(b_name, "b");
         // Parameter resolution deferred:
         assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]
