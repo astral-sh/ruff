@@ -397,7 +397,7 @@ mod tests {
     use crate::message::{EmitterContext, TextEmitter};
     use crate::settings::LinterSettings;
     use crate::settings::types::UnsafeFixes;
-    use crate::test::{test_path, test_snippet};
+    use crate::test::test_path;
 
     #[test]
     fn default() {
@@ -475,73 +475,7 @@ mod tests {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
         let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-        insta::assert_snapshot!(value.to_string(), @r"
-        error[no-indented-block]: Expected an indented block
-          --> E11.py:9:1
-           |
-         7 | #: E112
-         8 | if False:
-         9 | print()
-           | ^
-        10 | #: E113
-        11 | print()
-           |
-
-        error[invalid-syntax]: SyntaxError: Expected an indented block after `if` statement
-          --> E11.py:9:1
-           |
-         7 | #: E112
-         8 | if False:
-         9 | print()
-           | ^^^^^
-        10 | #: E113
-        11 | print()
-           |
-
-        error[invalid-syntax]: SyntaxError: Unexpected indentation
-          --> E11.py:12:1
-           |
-        10 | #: E113
-        11 | print()
-        12 |     print()
-           | ^^^^
-        13 | #: E114 E116
-        14 | mimetype = 'application/x-directory'
-           |
-
-        error[invalid-syntax]: SyntaxError: Expected a statement
-          --> E11.py:14:1
-           |
-        12 |     print()
-        13 | #: E114 E116
-        14 | mimetype = 'application/x-directory'
-           | ^
-        15 |      # 'httpd/unix-directory'
-        16 | create_date = False
-           |
-
-        error[no-indented-block]: Expected an indented block
-          --> E11.py:45:1
-           |
-        43 | #: E112
-        44 | if False:  #
-        45 | print()
-           | ^
-        46 | #:
-        47 | if False:
-           |
-
-        error[invalid-syntax]: SyntaxError: Expected an indented block after `if` statement
-          --> E11.py:45:1
-           |
-        43 | #: E112
-        44 | if False:  #
-        45 | print()
-           | ^^^^^
-        46 | #:
-        47 | if False:
-           |
-        ");
+        insta::assert_snapshot!(value.to_string());
         Ok(())
     }
 
@@ -557,14 +491,15 @@ mod tests {
     /// where the caret points to the `f` in the f-string instead of the start of the invalid
     /// character (`^Z`).
     #[test]
-    fn unprintable_characters() {
+    fn unprintable_characters() -> anyhow::Result<()> {
+        let path = Path::new("pylint").join("invalid_characters.py");
         let settings = LinterSettings::for_rule(Rule::InvalidCharacterSub);
-        // extracted from pylint/invalid_characters.py:55
-        let diagnostics = test_snippet(r#"nested_fstrings = f'{f'{f''}'}'"#, &settings);
+        let diagnostics = test_path(path, &settings)?;
         let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full);
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
         let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
-        insta::assert_snapshot!("unprintable_characters", value.to_string());
+        insta::assert_snapshot!(value.to_string());
+        Ok(())
     }
 }
