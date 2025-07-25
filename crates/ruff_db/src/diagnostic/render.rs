@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -379,33 +380,6 @@ impl<'a> ResolvedAnnotation<'a> {
                 OneIndexed::MIN,
             ),
             (Some(range), _) => {
-                // This attempts to "fix up" the span on `SourceCode` in the case where
-                // it's an empty span immediately following a line terminator.
-                //
-                // At present, `annotate-snippets` (both upstream and our vendored copy)
-                // will render annotations of such spans to point to the space immediately
-                // following the previous line. But ideally, this should point to the space
-                // immediately preceding the next line.
-                //
-                // After attempting to fix `annotate-snippets` and giving up after a couple
-                // hours, this routine takes a different tact: it adjusts the span to be
-                // non-empty and it will cover the first codepoint of the following line.
-                // This forces `annotate-snippets` to point to the right place.
-                //
-                // See also: <https://github.com/astral-sh/ruff/issues/15509> and
-                // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
-                // from which this was adapted.
-                let range = if range.is_empty()
-                    && range.start() != TextSize::from(0)
-                    && range.start() < source.text().text_len()
-                    && source.text().as_bytes()[range.start().to_usize() - 1] == b'\n'
-                {
-                    let start = range.start();
-                    let end = ceil_char_boundary(source.text(), start + TextSize::from(1));
-                    TextRange::new(start, end)
-                } else {
-                    range
-                };
                 let line_start = source.line_index(range.start());
                 let mut line_end = source.line_index(range.end());
                 // As a special case, if the *end* of our range comes
@@ -547,7 +521,7 @@ impl<'r> RenderableSnippets<'r> {
 #[derive(Debug)]
 struct RenderableSnippet<'r> {
     /// The actual snippet text.
-    snippet: &'r str,
+    snippet: Cow<'r, str>,
     /// The absolute line number corresponding to where this
     /// snippet begins.
     line_start: OneIndexed,
@@ -607,6 +581,13 @@ impl<'r> RenderableSnippet<'r> {
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
             .collect();
+
+        let EscapedSourceCode {
+            text: snippet,
+            annotations,
+        } = replace_whitespace_and_unprintable(snippet, annotations)
+            .fix_up_empty_spans_after_line_terminator();
+
         RenderableSnippet {
             snippet,
             line_start,
@@ -617,7 +598,7 @@ impl<'r> RenderableSnippet<'r> {
 
     /// Convert this to an "annotate" snippet.
     fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(self.snippet)
+        AnnotateSnippet::source(&self.snippet)
             .origin(path)
             .line_start(self.line_start.get())
             .annotations(
@@ -845,6 +826,135 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
         return path.as_str();
     }
     path
+}
+
+/// Given some source code and annotation ranges, this routine replaces tabs
+/// with ASCII whitespace, and unprintable characters with printable
+/// representations of them.
+///
+/// The source code and annotations returned are updated to reflect changes made
+/// to the source code (if any).
+fn replace_whitespace_and_unprintable<'r>(
+    source: &'r str,
+    mut annotations: Vec<RenderableAnnotation<'r>>,
+) -> EscapedSourceCode<'r> {
+    let mut result = String::new();
+    let mut last_end = 0;
+    let mut column = 0;
+    const TAB_SIZE: usize = 4;
+
+    // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
+    // `source`) is replaced with `len` bytes.
+    //
+    // When the index occurs before the start of the range, the range is
+    // offset by `len`. When the range occurs after or at the start but before
+    // the end, then the end of the range only is offset by `len`.
+    let mut update_ranges = |index: usize, len: u32| {
+        for ann in &mut annotations {
+            if index < usize::from(ann.range.start()) {
+                ann.range += TextSize::new(len - 1);
+            } else if index < usize::from(ann.range.end()) {
+                ann.range = ann.range.add_end(TextSize::new(len - 1));
+            }
+        }
+    };
+
+    // If `c` is an unprintable character, then this returns a printable
+    // representation of it (using a fancier Unicode codepoint).
+    let unprintable_replacement = |c: char| -> Option<char> {
+        match c {
+            '\x07' => Some('␇'),
+            '\x08' => Some('␈'),
+            '\x1b' => Some('␛'),
+            '\x7f' => Some('␡'),
+            _ => None,
+        }
+    };
+
+    for (index, c) in source.char_indices() {
+        if matches!(c, '\t') {
+            let tab_offset = TAB_SIZE - (column % TAB_SIZE);
+            column += tab_offset;
+            let tab_width = u32::try_from(tab_offset).expect("small width because of tab size");
+            result.push_str(&source[last_end..index]);
+            for _ in 0..tab_width {
+                result.push(' ');
+            }
+            last_end = index + 1;
+            update_ranges(index, tab_width);
+        } else {
+            match c {
+                '\n' | '\r' => column = 0,
+                _ => column += 1,
+            }
+        }
+
+        if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
+            result.push(printable);
+            last_end = index + 1;
+
+            let len = printable.text_len().to_u32();
+            update_ranges(index, len);
+        }
+    }
+
+    // No tabs or unprintable chars
+    if result.is_empty() {
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Borrowed(source),
+        }
+    } else {
+        result.push_str(&source[last_end..]);
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Owned(result),
+        }
+    }
+}
+
+struct EscapedSourceCode<'r> {
+    text: Cow<'r, str>,
+    annotations: Vec<RenderableAnnotation<'r>>,
+}
+
+impl<'r> EscapedSourceCode<'r> {
+    // This attempts to "fix up" the spans on each annotation  in the case where
+    // it's an empty span immediately following a line terminator.
+    //
+    // At present, `annotate-snippets` (both upstream and our vendored copy)
+    // will render annotations of such spans to point to the space immediately
+    // following the previous line. But ideally, this should point to the space
+    // immediately preceding the next line.
+    //
+    // After attempting to fix `annotate-snippets` and giving up after a couple
+    // hours, this routine takes a different tact: it adjusts the span to be
+    // non-empty and it will cover the first codepoint of the following line.
+    // This forces `annotate-snippets` to point to the right place.
+    //
+    // See also: <https://github.com/astral-sh/ruff/issues/15509> and
+    // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
+    // from which this was adapted.
+    fn fix_up_empty_spans_after_line_terminator(mut self) -> EscapedSourceCode<'r> {
+        for ann in &mut self.annotations {
+            let range = ann.range;
+            if !range.is_empty()
+                || range.start() == TextSize::from(0)
+                || range.start() >= self.text.text_len()
+            {
+                continue;
+            }
+            if self.text.as_bytes()[range.start().to_usize() - 1] != b'\n' {
+                continue;
+            }
+            let start = range.start();
+            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            ann.range = TextRange::new(start, end);
+        }
+
+        self
+    }
 }
 
 /// Finds the closest [`TextSize`] not less than the offset given for which
