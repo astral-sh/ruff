@@ -43,7 +43,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
-    registry.register_lint(&INVALID_ASSIGNMENT);
+    // registry.register_lint(&INVALID_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
