@@ -8841,7 +8841,7 @@ impl<'db> TypeIsType<'db> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);
 
-        Some(format!("{}", table.place_expr(place)))
+        Some(format!("{}", table.place(place)))
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

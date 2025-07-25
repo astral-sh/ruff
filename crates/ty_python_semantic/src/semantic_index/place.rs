@@ -13,15 +13,29 @@ use std::iter::FusedIterator;
 /// An expression that can be the target of a `Definition`.
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
 pub(crate) enum PlaceExpr {
+    /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
+
+    /// A member expression, e.g. `x.y.z[0]`.
     Member(Member),
 }
 
 impl PlaceExpr {
+    /// Create a new `PlaceExpr` from a name.
+    ///
+    /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
     pub(crate) fn from_expr_name(name: &ast::ExprName) -> Self {
         PlaceExpr::Symbol(Symbol::new(name.id.clone()))
     }
 
+    /// Tries to create a `PlaceExpr` from an expression.
+    ///
+    /// Returns `None` if the expression is not a valid place expression and `Some` otherwise.
+    ///
+    /// Valid expressions are:
+    /// * name: `x`
+    /// * attribute: `x.y`
+    /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
         let mut current = expr.into();
         let mut segments = smallvec::SmallVec::new_const();
@@ -87,6 +101,7 @@ pub(crate) enum PlaceExprRef<'a> {
 }
 
 impl<'a> PlaceExprRef<'a> {
+    /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
     pub(crate) const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
             Some(symbol)
@@ -95,22 +110,9 @@ impl<'a> PlaceExprRef<'a> {
         }
     }
 
+    /// Returns `true` if the reference is a `Symbol`, otherwise `false`.
     pub(crate) const fn is_symbol(self) -> bool {
         matches!(self, PlaceExprRef::Symbol(_))
-    }
-
-    pub(crate) fn is_global(self) -> bool {
-        match self {
-            Self::Symbol(symbol) => symbol.is_global(),
-            Self::Member(_) => false,
-        }
-    }
-
-    pub(crate) fn is_nonlocal(self) -> bool {
-        match self {
-            Self::Symbol(symbol) => symbol.is_nonlocal(),
-            Self::Member(_) => false,
-        }
     }
 
     pub(crate) fn is_declared(self) -> bool {
@@ -130,7 +132,7 @@ impl<'a> PlaceExprRef<'a> {
     pub(crate) fn num_member_segments(self) -> usize {
         match self {
             PlaceExprRef::Symbol(_) => 0,
-            PlaceExprRef::Member(member) => member.expression().segments().len(),
+            PlaceExprRef::Member(member) => member.expression().member_segments().len(),
         }
     }
 }
@@ -194,24 +196,35 @@ impl PlaceTable {
         }
     }
 
+    /// Iterator over all symbols in this scope.
     pub(crate) fn symbols(&self) -> std::slice::Iter<Symbol> {
         self.symbols.iter()
     }
 
+    /// Iterator over all members in this scope.
     pub(crate) fn members(&self) -> std::slice::Iter<Member> {
         self.members.iter()
     }
 
+    /// Looks up a symbol by its ID and returns a reference to it.
+    ///
+    /// ## Panics
+    /// If the symbol ID is not found in the table.
     #[track_caller]
     pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
         self.symbols.symbol(id)
     }
 
+    /// Looks up a symbol by its name and returns a reference to it, if it exists.
     #[cfg(test)]
     pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         self.symbols.symbol_id(name).map(|id| self.symbol(id))
     }
 
+    /// Looks up a member by its ID and returns a reference to it.
+    ///
+    /// ## Panics
+    /// If the member ID is not found in the table.
     #[track_caller]
     pub(crate) fn member(&self, id: ScopedMemberId) -> &Member {
         self.members.member(id)
@@ -237,8 +250,12 @@ impl PlaceTable {
         }
     }
 
+    /// Returns the place expression for the given place ID.
+    ///
+    /// ## Panics
+    /// If the place ID is not found in the table.
     #[track_caller]
-    pub(crate) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
+    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
         match place_id.into() {
             ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
             ScopedPlaceId::Member(member) => self.member(member).into(),
@@ -263,6 +280,7 @@ pub(crate) struct PlaceTableBuilder {
 }
 
 impl PlaceTableBuilder {
+    /// Looks up a place ID by its expression.
     pub(super) fn place_id(&self, expression: PlaceExprRef) -> Option<ScopedPlaceId> {
         match expression {
             PlaceExprRef::Symbol(symbol) => self.symbols.symbol_id(symbol.name()).map(Into::into),
@@ -418,7 +436,12 @@ impl ScopedPlaceId {
     }
 
     pub const fn expect_symbol(self) -> ScopedSymbolId {
-        self.as_symbol().unwrap()
+        match self {
+            ScopedPlaceId::Symbol(symbol) => symbol,
+            ScopedPlaceId::Member(_) => {
+                panic!("Expected ScopedPlaceId::Symbol, found ScopedPlaceId::Member")
+            }
+        }
     }
 
     pub const fn as_member(self) -> Option<ScopedMemberId> {
@@ -498,7 +521,7 @@ impl<'a> ParentPlaceIterState<'a> {
         symbols: &'a SymbolTable,
         members: &'a MemberTable,
     ) -> Self {
-        let segments = expression.rev_segments_slice();
+        let segments = expression.rev_member_segments();
         let segments = &segments[1..];
 
         if segments.is_empty() {

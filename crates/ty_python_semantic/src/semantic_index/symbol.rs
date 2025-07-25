@@ -6,10 +6,12 @@ use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
+/// Uniquely identifies a symbol in a given scope.
 #[newtype_index]
 #[derive(get_size2::GetSize)]
 pub struct ScopedSymbolId;
 
+/// A symbol in a given scope.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub(crate) struct Symbol {
     name: Name,
@@ -46,6 +48,10 @@ impl Symbol {
             name,
             flags: SymbolFlags::empty(),
         }
+    }
+
+    pub(crate) fn name(&self) -> &Name {
+        &self.name
     }
 
     /// Is the symbol used in its containing scope?
@@ -101,42 +107,51 @@ impl Symbol {
         self.insert_flags(SymbolFlags::IS_DECLARED);
     }
 
-    pub(crate) fn name(&self) -> &Name {
-        &self.name
-    }
-
     fn insert_flags(&mut self, flags: SymbolFlags) {
         self.flags.insert(flags);
     }
 }
 
+/// The symbols of a given scope.
+///
+/// Allows lookup by name and a symbol's ID.
 #[derive(Default, get_size2::GetSize)]
 pub(super) struct SymbolTable {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
 
-    /// Map from symbol name to it's ID.
+    /// Map from symbol name to its ID.
     ///
     /// Uses a hash table to avoid storing the name twice.
     map: hashbrown::HashTable<ScopedSymbolId>,
 }
 
 impl SymbolTable {
+    /// Look up a symbol by its ID.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this symbol table.
     #[track_caller]
     pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
         &self.symbols[id]
     }
 
+    /// Look up a symbol by its ID, mutably.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this symbol table.
     #[track_caller]
     pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
         &mut self.symbols[id]
     }
 
+    /// Look up the ID of a symbol by its name.
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.map
             .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
             .copied()
     }
 
+    /// Iterate over the symbols in this symbol table.
     pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
         self.symbols.iter()
     }
@@ -169,6 +184,7 @@ pub(super) struct SymbolTableBuilder {
 }
 
 impl SymbolTableBuilder {
+    /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(symbol.name());
         let entry = self.table.map.entry(

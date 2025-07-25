@@ -312,16 +312,17 @@ pub(crate) struct UseDefMap<'db> {
     /// bindings to that symbol. If there are any, the assignment is invalid.
     bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
-    /// [`PlaceState`] visible at end of scope for each place.
+    /// [`PlaceState`] visible at end of scope for each symbol.
     end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
 
-    /// [`PlaceState`] visible at end of scope for each place.
+    /// [`PlaceState`] visible at end of scope for each member.
     end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
 
-    /// All potentially reachable bindings and declarations, for each place.
-    reachable_symbols: IndexVec<ScopedSymbolId, ReachableDefinitions>,
+    /// All potentially reachable bindings and declarations, for each symbol.
+    reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
 
-    reachable_members: IndexVec<ScopedMemberId, ReachableDefinitions>,
+    /// All potentially reachable bindings and declarations, for each member.
+    reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
@@ -466,7 +467,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = &self.reachable_symbols[symbol].bindings;
+        let bindings = &self.reachable_definitions_by_symbol[symbol].bindings;
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -474,7 +475,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = &self.reachable_members[symbol].bindings;
+        let bindings = &self.reachable_definitions_by_member[symbol].bindings;
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -550,7 +551,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.reachable_symbols[symbol].declarations;
+        let declarations = &self.reachable_definitions_by_symbol[symbol].declarations;
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -558,7 +559,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.reachable_members[member].declarations;
+        let declarations = &self.reachable_definitions_by_member[member].declarations;
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -1384,8 +1385,8 @@ impl<'db> UseDefMapBuilder<'db> {
             node_reachability: self.node_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members: self.member_states,
-            reachable_symbols: self.reachable_symbol_definitions,
-            reachable_members: self.reachable_member_definitions,
+            reachable_definitions_by_symbol: self.reachable_symbol_definitions,
+            reachable_definitions_by_member: self.reachable_member_definitions,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_definition: self.bindings_by_definition,
             enclosing_snapshots: self.enclosing_snapshots,

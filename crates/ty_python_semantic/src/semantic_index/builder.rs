@@ -404,10 +404,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let place_table = &self.place_tables[key.enclosing_scope];
             key.nested_laziness.is_eager()
                 || key.enclosing_scope != popped_scope_id
-                || key
+                || !key
                     .enclosing_place
                     .as_symbol()
-                    .is_some_and(|symbol_id| !place_table.symbol(symbol_id).is_reassigned())
+                    .is_some_and(|symbol_id| place_table.symbol(symbol_id).is_reassigned())
         });
     }
 
@@ -430,7 +430,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         else {
                             return false;
                         };
-                        let symbol = other_scope_place_table.place(symbol_id);
+                        let symbol = other_scope_place_table.symbol(symbol_id);
                         symbol.is_nonlocal() && symbol.is_bound()
                     })
             };
