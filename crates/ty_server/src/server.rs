@@ -241,6 +241,8 @@ impl Server {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()
             }),
+            document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+            workspace_symbol_provider: Some(lsp_types::OneOf::Left(true)),
             ..Default::default()
         }
     }

@@ -16,6 +16,7 @@ bitflags::bitflags! {
         const MULTILINE_SEMANTIC_TOKENS = 1 << 7;
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
+        const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
     }
 }
 
@@ -68,6 +69,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports per-signature active parameter in signature help.
     pub(crate) const fn supports_signature_active_parameter(self) -> bool {
         self.contains(Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports hierarchical document symbols.
+    pub(crate) const fn supports_hierarchical_document_symbols(self) -> bool {
+        self.contains(Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -171,6 +177,18 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                text_document
+                    .document_symbol
+                    .as_ref()?
+                    .hierarchical_document_symbol_support
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
         flags
