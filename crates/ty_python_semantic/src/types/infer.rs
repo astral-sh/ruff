@@ -85,7 +85,7 @@ use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr, ScopeId, ScopeKind, ScopedPlaceId,
 };
 use crate::semantic_index::{
-    ApplicableConstraints, EagerSnapshotResult, SemanticIndex, place_table, semantic_index,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError};
 use crate::types::class::{CodeGeneratorKind, DataclassField, MetaclassErrorKind, SliceLiteral};
@@ -6461,17 +6461,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    match self
-                        .index
-                        .eager_snapshot(enclosing_scope_file_id, expr, file_scope_id)
-                    {
-                        EagerSnapshotResult::FoundConstraint(constraint) => {
+                    match self.index.enclosing_snapshot(
+                        enclosing_scope_file_id,
+                        expr,
+                        file_scope_id,
+                    ) {
+                        EnclosingSnapshotResult::FoundConstraint(constraint) => {
                             constraint_keys.push((
                                 enclosing_scope_file_id,
                                 ConstraintKey::NarrowingConstraint(constraint),
                             ));
                         }
-                        EagerSnapshotResult::FoundBindings(bindings) => {
+                        EnclosingSnapshotResult::FoundBindings(bindings) => {
                             if expr.is_name()
                                 && !enclosing_scope_id.is_function_like(db)
                                 && !is_immediately_enclosing_scope
@@ -6487,13 +6488,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             });
                             constraint_keys.push((
                                 enclosing_scope_file_id,
-                                ConstraintKey::EagerNestedScope(file_scope_id),
+                                ConstraintKey::NestedScope(file_scope_id),
                             ));
                             return place.into();
                         }
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
-                        EagerSnapshotResult::NotFound => {
+                        EnclosingSnapshotResult::NotFound => {
                             let enclosing_place_table =
                                 self.index.place_table(enclosing_scope_file_id);
                             for enclosing_root_place in enclosing_place_table.root_place_exprs(expr)
@@ -6513,7 +6514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             continue;
                         }
-                        EagerSnapshotResult::NoLongerInEagerContext => {}
+                        EnclosingSnapshotResult::NoLongerInEagerContext => {}
                     }
                 }
 
@@ -6583,17 +6584,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     if !self.is_deferred() {
-                        match self
-                            .index
-                            .eager_snapshot(FileScopeId::global(), expr, file_scope_id)
-                        {
-                            EagerSnapshotResult::FoundConstraint(constraint) => {
+                        match self.index.enclosing_snapshot(
+                            FileScopeId::global(),
+                            expr,
+                            file_scope_id,
+                        ) {
+                            EnclosingSnapshotResult::FoundConstraint(constraint) => {
                                 constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NarrowingConstraint(constraint),
                                 ));
                             }
-                            EagerSnapshotResult::FoundBindings(bindings) => {
+                            EnclosingSnapshotResult::FoundBindings(bindings) => {
                                 let place = place_from_bindings(db, bindings).map_type(|ty| {
                                     self.narrow_place_with_applicable_constraints(
                                         expr,
@@ -6603,15 +6605,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 });
                                 constraint_keys.push((
                                     FileScopeId::global(),
-                                    ConstraintKey::EagerNestedScope(file_scope_id),
+                                    ConstraintKey::NestedScope(file_scope_id),
                                 ));
                                 return place.into();
                             }
                             // There are no visible bindings / constraint here.
-                            EagerSnapshotResult::NotFound => {
+                            EnclosingSnapshotResult::NotFound => {
                                 return Place::Unbound.into();
                             }
-                            EagerSnapshotResult::NoLongerInEagerContext => {}
+                            EnclosingSnapshotResult::NoLongerInEagerContext => {}
                         }
                     }
 

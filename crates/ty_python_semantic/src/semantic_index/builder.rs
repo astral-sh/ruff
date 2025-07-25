@@ -43,9 +43,9 @@ use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
 use crate::semantic_index::use_def::{
-    EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, ScopeLaziness, SemanticIndex};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -113,7 +113,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
-    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
+    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
@@ -148,7 +148,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
-            eager_snapshots: FxHashMap::default(),
+            enclosing_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -276,25 +276,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
-    fn pop_scope(&mut self) -> FileScopeId {
-        self.try_node_context_stack_manager.exit_scope();
-
-        let ScopeInfo {
-            file_scope_id: popped_scope_id,
-            ..
-        } = self
-            .scope_stack
-            .pop()
-            .expect("Root scope should be present");
-
-        let children_end = self.scopes.next_index();
-        let popped_scope = &mut self.scopes[popped_scope_id];
-        popped_scope.extend_descendants(children_end);
-
-        if !popped_scope.is_eager() {
-            return popped_scope_id;
-        }
-
+    // Records snapshots of the place states visible from the current eager scope.
+    fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -327,26 +310,162 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
-                let key = EagerSnapshotKey {
+                let key = EnclosingSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
+                    nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
                     enclosing_place_id,
                     enclosing_scope_kind,
                     enclosing_place,
                 );
-                self.eager_snapshots.insert(key, eager_snapshot);
+                self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            // Also, narrowing constraints outside a lazy scope are not applicable.
-            // TODO: If the place has never been rewritten, they are applicable.
             if !enclosing_scope_kind.is_eager() {
                 break;
             }
+        }
+    }
+
+    fn bound_scope(
+        &self,
+        enclosing_scope: FileScopeId,
+        place_expr: &PlaceExpr,
+    ) -> Option<FileScopeId> {
+        self.scope_stack
+            .iter()
+            .rev()
+            .skip_while(|scope| scope.file_scope_id != enclosing_scope)
+            .find_map(|scope_info| {
+                let scope_id = scope_info.file_scope_id;
+                let place_table = &self.place_tables[scope_id];
+                let place_id = place_table.place_id_by_expr(place_expr)?;
+                if place_table.place_expr(place_id).is_bound() {
+                    Some(scope_id)
+                } else {
+                    None
+                }
+            })
+    }
+
+    // Records snapshots of the place states visible from the current lazy scope.
+    fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        for enclosing_scope_info in self.scope_stack.iter().rev() {
+            let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
+            let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+
+            for nested_place in self.place_tables[popped_scope_id].places() {
+                // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
+                // For the same reason, symbols declared as nonlocal or global are not recorded.
+                // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
+                if !nested_place.is_name()
+                    || self.scopes[enclosing_scope_id].visibility().is_public()
+                {
+                    continue;
+                }
+
+                // Skip this place if this enclosing scope doesn't contain any bindings for it.
+                // Note that even if this place is bound in the popped scope,
+                // it may refer to the enclosing scope bindings
+                // so we also need to snapshot the bindings of the enclosing scope.
+
+                let Some(enclosing_place_id) =
+                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
+                else {
+                    continue;
+                };
+                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
+                if !enclosing_place.is_bound() {
+                    // If the bound scope of a place can be modified from elsewhere, the snapshot will not be recorded.
+                    if self
+                        .bound_scope(enclosing_scope_id, &nested_place.expr)
+                        .is_none_or(|scope| self.scopes[scope].visibility().is_public())
+                    {
+                        continue;
+                    }
+                }
+
+                // Snapshot the state of this place that are visible at this point in this
+                // enclosing scope (this may later be invalidated and swept away).
+                let key = EnclosingSnapshotKey {
+                    enclosing_scope: enclosing_scope_id,
+                    enclosing_place: enclosing_place_id,
+                    nested_scope: popped_scope_id,
+                    nested_laziness: ScopeLaziness::Lazy,
+                };
+                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
+                    enclosing_place_id,
+                    enclosing_scope_kind,
+                    enclosing_place,
+                );
+                self.enclosing_snapshots.insert(key, lazy_snapshot);
+            }
+        }
+    }
+
+    /// Any lazy snapshots of places that have been reassigned or modified are no longer valid, so delete them.
+    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        self.enclosing_snapshots.retain(|key, _| {
+            let place_table = &self.place_tables[key.enclosing_scope];
+            key.nested_laziness.is_eager()
+                || key.enclosing_scope != popped_scope_id
+                || !place_table.is_place_reassigned(key.enclosing_place)
+        });
+    }
+
+    fn sweep_nonlocal_lazy_snapshots(&mut self) {
+        self.enclosing_snapshots.retain(|key, _| {
+            let place_table = &self.place_tables[key.enclosing_scope];
+
+            let is_place_bound_and_nonlocal = || -> bool {
+                let place_expr = place_table.place_expr(key.enclosing_place);
+                self.scopes
+                    .iter_enumerated()
+                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
+                    .any(|(scope_id, _)| {
+                        let other_scope_place_table = &self.place_tables[scope_id];
+                        let Some(place_id) =
+                            other_scope_place_table.place_id_by_expr(&place_expr.expr)
+                        else {
+                            return false;
+                        };
+                        let place = other_scope_place_table.place_expr(place_id);
+                        place.is_marked_nonlocal() && place.is_bound()
+                    })
+            };
+
+            key.nested_laziness.is_eager() || !is_place_bound_and_nonlocal()
+        });
+    }
+
+    fn pop_scope(&mut self) -> FileScopeId {
+        self.try_node_context_stack_manager.exit_scope();
+
+        let ScopeInfo {
+            file_scope_id: popped_scope_id,
+            ..
+        } = self
+            .scope_stack
+            .pop()
+            .expect("Root scope should be present");
+
+        self.sweep_lazy_snapshots(popped_scope_id);
+
+        let children_end = self.scopes.next_index();
+
+        let popped_scope = &mut self.scopes[popped_scope_id];
+        popped_scope.extend_descendants(children_end);
+
+        if popped_scope.is_eager() {
+            self.record_eager_snapshots(popped_scope_id);
+        } else {
+            self.record_lazy_snapshots(popped_scope_id);
         }
 
         popped_scope_id
@@ -1037,6 +1156,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
+        self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
@@ -1076,7 +1196,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
-        self.eager_snapshots.shrink_to_fit();
+        self.enclosing_snapshots.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1090,7 +1210,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            eager_snapshots: self.eager_snapshots,
+            enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
         }

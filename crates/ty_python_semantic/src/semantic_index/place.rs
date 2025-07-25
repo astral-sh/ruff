@@ -16,7 +16,9 @@ use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
-use crate::semantic_index::{PlaceSet, SemanticIndex, semantic_index};
+use crate::semantic_index::{
+    PlaceSet, ScopeLaziness, ScopeVisibility, SemanticIndex, semantic_index,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum PlaceExprSubSegment {
@@ -349,6 +351,10 @@ impl PlaceExprWithFlags {
         self.flags.contains(PlaceFlags::MARKED_NONLOCAL)
     }
 
+    pub fn is_reassigned(&self) -> bool {
+        self.flags.contains(PlaceFlags::IS_REASSIGNED)
+    }
+
     pub(crate) fn as_name(&self) -> Option<&Name> {
         self.expr.as_name()
     }
@@ -419,6 +425,7 @@ bitflags! {
         const MARKED_GLOBAL         = 1 << 3;
         const MARKED_NONLOCAL       = 1 << 4;
         const IS_INSTANCE_ATTRIBUTE = 1 << 5;
+        const IS_REASSIGNED         = 1 << 6;
     }
 }
 
@@ -579,6 +586,10 @@ impl Scope {
         self.node().scope_kind()
     }
 
+    pub(crate) fn visibility(&self) -> ScopeVisibility {
+        self.kind().visibility()
+    }
+
     pub fn descendants(&self) -> Range<FileScopeId> {
         self.descendants.clone()
     }
@@ -613,12 +624,27 @@ pub enum ScopeKind {
 
 impl ScopeKind {
     pub(crate) const fn is_eager(self) -> bool {
+        self.laziness().is_eager()
+    }
+
+    pub(crate) const fn laziness(self) -> ScopeLaziness {
         match self {
-            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => true,
+            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => ScopeLaziness::Eager,
             ScopeKind::Annotation
             | ScopeKind::Function
             | ScopeKind::Lambda
-            | ScopeKind::TypeAlias => false,
+            | ScopeKind::TypeAlias => ScopeLaziness::Lazy,
+        }
+    }
+
+    pub(crate) const fn visibility(self) -> ScopeVisibility {
+        match self {
+            ScopeKind::Module | ScopeKind::Class => ScopeVisibility::Public,
+            ScopeKind::Annotation
+            | ScopeKind::TypeAlias
+            | ScopeKind::Function
+            | ScopeKind::Lambda
+            | ScopeKind::Comprehension => ScopeVisibility::Private,
         }
     }
 
@@ -842,6 +868,9 @@ impl PlaceTableBuilder {
     }
 
     pub(super) fn mark_place_bound(&mut self, id: ScopedPlaceId) {
+        if self.table.places[id].is_bound() {
+            self.table.places[id].insert_flags(PlaceFlags::IS_REASSIGNED);
+        }
         self.table.places[id].insert_flags(PlaceFlags::IS_BOUND);
     }
 
@@ -871,6 +900,10 @@ impl PlaceTableBuilder {
 
     pub(super) fn place_expr(&self, place_id: impl Into<ScopedPlaceId>) -> &PlaceExprWithFlags {
         self.table.place_expr(place_id)
+    }
+
+    pub(super) fn is_place_reassigned(&self, place_id: ScopedPlaceId) -> bool {
+        self.table.places[place_id].is_reassigned()
     }
 
     /// Returns the place IDs associated with the place (e.g. `x.y`, `x.y.z`, `x.y.z[0]` for `x`).

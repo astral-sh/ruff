@@ -768,12 +768,14 @@ fn place_by_id<'db>(
                 .expr
                 .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
 
-            if scope.file(db).is_stub(db) {
+            if scope.file(db).is_stub(db) || scope.scope(db).visibility().is_private() {
                 // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
                 // leads to all sorts of downstream problems. Similarly, type variables are often
                 // defined as `_T = TypeVar("_T")`, without being declared.
+                // Also, if the scope is private, such as a function scope,
+                // meaning that the place cannot be rewritten from elsewhere, we do not union with `Unknown`.
 
                 inferred.into()
             } else {

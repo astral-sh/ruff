@@ -24,7 +24,7 @@ use crate::semantic_index::place::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, PlaceExpr, PlaceTable, Scope, ScopeId,
     ScopeKind, ScopedPlaceId,
 };
-use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
 
@@ -188,7 +188,39 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     FileScopeId::global().to_scope_id(db, file)
 }
 
-pub(crate) enum EagerSnapshotResult<'map, 'db> {
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
+pub(crate) enum ScopeVisibility {
+    /// The scope is private (e.g. function, type alias, comprehension scope).
+    Private,
+    /// The scope is public (e.g. module, class scope).
+    Public,
+}
+
+impl ScopeVisibility {
+    pub(crate) const fn is_public(self) -> bool {
+        matches!(self, ScopeVisibility::Public)
+    }
+
+    pub(crate) const fn is_private(self) -> bool {
+        matches!(self, ScopeVisibility::Private)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, get_size2::GetSize)]
+pub(crate) enum ScopeLaziness {
+    /// The scope is evaluated lazily (e.g. function, type alias scope).
+    Lazy,
+    /// The scope is evaluated eagerly (e.g. module, class, comprehension scope).
+    Eager,
+}
+
+impl ScopeLaziness {
+    pub(crate) const fn is_eager(self) -> bool {
+        matches!(self, ScopeLaziness::Eager)
+    }
+}
+
+pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
     FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
     NotFound,
@@ -234,8 +266,8 @@ pub(crate) struct SemanticIndex<'db> {
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
-    /// Map of all of the eager snapshots that appear in this file.
-    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
+    /// Map of all of the enclosing snapshots that appear in this file.
+    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
@@ -484,36 +516,56 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns
     /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
-    ///   (that is, not every scope that will be traversed is eager).
-    /// *  an iterator of bindings for a particular nested eager scope reference if the bindings exist.
-    /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an outer scope symbol.
-    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested eager scope.
-    pub(crate) fn eager_snapshot(
+    ///   (that is, not every scope that will be traversed is eager) and no lazy snapshots were found.
+    /// *  an iterator of bindings for a particular nested scope reference if the bindings exist.
+    /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an enclosing scope place.
+    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested scope.
+    pub(crate) fn enclosing_snapshot(
         &self,
         enclosing_scope: FileScopeId,
         expr: &PlaceExpr,
         nested_scope: FileScopeId,
-    ) -> EagerSnapshotResult<'_, 'db> {
+    ) -> EnclosingSnapshotResult<'_, 'db> {
         for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
             if ancestor_scope_id == enclosing_scope {
                 break;
             }
             if !ancestor_scope.is_eager() {
-                return EagerSnapshotResult::NoLongerInEagerContext;
+                if expr.is_name() {
+                    if let Some(place_id) =
+                        self.place_tables[enclosing_scope].place_id_by_expr(expr)
+                    {
+                        let key = EnclosingSnapshotKey {
+                            enclosing_scope,
+                            enclosing_place: place_id,
+                            nested_scope,
+                            nested_laziness: ScopeLaziness::Lazy,
+                        };
+                        if let Some(id) = self.enclosing_snapshots.get(&key) {
+                            return self.use_def_maps[enclosing_scope]
+                                .inner
+                                .enclosing_snapshot(*id, key.nested_laziness);
+                        }
+                    }
+                }
+                return EnclosingSnapshotResult::NoLongerInEagerContext;
             }
         }
         let Some(place_id) = self.place_tables[enclosing_scope].place_id_by_expr(expr) else {
-            return EagerSnapshotResult::NotFound;
+            return EnclosingSnapshotResult::NotFound;
         };
-        let key = EagerSnapshotKey {
+        let key = EnclosingSnapshotKey {
             enclosing_scope,
             enclosing_place: place_id,
             nested_scope,
+            nested_laziness: ScopeLaziness::Eager,
         };
-        let Some(id) = self.eager_snapshots.get(&key) else {
-            return EagerSnapshotResult::NotFound;
+        let Some(id) = self.enclosing_snapshots.get(&key) else {
+            return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].inner.eager_snapshot(*id)
+        self.use_def_maps[enclosing_scope]
+            .inner
+            .enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
