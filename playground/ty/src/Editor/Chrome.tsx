@@ -142,9 +142,8 @@ export default function Chrome({
   );
 
   const handleVendoredFileChange = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    (vendoredPath: string | null, _previousFileId: FileId | null) => {
-      if (vendoredPath) {
+    (vendoredPath: string | null) => {
+      if (vendoredPath != null) {
         onSelectVendoredFile(vendoredPath);
       } else {
         onClearVendoredFile();
@@ -153,18 +152,11 @@ export default function Chrome({
     [onSelectVendoredFile, onClearVendoredFile],
   );
 
-  const handleAddFile = useCallback(
-    (name: string) => {
-      onAddFile(workspace, name);
-    },
-    [workspace, onAddFile],
-  );
-
   const checkResult = useCheckResult(
     files,
     workspace,
     secondaryTool,
-    files.currentVendoredFile,
+    files.currentVendoredFile?.handle ?? null,
   );
 
   return (
@@ -175,7 +167,7 @@ export default function Chrome({
             files={files.index}
             theme={theme}
             selected={files.selected}
-            onAdd={handleAddFile}
+            onAdd={(name) => onAddFile(workspace, name)}
             onRename={handleFileRenamed}
             onSelect={onSelectFile}
             onRemove={handleRemoved}
@@ -276,7 +268,7 @@ function useCheckResult(
   files: ReadonlyFiles,
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
-  currentVendoredFile: { path: string; previousFileId: FileId } | null,
+  currentVendoredFileHandle: FileHandle | null,
 ): CheckResult {
   const deferredContent = useDeferredValue(
     files.selected == null ? null : files.contents[files.selected],
@@ -285,19 +277,11 @@ function useCheckResult(
   return useMemo(() => {
     // Determine which file handle to use
     let currentHandle: FileHandle | null = null;
-    const isVendoredFile = currentVendoredFile != null;
+    const isVendoredFile = currentVendoredFileHandle != null;
 
-    if (currentVendoredFile) {
+    if (currentVendoredFileHandle) {
       // Viewing a vendored file
-      currentHandle = workspace.getVendoredFile(currentVendoredFile.path);
-
-      if (currentHandle == null) {
-        return {
-          diagnostics: [],
-          error: "Failed to get vendored file handle",
-          secondary: null,
-        };
-      }
+      currentHandle = currentVendoredFileHandle;
     } else {
       // Regular file handling
       if (files.selected == null || deferredContent == null) {
@@ -388,7 +372,7 @@ function useCheckResult(
     files.selected,
     files.handles,
     secondaryTool,
-    currentVendoredFile,
+    currentVendoredFileHandle,
   ]);
 }
 

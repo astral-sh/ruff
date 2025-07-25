@@ -2,9 +2,10 @@ import type { RefObject } from "react";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
 import { FileId, ReadonlyFiles } from "../Playground";
+import type { FileHandle } from "ty_wasm";
 
 interface Props {
-  currentVendoredFile: { path: string; previousFileId: FileId };
+  currentVendoredFile: { handle: FileHandle; previousFileId: FileId };
   files: ReadonlyFiles;
   editorRef: RefObject<{
     editor: editor.IStandaloneCodeEditor;
@@ -65,7 +66,7 @@ export default function VendoredFileBanner({
             Viewing standard library file:
           </span>{" "}
           <code className="font-mono text-blue-700 dark:text-blue-300">
-            {currentVendoredFile.path}
+            {currentVendoredFile.handle.path()}
           </code>
           <span className="text-blue-600 dark:text-blue-400 ml-2 text-xs">
             (read-only)

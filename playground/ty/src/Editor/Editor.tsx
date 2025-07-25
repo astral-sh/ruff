@@ -44,10 +44,7 @@ type Props = {
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
-  onVendoredFileChange?: (
-    vendoredPath: string | null,
-    previousFileId: FileId | null,
-  ) => void;
+  onVendoredFileChange?: (vendoredPath: string | null) => void;
   isViewingVendoredFile?: boolean;
 };
 
@@ -155,10 +152,7 @@ interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
   onOpenFile: (file: FileId) => void;
-  onVendoredFileChange?: (
-    vendoredPath: string | null,
-    previousFileId: FileId | null,
-  ) => void;
+  onVendoredFileChange?: (vendoredPath: string | null) => void;
 }
 
 class PlaygroundServer
@@ -490,13 +484,13 @@ private documentHighlightDisposable: IDisposable;
 
   setCurrentVendoredFile(vendoredPath: string) {
     if (this.props.onVendoredFileChange) {
-      this.props.onVendoredFileChange(vendoredPath, null);
+      this.props.onVendoredFileChange(vendoredPath);
     }
   }
 
   clearVendoredFile() {
     if (this.props.onVendoredFileChange) {
-      this.props.onVendoredFileChange(null, null);
+      this.props.onVendoredFileChange(null);
     }
   }
 
