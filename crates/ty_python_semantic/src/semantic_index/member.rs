@@ -80,10 +80,7 @@ impl Member {
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
         match &*self.expression.segments {
-            [MemberSegment::Attribute(name)] => {
-                // The last segment is a symbol, the second is an attribute.
-                Some(name)
-            }
+            [MemberSegment::Attribute(name)] => Some(name),
             _ => None,
         }
     }
