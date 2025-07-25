@@ -202,7 +202,16 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
+            Type::TypeVar(typevar) => {
+                f.write_str(typevar.name(self.db))?;
+                if let Some(binding_context) = typevar
+                    .binding_context(self.db)
+                    .and_then(|def| def.name(self.db))
+                {
+                    write!(f, "@{binding_context}")?;
+                }
+                Ok(())
+            }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
