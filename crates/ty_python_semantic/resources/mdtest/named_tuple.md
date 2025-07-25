@@ -24,10 +24,12 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# TODO: These should reveal the types of the fields
-reveal_type(alice[0])  # revealed: Unknown
-reveal_type(alice[1])  # revealed: Unknown
-reveal_type(alice[2])  # revealed: Unknown
+# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(Person.__mro__)
+
+reveal_type(alice[0])  # revealed: int
+reveal_type(alice[1])  # revealed: str
+reveal_type(alice[2])  # revealed: int | None
 
 # error: [missing-argument]
 Person(3)
@@ -171,7 +173,17 @@ from collections import namedtuple
 
 Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
+# TODO: should support understanding this as a type
+reveal_type(Person)  # revealed: @Todo(unsupported nested subscript in type[X])
+
 alice = Person(1, "Alice", 42)
+
+# TODO: should be `Person`
+reveal_type(alice)  # revealed: @Todo(unsupported nested subscript in type[X])
+
+# TODO: should be `Unknown`
+reveal_type(alice.id)  # revealed: @Todo(unsupported nested subscript in type[X])
+
 bob = Person(2, "Bob")
 ```
 
