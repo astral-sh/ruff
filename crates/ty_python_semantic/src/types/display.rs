@@ -243,6 +243,9 @@ impl Display for DisplayRepresentation<'_> {
                 f.write_str("]")
             }
             Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class.name(self.db)),
+            Type::TypeAlias(alias) => {
+                write!(f, "{name}", name = alias.name(self.db),)
+            }
         }
     }
 }

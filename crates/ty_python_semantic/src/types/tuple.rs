@@ -254,12 +254,17 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, self.tuple(db).materialize(db, variance))
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
+        TupleType::new(
+            db,
+            self.tuple(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor),
+        )
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -379,11 +384,16 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
@@ -682,19 +692,26 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         )
     }
 
-    fn apply_type_mapping<'a>(
+    fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> TupleSpec<'db> {
+        // TODO maybe use interior mutability in `TypeTransformer` instead of passing around
+        // mutable references to it; then we wouldn't need to collect here.
+        let prefix: Vec<_> = self
+            .prefix
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+            .collect();
         Self::mixed(
-            self.prefix
-                .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            self.variable.apply_type_mapping(db, type_mapping),
+            prefix,
+            self.variable
+                .apply_type_mapping_impl(db, type_mapping, visitor),
             self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
@@ -1007,14 +1024,17 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.apply_type_mapping(db, type_mapping)),
-            Tuple::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),
+            Tuple::Fixed(tuple) => {
+                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
+            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, visitor),
         }
     }
 

@@ -20,7 +20,7 @@ x: IntOrStr = 1
 reveal_type(x)  # revealed: Literal[1]
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: IntOrStr
 ```
 
 ## `__value__` attribute
@@ -49,7 +49,7 @@ type IntOrStrOrBytes = IntOrStr | bytes
 x: IntOrStrOrBytes = 1
 
 def f() -> None:
-    reveal_type(x)  # revealed: int | str | bytes
+    reveal_type(x)  # revealed: IntOrStrOrBytes
 ```
 
 ## Aliased type aliases
@@ -109,7 +109,7 @@ reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 def f(x: IntOrStr) -> None:
-    reveal_type(x)  # revealed: int | str
+    reveal_type(x)  # revealed: IntOrStr
 ```
 
 ### Generic example
@@ -139,9 +139,9 @@ def get_name() -> str:
 IntOrStr = TypeAliasType(get_name(), int | str)
 ```
 
-### Cyclic aliases
+## Cyclic aliases
 
-#### Self-referential
+### Self-referential
 
 ```py
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
@@ -152,7 +152,7 @@ def f(x: OptNestedInt) -> None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
 ```
 
-#### Invalid self-referential
+### Invalid self-referential
 
 ```py
 type IntOr = int | IntOr
@@ -160,10 +160,10 @@ type IntOr = int | IntOr
 def f(x: IntOr):
     reveal_type(x)  # revealed: IntOr
     if not isinstance(x, int):
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Never
 ```
 
-#### Mutually recursive
+### Mutually recursive
 
 ```py
 type A = tuple[B] | None

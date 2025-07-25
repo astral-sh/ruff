@@ -182,6 +182,7 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
+            Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?

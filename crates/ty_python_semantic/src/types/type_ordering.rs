@@ -204,6 +204,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
+        (Type::TypeAlias(left), Type::TypeAlias(right)) => left.cmp(right),
+        (Type::TypeAlias(_), _) => Ordering::Less,
+        (_, Type::TypeAlias(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }

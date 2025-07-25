@@ -135,6 +135,8 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
+            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db)),
+
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
