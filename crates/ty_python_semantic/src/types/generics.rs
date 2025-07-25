@@ -1,22 +1,63 @@
 use std::borrow::Cow;
 
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::infer::bound_legacy_typevars;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, declaration_type,
+    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
+
+/// Returns an iterator of any generic context introduced by the given scope or any enclosing
+/// scope.
+fn enclosing_generic_contexts<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = GenericContext<'db>> {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                binding_type(db, index.expect_single_definition(class.node(module)))
+                    .into_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                binding_type(db, index.expect_single_definition(function.node(module)))
+                    .into_function_literal()?
+                    .signature(db)
+                    .iter()
+                    .last()
+                    .expect("function should have at least one overload")
+                    .generic_context
+            }
+            _ => None,
+        })
+}
+
+/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
+fn bound_legacy_typevars<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &'db SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = TypeVarInstance<'db>> {
+    enclosing_generic_contexts(db, module, index, scope)
+        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
+        .filter(|typevar| typevar.is_legacy(db))
+}
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -107,10 +148,7 @@ impl<'db> GenericContext<'db> {
         let file = definition.file(db);
         let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
-        let containing_scope = index
-            .parent_scope_id(definition.file_scope(db))
-            .expect("function definition should not be top-most scope");
-
+        let containing_scope = definition.file_scope(db);
         for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
             variables.remove(&typevar);
         }
