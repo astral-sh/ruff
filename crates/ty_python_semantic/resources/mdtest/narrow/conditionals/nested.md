@@ -222,9 +222,6 @@ g: str | None = "a"
 class A:
     x: str | None = None
 
-    def __bool__(self):
-        return self.x is not None
-
 a = A()
 
 l: list[str | None] = [None]
@@ -266,7 +263,7 @@ is still valid in the inner lazy scope.
 
 ```py
 def f(l: list[str | None] | None):
-    if l is not None and l[0] is not None:
+    if l is not None:
         def _():
             reveal_type(l)  # revealed: list[str | None]
         l[0] = None
