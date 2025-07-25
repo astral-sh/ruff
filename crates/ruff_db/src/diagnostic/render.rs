@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::num::NonZeroU8;
 use std::path::Path;
 
 use ruff_annotate_snippets::{
@@ -828,6 +829,73 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
+#[derive(Clone, Copy)]
+struct IndentWidth(NonZeroU8);
+
+impl IndentWidth {
+    fn as_usize(self) -> usize {
+        self.0.get() as usize
+    }
+}
+
+impl Default for IndentWidth {
+    fn default() -> Self {
+        Self(NonZeroU8::new(4).unwrap())
+    }
+}
+
+/// A measure of the width of a line of text.
+///
+/// This is used to determine if a line is too long.
+/// It should be compared to a [`LineLength`].
+#[derive(Clone, Copy)]
+struct LineWidthBuilder {
+    /// The width of the line.
+    width: usize,
+    /// The column of the line.
+    /// This is used to calculate the width of tabs.
+    column: usize,
+    /// The tab size to use when calculating the width of tabs.
+    tab_size: IndentWidth,
+}
+
+impl LineWidthBuilder {
+    fn get(&self) -> usize {
+        self.width
+    }
+
+    /// Creates a new `LineWidth` with the given tab size.
+    fn new(tab_size: IndentWidth) -> Self {
+        LineWidthBuilder {
+            width: 0,
+            column: 0,
+            tab_size,
+        }
+    }
+
+    /// Adds the given character to the line width.
+    #[must_use]
+    fn add_char(mut self, c: char) -> Self {
+        let tab_size: usize = self.tab_size.as_usize();
+        match c {
+            '\t' => {
+                let tab_offset = tab_size - (self.column % tab_size);
+                self.width += tab_offset;
+                self.column += tab_offset;
+            }
+            '\n' | '\r' => {
+                self.width = 0;
+                self.column = 0;
+            }
+            _ => {
+                self.width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+                self.column += 1;
+            }
+        }
+        self
+    }
+}
+
 /// Given some source code and annotation ranges, this routine replaces tabs
 /// with ASCII whitespace, and unprintable characters with printable
 /// representations of them.
@@ -840,8 +908,7 @@ fn replace_whitespace_and_unprintable<'r>(
 ) -> EscapedSourceCode<'r> {
     let mut result = String::new();
     let mut last_end = 0;
-    let mut column = 0;
-    const TAB_SIZE: usize = 4;
+    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
 
     // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
     // `source`) is replaced with `len` bytes.
@@ -872,24 +939,19 @@ fn replace_whitespace_and_unprintable<'r>(
     };
 
     for (index, c) in source.char_indices() {
+        let old_width = line_width.get();
+        line_width = line_width.add_char(c);
+
         if matches!(c, '\t') {
-            let tab_offset = TAB_SIZE - (column % TAB_SIZE);
-            column += tab_offset;
-            let tab_width = u32::try_from(tab_offset).expect("small width because of tab size");
+            let tab_width = u32::try_from(line_width.get() - old_width)
+                .expect("small width because of tab size");
             result.push_str(&source[last_end..index]);
             for _ in 0..tab_width {
                 result.push(' ');
             }
             last_end = index + 1;
             update_ranges(index, tab_width);
-        } else {
-            match c {
-                '\n' | '\r' => column = 0,
-                _ => column += 1,
-            }
-        }
-
-        if let Some(printable) = unprintable_replacement(c) {
+        } else if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
             result.push(printable);
             last_end = index + 1;
