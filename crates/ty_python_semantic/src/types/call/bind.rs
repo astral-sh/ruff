@@ -643,9 +643,9 @@ impl<'db> Bindings<'db> {
                                 // TODO: Handle generic functions, and unions/intersections of
                                 // generic types
                                 overload.set_return_type(match ty {
-                                    Type::ClassLiteral(class) => (class.generic_context(db))
+                                    Type::ClassLiteral(class) => class.generic_context(db)
                                         .map(|generic_context| generic_context.as_tuple(db))
-                                        .unwrap_or(Type::none(db)),
+                                        .unwrap_or_else(|| Type::none(db)),
 
                                     Type::FunctionLiteral(function) => {
                                         function_generic_context(*function)
