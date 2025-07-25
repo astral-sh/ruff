@@ -299,7 +299,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack);
+        let context = update_context(token, prev, prev_prev, &mut stack, settings);
 
         check_token(
             token,
@@ -427,6 +427,7 @@ fn update_context(
     prev: SimpleToken,
     prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
+    settings: &LinterSettings,
 ) -> Context {
     let new_context = match token.ty {
         TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
@@ -436,14 +437,28 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
-        TokenType::OpeningSquareBracket => match (prev.ty, prev_prev.ty) {
-            (TokenType::Named, TokenType::Def) => Context::new(ContextType::TypeParameters),
-            (TokenType::Named, TokenType::Class) => Context::new(ContextType::TypeParameters),
-            (TokenType::Named, TokenType::Type) => Context::new(ContextType::TypeParameters),
-            (TokenType::Named | TokenType::String, _) => Context::new(ContextType::List),
-            (TokenType::ClosingBracket, _) => Context::new(ContextType::Subscript),
-            _ => Context::new(ContextType::List),
-        },
+        TokenType::OpeningSquareBracket => {
+            if is_trailing_comma_type_params_enabled(settings) {
+                match (prev.ty, prev_prev.ty) {
+                    (TokenType::Named, TokenType::Def) => Context::new(ContextType::TypeParameters),
+                    (TokenType::Named, TokenType::Class) => {
+                        Context::new(ContextType::TypeParameters)
+                    }
+                    (TokenType::Named, TokenType::Type) => {
+                        Context::new(ContextType::TypeParameters)
+                    }
+                    (TokenType::Named | TokenType::String, _) => Context::new(ContextType::List),
+                    (TokenType::ClosingBracket, _) => Context::new(ContextType::Subscript),
+                    _ => Context::new(ContextType::List),
+                }
+            } else {
+                match prev.ty {
+                    TokenType::Named => Context::new(ContextType::List),
+                    TokenType::ClosingBracket => Context::new(ContextType::Subscript),
+                    _ => Context::new(ContextType::List),
+                }
+            }
+        }
         TokenType::OpeningCurlyBracket => Context::new(ContextType::Dict),
         TokenType::Lambda => Context::new(ContextType::LambdaParameters),
         TokenType::For => {
