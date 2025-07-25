@@ -59,7 +59,7 @@ jobs:
           mv target/release/ty ty-new
 
           echo "old commit (merge base)"
-          MERGE_BASE="$(git merge-base "${{ github.event.pull_request.head.sha }}" "origin/${{ github.event.pull_request.base.ref }}")"
+          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
           git checkout -b old_commit "$MERGE_BASE"
           git rev-list --format=%s --max-count=1 old_commit
           cargo build --release --bin ty
