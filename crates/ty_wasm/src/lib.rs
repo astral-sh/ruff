@@ -15,9 +15,11 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, NavigationTargets, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints, signature_help,
+    MarkupKind, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_type_definition, hover,
+    inlay_hints, references,
 };
+use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -158,28 +160,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: ruff_db::files::FilePath::System(path),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -198,18 +207,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -337,30 +350,14 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) = references(&self.db, file_id.file, offset, true) else {
             return Ok(Vec::new());
         };
 
         Ok(targets
             .into_iter()
-            .map(|target| LocationLink {
-                path: target.file().path(&self.db).to_string(),
-                full_range: Range::from_file_range(
-                    &self.db,
-                    target.file_range(),
-                    self.position_encoding,
-                ),
-                selection_range: Some(Range::from_file_range(
-                    &self.db,
-                    target.file_range(),
-                    self.position_encoding,
-                )),
-                origin_selection_range: Some(Range::from_text_range(
-                    ruff_text_size::TextRange::new(offset, offset),
-                    &index,
-                    &source,
-                    self.position_encoding,
-                )),
+            .flat_map(|target| {
+                map_targets_to_links(&self.db, target, &source, &index, self.position_encoding)
             })
             .collect())
     }
@@ -556,6 +553,40 @@ impl Workspace {
             })
             .collect())
     }
+
+    /// Reads the contents of a vendored file by its path.
+    #[wasm_bindgen(js_name = "readVendoredFile")]
+    pub fn read_vendored_file(&self, path: &str) -> Result<String, Error> {
+        use ruff_db::vendored::VendoredPath;
+
+        let vendored_path = VendoredPath::new(path);
+        self.db
+            .vendored()
+            .read_to_string(vendored_path)
+            .map_err(into_error)
+    }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFileHandle")]
+    pub fn get_vendored_file_handle(&self, path: &str) -> Result<FileHandle, Error> {
+        use ruff_db::files::vendored_path_to_file;
+        use ruff_db::vendored::VendoredPath;
+
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {}: {}", path, err)))?;
+
+        // Create a FilePath::Vendored for the vendored file
+        let file_path = ruff_db::files::FilePath::Vendored(vendored_path.to_path_buf());
+
+        Ok(FileHandle {
+            file,
+            path: file_path,
+        })
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -598,7 +629,7 @@ fn map_targets_to_links(
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: ruff_db::files::FilePath,
     file: File,
 }
 
@@ -606,11 +637,11 @@ pub struct FileHandle {
 impl FileHandle {
     #[wasm_bindgen(js_name = toString)]
     pub fn js_to_string(&self) -> String {
-        format!("file(id: {:?}, path: {})", self.file, self.path)
+        format!("file(id: {:?}, path: {})", self.file, self.path.as_str())
     }
 
     pub fn path(&self) -> String {
-        self.path.to_string()
+        self.path.as_str().to_string()
     }
 }
 

@@ -68,6 +68,12 @@ export default function Chrome({
     null,
   );
 
+  const [currentVendoredFile, setCurrentVendoredFile] = useState<{
+    path: string;
+    previousFileId: FileId | null;
+  } | null>(null);
+
+
   const editorRef = useRef<{
     editor: editor.IStandaloneCodeEditor;
     monaco: Monaco;
@@ -134,6 +140,21 @@ export default function Chrome({
     [workspace, files.index, onRemoveFile],
   );
 
+  const handleVendoredFileChange = useCallback(
+    (vendoredPath: string | null, previousFileId: FileId | null) => {
+      if (vendoredPath) {
+        setCurrentVendoredFile(current => {
+          // If we're already viewing a vendored file, preserve the original previousFileId
+          const preservedPreviousFileId = current?.previousFileId ?? previousFileId;
+          return { path: vendoredPath, previousFileId: preservedPreviousFileId };
+        });
+      } else {
+        setCurrentVendoredFile(null);
+      }
+    },
+    [],
+  );
+
   const checkResult = useCheckResult(files, workspace, secondaryTool);
 
   return (
@@ -153,11 +174,71 @@ export default function Chrome({
             <Panel
               id="main"
               order={0}
-              className="flex flex-col gap-2 my-4"
+              className={`flex flex-col gap-2 ${currentVendoredFile ? "mb-4" : "my-4"}`}
               minSize={10}
             >
               <PanelGroup id="vertical" direction="vertical">
-                <Panel minSize={10} className="my-2" order={0}>
+                <Panel minSize={10} className={currentVendoredFile ? "mb-2" : "my-2"} order={0}>
+                  {currentVendoredFile && (
+                    <div className="bg-blue-50 dark:bg-blue-900 px-3 py-2 border-b border-blue-200 dark:border-blue-700 text-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-medium text-blue-800 dark:text-blue-200">Viewing standard library file:</span>{" "}
+                          <code className="font-mono text-blue-700 dark:text-blue-300">{currentVendoredFile.path}</code>
+                          <span className="text-blue-600 dark:text-blue-400 ml-2 text-xs">
+                            (read-only)
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            
+                            if (currentVendoredFile?.previousFileId != null) {
+                              
+                              // Find the previous file
+                              const previousFile = files.index.find(f => f.id === currentVendoredFile.previousFileId);
+                              
+                              if (previousFile) {
+                                
+                                // Force the editor to switch back to the user file immediately
+                                if (editorRef.current) {
+                                  const monaco = editorRef.current.monaco;
+                                  const fileUri = monaco.Uri.file(previousFile.name);
+                                  
+                                  
+                                  // Get or create the model for the user file
+                                  let userModel = monaco.editor.getModel(fileUri);
+                                  if (!userModel) {
+                                    userModel = monaco.editor.createModel(
+                                      files.contents[currentVendoredFile.previousFileId] || '',
+                                      'python',
+                                      fileUri
+                                    );
+                                  } else {
+                                    // Update the model content
+                                    userModel.setValue(files.contents[currentVendoredFile.previousFileId] || '');
+                                  }
+                                  
+                                  // Force the editor to use this model
+                                  editorRef.current.editor.setModel(userModel);
+                                }
+                                
+                                // Clear vendored file state AFTER forcing the editor change
+                                setCurrentVendoredFile(null);
+                                
+                                // Update the application state
+                                onSelectFile(currentVendoredFile.previousFileId);
+                              }
+                            } else {
+                              setCurrentVendoredFile(null);
+                            }
+                          }}
+                          className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+                        >
+                          Back to {currentVendoredFile.previousFileId ? files.index.find(f => f.id === currentVendoredFile.previousFileId)?.name || 'file' : 'editor'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <Editor
                     theme={theme}
                     visible={true}
@@ -169,6 +250,8 @@ export default function Chrome({
                     onMount={handleEditorMount}
                     onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
+                    onVendoredFileChange={handleVendoredFileChange}
+                    isViewingVendoredFile={currentVendoredFile != null}
                   />
                   {checkResult.error ? (
                     <div
