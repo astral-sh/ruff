@@ -686,34 +686,30 @@ cls = MyClass
             .source(
                 "utils.py",
                 "
-def helper_fun<CURSOR>ction(x):
+def fun<CURSOR>c(x):
     return x * 2
 ",
             )
             .source(
                 "module.py",
                 "
-from utils import helper_function
+from utils import func
 
 def process_data(data):
-    return helper_function(data)
-
-def double_process(data):
-    result = helper_function(data)
-    return helper_function(result)
+    return func(data)
 ",
             )
             .source(
                 "app.py",
                 "
-from utils import helper_function
+from utils import func
 
 class DataProcessor:
     def __init__(self):
-        self.multiplier = helper_function
+        self.multiplier = func
     
     def process(self, value):
-        return helper_function(value)
+        return func(value)
 ",
             )
             .build();
@@ -722,37 +718,35 @@ class DataProcessor:
         info[references]: Reference 1
          --> utils.py:2:5
           |
-        2 | def helper_function(x):
-          |     ^^^^^^^^^^^^^^^
+        2 | def func(x):
+          |     ^^^^
         3 |     return x * 2
           |
 
         info[references]: Reference 2
-         --> module.py:5:12
+         --> module.py:2:19
           |
+        2 | from utils import func
+          |                   ^^^^
+        3 |
         4 | def process_data(data):
-        5 |     return helper_function(data)
-          |            ^^^^^^^^^^^^^^^
-        6 |
-        7 | def double_process(data):
           |
 
         info[references]: Reference 3
-         --> module.py:8:14
+         --> module.py:5:12
           |
-        7 | def double_process(data):
-        8 |     result = helper_function(data)
-          |              ^^^^^^^^^^^^^^^
-        9 |     return helper_function(result)
+        4 | def process_data(data):
+        5 |     return func(data)
+          |            ^^^^
           |
 
         info[references]: Reference 4
-         --> module.py:9:12
+         --> app.py:2:19
           |
-        7 | def double_process(data):
-        8 |     result = helper_function(data)
-        9 |     return helper_function(result)
-          |            ^^^^^^^^^^^^^^^
+        2 | from utils import func
+          |                   ^^^^
+        3 |
+        4 | class DataProcessor:
           |
 
         info[references]: Reference 5
@@ -760,8 +754,8 @@ class DataProcessor:
           |
         4 | class DataProcessor:
         5 |     def __init__(self):
-        6 |         self.multiplier = helper_function
-          |                           ^^^^^^^^^^^^^^^
+        6 |         self.multiplier = func
+          |                           ^^^^
         7 |     
         8 |     def process(self, value):
           |
@@ -770,8 +764,8 @@ class DataProcessor:
          --> app.py:9:16
           |
         8 |     def process(self, value):
-        9 |         return helper_function(value)
-          |                ^^^^^^^^^^^^^^^
+        9 |         return func(value)
+          |                ^^^^
           |
         ");
     }
@@ -850,6 +844,51 @@ def process_model():
         7 |     model.attr = 100
         8 |     return model.attr
           |                  ^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_import_alias_references_should_not_resolve_to_original() {
+        let test = CursorTest::builder()
+            .source(
+                "original.py",
+                "
+def func():
+    pass
+
+func()
+",
+            )
+            .source(
+                "importer.py",
+                "
+from original import func as func_alias
+
+func<CURSOR>_alias()
+",
+            )
+            .build();
+
+        // When finding references to the alias, we should NOT find references
+        // to the original function in the original module
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> importer.py:2:30
+          |
+        2 | from original import func as func_alias
+          |                              ^^^^^^^^^^
+        3 |
+        4 | func_alias()
+          |
+
+        info[references]: Reference 2
+         --> importer.py:4:1
+          |
+        2 | from original import func as func_alias
+        3 |
+        4 | func_alias()
+          | ^^^^^^^^^^
           |
         ");
     }

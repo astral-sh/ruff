@@ -7,9 +7,10 @@ use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
     HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
-    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    MessageType, RenameOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
@@ -210,6 +211,10 @@ impl Server {
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
             references_provider: Some(lsp_types::OneOf::Left(true)),
+            rename_provider: Some(lsp_types::OneOf::Right(RenameOptions {
+                prepare_provider: Some(true),
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+            })),
             document_highlight_provider: Some(lsp_types::OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
