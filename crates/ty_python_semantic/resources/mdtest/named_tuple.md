@@ -24,6 +24,10 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
+# TODO: element 1 should be `tuple[int, str, int | None]`, not `tuple[Unknown, ...]`
+# revealed: tuple[<class 'Person'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(Person.__mro__)
+
 # TODO: These should reveal the types of the fields
 reveal_type(alice[0])  # revealed: Unknown
 reveal_type(alice[1])  # revealed: Unknown
@@ -171,7 +175,17 @@ from collections import namedtuple
 
 Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
 
+# TODO: should support understanding this as a type
+reveal_type(Person)  # revealed: @Todo(unsupported nested subscript in type[X])
+
 alice = Person(1, "Alice", 42)
+
+# TODO: should be `Person`
+reveal_type(alice)  # revealed: @Todo(unsupported nested subscript in type[X])
+
+# TODO: should be `Unknown`
+reveal_type(alice.id)  # revealed: @Todo(unsupported nested subscript in type[X])
+
 bob = Person(2, "Bob")
 ```
 
