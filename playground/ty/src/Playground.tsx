@@ -128,11 +128,9 @@ export default function Playground() {
     dispatchFiles({ type: "selectFile", id: file });
   }, []);
 
-  const handleVendoredFileSelected = useCallback((path: string) => {
-    if (workspace != null) {
-      dispatchFiles({ type: "selectVendoredFile", path, workspace });
-    }
-  }, [workspace]);
+  const handleVendoredFileSelected = useCallback((handle: FileHandle) => {
+    dispatchFiles({ type: "selectVendoredFile", handle });
+  }, []);
 
   const handleVendoredFileCleared = useCallback(() => {
     dispatchFiles({ type: "clearVendoredFile" });
@@ -331,8 +329,7 @@ export type FileAction =
   | { type: "reset" }
   | {
       type: "selectVendoredFile";
-      path: string;
-      workspace: Workspace;
+      handle: FileHandle;
     }
   | { type: "clearVendoredFile" };
 
@@ -449,7 +446,7 @@ function filesReducer(
     }
 
     case "selectVendoredFile": {
-      const { path, workspace } = action;
+      const { handle } = action;
 
       // We should always have a selected file when navigating to vendored files
       const previousFileId =
@@ -458,9 +455,6 @@ function filesReducer(
         // This should never happen in practice, but handle it gracefully
         return state;
       }
-
-      // Get the file handle for the vendored file  
-      const handle = workspace.getVendoredFile(path);
 
       return {
         ...state,

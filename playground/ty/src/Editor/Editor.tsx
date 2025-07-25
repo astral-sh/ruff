@@ -24,6 +24,7 @@ import {
   Severity,
   type Workspace,
   CompletionKind,
+  type FileHandle,
   DocumentHighlight,
   DocumentHighlightKind,
 } from "ty_wasm";
@@ -44,8 +45,8 @@ type Props = {
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
-  onVendoredFileChange?: (vendoredPath: string | null) => void;
-  isViewingVendoredFile?: boolean;
+  onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
+  isViewingVendoredFile: boolean;
 };
 
 export default function Editor({
@@ -152,7 +153,7 @@ interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
   onOpenFile: (file: FileId) => void;
-  onVendoredFileChange?: (vendoredPath: string | null) => void;
+  onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
 }
 
 class PlaygroundServer
@@ -185,7 +186,7 @@ class PlaygroundServer
   private signatureHelpDisposable: IDisposable;
 private documentHighlightDisposable: IDisposable;
   // Cache for vendored file handles
-  private vendoredFileHandles = new Map<string, any>();
+  private vendoredFileHandles = new Map<string, FileHandle>();
 
   private getVendoredPath(uri: Uri): string {
     // Monaco parses "vendored://stdlib/typing.pyi" as authority="stdlib", path="/typing.pyi"
@@ -411,10 +412,11 @@ private documentHighlightDisposable: IDisposable;
     this.props = props;
   }
 
-  private getOrCreateVendoredFileHandle(vendoredPath: string) {
+  private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
+    const cachedHandle = this.vendoredFileHandles.get(vendoredPath);
     // Check if we already have a handle for this vendored file
-    if (this.vendoredFileHandles.has(vendoredPath)) {
-      return this.vendoredFileHandles.get(vendoredPath);
+    if (cachedHandle != null) {
+      return cachedHandle;
     }
 
     // Use the new WASM method to get a proper file handle for the vendored file
@@ -423,24 +425,12 @@ private documentHighlightDisposable: IDisposable;
     return handle;
   }
 
-  private getVendoredFileHandle(model: editor.ITextModel) {
-    if (model.uri.scheme !== "vendored") {
-      return null;
-    }
-
-    const vendoredPath = this.getVendoredPath(model.uri);
-    return this.vendoredFileHandles.get(vendoredPath) || null;
-  }
-
   private getFileHandleForModel(model: editor.ITextModel) {
     // Handle vendored files
     if (model.uri.scheme === "vendored") {
-      const vendoredHandle = this.getVendoredFileHandle(model);
-      if (vendoredHandle) {
-        return vendoredHandle;
-      }
-      // If not cached, try to create it
       const vendoredPath = this.getVendoredPath(model.uri);
+
+      // If not cached, try to create it
       return this.getOrCreateVendoredFileHandle(vendoredPath);
     }
 
@@ -480,18 +470,6 @@ private documentHighlightDisposable: IDisposable;
             : 0,
       },
     };
-  }
-
-  setCurrentVendoredFile(vendoredPath: string) {
-    if (this.props.onVendoredFileChange) {
-      this.props.onVendoredFileChange(vendoredPath);
-    }
-  }
-
-  clearVendoredFile() {
-    if (this.props.onVendoredFileChange) {
-      this.props.onVendoredFileChange(null);
-    }
   }
 
   updateDiagnostics(diagnostics: Array<Diagnostic>) {
@@ -666,17 +644,14 @@ private documentHighlightDisposable: IDisposable;
       // Get a file handle for this vendored file
       const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
 
-      // Read the vendored file content using the file handle
-      const content = this.props.workspace.sourceText(fileHandle);
-
       // Create or get the model for the vendored file
       let model = this.monaco.editor.getModel(resource);
+
       if (model == null) {
+        // Read the vendored file content using the file handle
+        const content = this.props.workspace.sourceText(fileHandle);
         // Ensure vendored files get proper Python language features
         model = this.monaco.editor.createModel(content, "python", resource);
-      } else {
-        // Update the model content in case it changed
-        model.setValue(content);
       }
 
       // Set the model and reveal the position
@@ -696,7 +671,7 @@ private documentHighlightDisposable: IDisposable;
       }
 
       // Track that we're now viewing a vendored file
-      this.setCurrentVendoredFile(vendoredPath);
+      this.props.onVendoredFileChange(fileHandle);
       return true;
     }
 
@@ -729,9 +704,6 @@ private documentHighlightDisposable: IDisposable;
 
     // Set the model on the editor
     source.setModel(model);
-
-    // Clear vendored file state when opening a regular file
-    this.clearVendoredFile();
 
     // Always call onOpenFile to ensure the UI state is updated
     this.props.onOpenFile(fileId);

@@ -51,7 +51,7 @@ export interface Props {
 
   onSelectFile(id: FileId): void;
 
-  onSelectVendoredFile(path: string): void;
+  onSelectVendoredFile(handle: FileHandle): void;
 
   onClearVendoredFile(): void;
 }
@@ -141,17 +141,6 @@ export default function Chrome({
     [workspace, files.index, onRemoveFile],
   );
 
-  const handleVendoredFileChange = useCallback(
-    (vendoredPath: string | null) => {
-      if (vendoredPath != null) {
-        onSelectVendoredFile(vendoredPath);
-      } else {
-        onClearVendoredFile();
-      }
-    },
-    [onSelectVendoredFile, onClearVendoredFile],
-  );
-
   const checkResult = useCheckResult(
     files,
     workspace,
@@ -204,7 +193,7 @@ export default function Chrome({
                     onMount={handleEditorMount}
                     onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
-                    onVendoredFileChange={handleVendoredFileChange}
+                    onVendoredFileChange={onSelectVendoredFile}
                     isViewingVendoredFile={files.currentVendoredFile != null}
                   />
                   {checkResult.error ? (
@@ -276,30 +265,24 @@ function useCheckResult(
 
   return useMemo(() => {
     // Determine which file handle to use
-    let currentHandle: FileHandle | null = null;
+    const currentHandle =
+      (currentVendoredFileHandle ?? files.selected == null)
+        ? null
+        : files.handles[files.selected];
+
     const isVendoredFile = currentVendoredFileHandle != null;
 
-    if (currentVendoredFileHandle) {
-      // Viewing a vendored file
-      currentHandle = currentVendoredFileHandle;
-    } else {
-      // Regular file handling
-      if (files.selected == null || deferredContent == null) {
-        return {
-          diagnostics: [],
-          error: null,
-          secondary: null,
-        };
-      }
-
-      currentHandle = files.handles[files.selected];
-      if (currentHandle == null || !isPythonFile(currentHandle)) {
-        return {
-          diagnostics: [],
-          error: null,
-          secondary: null,
-        };
-      }
+    // Regular file handling
+    if (
+      currentHandle == null ||
+      deferredContent == null ||
+      !isPythonFile(currentHandle)
+    ) {
+      return {
+        diagnostics: [],
+        error: null,
+        secondary: null,
+      };
     }
 
     try {
