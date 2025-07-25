@@ -184,7 +184,7 @@ class PlaygroundServer
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
-private documentHighlightDisposable: IDisposable;
+  private documentHighlightDisposable: IDisposable;
   // Cache for vendored file handles
   private vendoredFileHandles = new Map<string, FileHandle>();
 
