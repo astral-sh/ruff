@@ -1,3 +1,4 @@
+use ruff_python_ast::InterpolatedStringElement;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -55,8 +56,64 @@ fn check_msg(checker: &Checker, msg: &Expr) {
             _ => {}
         },
         // Check for f-strings.
-        Expr::FString(_) => {
-            checker.report_diagnostic_if_enabled(LoggingFString, msg.range());
+        Expr::FString(f_string) => {
+            if checker.is_rule_enabled(Rule::LoggingFString) {
+                let mut format_string = String::new();
+                let mut args = Vec::new();
+                let mut simple = true;
+
+                for f in f_string.value.f_strings() {
+                    for element in &f.elements {
+                        match element {
+                            InterpolatedStringElement::Literal(lit) => {
+                                format_string.push_str(lit.value.as_ref());
+                            }
+
+                            InterpolatedStringElement::Interpolation(interpolated) => {
+                                if interpolated.format_spec.is_some()
+                                    || !matches!(
+                                        interpolated.conversion,
+                                        ruff_python_ast::ConversionFlag::None
+                                    )
+                                {
+                                    simple = false;
+                                    break;
+                                }
+
+                                match interpolated.expression.as_ref() {
+                                    Expr::Name(name) => {
+                                        format_string.push_str("%s");
+                                        args.push(name.id.to_string());
+                                    }
+
+                                    _ => {
+                                        simple = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if simple && !args.is_empty() {
+                    // Always emit comma-separated arguments, not a tuple, even for >1 arg
+                    let replacement = format!(
+                        "\"{format_string}\"{sep}{args}",
+                        sep = if args.is_empty() {
+                            ""
+                        } else {
+                            ", "
+                        },
+                        args = args.join(", ")
+                    );
+                    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
+                    let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
+                    diagnostic.set_fix(fix);
+                } else {
+                    checker.report_diagnostic(LoggingFString, msg.range());
+                }
+            }
         }
         // Check for .format() calls.
         Expr::Call(ast::ExprCall { func, .. }) => {
