@@ -383,15 +383,23 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         other: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, self.name).place
-        else {
-            return false;
-        };
-
         match &self.kind {
-            // TODO: consider the types of the attribute on `other` for property/method members
-            ProtocolMemberKind::Method(_) | ProtocolMemberKind::Property(_) => true,
+            // TODO: consider the types of the attribute on `other` for method members
+            ProtocolMemberKind::Method(_) => matches!(
+                other.to_meta_type(db).member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            ),
+            // TODO: consider the types of the attribute on `other` for property members
+            ProtocolMemberKind::Property(_) => matches!(
+                other.member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            ),
             ProtocolMemberKind::Other(member_type) => {
+                let Place::Type(attribute_type, Boundness::Bound) =
+                    other.member(db, self.name).place
+                else {
+                    return false;
+                };
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
             }
