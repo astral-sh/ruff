@@ -340,6 +340,7 @@ impl<'db> OverloadLiteral<'db> {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         });
+
         Signature::from_function(
             db,
             generic_context,
