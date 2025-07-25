@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-missing_maxsplit_arg.py:14:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:14:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 12 | # Errors
 13 | ## Test split called directly on string literal
@@ -22,7 +22,7 @@ missing_maxsplit_arg.py:14:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 16 16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
 17 17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:15:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:15:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 13 | ## Test split called directly on string literal
 14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
@@ -43,7 +43,7 @@ missing_maxsplit_arg.py:15:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 17 17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
 18 18 | 
 
-missing_maxsplit_arg.py:16:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:16:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
 15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
@@ -63,7 +63,7 @@ missing_maxsplit_arg.py:16:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 18 18 | 
 19 19 | ## Test split called on string variable
 
-missing_maxsplit_arg.py:17:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:17:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
 16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -84,7 +84,7 @@ missing_maxsplit_arg.py:17:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 19 19 | ## Test split called on string variable
 20 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:20:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:20:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 19 | ## Test split called on string variable
 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
@@ -104,7 +104,7 @@ missing_maxsplit_arg.py:20:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 22 22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
 23 23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:21:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:21:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 19 | ## Test split called on string variable
 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
@@ -125,7 +125,7 @@ missing_maxsplit_arg.py:21:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 23 23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
 24 24 | 
 
-missing_maxsplit_arg.py:22:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:22:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
 21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
@@ -145,7 +145,7 @@ missing_maxsplit_arg.py:22:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 24 24 | 
 25 25 | ## Test split called on class attribute
 
-missing_maxsplit_arg.py:23:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:23:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
 22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -166,7 +166,7 @@ missing_maxsplit_arg.py:23:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 25 25 | ## Test split called on class attribute
 26 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:26:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:26:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 25 | ## Test split called on class attribute
 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
@@ -186,7 +186,7 @@ missing_maxsplit_arg.py:26:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 28 28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
 29 29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:27:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:27:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 25 | ## Test split called on class attribute
 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
@@ -207,7 +207,7 @@ missing_maxsplit_arg.py:27:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 29 29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 30 30 | 
 
-missing_maxsplit_arg.py:28:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:28:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
 27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
@@ -227,7 +227,7 @@ missing_maxsplit_arg.py:28:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 30 30 | 
 31 31 | ## Test split called on sliced string
 
-missing_maxsplit_arg.py:29:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:29:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
 28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -248,7 +248,7 @@ missing_maxsplit_arg.py:29:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 31 31 | ## Test split called on sliced string
 32 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:32:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:32:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 31 | ## Test split called on sliced string
 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
@@ -268,7 +268,7 @@ missing_maxsplit_arg.py:32:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 34 34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
 35 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:33:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:33:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 31 | ## Test split called on sliced string
 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
@@ -289,7 +289,7 @@ missing_maxsplit_arg.py:33:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 35 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 36 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:34:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:34:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
 33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
@@ -310,7 +310,7 @@ missing_maxsplit_arg.py:34:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 36 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
 37 37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:35:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:35:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
 34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
@@ -331,7 +331,7 @@ missing_maxsplit_arg.py:35:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 37 37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
 38 38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:36:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:36:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
@@ -352,7 +352,7 @@ missing_maxsplit_arg.py:36:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 38 38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
 39 39 | 
 
-missing_maxsplit_arg.py:37:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:37:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -372,7 +372,7 @@ missing_maxsplit_arg.py:37:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 39 39 | 
 40 40 | ## Test sep given as named argument
 
-missing_maxsplit_arg.py:38:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:38:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
 37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -393,7 +393,7 @@ missing_maxsplit_arg.py:38:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 40 40 | ## Test sep given as named argument
 41 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:41:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:41:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 40 | ## Test sep given as named argument
 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
@@ -413,7 +413,7 @@ missing_maxsplit_arg.py:41:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 43 43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
 44 44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:42:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:42:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 40 | ## Test sep given as named argument
 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
@@ -434,7 +434,7 @@ missing_maxsplit_arg.py:42:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 44 44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
 45 45 | 
 
-missing_maxsplit_arg.py:43:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:43:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
 42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
@@ -454,7 +454,7 @@ missing_maxsplit_arg.py:43:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 45 45 | 
 46 46 | ## Special cases
 
-missing_maxsplit_arg.py:44:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:44:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
 43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
@@ -475,7 +475,7 @@ missing_maxsplit_arg.py:44:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 46 46 | ## Special cases
 47 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:47:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:47:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 46 | ## Special cases
 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
@@ -495,7 +495,7 @@ missing_maxsplit_arg.py:47:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 49 49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
 50 50 | 
 
-missing_maxsplit_arg.py:48:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:48:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 46 | ## Special cases
 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
@@ -515,7 +515,7 @@ missing_maxsplit_arg.py:48:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 50 50 | 
 51 51 | ## Test class attribute named split
 
-missing_maxsplit_arg.py:49:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:49:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
 48 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
@@ -536,7 +536,7 @@ missing_maxsplit_arg.py:49:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 51 51 | ## Test class attribute named split
 52 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:52:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:52:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 51 | ## Test class attribute named split
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
@@ -556,7 +556,7 @@ missing_maxsplit_arg.py:52:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 54 54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
 55 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:53:1: PLC0207 [*] Instead of `str.split()`, call `str.rsplit()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:53:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 51 | ## Test class attribute named split
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
@@ -577,7 +577,7 @@ missing_maxsplit_arg.py:53:1: PLC0207 [*] Instead of `str.split()`, call `str.rs
 55 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 56 56 | 
 
-missing_maxsplit_arg.py:54:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.split()` and pass `maxsplit=1`
+missing_maxsplit_arg.py:54:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
 53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
@@ -597,7 +597,7 @@ missing_maxsplit_arg.py:54:1: PLC0207 [*] Instead of `str.rsplit()`, call `str.s
 56 56 | 
 57 57 | ## Test unpacked dict literal kwargs 
 
-missing_maxsplit_arg.py:55:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
+missing_maxsplit_arg.py:55:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
    |
 53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
 54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -618,7 +618,7 @@ missing_maxsplit_arg.py:55:1: PLC0207 [*] Pass `maxsplit=1` into `str.rsplit()`
 57 57 | ## Test unpacked dict literal kwargs 
 58 58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
 
-missing_maxsplit_arg.py:58:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:58:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
    |
 57 | ## Test unpacked dict literal kwargs 
 58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
@@ -626,7 +626,7 @@ missing_maxsplit_arg.py:58:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
    |
    = help: Pass `maxsplit=1` into `str.split()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 55 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 56 56 | 
 57 57 | ## Test unpacked dict literal kwargs 
@@ -636,7 +636,7 @@ missing_maxsplit_arg.py:58:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 60 60 | 
 61 61 | # OK
 
-missing_maxsplit_arg.py:179:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:179:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
 177 | # Errors
 178 | kwargs_without_maxsplit = {"seq": ","}
@@ -647,7 +647,7 @@ missing_maxsplit_arg.py:179:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 176 176 | ## TODO: These require the ability to resolve a dict variable name to a value
 177 177 | # Errors
 178 178 | kwargs_without_maxsplit = {"seq": ","}
@@ -657,7 +657,7 @@ missing_maxsplit_arg.py:179:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
 182 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 
-missing_maxsplit_arg.py:182:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:182:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
 180 | # OK
 181 | kwargs_with_maxsplit = {"maxsplit": 1}
@@ -668,7 +668,7 @@ missing_maxsplit_arg.py:182:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 179 179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
 180 180 | # OK
 181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
@@ -677,7 +677,7 @@ missing_maxsplit_arg.py:182:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
 183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 184 184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
 
-missing_maxsplit_arg.py:184:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
+missing_maxsplit_arg.py:184:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
@@ -686,7 +686,7 @@ missing_maxsplit_arg.py:184:1: PLC0207 [*] Pass `maxsplit=1` into `str.split()`
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
-ℹ Safe fix
+ℹ Unsafe fix
 181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
 182 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}

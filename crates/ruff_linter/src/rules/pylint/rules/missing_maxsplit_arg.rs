@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
@@ -36,6 +36,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// url = "www.example.com"
 /// suffix = url.rsplit(".", maxsplit=1)[-1]
 /// ```
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `**kwargs`, as
+/// adding a `maxsplit` keyword to such a call may lead to a duplicate keyword argument error.
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
     actual_split_type: String,
@@ -52,17 +56,11 @@ impl AlwaysFixableViolation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingMaxsplitArg {
-            actual_split_type,
+            actual_split_type: _,
             suggested_split_type,
         } = self;
 
-        if actual_split_type == suggested_split_type {
-            format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
-        } else {
-            format!(
-                "Instead of `str.{actual_split_type}()`, call `str.{suggested_split_type}()` and pass `maxsplit=1`",
-            )
-        }
+        format!("Replace with `{suggested_split_type}(..., maxsplit=1)`.")
     }
 
     fn fix_title(&self) -> String {
@@ -200,5 +198,18 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         expr.range(),
     );
 
-    diagnostic.set_fix(Fix::safe_edits(maxsplit_argument_edit, split_type_edit));
+    diagnostic.set_fix(Fix::applicable_edits(
+        maxsplit_argument_edit,
+        split_type_edit,
+        // If keyword.arg is `None` (i.e. if the function call contains `**kwargs`), mark the fix as unsafe
+        if arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
+        {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }
