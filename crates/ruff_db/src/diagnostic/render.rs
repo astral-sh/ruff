@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::num::NonZeroU8;
 use std::path::Path;
 
 use ruff_annotate_snippets::{
@@ -829,31 +828,14 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
-#[derive(Clone, Copy)]
-struct IndentWidth(NonZeroU8);
-
-impl IndentWidth {
-    fn as_usize(self) -> usize {
-        self.0.get() as usize
-    }
-}
-
-impl Default for IndentWidth {
-    fn default() -> Self {
-        Self(NonZeroU8::new(4).unwrap())
-    }
-}
-
 /// A measure of the width of a line of text.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 struct LineWidthBuilder {
     /// The width of the line.
     width: usize,
     /// The column of the line.
     /// This is used to calculate the width of tabs.
     column: usize,
-    /// The tab size to use when calculating the width of tabs.
-    tab_size: IndentWidth,
 }
 
 impl LineWidthBuilder {
@@ -861,22 +843,13 @@ impl LineWidthBuilder {
         self.width
     }
 
-    /// Creates a new `LineWidth` with the given tab size.
-    fn new(tab_size: IndentWidth) -> Self {
-        LineWidthBuilder {
-            width: 0,
-            column: 0,
-            tab_size,
-        }
-    }
-
     /// Adds the given character to the line width.
     #[must_use]
     fn add_char(mut self, c: char) -> Self {
-        let tab_size: usize = self.tab_size.as_usize();
+        const TAB_SIZE: usize = 4;
         match c {
             '\t' => {
-                let tab_offset = tab_size - (self.column % tab_size);
+                let tab_offset = TAB_SIZE - (self.column % TAB_SIZE);
                 self.width += tab_offset;
                 self.column += tab_offset;
             }
@@ -906,7 +879,7 @@ fn replace_whitespace_and_unprintable<'r>(
     let mut result = String::new();
     let mut last_end = 0;
     let original_ranges: Vec<TextRange> = annotations.iter().map(|ann| ann.range).collect();
-    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
+    let mut line_width = LineWidthBuilder::default();
 
     // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
     // `source`) is replaced with `len` bytes.
