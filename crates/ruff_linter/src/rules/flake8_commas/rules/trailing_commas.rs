@@ -344,7 +344,7 @@ fn check_token(
             ContextType::No => false,
             ContextType::FunctionParameters => true,
             ContextType::CallArguments => true,
-            ContextType::TypeParameters => is_trailing_comma_type_params_enabled(settings),
+            ContextType::TypeParameters => true,
             // `(1)` is not equivalent to `(1,)`.
             ContextType::Tuple => context.num_commas != 0,
             // `x[1]` is not equivalent to `x[1,]`.
