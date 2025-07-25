@@ -71,7 +71,7 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
         }
         let state = match part {
             StringLikePart::String(_) | StringLikePart::Bytes(_) => {
-                analyze_escape_chars(locator, part.range(), part.flags())
+                analyze_escape_chars(locator, part.range(), part.flags(), false)
             }
             StringLikePart::FString(f_string) => analyze_escape_chars_in_interpolated_string(
                 AnyStringFlags::from(f_string.flags),
@@ -92,12 +92,15 @@ pub(crate) fn invalid_escape_sequence(checker: &Checker, string_like: StringLike
 struct EscapeCharsState {
     contains_valid_escape_sequence: bool,
     invalid_escape_chars: Vec<InvalidEscapeChar>,
+    invalid_format_spec_escape_chars: Vec<InvalidEscapeChar>,
 }
 
 impl EscapeCharsState {
     fn update(&mut self, other: Self) {
         self.contains_valid_escape_sequence |= other.contains_valid_escape_sequence;
         self.invalid_escape_chars.extend(other.invalid_escape_chars);
+        self.invalid_format_spec_escape_chars
+            .extend(other.invalid_format_spec_escape_chars);
     }
 }
 
@@ -108,10 +111,12 @@ fn analyze_escape_chars(
     // Range in the source code to perform the analysis on.
     source_range: TextRange,
     flags: AnyStringFlags,
+    in_format_spec: bool,
 ) -> EscapeCharsState {
     let source = locator.slice(source_range);
     let mut contains_valid_escape_sequence = false;
     let mut invalid_escape_chars = Vec::new();
+    let mut invalid_format_spec_escape_chars = Vec::new();
 
     let mut prev = None;
     let bytes = source.as_bytes();
@@ -193,20 +198,30 @@ fn analyze_escape_chars(
             | 'u'
             | 'U'
         ) {
-            contains_valid_escape_sequence = true;
+            if !in_format_spec {
+                contains_valid_escape_sequence = true;
+            }
             continue;
         }
 
         let location = source_range.start() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-        invalid_escape_chars.push(InvalidEscapeChar {
-            ch: next_char,
-            range,
-        });
+        if in_format_spec && !matches!(next_char, '{' | '}') {
+            invalid_format_spec_escape_chars.push(InvalidEscapeChar {
+                ch: next_char,
+                range,
+            });
+        } else {
+            invalid_escape_chars.push(InvalidEscapeChar {
+                ch: next_char,
+                range,
+            });
+        }
     }
     EscapeCharsState {
         contains_valid_escape_sequence,
         invalid_escape_chars,
+        invalid_format_spec_escape_chars,
     }
 }
 
@@ -224,7 +239,12 @@ fn analyze_escape_chars_in_interpolated_string(
     for element in elements {
         match element {
             InterpolatedStringElement::Literal(literal) => {
-                escape_chars_state.update(analyze_escape_chars(locator, literal.range(), flags));
+                escape_chars_state.update(analyze_escape_chars(
+                    locator,
+                    literal.range(),
+                    flags,
+                    false,
+                ));
             }
             InterpolatedStringElement::Interpolation(interpolation) => {
                 let Some(format_spec) = interpolation.format_spec.as_ref() else {
@@ -235,6 +255,7 @@ fn analyze_escape_chars_in_interpolated_string(
                         locator,
                         literal.range(),
                         flags,
+                        true,
                     ));
                 }
             }
@@ -248,6 +269,9 @@ fn analyze_escape_chars_in_interpolated_string(
 /// If we have not seen any valid escape characters, we convert to
 /// a raw string. If we have seen valid escape characters,
 /// we manually add backslashes to each invalid escape character found.
+///
+/// Escapes in format specs are handled separately because they are not
+/// effected by whether or not the string is raw.
 fn check(
     checker: &Checker,
     locator: &Locator,
@@ -261,22 +285,11 @@ fn check(
     let EscapeCharsState {
         contains_valid_escape_sequence,
         invalid_escape_chars,
+        invalid_format_spec_escape_chars,
     } = escape_chars_state;
+    make_diagnostics(checker, &invalid_format_spec_escape_chars);
     if contains_valid_escape_sequence {
-        // Escape with backslash.
-        for invalid_escape_char in &invalid_escape_chars {
-            let mut diagnostic = checker.report_diagnostic(
-                InvalidEscapeSequence {
-                    ch: invalid_escape_char.ch,
-                    fix_title: FixTitle::AddBackslash,
-                },
-                invalid_escape_char.range(),
-            );
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                r"\".to_string(),
-                invalid_escape_char.start() + TextSize::from(1),
-            )));
-        }
+        make_diagnostics(checker, &invalid_escape_chars);
     } else {
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
@@ -308,6 +321,23 @@ fn check(
                 );
             }
         }
+    }
+}
+
+fn make_diagnostics(checker: &Checker, invalid_escape_chars: &[InvalidEscapeChar]) {
+    // Escape with backslash.
+    for invalid_escape_char in invalid_escape_chars {
+        let mut diagnostic = checker.report_diagnostic(
+            InvalidEscapeSequence {
+                ch: invalid_escape_char.ch,
+                fix_title: FixTitle::AddBackslash,
+            },
+            invalid_escape_char.range(),
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+            r"\".to_string(),
+            invalid_escape_char.start() + TextSize::from(1),
+        )));
     }
 }
 
