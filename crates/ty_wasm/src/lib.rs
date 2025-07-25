@@ -16,9 +16,8 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references,
-    goto_type_definition, hover, inlay_hints,
+    MarkupKind, RangedValue, document_highlights, goto_declaration, goto_definition,
+    goto_references, goto_type_definition, hover, inlay_hints,
 };
 use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -579,7 +578,7 @@ impl Workspace {
 
         // Try to get the vendored file as a File
         let file = vendored_path_to_file(&self.db, vendored_path)
-            .map_err(|err| Error::new(&format!("Vendored file not found: {}: {}", path, err)))?;
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
 
         Ok(FileHandle {
             file,
