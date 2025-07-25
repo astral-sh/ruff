@@ -1453,8 +1453,8 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 
 ### Negation types
 
-Make sure that attributes accesible on `object` are also accessible on negation types like `~P`
-(which is equivalent to `object & ~P`):
+Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
+which is equivalent to `object & ~P`:
 
 ```py
 class P: ...
