@@ -44,7 +44,7 @@ def _(obj: FinalClass):
 ```
 
 When the corresponding attribute is already defined on the class, `hasattr` narrowing does not
-change the type. `<Protocol with members 'spam'>` is a subtype of `WithSpam`, and so
+change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
 `WithSpam & <Protocol …>` simplifies to `WithSpam`:
 
 ```py
