@@ -13,13 +13,10 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use ruff_db::parsed::ParsedModuleRef;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
-use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::FileScopeId;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
@@ -317,14 +314,10 @@ impl<'db> Signature<'db> {
     }
 
     /// Return a typed signature from a function definition.
-    #[expect(clippy::too_many_arguments)]
     pub(super) fn from_function(
         db: &'db dyn Db,
         generic_context: Option<GenericContext<'db>>,
         inherited_generic_context: Option<GenericContext<'db>>,
-        module: &ParsedModuleRef,
-        index: &'db SemanticIndex<'db>,
-        containing_scope: FileScopeId,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
@@ -337,14 +330,8 @@ impl<'db> Signature<'db> {
                 definition_expression_type(db, definition, returns.as_ref())
             }
         });
-        let legacy_generic_context = GenericContext::from_function_params(
-            db,
-            module,
-            index,
-            containing_scope,
-            &parameters,
-            return_ty,
-        );
+        let legacy_generic_context =
+            GenericContext::from_function_params(db, definition, &parameters, return_ty);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!

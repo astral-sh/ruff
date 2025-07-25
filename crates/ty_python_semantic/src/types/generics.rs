@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::SemanticIndex;
-use crate::semantic_index::scope::FileScopeId;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::bound_legacy_typevars;
@@ -85,12 +85,11 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
-        module: &ParsedModuleRef,
-        index: &'db SemanticIndex<'db>,
-        containing_scope: FileScopeId,
+        definition: Definition<'db>,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
     ) -> Option<Self> {
+        // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
@@ -103,9 +102,19 @@ impl<'db> GenericContext<'db> {
         if let Some(ty) = return_type {
             ty.find_legacy_typevars(db, &mut variables);
         }
-        for typevar in bound_legacy_typevars(db, module, index, containing_scope) {
+
+        // Then remove any that were bound in enclosing scopes.
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let containing_scope = index
+            .parent_scope_id(definition.file_scope(db))
+            .expect("function definition should not be top-most scope");
+
+        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
             variables.remove(&typevar);
         }
+
         if variables.is_empty() {
             return None;
         }

@@ -332,28 +332,19 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         inherited_generic_context: Option<GenericContext<'db>>,
     ) -> Signature<'db> {
-        let body_scope = self.body_scope(db);
-        let body_node = body_scope.node(db);
-        let file = body_scope.file(db);
-        let module = parsed_module(db, file).load(db);
-        let function_stmt_node = body_node.expect_function(&module);
-        let index = semantic_index(db, file);
-        let definition = index.expect_single_definition(function_stmt_node);
-        let containing_scope = index
-            .parent_scope_id(body_scope.file_scope_id(db))
-            .expect("function definition should not be top-most scope");
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_stmt_node = scope.node(db).expect_function(&module);
+        let definition = self.definition(db);
+        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+            let index = semantic_index(db, scope.file(db));
+            GenericContext::from_type_params(db, index, type_params)
+        });
 
-        let generic_context = function_stmt_node
-            .type_params
-            .as_ref()
-            .map(|type_params| GenericContext::from_type_params(db, index, type_params));
         Signature::from_function(
             db,
             generic_context,
             inherited_generic_context,
-            &module,
-            index,
-            containing_scope,
             definition,
             function_stmt_node,
         )
