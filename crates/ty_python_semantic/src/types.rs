@@ -8294,6 +8294,16 @@ impl<'db> IntersectionType<'db> {
         sorted_self == other.normalized(db)
     }
 
+    /// Returns an iterator over the positive elements of the intersection. If
+    /// there are no positive elements, returns a single `object` type.
+    fn positive_elements_or_object(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        if self.positive(db).is_empty() {
+            Either::Left(std::iter::once(Type::object(db)))
+        } else {
+            Either::Right(self.positive(db).iter().copied())
+        }
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
@@ -8303,8 +8313,8 @@ impl<'db> IntersectionType<'db> {
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
-        for ty in self.positive(db) {
-            let ty_member = transform_fn(ty);
+        for ty in self.positive_elements_or_object(db) {
+            let ty_member = transform_fn(&ty);
             match ty_member {
                 Place::Unbound => {}
                 Place::Type(ty_member, member_boundness) => {
@@ -8342,11 +8352,11 @@ impl<'db> IntersectionType<'db> {
 
         let mut any_unbound = false;
         let mut any_possibly_unbound = false;
-        for ty in self.positive(db) {
+        for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
-            } = transform_fn(ty);
+            } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
                 Place::Unbound => {
