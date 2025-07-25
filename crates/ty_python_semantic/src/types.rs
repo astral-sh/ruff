@@ -9389,7 +9389,17 @@ impl<'db> BoundSuperType<'db> {
             ));
         }
 
-        let pivot_class = ClassBase::try_from_type(db, pivot_class_type).ok_or({
+        // TODO: having to get a class-literal just to pass it in here is silly.
+        // `BoundSuperType` should use a different enum rather than reusing `ClassBase`.
+        let pivot_class = ClassBase::try_from_type(
+            db,
+            pivot_class_type,
+            KnownClass::Object
+                .to_class_literal(db)
+                .into_class_literal()
+                .expect("`object` should always exist in typeshed"),
+        )
+        .ok_or({
             BoundSuperError::InvalidPivotClassType {
                 pivot_class: pivot_class_type,
             }

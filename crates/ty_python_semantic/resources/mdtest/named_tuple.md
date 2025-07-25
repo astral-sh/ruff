@@ -24,10 +24,12 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# TODO: These should reveal the types of the fields
-reveal_type(alice[0])  # revealed: Unknown
-reveal_type(alice[1])  # revealed: Unknown
-reveal_type(alice[2])  # revealed: Unknown
+# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(Person.__mro__)
+
+reveal_type(alice[0])  # revealed: int
+reveal_type(alice[1])  # revealed: str
+reveal_type(alice[2])  # revealed: int | None
 
 # error: [missing-argument]
 Person(3)
