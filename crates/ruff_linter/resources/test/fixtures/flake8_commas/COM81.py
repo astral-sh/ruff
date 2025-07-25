@@ -650,3 +650,17 @@ f"""This is a test. {
     if True else
     "Don't add a trailing comma here ->"
 }"""
+
+type X[
+    T
+] = T
+def f[
+    T
+](): pass
+class C[
+    T
+]: pass
+
+type X[T,] = T
+def f[T,](): pass
+class C[T,]: pass
