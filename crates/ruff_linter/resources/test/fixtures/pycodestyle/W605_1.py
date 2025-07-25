@@ -135,3 +135,12 @@ s = t"TOTAL: {total}\nOK: {ok}\INCOMPLETE: {incomplete}\n"
 
 # Debug text (should trigger)
 t = t"{'\InHere'=}"
+
+# https://github.com/astral-sh/ruff/issues/11491
+f"\n{a:\XFF}"
+f"\XFF{a:\XFF}"
+t"\n{a:\XFF}"
+t"\XFF{a:\XFF}"
+
+f"{a:\{1}\}"
+t"{a:\{1}\}"
