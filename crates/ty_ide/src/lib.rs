@@ -12,6 +12,7 @@ mod hover;
 mod inlay_hints;
 mod markup;
 mod references;
+mod selection_range;
 mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
@@ -28,6 +29,7 @@ pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
+pub use selection_range::selection_range;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
 };

@@ -9,6 +9,7 @@ expression: initialization_result
       "openClose": true,
       "change": 2
     },
+    "selectionRangeProvider": true,
     "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [

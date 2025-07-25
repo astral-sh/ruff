@@ -84,6 +84,9 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::LatencySensitive
         ),
+        requests::SelectionRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::SelectionRangeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentSymbolRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentSymbolRequestHandler,
         >(req, BackgroundSchedule::Worker),
