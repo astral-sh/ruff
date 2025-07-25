@@ -845,9 +845,6 @@ impl Default for IndentWidth {
 }
 
 /// A measure of the width of a line of text.
-///
-/// This is used to determine if a line is too long.
-/// It should be compared to a [`LineLength`].
 #[derive(Clone, Copy)]
 struct LineWidthBuilder {
     /// The width of the line.
