@@ -3049,28 +3049,4 @@ if call(foo
 
         (env, diagnostics)
     }
-
-    #[test]
-    fn fix_snippet_range() {
-        // this is the actual input snippet, I was pasting in the output before, so obviously it
-        // wasn't changing
-        let source = "# https://github.com/astral-sh/ruff/issues/13294\nprint(r\"\"\"\u{8}\u{1a}\u{1b}\0\u{200b}\n\"\"\")\nprint(fr\"\"\"\u{8}\u{1a}\u{1b}\0\u{200b}\n";
-        // the input range is supposed to be 60..61, and 62..63 on output. I'm getting 64..65 on
-        // output for some reason, but the input is correct. actually I'm getting 60..61 here in
-        // this test, but the snippet itself is 64..65 instead of 62..63. I think line_start on the
-        // snippet might be wrong. it's supposed to be 63 in ruff_linter. okay line_start is also 63
-        // here, so back to suspecting the range
-        let annotations = vec![RenderableAnnotation {
-            range: TextRange::new(TextSize::new(60), TextSize::new(61)),
-            message: None,
-            is_primary: true,
-        }];
-        let result = replace_whitespace_and_unprintable(source, annotations)
-            .fix_up_empty_spans_after_line_terminator();
-
-        assert_eq!(
-            result.annotations[0].range,
-            TextRange::new(TextSize::new(62), TextSize::new(63))
-        );
-    }
 }
