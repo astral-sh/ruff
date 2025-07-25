@@ -453,8 +453,9 @@ fn update_context(
                 }
             } else {
                 match prev.ty {
-                    TokenType::Named => Context::new(ContextType::List),
-                    TokenType::ClosingBracket => Context::new(ContextType::Subscript),
+                    TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
+                        Context::new(ContextType::Subscript)
+                    }
                     _ => Context::new(ContextType::List),
                 }
             }
