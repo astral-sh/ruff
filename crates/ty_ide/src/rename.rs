@@ -84,15 +84,8 @@ pub fn rename(
 }
 
 /// Helper function to check if a file is included in the project.
-/// Returns `false` if the file path cannot be converted to a system path.
 fn is_file_in_project(db: &dyn Db, file: File) -> bool {
-    let project = db.project();
-    let file_path = file.path(db);
-
-    file_path
-        .as_system_path()
-        .map(|path| project.is_file_included(db, path))
-        .unwrap_or(false)
+    db.project().files(db).contains(&file)
 }
 
 #[cfg(test)]
@@ -124,32 +117,43 @@ mod tests {
                 return "No locations to rename".to_string();
             }
 
-            self.render_diagnostics(rename_results.into_iter().enumerate().map(
-                |(i, ref_item)| -> RenameResult {
-                    RenameResult {
-                        index: i,
-                        file_range: FileRange::new(ref_item.file(), ref_item.range()),
-                    }
-                },
-            ))
+            // Create a single diagnostic with multiple annotations
+            let rename_diagnostic = RenameResultSet {
+                locations: rename_results
+                    .into_iter()
+                    .map(|ref_item| FileRange::new(ref_item.file(), ref_item.range()))
+                    .collect(),
+            };
+
+            self.render_diagnostics([rename_diagnostic])
         }
     }
 
-    struct RenameResult {
-        index: usize,
-        file_range: FileRange,
+    struct RenameResultSet {
+        locations: Vec<FileRange>,
     }
 
-    impl IntoDiagnostic for RenameResult {
+    impl IntoDiagnostic for RenameResultSet {
         fn into_diagnostic(self) -> Diagnostic {
             let mut main = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("rename")),
                 Severity::Info,
-                format!("Rename location {}", self.index + 1),
+                format!("Rename symbol (found {} locations)", self.locations.len()),
             );
-            main.annotate(Annotation::primary(
-                Span::from(self.file_range.file()).with_range(self.file_range.range()),
-            ));
+
+            // Add the first location as primary annotation (the symbol being renamed)
+            if let Some(first_location) = self.locations.first() {
+                main.annotate(Annotation::primary(
+                    Span::from(first_location.file()).with_range(first_location.range()),
+                ));
+
+                // Add remaining locations as secondary annotations
+                for location in &self.locations[1..] {
+                    main.annotate(Annotation::secondary(
+                        Span::from(location.file()).with_range(location.range()),
+                    ));
+                }
+            }
 
             main
         }
@@ -183,42 +187,18 @@ func(value=42)
         );
 
         assert_snapshot!(test.rename("number"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 4 locations)
          --> main.py:2:10
           |
         2 | def func(value: int) -> int:
           |          ^^^^^
         3 |     value *= 2
+          |     -----
         4 |     return value
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:3:5
-          |
-        2 | def func(value: int) -> int:
-        3 |     value *= 2
-          |     ^^^^^
-        4 |     return value
-          |
-
-        info[rename]: Rename location 3
-         --> main.py:4:12
-          |
-        2 | def func(value: int) -> int:
-        3 |     value *= 2
-        4 |     return value
-          |            ^^^^^
+          |            -----
         5 |
         6 | func(value=42)
-          |
-
-        info[rename]: Rename location 4
-         --> main.py:6:6
-          |
-        4 |     return value
-        5 |
-        6 | func(value=42)
-          |      ^^^^^
+          |      -----
           |
         ");
     }
@@ -236,30 +216,17 @@ x = func
         );
 
         assert_snapshot!(test.rename("calculate"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:5
           |
         2 | def func():
           |     ^^^^
         3 |     pass
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:5:11
-          |
-        3 |     pass
         4 |
         5 | result1 = func()
-          |           ^^^^
+          |           ----
         6 | x = func
-          |
-
-        info[rename]: Rename location 3
-         --> main.py:6:5
-          |
-        5 | result1 = func()
-        6 | x = func
-          |     ^^^^
+          |     ----
           |
         ");
     }
@@ -278,31 +245,18 @@ cls = MyClass
         );
 
         assert_snapshot!(test.rename("MyNewClass"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:7
           |
         2 | class MyClass:
           |       ^^^^^^^
         3 |     def __init__(self):
         4 |         pass
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:6:8
-          |
-        4 |         pass
         5 |
         6 | obj1 = MyClass()
-          |        ^^^^^^^
+          |        -------
         7 | cls = MyClass
-          |
-
-        info[rename]: Rename location 3
-         --> main.py:7:7
-          |
-        6 | obj1 = MyClass()
-        7 | cls = MyClass
-          |       ^^^^^^^
+          |       -------
           |
         ");
     }
@@ -318,7 +272,7 @@ def fu<CURSOR>nc():
 
         assert_snapshot!(test.rename(""), @"Cannot rename");
         assert_snapshot!(test.rename("valid_name"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 1 locations)
          --> main.py:2:5
           |
         2 | def func():
@@ -363,29 +317,21 @@ class DataProcessor:
             .build();
 
         assert_snapshot!(test.rename("utility_function"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 3 locations)
          --> utils.py:2:5
           |
         2 | def func(x):
           |     ^^^^
         3 |     return x * 2
           |
-
-        info[rename]: Rename location 2
-         --> module.py:2:19
+         ::: module.py:2:19
           |
         2 | from utils import func
-          |                   ^^^^
+          |                   ----
         3 |
         4 | def test(data):
-          |
-
-        info[rename]: Rename location 3
-         --> module.py:5:12
-          |
-        4 | def test(data):
         5 |     return func(data)
-          |            ^^^^
+          |            ----
           |
         ");
     }
@@ -449,20 +395,13 @@ result = test_alias()
             .build();
 
         assert_snapshot!(test.rename("new_alias"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
         2 | from utils import test as test_alias
           |                           ^^^^^^^^^^
         3 | result = test_alias()
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:3:10
-          |
-        2 | from utils import test as test_alias
-        3 | result = test_alias()
-          |          ^^^^^^^^^^
+          |          ----------
           |
         ");
     }
@@ -487,20 +426,13 @@ result = test_<CURSOR>alias()
             .build();
 
         assert_snapshot!(test.rename("new_alias"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
         2 | from utils import test as test_alias
           |                           ^^^^^^^^^^
         3 | result = test_alias()
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:3:10
-          |
-        2 | from utils import test as test_alias
-        3 | result = test_alias()
-          |          ^^^^^^^^^^
+          |          ----------
           |
         ");
     }
@@ -544,49 +476,31 @@ value1 = func_alias()
             .build();
 
         assert_snapshot!(test.rename("renamed_function"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 5 locations)
          --> source.py:2:5
           |
         2 | def original_function():
           |     ^^^^^^^^^^^^^^^^^
         3 |     return 'Hello from source'
           |
-
-        info[rename]: Rename location 2
-         --> middle.py:2:20
-          |
-        2 | from source import original_function
-          |                    ^^^^^^^^^^^^^^^^^
-        3 |
-        4 | def wrapper():
-          |
-
-        info[rename]: Rename location 3
-         --> middle.py:5:12
-          |
-        4 | def wrapper():
-        5 |     return original_function()
-          |            ^^^^^^^^^^^^^^^^^
-        6 |
-        7 | result = original_function()
-          |
-
-        info[rename]: Rename location 4
-         --> middle.py:7:10
-          |
-        5 |     return original_function()
-        6 |
-        7 | result = original_function()
-          |          ^^^^^^^^^^^^^^^^^
-          |
-
-        info[rename]: Rename location 5
-         --> consumer.py:2:20
+         ::: consumer.py:2:20
           |
         2 | from middle import original_function as func_alias
-          |                    ^^^^^^^^^^^^^^^^^
+          |                    -----------------
         3 |
         4 | def process():
+          |
+         ::: middle.py:2:20
+          |
+        2 | from source import original_function
+          |                    -----------------
+        3 |
+        4 | def wrapper():
+        5 |     return original_function()
+          |            -----------------
+        6 |
+        7 | result = original_function()
+          |          -----------------
           |
         ");
     }
@@ -621,40 +535,24 @@ class App:
             .build();
 
         assert_snapshot!(test.rename("new_util_name"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 4 locations)
          --> file3.py:2:19
           |
         2 | from file2 import func2
           |                   ^^^^^
         3 |
         4 | class App:
-          |
-
-        info[rename]: Rename location 2
-         --> file3.py:6:16
-          |
-        4 | class App:
         5 |     def run(self):
         6 |         return func2()
-          |                ^^^^^
+          |                -----
           |
-
-        info[rename]: Rename location 3
-         --> file2.py:2:28
+         ::: file2.py:2:28
           |
         2 | from file1 import func1 as func2
-          |                            ^^^^^
+          |                            -----
         3 |
         4 | func2()
-          |
-
-        info[rename]: Rename location 4
-         --> file2.py:4:1
-          |
-        2 | from file1 import func1 as func2
-        3 |
-        4 | func2()
-          | ^^^^^
+          | -----
           |
         ");
     }
@@ -700,31 +598,16 @@ result = func(10, <CURSOR>y=20)
         );
 
         assert_snapshot!(test.rename("z"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
         2 | def func(x, y=5):
           |             ^
         3 |     return x + y
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:3:16
-          |
-        2 | def func(x, y=5):
-        3 |     return x + y
-          |                ^
+          |                -
         4 |
         5 | result = func(10, y=20)
-          |
-
-        info[rename]: Rename location 3
-         --> main.py:5:19
-          |
-        3 |     return x + y
-        4 |
-        5 | result = func(10, y=20)
-          |                   ^
+          |                   -
           |
         ");
     }
@@ -742,31 +625,16 @@ result = func(10, y=20)
         );
 
         assert_snapshot!(test.rename("z"), @r"
-        info[rename]: Rename location 1
+        info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
         2 | def func(x, y=5):
           |             ^
         3 |     return x + y
-          |
-
-        info[rename]: Rename location 2
-         --> main.py:3:16
-          |
-        2 | def func(x, y=5):
-        3 |     return x + y
-          |                ^
+          |                -
         4 |
         5 | result = func(10, y=20)
-          |
-
-        info[rename]: Rename location 3
-         --> main.py:5:19
-          |
-        3 |     return x + y
-        4 |
-        5 | result = func(10, y=20)
-          |                   ^
+          |                   -
           |
         ");
     }
