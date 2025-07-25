@@ -174,7 +174,7 @@ export default function Chrome({
                   className={files.currentVendoredFile ? "mb-2" : "my-2"}
                   order={0}
                 >
-                  {files.currentVendoredFile && files.selected && (
+                  {files.currentVendoredFile != null && (
                     <VendoredFileBanner
                       currentVendoredFile={files.currentVendoredFile}
                       selectedFile={{

@@ -98,10 +98,10 @@ export default function Playground() {
   ) => {
     const handle = files.handles[file];
     let newHandle: FileHandle | null = null;
-    if (handle != null) {
-      workspace.closeFile(handle);
-    } else {
+    if (handle == null) {
       updateOptions(workspace, null, setError);
+    } else {
+      workspace.closeFile(handle);
     }
 
     if (newName === SETTINGS_FILE_NAME) {
@@ -115,10 +115,10 @@ export default function Playground() {
 
   const handleFileRemoved = (workspace: Workspace, file: FileId) => {
     const handle = files.handles[file];
-    if (handle != null) {
-      workspace.closeFile(handle);
-    } else {
+    if (handle == null) {
       updateOptions(workspace, null, setError);
+    } else {
+      workspace.closeFile(handle);
     }
 
     dispatchFiles({ type: "remove", id: file });
