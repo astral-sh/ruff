@@ -301,15 +301,7 @@ pub(crate) fn trailing_commas(
         // Update the comma context stack.
         let context = update_context(token, prev, prev_prev, &mut stack, settings);
 
-        check_token(
-            token,
-            prev,
-            prev_prev,
-            context,
-            locator,
-            lint_context,
-            settings,
-        );
+        check_token(token, prev, prev_prev, context, locator, lint_context);
 
         // Pop the current context if the current token ended it.
         // The top context is never popped (if unbalanced closing brackets).
@@ -336,7 +328,6 @@ fn check_token(
     context: Context,
     locator: &Locator,
     lint_context: &LintContext,
-    settings: &LinterSettings,
 ) {
     // Is it allowed to have a trailing comma before this token?
     let comma_allowed = token.ty == TokenType::ClosingBracket
