@@ -473,7 +473,7 @@ pub fn lint_only(
         && !is_py314_support_enabled(settings)
     {
         warn_user_once!(
-            "Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning."
+            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
         );
     }
 
@@ -584,7 +584,7 @@ pub fn lint_fix<'a>(
         && !is_py314_support_enabled(settings)
     {
         warn_user_once!(
-            "Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning."
+            "Support for Python 3.14 is in preview and may undergo breaking changes. Enable `preview` to remove this warning."
         );
     }
 
