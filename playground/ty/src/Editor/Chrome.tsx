@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Workspace } from "ty_wasm";
+import { FileHandle, Workspace } from "ty_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
@@ -22,6 +22,7 @@ import SecondaryPanel, {
   SecondaryTool,
 } from "./SecondaryPanel";
 import Diagnostics, { Diagnostic } from "./Diagnostics";
+import VendoredFileBanner from "./VendoredFileBanner";
 import { FileId, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
@@ -49,6 +50,10 @@ export interface Props {
   onRemoveFile(workspace: Workspace, file: FileId): void;
 
   onSelectFile(id: FileId): void;
+
+  onSelectVendoredFile(path: string): void;
+
+  onClearVendoredFile(): void;
 }
 
 export default function Chrome({
@@ -61,18 +66,14 @@ export default function Chrome({
   onRemoveFile,
   onSelectFile,
   onChangeFile,
+  onSelectVendoredFile,
+  onClearVendoredFile,
 }: Props) {
   const workspace = use(workspacePromise);
 
   const [secondaryTool, setSecondaryTool] = useState<SecondaryTool | null>(
     null,
   );
-
-  const [currentVendoredFile, setCurrentVendoredFile] = useState<{
-    path: string;
-    previousFileId: FileId | null;
-  } | null>(null);
-
 
   const editorRef = useRef<{
     editor: editor.IStandaloneCodeEditor;
@@ -141,21 +142,30 @@ export default function Chrome({
   );
 
   const handleVendoredFileChange = useCallback(
-    (vendoredPath: string | null, previousFileId: FileId | null) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (vendoredPath: string | null, _previousFileId: FileId | null) => {
       if (vendoredPath) {
-        setCurrentVendoredFile(current => {
-          // If we're already viewing a vendored file, preserve the original previousFileId
-          const preservedPreviousFileId = current?.previousFileId ?? previousFileId;
-          return { path: vendoredPath, previousFileId: preservedPreviousFileId };
-        });
+        onSelectVendoredFile(vendoredPath);
       } else {
-        setCurrentVendoredFile(null);
+        onClearVendoredFile();
       }
     },
-    [],
+    [onSelectVendoredFile, onClearVendoredFile],
   );
 
-  const checkResult = useCheckResult(files, workspace, secondaryTool);
+  const handleAddFile = useCallback(
+    (name: string) => {
+      onAddFile(workspace, name);
+    },
+    [workspace, onAddFile],
+  );
+
+  const checkResult = useCheckResult(
+    files,
+    workspace,
+    secondaryTool,
+    files.currentVendoredFile,
+  );
 
   return (
     <>
@@ -165,7 +175,7 @@ export default function Chrome({
             files={files.index}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onAddFile(workspace, name)}
+            onAdd={handleAddFile}
             onRename={handleFileRenamed}
             onSelect={onSelectFile}
             onRemove={handleRemoved}
@@ -174,70 +184,22 @@ export default function Chrome({
             <Panel
               id="main"
               order={0}
-              className={`flex flex-col gap-2 ${currentVendoredFile ? "mb-4" : "my-4"}`}
+              className={`flex flex-col gap-2 ${files.currentVendoredFile ? "mb-4" : "my-4"}`}
               minSize={10}
             >
               <PanelGroup id="vertical" direction="vertical">
-                <Panel minSize={10} className={currentVendoredFile ? "mb-2" : "my-2"} order={0}>
-                  {currentVendoredFile && (
-                    <div className="bg-blue-50 dark:bg-blue-900 px-3 py-2 border-b border-blue-200 dark:border-blue-700 text-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="font-medium text-blue-800 dark:text-blue-200">Viewing standard library file:</span>{" "}
-                          <code className="font-mono text-blue-700 dark:text-blue-300">{currentVendoredFile.path}</code>
-                          <span className="text-blue-600 dark:text-blue-400 ml-2 text-xs">
-                            (read-only)
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => {
-                            
-                            if (currentVendoredFile?.previousFileId != null) {
-                              
-                              // Find the previous file
-                              const previousFile = files.index.find(f => f.id === currentVendoredFile.previousFileId);
-                              
-                              if (previousFile) {
-                                
-                                // Force the editor to switch back to the user file immediately
-                                if (editorRef.current) {
-                                  const monaco = editorRef.current.monaco;
-                                  const fileUri = monaco.Uri.file(previousFile.name);
-                                  
-                                  
-                                  // Get or create the model for the user file
-                                  let userModel = monaco.editor.getModel(fileUri);
-                                  if (!userModel) {
-                                    userModel = monaco.editor.createModel(
-                                      files.contents[currentVendoredFile.previousFileId] || '',
-                                      'python',
-                                      fileUri
-                                    );
-                                  } else {
-                                    // Update the model content
-                                    userModel.setValue(files.contents[currentVendoredFile.previousFileId] || '');
-                                  }
-                                  
-                                  // Force the editor to use this model
-                                  editorRef.current.editor.setModel(userModel);
-                                }
-                                
-                                // Clear vendored file state AFTER forcing the editor change
-                                setCurrentVendoredFile(null);
-                                
-                                // Update the application state
-                                onSelectFile(currentVendoredFile.previousFileId);
-                              }
-                            } else {
-                              setCurrentVendoredFile(null);
-                            }
-                          }}
-                          className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
-                        >
-                          Back to {currentVendoredFile.previousFileId ? files.index.find(f => f.id === currentVendoredFile.previousFileId)?.name || 'file' : 'editor'}
-                        </button>
-                      </div>
-                    </div>
+                <Panel
+                  minSize={10}
+                  className={files.currentVendoredFile ? "mb-2" : "my-2"}
+                  order={0}
+                >
+                  {files.currentVendoredFile && (
+                    <VendoredFileBanner
+                      currentVendoredFile={files.currentVendoredFile}
+                      files={files}
+                      editorRef={editorRef}
+                      onClearVendoredFile={onClearVendoredFile}
+                    />
                   )}
                   <Editor
                     theme={theme}
@@ -251,7 +213,7 @@ export default function Chrome({
                     onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={handleVendoredFileChange}
-                    isViewingVendoredFile={currentVendoredFile != null}
+                    isViewingVendoredFile={files.currentVendoredFile != null}
                   />
                   {checkResult.error ? (
                     <div
@@ -314,31 +276,53 @@ function useCheckResult(
   files: ReadonlyFiles,
   workspace: Workspace,
   secondaryTool: SecondaryTool | null,
+  currentVendoredFile: { path: string; previousFileId: FileId } | null,
 ): CheckResult {
   const deferredContent = useDeferredValue(
     files.selected == null ? null : files.contents[files.selected],
   );
 
   return useMemo(() => {
-    if (files.selected == null || deferredContent == null) {
-      return {
-        diagnostics: [],
-        error: null,
-        secondary: null,
-      };
-    }
+    // Determine which file handle to use
+    let currentHandle: FileHandle | null = null;
+    const isVendoredFile = currentVendoredFile != null;
 
-    const currentHandle = files.handles[files.selected];
-    if (currentHandle == null || !isPythonFile(currentHandle)) {
-      return {
-        diagnostics: [],
-        error: null,
-        secondary: null,
-      };
+    if (currentVendoredFile) {
+      // Viewing a vendored file
+      currentHandle = workspace.getVendoredFileHandle(currentVendoredFile.path);
+
+      if (currentHandle == null) {
+        return {
+          diagnostics: [],
+          error: "Failed to get vendored file handle",
+          secondary: null,
+        };
+      }
+    } else {
+      // Regular file handling
+      if (files.selected == null || deferredContent == null) {
+        return {
+          diagnostics: [],
+          error: null,
+          secondary: null,
+        };
+      }
+
+      currentHandle = files.handles[files.selected];
+      if (currentHandle == null || !isPythonFile(currentHandle)) {
+        return {
+          diagnostics: [],
+          error: null,
+          secondary: null,
+        };
+      }
     }
 
     try {
-      const diagnostics = workspace.checkFile(currentHandle);
+      // Don't run diagnostics for vendored files - always empty
+      const diagnostics = isVendoredFile
+        ? []
+        : workspace.checkFile(currentHandle);
 
       let secondary: SecondaryPanelResult = null;
 
@@ -359,10 +343,15 @@ function useCheckResult(
             break;
 
           case "Run":
-            secondary = {
-              status: "ok",
-              content: "",
-            };
+            secondary = isVendoredFile
+              ? {
+                  status: "error",
+                  error: "Cannot run vendored/standard library files",
+                }
+              : {
+                  status: "ok",
+                  content: "",
+                };
             break;
         }
       } catch (error: unknown) {
@@ -372,8 +361,7 @@ function useCheckResult(
         };
       }
 
-      // Eagerly convert the diagnostic to avoid out of bound errors
-      // when the diagnostics are "deferred".
+      // Convert diagnostics (empty array for vendored files)
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
@@ -388,9 +376,6 @@ function useCheckResult(
         secondary,
       };
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e);
-
       return {
         diagnostics: [],
         error: formatError(e),
@@ -403,6 +388,7 @@ function useCheckResult(
     files.selected,
     files.handles,
     secondaryTool,
+    currentVendoredFile,
   ]);
 }
 

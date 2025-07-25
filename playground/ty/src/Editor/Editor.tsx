@@ -44,7 +44,10 @@ type Props = {
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
-  onVendoredFileChange?: (vendoredPath: string | null, previousFileId: FileId | null) => void;
+  onVendoredFileChange?: (
+    vendoredPath: string | null,
+    previousFileId: FileId | null,
+  ) => void;
   isViewingVendoredFile?: boolean;
 };
 
@@ -130,7 +133,7 @@ export default function Editor({
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,
-        readOnly: false, // Vendored files are handled separately
+        readOnly: isViewingVendoredFile, // Make editor read-only for vendored files
         minimap: { enabled: false },
         fontSize: 14,
         roundedSelection: false,
@@ -152,7 +155,10 @@ interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
   onOpenFile: (file: FileId) => void;
-  onVendoredFileChange?: (vendoredPath: string | null, previousFileId: FileId | null) => void;
+  onVendoredFileChange?: (
+    vendoredPath: string | null,
+    previousFileId: FileId | null,
+  ) => void;
 }
 
 class PlaygroundServer
@@ -183,11 +189,15 @@ class PlaygroundServer
   private semanticTokensDisposable: IDisposable;
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
-  private documentHighlightDisposable: IDisposable;
-
+private documentHighlightDisposable: IDisposable;
   // Cache for vendored file handles
   private vendoredFileHandles = new Map<string, any>();
 
+  private getVendoredPath(uri: Uri): string {
+    // Monaco parses "vendored://stdlib/typing.pyi" as authority="stdlib", path="/typing.pyi"
+    // We need to reconstruct the full path
+    return uri.authority ? `${uri.authority}${uri.path}` : uri.path;
+  }
 
   constructor(
     private monaco: Monaco,
@@ -424,7 +434,7 @@ class PlaygroundServer
       return null;
     }
 
-    const vendoredPath = model.uri.authority ? `${model.uri.authority}${model.uri.path}` : model.uri.path;
+    const vendoredPath = this.getVendoredPath(model.uri);
     return this.vendoredFileHandles.get(vendoredPath) || null;
   }
 
@@ -436,7 +446,7 @@ class PlaygroundServer
         return vendoredHandle;
       }
       // If not cached, try to create it
-      const vendoredPath = model.uri.authority ? `${model.uri.authority}${model.uri.path}` : model.uri.path;
+      const vendoredPath = this.getVendoredPath(model.uri);
       return this.getOrCreateVendoredFileHandle(vendoredPath);
     }
 
@@ -449,7 +459,9 @@ class PlaygroundServer
     return this.props.files.handles[selectedFile];
   }
 
-  private formatSignatureHelp(signatureHelp: any): languages.SignatureHelpResult {
+  private formatSignatureHelp(
+    signatureHelp: any,
+  ): languages.SignatureHelpResult {
     return {
       dispose() {},
       value: {
@@ -476,9 +488,9 @@ class PlaygroundServer
     };
   }
 
-  setCurrentVendoredFile(vendoredPath: string, previousFileId: FileId | null) {
+  setCurrentVendoredFile(vendoredPath: string) {
     if (this.props.onVendoredFileChange) {
-      this.props.onVendoredFileChange(vendoredPath, previousFileId);
+      this.props.onVendoredFileChange(vendoredPath, null);
     }
   }
 
@@ -654,13 +666,9 @@ class PlaygroundServer
   ): boolean {
     const files = this.props.files;
 
-
     // Check if this is a vendored file
     if (resource.scheme === "vendored") {
-      // For vendored URIs like "vendored://stdlib/typing.pyi", we need to combine authority and path
-      // because URI parsing treats "stdlib" as the authority/host, not part of the path
-      const vendoredPath = resource.authority ? `${resource.authority}${resource.path}` : resource.path;
-
+      const vendoredPath = this.getVendoredPath(resource);
       // Read the vendored file content
       const content = this.props.workspace.readVendoredFile(vendoredPath);
 
@@ -694,8 +702,7 @@ class PlaygroundServer
       }
 
       // Track that we're now viewing a vendored file
-      this.setCurrentVendoredFile(vendoredPath, this.props.files.selected);
-
+      this.setCurrentVendoredFile(vendoredPath);
       return true;
     }
 
@@ -712,7 +719,6 @@ class PlaygroundServer
     if (handle == null) {
       return false;
     }
-
 
     let model = this.monaco.editor.getModel(resource);
     if (model == null) {
