@@ -289,7 +289,7 @@ function useCheckResult(
 
     if (currentVendoredFile) {
       // Viewing a vendored file
-      currentHandle = workspace.getVendoredFileHandle(currentVendoredFile.path);
+      currentHandle = workspace.getVendoredFile(currentVendoredFile.path);
 
       if (currentHandle == null) {
         return {

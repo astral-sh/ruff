@@ -3,13 +3,14 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
@@ -161,7 +162,7 @@ impl Workspace {
         self.db.project().open_file(&mut self.db, file);
 
         Ok(FileHandle {
-            path: ruff_db::files::FilePath::System(path),
+            path: path.into(),
             file,
         })
     }
@@ -570,37 +571,19 @@ impl Workspace {
             .collect())
     }
 
-    /// Reads the contents of a vendored file by its path.
-    #[wasm_bindgen(js_name = "readVendoredFile")]
-    pub fn read_vendored_file(&self, path: &str) -> Result<String, Error> {
-        use ruff_db::vendored::VendoredPath;
-
-        let vendored_path = VendoredPath::new(path);
-        self.db
-            .vendored()
-            .read_to_string(vendored_path)
-            .map_err(into_error)
-    }
-
     /// Gets a file handle for a vendored file by its path.
     /// This allows vendored files to participate in LSP features like hover, completions, etc.
-    #[wasm_bindgen(js_name = "getVendoredFileHandle")]
-    pub fn get_vendored_file_handle(&self, path: &str) -> Result<FileHandle, Error> {
-        use ruff_db::files::vendored_path_to_file;
-        use ruff_db::vendored::VendoredPath;
-
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
         let vendored_path = VendoredPath::new(path);
 
         // Try to get the vendored file as a File
         let file = vendored_path_to_file(&self.db, vendored_path)
             .map_err(|err| Error::new(&format!("Vendored file not found: {}: {}", path, err)))?;
 
-        // Create a FilePath::Vendored for the vendored file
-        let file_path = ruff_db::files::FilePath::Vendored(vendored_path.to_path_buf());
-
         Ok(FileHandle {
             file,
-            path: file_path,
+            path: vendored_path.to_path_buf().into(),
         })
     }
 }
@@ -645,7 +628,7 @@ fn map_targets_to_links(
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: ruff_db::files::FilePath,
+    path: FilePath,
     file: File,
 }
 
@@ -653,11 +636,11 @@ pub struct FileHandle {
 impl FileHandle {
     #[wasm_bindgen(js_name = toString)]
     pub fn js_to_string(&self) -> String {
-        format!("file(id: {:?}, path: {})", self.file, self.path.as_str())
+        format!("file(id: {:?}, path: {})", self.file, self.path)
     }
 
     pub fn path(&self) -> String {
-        self.path.as_str().to_string()
+        self.path.to_string()
     }
 }
 

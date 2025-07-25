@@ -424,7 +424,7 @@ private documentHighlightDisposable: IDisposable;
     }
 
     // Use the new WASM method to get a proper file handle for the vendored file
-    const handle = this.props.workspace.getVendoredFileHandle(vendoredPath);
+    const handle = this.props.workspace.getVendoredFile(vendoredPath);
     this.vendoredFileHandles.set(vendoredPath, handle);
     return handle;
   }
@@ -669,11 +669,11 @@ private documentHighlightDisposable: IDisposable;
     // Check if this is a vendored file
     if (resource.scheme === "vendored") {
       const vendoredPath = this.getVendoredPath(resource);
-      // Read the vendored file content
-      const content = this.props.workspace.readVendoredFile(vendoredPath);
+      // Get a file handle for this vendored file
+      const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
 
-      // Get or create a file handle for this vendored file
-      this.getOrCreateVendoredFileHandle(vendoredPath);
+      // Read the vendored file content using the file handle
+      const content = this.props.workspace.sourceText(fileHandle);
 
       // Create or get the model for the vendored file
       let model = this.monaco.editor.getModel(resource);
