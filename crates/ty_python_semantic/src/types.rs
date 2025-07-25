@@ -703,7 +703,7 @@ impl<'db> Type<'db> {
                     None,
                     variance,
                     None,
-                    TypeVarKind::Pep695,
+                    TypeVarKind::Synthesized,
                 )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
@@ -5184,7 +5184,7 @@ impl<'db> Type<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Legacy,
+                        TypeVarKind::Synthesized,
                     )))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
@@ -6441,6 +6441,7 @@ impl<'db> FieldInstance<'db> {
 pub enum TypeVarKind {
     Legacy,
     Pep695,
+    Synthesized,
 }
 
 /// Data regarding a single type variable.
@@ -6497,6 +6498,23 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn with_binding_context(
+        self,
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            Some(binding_context),
+            self.bound_or_constraints(db),
+            self.variance(db),
+            self.default_ty(db),
+            self.kind(db),
+        )
+    }
+
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Legacy)
     }
