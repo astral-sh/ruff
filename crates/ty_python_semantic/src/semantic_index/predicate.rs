@@ -14,7 +14,8 @@ use ruff_python_ast::Singleton;
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::global_scope;
-use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -217,7 +218,7 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedPlaceId,
+    pub(crate) symbol_id: ScopedSymbolId,
 
     pub(crate) referenced_file: File,
 }

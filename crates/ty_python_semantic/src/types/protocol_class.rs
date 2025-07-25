@@ -4,10 +4,12 @@ use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
 
+use super::TypeVarVariance;
+use crate::semantic_index::place_table;
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
-    semantic_index::{place_table, use_def_map},
+    semantic_index::use_def_map,
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
         Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
@@ -15,8 +17,6 @@ use crate::{
         signatures::{Parameter, Parameters},
     },
 };
-
-use super::TypeVarVariance;
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -471,15 +471,15 @@ fn cached_protocol_interface<'db>(
 
         members.extend(
             use_def_map
-                .all_end_of_scope_declarations()
-                .flat_map(|(place_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|place| (place_id, place))
+                .all_end_of_scope_symbol_declarations()
+                .flat_map(|(symbol_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|place| (symbol_id, place))
                 })
-                .filter_map(|(place_id, place)| {
+                .filter_map(|(symbol_id, place)| {
                     place
                         .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (place_id, ty, place.qualifiers, BoundOnClass::No))
+                        .map(|ty| (symbol_id, ty, place.qualifiers, BoundOnClass::No))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -489,20 +489,20 @@ fn cached_protocol_interface<'db>(
                 // members at runtime, and it's important that we accurately understand
                 // type narrowing that uses `isinstance()` or `issubclass()` with
                 // runtime-checkable protocols.
-                .chain(use_def_map.all_end_of_scope_bindings().filter_map(
-                    |(place_id, bindings)| {
+                .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+                    |(symbol_id, bindings)| {
                         place_from_bindings(db, bindings)
                             .ignore_possibly_unbound()
-                            .map(|ty| (place_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
+                            .map(|ty| (symbol_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
                     },
                 ))
-                .filter_map(|(place_id, member, qualifiers, bound_on_class)| {
-                    Some((
-                        place_table.place_expr(place_id).as_name()?,
+                .map(|(symbol_id, member, qualifiers, bound_on_class)| {
+                    (
+                        place_table.symbol(symbol_id).name(),
                         member,
                         qualifiers,
                         bound_on_class,
-                    ))
+                    )
                 })
                 .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers, bound_on_class)| {

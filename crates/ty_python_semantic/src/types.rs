@@ -33,7 +33,8 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -8840,7 +8841,7 @@ impl<'db> TypeIsType<'db> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);
 
-        Some(format!("{}", table.place_expr(place)))
+        Some(format!("{}", table.place(place)))
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

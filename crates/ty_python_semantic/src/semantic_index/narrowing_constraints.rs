@@ -30,8 +30,8 @@
 
 use crate::list::{List, ListBuilder, ListSetReverseIterator, ListStorage};
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::place::FileScopeId;
 use crate::semantic_index::predicate::ScopedPredicateId;
+use crate::semantic_index::scope::FileScopeId;
 
 /// A narrowing constraint associated with a live binding.
 ///
