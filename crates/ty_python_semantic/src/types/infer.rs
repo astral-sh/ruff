@@ -385,7 +385,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
         })
 }
 
-/// Returns in iterator of any generic context introduced by the given scope or any enclosing
+/// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
 pub(crate) fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
