@@ -1247,7 +1247,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method object.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self
+        __new__ :: bound method object.__new__[Self: object]() -> Self
         __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method object.__repr__() -> str
@@ -1292,7 +1292,7 @@ quux.b<CURSOR>
         __init_subclass__ :: bound method object.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self
+        __new__ :: bound method object.__new__[Self: object]() -> Self
         __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method object.__repr__() -> str
@@ -1346,7 +1346,7 @@ C.<CURSOR>
         __mro__ :: tuple[<class 'C'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self
+        __new__ :: def __new__[Self: object](cls) -> Self
         __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1358,7 +1358,7 @@ C.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__() -> list[Self]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1426,7 +1426,7 @@ Meta.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__(self: Self) -> list[Self]
+                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1522,7 +1522,7 @@ Quux.<CURSOR>
         __mro__ :: tuple[<class 'Quux'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self
+        __new__ :: def __new__[Self: object](cls) -> Self
         __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1534,7 +1534,7 @@ Quux.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__() -> list[Self]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1574,8 +1574,8 @@ Answer.<CURSOR>
                 __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
                 __class__ :: <class 'EnumMeta'>
                 __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
-                __copy__ :: def __copy__(self) -> Self
-                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self
+                __copy__ :: def __copy__[Self: Enum](self) -> Self
+                __deepcopy__ :: def __deepcopy__[Self: Enum](self, memo: Any) -> Self
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
                 __dict__ :: MappingProxyType[str, Any]
                 __dictoffset__ :: int
@@ -1585,35 +1585,35 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> _EnumMemberT
+                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: def __init_subclass__(cls) -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[_EnumMemberT]
+                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Unknown]
                 __module__ :: str
                 __mro__ :: tuple[<class 'Answer'>, <class 'Enum'>, <class 'object'>]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __new__ :: def __new__(cls, value: object) -> Self
+                __new__ :: def __new__[Self: Enum](cls, value: object) -> Self
                 __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[_EnumMemberT]
+                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT]
                 __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __signature__ :: bound method <class 'Answer'>.__signature__() -> str
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__() -> list[Self]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
