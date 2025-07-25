@@ -76,6 +76,12 @@ impl TextEmitter {
         self.config = self.config.preview(preview);
         self
     }
+
+    #[must_use]
+    pub fn with_color(mut self, color: bool) -> Self {
+        self.config = self.config.color(color);
+        self
+    }
 }
 
 impl Emitter for TextEmitter {
