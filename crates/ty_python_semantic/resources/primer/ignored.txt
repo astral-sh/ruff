@@ -1,0 +1,11 @@
+This file lists mypy_primer projects that we do not to test on:
+
+apprise:
+
+  This project has outdated (and completely wrong) stub files that
+  frequently lead to very confusing errors (usually true positives).
+  Evaluating ecosystem impact on this project is therefore irritating
+  and usually not very helpful.
+
+  [1] https://github.com/caronc/apprise/issues/1211
+  [2] https://github.com/caronc/apprise/blob/91faed0c6d22b49e7f31bc9dec1c8742f52a0aa3/apprise/config/base.pyi
