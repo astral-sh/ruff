@@ -1,0 +1,81 @@
+---
+source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
+---
+C421.py:1:1: C421 [*] Unnecessary set literal passed to `set()` (remove the outer call to `set()`)
+  |
+1 | set({1, 2, 3})
+  | ^^^^^^^^^^^^^^ C421
+2 | set({'a', 'b'})
+3 | set({x for x in range(10)})
+  |
+  = help: Remove outer `set()` call
+
+ℹ Unsafe fix
+1   |-set({1, 2, 3})
+  1 |+{1, 2, 3}
+2 2 | set({'a', 'b'})
+3 3 | set({x for x in range(10)})
+4 4 | set(
+
+C421.py:2:1: C421 [*] Unnecessary set literal passed to `set()` (remove the outer call to `set()`)
+  |
+1 | set({1, 2, 3})
+2 | set({'a', 'b'})
+  | ^^^^^^^^^^^^^^^ C421
+3 | set({x for x in range(10)})
+4 | set(
+  |
+  = help: Remove outer `set()` call
+
+ℹ Unsafe fix
+1 1 | set({1, 2, 3})
+2   |-set({'a', 'b'})
+  2 |+{'a', 'b'}
+3 3 | set({x for x in range(10)})
+4 4 | set(
+5 5 |     {x for x in range(10)}
+
+C421.py:3:1: C421 [*] Unnecessary set comprehension passed to `set()` (remove the outer call to `set()`)
+  |
+1 | set({1, 2, 3})
+2 | set({'a', 'b'})
+3 | set({x for x in range(10)})
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C421
+4 | set(
+5 |     {x for x in range(10)}
+  |
+  = help: Remove outer `set()` call
+
+ℹ Unsafe fix
+1 1 | set({1, 2, 3})
+2 2 | set({'a', 'b'})
+3   |-set({x for x in range(10)})
+  3 |+{x for x in range(10)}
+4 4 | set(
+5 5 |     {x for x in range(10)}
+6 6 | )
+
+C421.py:4:1: C421 [*] Unnecessary set comprehension passed to `set()` (remove the outer call to `set()`)
+  |
+2 |   set({'a', 'b'})
+3 |   set({x for x in range(10)})
+4 | / set(
+5 | |     {x for x in range(10)}
+6 | | )
+  | |_^ C421
+7 |
+8 |   set({1, 2}, a=1)
+  |
+  = help: Remove outer `set()` call
+
+ℹ Unsafe fix
+1 1 | set({1, 2, 3})
+2 2 | set({'a', 'b'})
+3 3 | set({x for x in range(10)})
+4   |-set(
+5   |-    {x for x in range(10)}
+6   |-)
+  4 |+{x for x in range(10)}
+7 5 | 
+8 6 | set({1, 2}, a=1)
+9 7 | set(iterable={1, 2})
