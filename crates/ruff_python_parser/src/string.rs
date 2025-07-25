@@ -864,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_t_string_concat_3_err() {
+    fn test_parse_t_string_concat_3_error() {
         let source = "'Hello ' t'world{\"!\"}'";
         let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
