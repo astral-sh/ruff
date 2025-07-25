@@ -28,6 +28,9 @@ expression: initialization_result
     "typeDefinitionProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
+    "renameProvider": {
+      "prepareProvider": true
+    },
     "declarationProvider": true,
     "semanticTokensProvider": {
       "legend": {
