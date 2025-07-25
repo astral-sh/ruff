@@ -154,7 +154,7 @@ impl TestServer {
     /// Create a new test server with the given workspace configurations
     fn new(
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-        test_dir: TestContext,
+        test_context: TestContext,
         capabilities: ClientCapabilities,
     ) -> Result<Self> {
         setup_tracing();
@@ -162,7 +162,7 @@ impl TestServer {
         let (server_connection, client_connection) = Connection::memory();
 
         // Create OS system with the test directory as cwd
-        let os_system = OsSystem::new(test_dir.root());
+        let os_system = OsSystem::new(test_context.root());
 
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
@@ -195,7 +195,7 @@ impl TestServer {
         Self {
             server_thread: Some(server_thread),
             client_connection: Some(client_connection),
-            test_context: test_dir,
+            test_context,
             request_counter: 0,
             responses: FxHashMap::default(),
             notifications: VecDeque::new(),
@@ -707,7 +707,7 @@ impl Drop for TestServer {
 
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
-    test_dir: TestContext,
+    test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
     client_capabilities: ClientCapabilities,
 }
@@ -734,7 +734,7 @@ impl TestServerBuilder {
 
         Ok(Self {
             workspaces: Vec::new(),
-            test_dir: TestContext::new()?,
+            test_context: TestContext::new()?,
             client_capabilities,
         })
     }
@@ -753,7 +753,7 @@ impl TestServerBuilder {
             anyhow::bail!("Test server doesn't support multiple workspaces yet");
         }
 
-        let workspace_path = self.test_dir.root().join(workspace_root);
+        let workspace_path = self.test_context.root().join(workspace_root);
         fs::create_dir_all(workspace_path.as_std_path())?;
 
         self.workspaces.push((
@@ -812,7 +812,7 @@ impl TestServerBuilder {
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let file_path = self.test_dir.root().join(path.as_ref());
+        let file_path = self.test_context.root().join(path.as_ref());
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent.as_std_path())?;
@@ -837,7 +837,7 @@ impl TestServerBuilder {
 
     /// Build the test server
     pub(crate) fn build(self) -> Result<TestServer> {
-        TestServer::new(self.workspaces, self.test_dir, self.client_capabilities)
+        TestServer::new(self.workspaces, self.test_context, self.client_capabilities)
     }
 }
 
