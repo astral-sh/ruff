@@ -397,7 +397,7 @@ mod tests {
     use crate::message::{EmitterContext, TextEmitter};
     use crate::settings::LinterSettings;
     use crate::settings::types::UnsafeFixes;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
 
     #[test]
     fn default() {
@@ -543,5 +543,28 @@ mod tests {
            |
         ");
         Ok(())
+    }
+
+    /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit 2922490.
+    ///
+    /// For example, without the fix, we get diagnostics like this:
+    ///
+    /// ```
+    ///  55 | nested_fstrings = f'␈{f'^Z{f'␛'}'}'
+    ///     |                       ^ PLE2512
+    ///  ```
+    ///
+    /// where the caret points to the `f` in the f-string instead of the start of the invalid
+    /// character (`^Z`).
+    #[test]
+    fn unprintable_characters() {
+        let settings = LinterSettings::for_rule(Rule::InvalidCharacterSub);
+        // extracted from pylint/invalid_characters.py:55
+        let diagnostics = test_snippet(r#"nested_fstrings = f'{f'{f''}'}'"#, &settings);
+        let config = DisplayDiagnosticConfig::default().format(DiagnosticFormat::Full);
+        let notebook_indexes = FxHashMap::default();
+        let context = EmitterContext::new(&notebook_indexes);
+        let value = DisplayDiagnostics::new(&context, &config, &diagnostics);
+        insta::assert_snapshot!("unprintable_characters", value.to_string());
     }
 }

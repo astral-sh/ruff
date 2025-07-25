@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/message/text.rs
+expression: value.to_string()
+---
+error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+ --> <filename>:1:25
+  |
+1 | nested_fstrings = f'{f'{f''}'}'
+  |                        ^
+  |
+help: Replace with escape sequence
