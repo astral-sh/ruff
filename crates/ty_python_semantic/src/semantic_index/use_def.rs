@@ -265,7 +265,7 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::PreviousDefinitions;
-use crate::semantic_index::{EnclosingSnapshotResult,  SemanticIndex};
+use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -1200,7 +1200,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
-        enclosing_place_expr: &PlaceExprRef,
+        enclosing_place_expr: PlaceExprRef,
     ) -> ScopedEnclosingSnapshotId {
         let bindings = match enclosing_place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),

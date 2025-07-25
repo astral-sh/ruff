@@ -1830,7 +1830,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
 
                     let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
-                    if enclosing_symbol.is_marked_nonlocal() {
+                    if enclosing_symbol.is_nonlocal() {
                         // The variable is `nonlocal` in this ancestor scope. Keep going.
                         continue;
                     }
@@ -5142,7 +5142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 if !enclosing_symbol.is_bound()
                     && !enclosing_symbol.is_declared()
-                    && !enclosing_symbol.is_marked_nonlocal()
+                    && !enclosing_symbol.is_nonlocal()
                 {
                     debug_assert!(enclosing_symbol.is_used());
                     // The name is only referenced here, not defined. Keep going.

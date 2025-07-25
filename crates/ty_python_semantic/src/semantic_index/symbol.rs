@@ -69,8 +69,12 @@ impl Symbol {
     }
 
     /// Is the symbol `nonlocal` its containing scope?
-    pub(crate) fn is_marked_nonlocal(&self) -> bool {
+    pub(crate) fn is_nonlocal(&self) -> bool {
         self.flags.contains(SymbolFlags::MARKED_NONLOCAL)
+    }
+
+    pub(crate) const fn is_reassigned(&self) -> bool {
+        self.flags.contains(SymbolFlags::IS_REASSIGNED)
     }
 
     pub(super) fn mark_global(&mut self) {
@@ -82,6 +86,10 @@ impl Symbol {
     }
 
     pub(super) fn mark_bound(&mut self) {
+        if self.is_bound() {
+            self.insert_flags(SymbolFlags::IS_REASSIGNED);
+        }
+
         self.insert_flags(SymbolFlags::IS_BOUND);
     }
 

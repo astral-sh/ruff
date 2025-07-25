@@ -332,11 +332,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn bound_scope(
-        &self,
-        enclosing_scope: FileScopeId,
-        place_expr: &PlaceExpr,
-    ) -> Option<FileScopeId> {
+    fn bound_scope(&self, enclosing_scope: FileScopeId, symbol: &Symbol) -> Option<FileScopeId> {
         self.scope_stack
             .iter()
             .rev()
@@ -344,12 +340,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .find_map(|scope_info| {
                 let scope_id = scope_info.file_scope_id;
                 let place_table = &self.place_tables[scope_id];
-                let place_id = place_table.place_id_by_expr(place_expr)?;
-                if place_table.place_expr(place_id).is_bound() {
-                    Some(scope_id)
-                } else {
-                    None
-                }
+                let place_id = place_table.symbol_id(symbol.name())?;
+                place_table.place(place_id).is_bound().then_some(scope_id)
             })
     }
 
@@ -360,13 +352,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
-            for nested_place in self.place_tables[popped_scope_id].places() {
-                // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
+            // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
+            for nested_symbol in self.place_tables[popped_scope_id].symbols() {
                 // For the same reason, symbols declared as nonlocal or global are not recorded.
                 // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
-                if !nested_place.is_name()
-                    || self.scopes[enclosing_scope_id].visibility().is_public()
-                {
+                if self.scopes[enclosing_scope_id].visibility().is_public() {
                     continue;
                 }
 
@@ -374,17 +364,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Note that even if this place is bound in the popped scope,
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
-
-                let Some(enclosing_place_id) =
-                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
+                let Some(enclosed_symbol_id) =
+                    enclosing_place_table.symbol_id(nested_symbol.name())
                 else {
                     continue;
                 };
-                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
+                let enclosing_place = enclosing_place_table.symbol(enclosed_symbol_id);
                 if !enclosing_place.is_bound() {
                     // If the bound scope of a place can be modified from elsewhere, the snapshot will not be recorded.
                     if self
-                        .bound_scope(enclosing_scope_id, &nested_place.expr)
+                        .bound_scope(enclosing_scope_id, nested_symbol)
                         .is_none_or(|scope| self.scopes[scope].visibility().is_public())
                     {
                         continue;
@@ -395,14 +384,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // enclosing scope (this may later be invalidated and swept away).
                 let key = EnclosingSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
-                    enclosing_place: enclosing_place_id,
+                    enclosing_place: enclosed_symbol_id.into(),
                     nested_scope: popped_scope_id,
                     nested_laziness: ScopeLaziness::Lazy,
                 };
                 let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
-                    enclosing_place_id,
+                    enclosed_symbol_id.into(),
                     enclosing_scope_kind,
-                    enclosing_place,
+                    enclosing_place.into(),
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
@@ -415,7 +404,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let place_table = &self.place_tables[key.enclosing_scope];
             key.nested_laziness.is_eager()
                 || key.enclosing_scope != popped_scope_id
-                || !place_table.is_place_reassigned(key.enclosing_place)
+                || key
+                    .enclosing_place
+                    .as_symbol()
+                    .is_some_and(|symbol_id| !place_table.symbol(symbol_id).is_reassigned())
         });
     }
 
@@ -423,24 +415,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.enclosing_snapshots.retain(|key, _| {
             let place_table = &self.place_tables[key.enclosing_scope];
 
-            let is_place_bound_and_nonlocal = || -> bool {
-                let place_expr = place_table.place_expr(key.enclosing_place);
+            let is_bound_and_non_local = || -> bool {
+                let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
+                    return false;
+                };
+
+                let symbol = place_table.symbol(symbol_id);
                 self.scopes
                     .iter_enumerated()
                     .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
                     .any(|(scope_id, _)| {
                         let other_scope_place_table = &self.place_tables[scope_id];
-                        let Some(place_id) =
-                            other_scope_place_table.place_id_by_expr(&place_expr.expr)
+                        let Some(symbol_id) = other_scope_place_table.symbol_id(symbol.name())
                         else {
                             return false;
                         };
-                        let place = other_scope_place_table.place_expr(place_id);
-                        place.is_marked_nonlocal() && place.is_bound()
+                        let symbol = other_scope_place_table.place(symbol_id);
+                        symbol.is_nonlocal() && symbol.is_bound()
                     })
             };
 
-            key.nested_laziness.is_eager() || !is_place_bound_and_nonlocal()
+            key.nested_laziness.is_eager() || !is_bound_and_non_local()
         });
     }
 
@@ -1593,7 +1588,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     // Check whether the variable has been declared nonlocal.
-                    if symbol.is_marked_nonlocal() {
+                    if symbol.is_nonlocal() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
                                 name.id.as_str().into(),
@@ -2094,7 +2089,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         });
                     }
                     // Check whether the variable has also been declared nonlocal.
-                    if symbol.is_marked_nonlocal() {
+                    if symbol.is_nonlocal() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
                             range: name.range,

@@ -129,7 +129,6 @@ bitflags! {
         const IS_BOUND              = 1 << 0;
         const IS_DECLARED           = 1 << 1;
         const IS_INSTANCE_ATTRIBUTE = 1 << 2;
-        const IS_REASSIGNED         = 1 << 3;
     }
 }
 

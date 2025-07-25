@@ -22,7 +22,9 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
 pub use crate::semantic_index::scope::FileScopeId;
-use crate::semantic_index::scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind};
+use crate::semantic_index::scope::{
+    NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
+};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
@@ -189,8 +191,6 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     FileScopeId::global().to_scope_id(db, file)
 }
 
-
-
 pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
     FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
@@ -319,7 +319,7 @@ impl<'db> SemanticIndex<'db> {
         symbol: ScopedSymbolId,
         scope: FileScopeId,
     ) -> bool {
-        self.place_table(scope).symbol(symbol).is_marked_nonlocal()
+        self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
     /// Returns the id of the parent scope.
@@ -498,13 +498,13 @@ impl<'db> SemanticIndex<'db> {
                 break;
             }
             if !ancestor_scope.is_eager() {
-                if expr.is_name() {
+                if let PlaceExprRef::Symbol(symbol) = expr {
                     if let Some(place_id) =
-                        self.place_tables[enclosing_scope].place_id_by_expr(expr)
+                        self.place_tables[enclosing_scope].symbol_id(symbol.name())
                     {
                         let key = EnclosingSnapshotKey {
                             enclosing_scope,
-                            enclosing_place: place_id,
+                            enclosing_place: place_id.into(),
                             nested_scope,
                             nested_laziness: ScopeLaziness::Lazy,
                         };

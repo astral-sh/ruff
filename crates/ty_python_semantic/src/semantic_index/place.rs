@@ -108,7 +108,7 @@ impl<'a> PlaceExprRef<'a> {
 
     pub(crate) fn is_nonlocal(self) -> bool {
         match self {
-            Self::Symbol(symbol) => symbol.is_marked_nonlocal(),
+            Self::Symbol(symbol) => symbol.is_nonlocal(),
             Self::Member(_) => false,
         }
     }
@@ -277,6 +277,10 @@ impl PlaceTableBuilder {
         self.symbols.symbol(id)
     }
 
+    pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.symbols.symbol_id(name)
+    }
+
     #[track_caller]
     pub(super) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
         self.symbols.symbol_mut(id)
@@ -287,6 +291,7 @@ impl PlaceTableBuilder {
         self.member.member_mut(id)
     }
 
+    #[track_caller]
     pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
         match place_id.into() {
             ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
@@ -306,6 +311,10 @@ impl PlaceTableBuilder {
             .iter()
             .map(Into::into)
             .chain(self.member.iter().map(PlaceExprRef::Member))
+    }
+
+    pub(crate) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
+        self.symbols.iter()
     }
 
     pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {

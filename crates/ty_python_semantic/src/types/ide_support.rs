@@ -415,7 +415,7 @@ pub fn definitions_for_name<'db>(
         // Check if this place is marked as global or nonlocal
         let place_expr = place_table.symbol(symbol_id);
         let is_global = place_expr.is_global();
-        let is_nonlocal = place_expr.is_marked_nonlocal();
+        let is_nonlocal = place_expr.is_nonlocal();
 
         // TODO: The current algorithm doesn't return definintions or bindings
         // for other scopes that are outside of this scope hierarchy that target
