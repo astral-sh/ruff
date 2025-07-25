@@ -387,9 +387,9 @@ pub(crate) fn nearest_enclosing_class<'db>(
 
 /// Returns in iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
-pub(crate) fn enclosing_generic_contexts<'ast, 'db>(
+pub(crate) fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
-    module: &'ast ParsedModuleRef,
+    module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = GenericContext<'db>> {
@@ -415,9 +415,9 @@ pub(crate) fn enclosing_generic_contexts<'ast, 'db>(
 }
 
 /// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
-pub(crate) fn bound_legacy_typevars<'ast, 'db>(
+pub(crate) fn bound_legacy_typevars<'db>(
     db: &'db dyn Db,
-    module: &'ast ParsedModuleRef,
+    module: &ParsedModuleRef,
     index: &'db SemanticIndex<'db>,
     scope: FileScopeId,
 ) -> impl Iterator<Item = TypeVarInstance<'db>> {

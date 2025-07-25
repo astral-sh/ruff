@@ -317,6 +317,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Return a typed signature from a function definition.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn from_function(
         db: &'db dyn Db,
         generic_context: Option<GenericContext<'db>>,
