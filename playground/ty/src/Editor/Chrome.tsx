@@ -145,7 +145,7 @@ export default function Chrome({
     files,
     workspace,
     secondaryTool,
-    files.currentVendoredFile?.handle ?? null,
+    files.currentVendoredFile ?? null,
   );
 
   return (
@@ -174,10 +174,13 @@ export default function Chrome({
                   className={files.currentVendoredFile ? "mb-2" : "my-2"}
                   order={0}
                 >
-                  {files.currentVendoredFile && (
+                  {files.currentVendoredFile && files.selected && (
                     <VendoredFileBanner
                       currentVendoredFile={files.currentVendoredFile}
-                      files={files}
+                      selectedFile={{
+                        id: files.selected,
+                        name: selectedFileName,
+                      }}
                       editorRef={editorRef}
                       onClearVendoredFile={onClearVendoredFile}
                     />
@@ -266,9 +269,8 @@ function useCheckResult(
   return useMemo(() => {
     // Determine which file handle to use
     const currentHandle =
-      (currentVendoredFileHandle ?? files.selected == null)
-        ? null
-        : files.handles[files.selected];
+      currentVendoredFileHandle ??
+      (files.selected == null ? null : files.handles[files.selected]);
 
     const isVendoredFile = currentVendoredFileHandle != null;
 

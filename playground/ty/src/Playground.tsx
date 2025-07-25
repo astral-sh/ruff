@@ -303,7 +303,7 @@ interface FilesState {
   /**
    * The currently viewed vendored/builtin file, if any.
    */
-  currentVendoredFile: { handle: FileHandle; previousFileId: FileId } | null;
+  currentVendoredFile: FileHandle | null;
 }
 
 export type FileAction =
@@ -448,20 +448,9 @@ function filesReducer(
     case "selectVendoredFile": {
       const { handle } = action;
 
-      // We should always have a selected file when navigating to vendored files
-      const previousFileId =
-        state.currentVendoredFile?.previousFileId ?? state.selected;
-      if (previousFileId == null) {
-        // This should never happen in practice, but handle it gracefully
-        return state;
-      }
-
       return {
         ...state,
-        currentVendoredFile: {
-          handle,
-          previousFileId,
-        },
+        currentVendoredFile: handle,
       };
     }
 

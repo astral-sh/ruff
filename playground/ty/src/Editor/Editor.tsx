@@ -605,9 +605,7 @@ private documentHighlightDisposable: IDisposable;
       new TyPosition(position.lineNumber, position.column),
     );
 
-    const mappedTargets = mapNavigationTargets(links);
-
-    return mappedTargets;
+    return mapNavigationTargets(links);
   }
 
   provideReferences(
@@ -672,41 +670,43 @@ private documentHighlightDisposable: IDisposable;
 
       // Track that we're now viewing a vendored file
       this.props.onVendoredFileChange(fileHandle);
-      return true;
-    }
-
-    // Handle regular files
-    const fileId = files.index.find((file) => {
-      return Uri.file(file.name).toString() === resource.toString();
-    })?.id;
-
-    if (fileId == null) {
-      return false;
-    }
-
-    const handle = files.handles[fileId];
-    if (handle == null) {
-      return false;
-    }
-
-    let model = this.monaco.editor.getModel(resource);
-    if (model == null) {
-      const language = isPythonFile(handle) ? "python" : undefined;
-      model = this.monaco.editor.createModel(
-        files.contents[fileId],
-        language,
-        resource,
-      );
     } else {
-      // Update model content to match current file state
-      model.setValue(files.contents[fileId]);
+      // Handle regular files
+      const fileId = files.index.find((file) => {
+        return Uri.file(file.name).toString() === resource.toString();
+      })?.id;
+
+      if (fileId == null) {
+        return false;
+      }
+
+      const handle = files.handles[fileId];
+      if (handle == null) {
+        return false;
+      }
+
+      let model = this.monaco.editor.getModel(resource);
+      if (model == null) {
+        const language = isPythonFile(handle) ? "python" : undefined;
+        model = this.monaco.editor.createModel(
+          files.contents[fileId],
+          language,
+          resource,
+        );
+      } else {
+        // Update model content to match current file state
+        model.setValue(files.contents[fileId]);
+      }
+
+      // it's a bit hacky to create the model manually
+      // but only using `onOpenFile` isn't enough
+      // because the model doesn't get updated until the next render.
+      if (files.selected !== fileId) {
+        source.setModel(model);
+
+        this.props.onOpenFile(fileId);
+      }
     }
-
-    // Set the model on the editor
-    source.setModel(model);
-
-    // Always call onOpenFile to ensure the UI state is updated
-    this.props.onOpenFile(fileId);
 
     if (selectionOrPosition != null) {
       if (Position.isIPosition(selectionOrPosition)) {
