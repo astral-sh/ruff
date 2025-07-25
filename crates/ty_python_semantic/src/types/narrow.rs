@@ -182,6 +182,7 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
+            Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
             Type::Tuple(tuple) => UnionType::try_from_elements(
                 db,
                 tuple
