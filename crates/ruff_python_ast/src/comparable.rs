@@ -709,7 +709,7 @@ pub struct ComparableTString<'a> {
 
 impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
     // We model a [`ComparableTString`] on the actual
-    // [CPython implementation] of a `string.templatelib.Template` object:
+    // [CPython implementation] of a `string.templatelib.Template` object.
     //
     // As in CPython, we must be careful to ensure that the length
     // of `strings` is always one more than the length of `interpolations` -

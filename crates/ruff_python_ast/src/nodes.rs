@@ -673,7 +673,7 @@ impl TStringValue {
     /// string literal or an interpolation. In the following example,
     ///
     /// ```python
-    /// "foo" t"bar {x}" "baz" t"qux"
+    /// t"foo" t"bar {x}" t"baz" t"qux"
     /// ```
     ///
     /// The interpolated string elements returned would be string literal (`"bar "`),
@@ -707,7 +707,7 @@ enum TStringValueInner {
     /// A single t-string i.e., `t"foo"`.
     Single(TString),
 
-    /// An implicitly concatenated t-string i.e., `"foo" t"bar {x}"`.
+    /// An implicitly concatenated t-string i.e., `t"foo" t"bar {x}"`.
     Concatenated(Vec<TString>),
 }
 
