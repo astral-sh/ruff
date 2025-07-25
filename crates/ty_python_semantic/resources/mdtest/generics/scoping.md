@@ -149,8 +149,13 @@ The class typevar in the method signature does not bind a _new_ instance of the 
 already solved and specialized when the class was specialized:
 
 ```py
+from ty_extensions import generic_context
+
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m(x: int, y: S) -> S
+reveal_type(generic_context(Legacy))  # revealed: tuple[T]
+# TODO: revealed: tuple[S]
+reveal_type(generic_context(legacy.m))  # revealed: tuple[T, S]
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:

@@ -457,6 +457,10 @@ reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[T, U]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
+reveal_type(generic_context(c))  # revealed: None
+reveal_type(generic_context(c.method))  # revealed: None
+# TODO: revealed: tuple[U]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[T, U]
 ```
 
 ## Specializations propagate
