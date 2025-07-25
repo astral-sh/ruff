@@ -2828,11 +2828,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_ty) = default_ty {
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+            } else if let Some(ty) = self.special_first_method_argument(parameter) {
+                ty
             } else {
                 Type::unknown()
             };
             self.add_binding(parameter.into(), definition, ty);
         }
+    }
+
+    /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
+    fn special_first_method_argument(&self, parameter: &ast::Parameter) -> Option<Type<'db>> {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        let method = current_scope.node().as_function(module)?;
+
+        let parent_scope_id = current_scope.parent()?;
+        let parent_scope = self.index.scope(parent_scope_id);
+        parent_scope.node().as_class(module)?;
+
+        let definition = self.index.expect_single_definition(method);
+        let DefinitionKind::Function(func_def) = definition.kind(self.db()) else {
+            return None;
+        };
+        let func_type = infer_definition_types(self.db(), definition)
+            .declaration_type(definition)
+            .inner_type()
+            .into_function_literal()?;
+
+        if func_def
+            .node(module)
+            .parameters
+            .index(parameter.name())
+            .is_some_and(|index| index != 0)
+        {
+            return None;
+        }
+
+        if func_type.is_class_method(self.db()) {
+            // TODO: set the type for `cls` argument
+            return None;
+        } else if func_type.has_known_decorator(self.db(), FunctionDecorators::STATICMETHOD) {
+            return None;
+        }
+        Type::SpecialForm(SpecialFormType::TypingSelf)
+            .in_type_expression(self.db(), self.scope())
+            .ok()
     }
 
     /// Set initial declared/inferred types for a `*args` variadic positional parameter.
@@ -11075,6 +11117,80 @@ mod tests {
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
+
+    #[test]
+    fn analyze_cycles_gridout() {
+        let mut db = setup_db();
+        let filename = "src/gridout.py";
+        db.write_dedented(
+            filename,
+            r#"
+            EMPTY = b""
+
+
+            class GridOut:
+                def __init__(self) -> None:
+                    self._buffer_pos = 0
+                    self._buffer = b""
+
+                def readchunk(self) -> bytes:
+                    if not len(self._buffer) - self._buffer_pos:
+                        raise Exception("truncated chunk")
+                    self._buffer_pos = 0
+                    return EMPTY
+
+                def _read_size_or_line(self, size: int = -1) -> bytes:
+                    if size > self._position:
+                        size = self._position
+                    if size == 0:
+                        return bytes()
+
+                    received = 0
+                    needed = size - received
+                    while received < size:
+                        if self._buffer:
+                            buf = self._buffer
+                            chunk_start = self._buffer_pos
+                            chunk_data = buf[self._buffer_pos :]
+                            self._buffer = EMPTY
+                        else:
+                            buf = self.readchunk()
+                            chunk_start = 0
+                            chunk_data = buf
+
+                        needed = buf.find(EMPTY, chunk_start, chunk_start + needed)
+                        if len(chunk_data) > needed:
+                            self._buffer = buf
+                            self._buffer_pos = chunk_start + needed
+                            self._position -= len(self._buffer) - self._buffer_pos
+
+                    return b""
+            "#,
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, filename, &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle {
+                        database_key,
+                        iteration_count,
+                        fell_back: _,
+                    } = event.kind
+                    {
+                        Some(format!("{database_key:?}, {iteration_count:?}"))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(cycles.len(), 651);
+    }
 
     #[track_caller]
     fn get_symbol<'db>(

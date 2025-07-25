@@ -21,3 +21,5 @@ spark  # too many iterations
 steam.py  # hangs (single threaded)
 xarray  # too many iterations
 zope.interface  # https://github.com/astral-sh/ty/issues/764
+apprise # too many iterations (https://github.com/astral-sh/ty/issues/692)
+discord.py # too many cycle itertions

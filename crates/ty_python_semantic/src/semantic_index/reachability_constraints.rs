@@ -195,6 +195,7 @@
 
 use std::cmp::Ordering;
 
+use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexVec};
 use rustc_hash::FxHashMap;
 
@@ -208,7 +209,7 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type,
+    IntersectionBuilder, Truthiness, Type, UnionBuilder, UnionType, infer_expression_type, infer_expression_types
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -791,7 +792,11 @@ impl ReachabilityConstraints {
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                let ty = infer_expression_type(db, test_expr);
+                let file = test_expr.file(db);
+                let module = parsed_module(db, file).load(db);
+                let expression_node = test_expr.node_ref(db, &module);
+                let inference = infer_expression_types(db, test_expr);
+                let ty = inference.expression_type(test_expr.node_ref(db, &module));
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
