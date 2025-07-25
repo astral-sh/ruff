@@ -452,14 +452,9 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
-    #[track_caller]
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression).expect(
-            "Failed to retrieve the inferred type for an `ast::Expr` node \
-            passed to `TypeInference::expression_type()`. The `TypeInferenceBuilder` \
-            should infer and store types for all `ast::Expr` nodes in any `TypeInference` \
-            region it analyzes.",
-        )
+        self.try_expression_type(expression)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
@@ -541,14 +536,9 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    #[track_caller]
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression).expect(
-            "Failed to retrieve the inferred type for an `ast::Expr` node \
-            passed to `TypeInference::expression_type()`. The `TypeInferenceBuilder` \
-            should infer and store types for all `ast::Expr` nodes in any `TypeInference` \
-            region it analyzes.",
-        )
+        self.try_expression_type(expression)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
@@ -675,14 +665,9 @@ impl<'db> ExpressionInference<'db> {
             .or_else(|| self.fallback_type())
     }
 
-    #[track_caller]
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression).expect(
-            "Failed to retrieve the inferred type for an `ast::Expr` node \
-            passed to `TypeInference::expression_type()`. The `TypeInferenceBuilder` \
-            should infer and store types for all `ast::Expr` nodes in any `TypeInference` \
-            region it analyzes.",
-        )
+        self.try_expression_type(expression)
+            .unwrap_or_else(Type::unknown)
     }
 
     fn is_cycle_callback(&self) -> bool {
@@ -959,19 +944,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.context.in_stub()
     }
 
-    /// Get the already-inferred type of an expression node.
-    ///
-    /// ## Panics
-    /// If the expression is not within this region, or if no type has yet been inferred for
-    /// this node.
-    #[track_caller]
+    /// Get the already-inferred type of an expression node, or Unknown.
     fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        self.try_expression_type(expr).expect(
-            "Failed to retrieve the inferred type for an `ast::Expr` node \
-            passed to `TypeInference::expression_type()`. The `TypeInferenceBuilder` \
-            should infer and store types for all `ast::Expr` nodes in any `TypeInference` \
-            region it analyzes.",
-        )
+        self.try_expression_type(expr).unwrap_or_else(Type::unknown)
     }
 
     fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
