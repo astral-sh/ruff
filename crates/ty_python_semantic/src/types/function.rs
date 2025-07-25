@@ -1049,6 +1049,8 @@ pub enum KnownFunction {
 
     /// `dataclasses.dataclass`
     Dataclass,
+    /// `dataclasses.field`
+    Field,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -1127,7 +1129,7 @@ impl KnownFunction {
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
             }
-            Self::Dataclass => {
+            Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
@@ -1408,7 +1410,7 @@ pub(crate) mod tests {
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
 
-                KnownFunction::Dataclass => KnownModule::Dataclasses,
+                KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
