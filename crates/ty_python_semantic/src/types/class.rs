@@ -11,7 +11,9 @@ use super::{
 };
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::{
+    DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -45,7 +47,7 @@ use crate::{
     },
 };
 use indexmap::IndexSet;
-use itertools::Itertools as _;
+use itertools::Itertools;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -243,6 +245,33 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
         Type::GenericAlias(alias)
     }
 }
+
+/// The result of looking up a declaration from declarations; see [`ClassLiteral::own_instance_member`].
+pub(crate) type PlaceFromOwnInstanceMemberResult<'db> =
+    Result<PlaceAndQualifiers<'db>, MemberAndConflictingTypes<'db>>;
+
+pub(crate) type MemberAndConflictingTypes<'db> = (PlaceAndQualifiers<'db>, Box<[Type<'db>]>);
+
+/// The result of looking up a declaration/binding from an implicit attribute; see [`ClassLiteral::implicit_attribute`]
+pub(crate) type PlaceFromImplicitAttributeResult<'db> =
+    Result<PlaceAndQualifiers<'db>, (PlaceAndQualifiers<'db>, Box<[Type<'db>]>)>;
+
+/// Represents the potential type annotation from in the returned `Place` from [`ClassLiteral::implicit_attribute`]
+/// Since [`ClassLiteral::implicit_attribute`] returns a `Place`, the caller does not know if the returned
+/// `Place` also had an annotation. This is important for checking conflicting declared annotations
+/// for class  attributes.
+pub(crate) enum TypeAnnotation {
+    Annotated,
+    NotAnnotated,
+}
+
+/// Used in [`ClassLiteral::implicit_attribute`]
+///
+/// Since [`ClassLiteral::implicit_attribute`] returns a `Place`, the caller does not know if the returned
+/// `Place` also had an annotation. This is important for checking conflicting declared annotations
+/// for class  attributes. We return a flag `IsAnnotated` to inform the caller.
+pub(crate) type AnnotatedAndPlaceFromImplicitAttributeResult<'db> =
+    (TypeAnnotation, PlaceFromImplicitAttributeResult<'db>);
 
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
@@ -680,20 +709,39 @@ impl<'db> ClassType<'db> {
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .instance_member(db, specialization, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match class_literal.instance_member(db, specialization, name) {
+            Ok(member) => {
+                Ok(member.map_type(|ty| ty.apply_optional_specialization(db, specialization)))
+            }
+            Err((member, conflicting_declarations)) => Err((
+                member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                conflicting_declarations,
+            )),
+        }
     }
-
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    fn own_instance_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match class_literal.own_instance_member(db, name) {
+            Ok(member) => {
+                Ok(member.map_type(|ty| ty.apply_optional_specialization(db, specialization)))
+            }
+            Err((member, conflicting_declarations)) => Err((
+                member.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                conflicting_declarations,
+            )),
+        }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -1573,7 +1621,9 @@ impl<'db> ClassLiteral<'db> {
                 return Place::bound(synthesized_member).into();
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
+            let (_, attribute) =
+                Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
+            return attribute.unwrap_or_else(|(member, _)| member);
         }
         symbol
     }
@@ -1758,6 +1808,41 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns the list of annotated attributes defined in this class
+    ///
+    /// For a class body like
+    /// ```py
+    /// class C:
+    ///     x: int
+    ///     y: str = "a"
+    ///
+    ///    def f(self):
+    ///        self.z: int = 1
+    /// ```
+    /// we return a list `["x", "y", "z"].
+    pub(crate) fn instance_attributes(self, db: &'db dyn Db) -> Box<[Name]> {
+        let mut implicit_attributes = vec![];
+        let class_body_scope = self.body_scope(db);
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        for function_scope_id in attribute_scopes(db, class_body_scope) {
+            let place_table = index.place_table(function_scope_id);
+
+            implicit_attributes.extend(place_table.instance_attributes().cloned());
+        }
+
+        let body_attributes: Box<[Name]> = self
+            .own_fields(db, None)
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect();
+        implicit_attributes
+            .into_iter()
+            .chain(body_attributes)
+            .unique()
+            .collect()
+    }
+
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_fields`] for more details.
@@ -1844,22 +1929,42 @@ impl<'db> ClassLiteral<'db> {
 
             let place_expr = table.place_expr(place_id);
 
-            if let Ok(attr) = place_from_declarations(db, declarations) {
-                if attr.is_class_var() {
-                    continue;
-                }
+            match place_from_declarations(db, declarations) {
+                Ok(attr) => {
+                    if attr.is_class_var() {
+                        continue;
+                    }
 
-                if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                    if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                        let bindings = use_def.end_of_scope_bindings(place_id);
+                        let default_ty =
+                            place_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                        attributes.insert(
+                            place_expr.expect_name().clone(),
+                            DataclassField {
+                                field_ty: attr_ty.apply_optional_specialization(db, specialization),
+                                default_ty: default_ty
+                                    .map(|ty| ty.apply_optional_specialization(db, specialization)),
+                                init_only: attr.is_init_var(),
+                            },
+                        );
+                    }
+                }
+                // In case of conflicts, we know that at least one annotated type exists
+                Err((attr_ty, _)) => {
                     let bindings = use_def.end_of_scope_bindings(place_id);
                     let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
 
                     attributes.insert(
                         place_expr.expect_name().clone(),
                         DataclassField {
-                            field_ty: attr_ty.apply_optional_specialization(db, specialization),
+                            field_ty: attr_ty
+                                .inner
+                                .apply_optional_specialization(db, specialization),
                             default_ty: default_ty
                                 .map(|ty| ty.apply_optional_specialization(db, specialization)),
-                            init_only: attr.is_init_var(),
+                            init_only: attr_ty.qualifiers.contains(TypeQualifiers::INIT_VAR),
                         },
                     );
                 }
@@ -1877,7 +1982,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
@@ -1887,15 +1992,23 @@ impl<'db> ClassLiteral<'db> {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
-                    return PlaceAndQualifiers::todo(
+                    return Ok(PlaceAndQualifiers::todo(
                         "instance attribute on class with dynamic base",
-                    );
+                    ));
                 }
                 ClassBase::Class(class) => {
+                    let mut conflicts: Option<Box<[Type<'_>]>> = None;
+                    let member = class.own_instance_member(db, name).unwrap_or_else(
+                        |(member, member_conflicts)| {
+                            conflicts = Some(member_conflicts);
+                            member
+                        },
+                    );
+
                     if let member @ PlaceAndQualifiers {
                         place: Place::Type(ty, boundness),
                         qualifiers,
-                    } = class.own_instance_member(db, name)
+                    } = member
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -1903,11 +2016,18 @@ impl<'db> ClassLiteral<'db> {
                         if boundness == Boundness::Bound {
                             if union.is_empty() {
                                 // Short-circuit, no need to allocate inside the union builder
-                                return member;
+                                return match conflicts {
+                                    Some(conflicts) => Err((member, conflicts)),
+                                    None => Ok(member),
+                                };
                             }
 
-                            return Place::bound(union.add(ty).build())
+                            let place = Place::bound(union.add(ty).build())
                                 .with_qualifiers(union_qualifiers);
+                            return match conflicts {
+                                Some(conflicts) => Err((place, conflicts)),
+                                None => Ok(place),
+                            };
                         }
 
                         // If we see a possibly-unbound symbol, we need to keep looking
@@ -1919,12 +2039,13 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if union.is_empty() {
-            Place::Unbound.with_qualifiers(TypeQualifiers::empty())
+            Ok(Place::Unbound.with_qualifiers(TypeQualifiers::empty()))
         } else {
             // If we have reached this point, we know that we have only seen possibly-unbound places.
             // This means that the final result is still possibly-unbound.
 
-            Place::Type(union.build(), Boundness::PossiblyUnbound).with_qualifiers(union_qualifiers)
+            Ok(Place::Type(union.build(), Boundness::PossiblyUnbound)
+                .with_qualifiers(union_qualifiers))
         }
     }
 
@@ -1932,18 +2053,25 @@ impl<'db> ClassLiteral<'db> {
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
     /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
     /// used to skip methods that do not have the expected decorator.
+    /// In case of conflicting type annotation declarations, an `Err(..)` variant is returned along
+    /// the declarations/bindings of the attribute named `name`.
     fn implicit_attribute(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> AnnotatedAndPlaceFromImplicitAttributeResult<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
         let mut union_of_inferred_types = UnionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
+        let mut annotations = Vec::new();
+        // In the context of a bare `Final` as in `self.SOME_CONSTANT: Final = 1`, we infer the type
+        // and it should be the presented type. This is used in conflicting attributes, where an attribute
+        // can be wrongly re-annottated and we avoid it.
+        let mut final_type: Option<Type<'_>> = None;
 
         let mut is_attribute_bound = false;
 
@@ -2001,8 +2129,8 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let annotation = declaration_type(db, declaration);
-                let annotation =
-                    Place::bound(annotation.inner).with_qualifiers(annotation.qualifiers);
+                let ty = annotation.inner;
+                let annotation = Place::bound(ty).with_qualifiers(annotation.qualifiers);
 
                 if let Some(all_qualifiers) = annotation.is_bare_final() {
                     if let Some(value) = assignment.value(&module) {
@@ -2011,16 +2139,63 @@ impl<'db> ClassLiteral<'db> {
                         // on the right-hand side.
 
                         let inferred_ty = infer_expression_type(db, index.expression(value));
-                        return Place::bound(inferred_ty).with_qualifiers(all_qualifiers);
+                        annotations.push((inferred_ty, true));
+                        if final_type.is_none() {
+                            final_type = Some(inferred_ty);
+                        }
                     }
 
                     // If there is no right-hand side, just record that we saw a `Final` qualifier
                     qualifiers |= all_qualifiers;
                     continue;
                 }
-
-                return annotation;
+                qualifiers |= annotation.qualifiers;
+                annotations.push((ty, true));
             }
+        }
+
+        if let Some((first_ty, boundness)) = annotations.first() {
+            let ty = match final_type {
+                Some(ty) => ty,
+                None => *first_ty,
+            };
+
+            let mut conflicting = FxOrderSet::default();
+            // If we collected more than one annotation then we may have conflicting declarations
+            if annotations.len() > 1 {
+                for other in &annotations[1..] {
+                    let (other_ty, _) = other;
+                    if !ty.is_equivalent_to(db, *other_ty) {
+                        conflicting.insert(*other_ty);
+                    }
+                }
+            }
+            if conflicting.is_empty() {
+                if *boundness {
+                    return (
+                        TypeAnnotation::Annotated,
+                        Ok(Place::bound(ty).with_qualifiers(qualifiers)),
+                    );
+                }
+                return (
+                    TypeAnnotation::Annotated,
+                    Ok(Place::Unbound.with_qualifiers(qualifiers)),
+                );
+            }
+            conflicting.insert(ty);
+            let place = if *boundness {
+                Place::bound(ty)
+            } else {
+                Place::Unbound
+            };
+
+            return (
+                TypeAnnotation::Annotated,
+                Err((
+                    place.with_qualifiers(qualifiers),
+                    conflicting.into_iter().collect(),
+                )),
+            );
         }
 
         if !qualifiers.contains(TypeQualifiers::FINAL) {
@@ -2101,7 +2276,6 @@ impl<'db> ClassLiteral<'db> {
                 {
                     is_attribute_bound = true;
                 }
-
                 match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
                         // Annotated assignments were handled above. This branch is not
@@ -2238,19 +2412,29 @@ impl<'db> ClassLiteral<'db> {
         }
 
         if is_attribute_bound {
-            Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)
+            (
+                TypeAnnotation::NotAnnotated,
+                Ok(Place::bound(union_of_inferred_types.build()).with_qualifiers(qualifiers)),
+            )
         } else {
-            Place::Unbound.with_qualifiers(qualifiers)
+            (
+                TypeAnnotation::NotAnnotated,
+                Ok(Place::Unbound.with_qualifiers(qualifiers)),
+            )
         }
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
+    ///
+    /// If there is only one declaration, or all declarations declare the same type, returns
+    /// `Ok(..)`. If there are conflicting declarations, returns an `Err(..)` variant with a
+    /// list of all conflicting types.
     pub(crate) fn own_instance_member(
         self,
         db: &'db dyn Db,
         name: &str,
-    ) -> PlaceAndQualifiers<'db> {
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -2279,10 +2463,12 @@ impl<'db> ClassLiteral<'db> {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
                         if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                            .1
+                            .unwrap_or_else(|(member, _)| member)
                             .place
                             .is_unbound()
                         {
-                            return Place::Unbound.into();
+                            return Ok(Place::Unbound.into());
                         }
                     }
 
@@ -2292,25 +2478,56 @@ impl<'db> ClassLiteral<'db> {
                     let inferred = place_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 
+                    let mut conflicts: Option<Box<[Type<'_>]>> = None;
+                    let (annotation, implicit_attribute_result) =
+                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+
+                    let implicit_attribute =
+                        implicit_attribute_result.unwrap_or_else(|(member, member_conflicts)| {
+                            conflicts = Some(member_conflicts);
+                            member
+                        });
+
                     if has_binding {
                         // The attribute is declared and bound in the class body.
-
                         if let Some(implicit_ty) =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                                .place
-                                .ignore_possibly_unbound()
+                            implicit_attribute.place.ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
                                 // we trust the declared type.
-                                declared.with_qualifiers(qualifiers)
+
+                                // Checking for implicit declarations conflicts
+                                if let Some(declared_implicit_ty) =
+                                    declared.ignore_possibly_unbound()
+                                {
+                                    if let TypeAnnotation::Annotated = annotation {
+                                        if !implicit_ty.is_equivalent_to(db, declared_implicit_ty) {
+                                            let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                            return Err((
+                                                declared.with_qualifiers(qualifiers),
+                                                conflicts,
+                                            ));
+                                        }
+                                    }
+                                }
+                                Ok(declared.with_qualifiers(qualifiers))
                             } else {
-                                Place::Type(
+                                Ok(Place::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,
                                 )
-                                .with_qualifiers(qualifiers)
+                                .with_qualifiers(qualifiers))
                             }
                         } else {
                             // The symbol is declared and bound in the class body,
@@ -2319,7 +2536,7 @@ impl<'db> ClassLiteral<'db> {
                             // has a class-level default value, but it would not be
                             // found in a `__dict__` lookup.
 
-                            Place::Unbound.into()
+                            Ok(Place::Unbound.into())
                         }
                     } else {
                         // The attribute is declared but not bound in the class body.
@@ -2327,26 +2544,60 @@ impl<'db> ClassLiteral<'db> {
                         // instance attribute, and we trust the declared type, unless
                         // it is possibly-undeclared. In the latter case, we also
                         // union with the inferred type from attribute assignments.
-
                         if declaredness == Boundness::Bound {
-                            declared.with_qualifiers(qualifiers)
-                        } else {
-                            if let Some(implicit_ty) = Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            )
-                            .place
-                            .ignore_possibly_unbound()
+                            if let Some(implicit_ty) =
+                                implicit_attribute.place.ignore_possibly_unbound()
                             {
-                                Place::Type(
+                                if let Some(declared_implicit_ty) =
+                                    declared.ignore_possibly_unbound()
+                                {
+                                    if let TypeAnnotation::Annotated = annotation {
+                                        if !implicit_ty.is_equivalent_to(db, declared_implicit_ty) {
+                                            let conflicts: Box<[Type<'_>]> = [declared_implicit_ty]
+                                                .into_iter()
+                                                .chain({
+                                                    match conflicts {
+                                                        Some(conflicts) => conflicts,
+                                                        None => Box::new([implicit_ty]),
+                                                    }
+                                                })
+                                                .unique()
+                                                .collect();
+                                            return Err((
+                                                declared.with_qualifiers(qualifiers),
+                                                conflicts,
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                            match conflicts {
+                                Some(conflicts) => {
+                                    Err((declared.with_qualifiers(qualifiers), conflicts))
+                                }
+                                None => Ok(declared.with_qualifiers(qualifiers)),
+                            }
+                        } else {
+                            if let Some(implicit_ty) =
+                                implicit_attribute.place.ignore_possibly_unbound()
+                            {
+                                let place = Place::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
                                     declaredness,
                                 )
-                                .with_qualifiers(qualifiers)
+                                .with_qualifiers(qualifiers);
+
+                                match conflicts {
+                                    Some(conflicts) => Err((place, conflicts)),
+                                    None => Ok(place),
+                                }
                             } else {
-                                declared.with_qualifiers(qualifiers)
+                                match conflicts {
+                                    Some(conflicts) => {
+                                        Err((declared.with_qualifiers(qualifiers), conflicts))
+                                    }
+                                    None => Ok(declared.with_qualifiers(qualifiers)),
+                                }
                             }
                         }
                     }
@@ -2359,18 +2610,47 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
+                        (_, Ok(place)) => Ok(place),
+                        (_, Err((place, conflicts))) => Err((place.into(), conflicts)),
+                    }
                 }
-                Err((declared, _conflicting_declarations)) => {
+                Err((declared, conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
-                    Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
+                    // Attribute could be implicitly defined in a method, we need to collect the potential conflicts there
+                    let place_qualifiers =
+                        Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers());
+                    let conflicting_declarations_with_class_body = {
+                        match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                        {
+                            (TypeAnnotation::Annotated, Ok(place_qualifiers)) => place_qualifiers
+                                .place
+                                .ignore_possibly_unbound()
+                                .map(|ty| Box::<[Type<'_>]>::from([ty])),
+                            (_, Err((_, new_conflicts))) => Some(new_conflicts),
+                            (TypeAnnotation::NotAnnotated, Ok(_)) => None,
+                        }
+                    };
+                    let conflicts = match conflicting_declarations_with_class_body {
+                        Some(conflicts) => conflicts
+                            .into_iter()
+                            .chain(conflicting_declarations)
+                            .unique()
+                            .collect(),
+
+                        None => conflicting_declarations.into_iter().collect(),
+                    };
+                    Err((place_qualifiers, conflicts))
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            match Self::implicit_attribute(db, body_scope, name, MethodDecorator::None) {
+                (_, Ok(place)) => Ok(place),
+                (_, Err((place, conflicts))) => Err((place, conflicts)),
+            }
         }
     }
 

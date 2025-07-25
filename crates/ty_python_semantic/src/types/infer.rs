@@ -1374,6 +1374,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            // (6) check for conflicting declared attribute types
+            for attr_name in class.instance_attributes(self.db()) {
+                if let Err((member, conflicting)) =
+                    class.instance_member(self.db(), None, &attr_name)
+                {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&CONFLICTING_DECLARATIONS, class_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Conflicting declared types for attribute `{attr_name}`: {}",
+                            format_enumeration(conflicting.iter().map(|ty| ty.display(self.db())))
+                        ));
+                    }
+                }
+            }
         }
     }
 
@@ -3891,8 +3908,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         place:
                                             Place::Type(instance_attr_ty, instance_attr_boundness),
                                         qualifiers,
-                                    } =
-                                        object_ty.instance_member(db, attribute)
+                                    } = object_ty
+                                        .instance_member(db, attribute)
+                                        .unwrap_or_else(|(member, _)| member)
                                     {
                                         if invalid_assignment_to_final(qualifiers) {
                                             return false;
@@ -3930,7 +3948,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let PlaceAndQualifiers {
                                     place: Place::Type(instance_attr_ty, instance_attr_boundness),
                                     qualifiers,
-                                } = object_ty.instance_member(db, attribute)
+                                } = object_ty
+                                    .instance_member(db, attribute)
+                                    .unwrap_or_else(|(member, _)| member)
                                 {
                                     if invalid_assignment_to_final(qualifiers) {
                                         return false;
@@ -4065,6 +4085,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 object_ty.to_instance(self.db()).is_some_and(|instance| {
                                     !instance
                                         .instance_member(self.db(), attribute)
+                                        .unwrap_or_else(|(member, _)| member)
                                         .place
                                         .is_unbound()
                                 });
@@ -6772,7 +6793,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let resolved_type = value_type
             .member(db, &attr.id)
-            .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
+            .map_type(|ty| {
+                self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            })
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
@@ -6780,12 +6803,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if report_unresolved_attribute {
                         let bound_on_instance = match value_type {
                             Type::ClassLiteral(class) => {
-                                !class.instance_member(db, None, attr).place.is_unbound()
+                                !class.instance_member(db, None, attr).unwrap_or_else(|(member, _)| member).place.is_unbound()
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
                                     SubclassOfInner::Class(class) => {
-                                        !class.instance_member(db, attr).place.is_unbound()
+                                        !class.instance_member(db, attr).unwrap_or_else(|(member, _)| member).place.is_unbound()
                                     }
                                     SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"

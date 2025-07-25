@@ -60,7 +60,9 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signat
 use crate::types::tuple::{TupleSpec, TupleType};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
+pub(crate) use class::{
+    ClassLiteral, ClassType, GenericAlias, KnownClass, PlaceFromOwnInstanceMemberResult,
+};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -2607,7 +2609,9 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::Synthesized(_),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => self
+                .instance_member(db, &name)
+                .unwrap_or_else(|(member, _)| member),
             _ => self
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
@@ -2633,20 +2637,28 @@ impl<'db> Type<'db> {
     ///     def __init__(self):
     ///         self.b: str = "a"
     /// ```
-    fn instance_member(&self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    fn instance_member(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+    ) -> PlaceFromOwnInstanceMemberResult<'db> {
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
+            Type::Union(union) => Ok(union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.instance_member(db, name)
+                    .unwrap_or_else(|(member, _)| member)
+            })),
+
+            Type::Intersection(intersection) => {
+                Ok(intersection.map_with_boundness_and_qualifiers(db, |elem| {
+                    elem.instance_member(db, name)
+                        .unwrap_or_else(|(member, _)| member)
+                }))
             }
 
-            Type::Intersection(intersection) => intersection
-                .map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name)),
-
-            Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Never => Ok(Place::bound(self).into()),
 
             Type::NominalInstance(instance) => instance.class.instance_member(db, name),
-
-            Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
+            Type::ProtocolInstance(protocol) => Ok(protocol.instance_member(db, name)),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -2673,10 +2685,12 @@ impl<'db> Type<'db> {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     bound.instance_member(db, name)
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Ok(constraints
                     .map_with_boundness_and_qualifiers(db, |constraint| {
-                        constraint.instance_member(db, name)
-                    }),
+                        constraint
+                            .instance_member(db, name)
+                            .unwrap_or_else(|(member, _)| member)
+                    })),
             },
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
@@ -2690,17 +2704,21 @@ impl<'db> Type<'db> {
             Type::EnumLiteral(enum_literal) => enum_literal
                 .enum_class_instance(db)
                 .instance_member(db, name),
-            Type::Tuple(tuple) => tuple
+            Type::Tuple(tuple) => Ok(tuple
                 .to_class_type(db)
-                .map(|class| class.instance_member(db, name))
-                .unwrap_or(Place::Unbound.into()),
+                .map(|class| {
+                    class
+                        .instance_member(db, name)
+                        .unwrap_or_else(|(member, _)| member)
+                })
+                .unwrap_or(Place::Unbound.into())),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(db).instance_member(db, name),
             Type::ModuleLiteral(_) => KnownClass::ModuleType
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Unbound.into(),
+            Type::SpecialForm(_) | Type::KnownInstance(_) => Ok(Place::Unbound.into()),
 
             Type::PropertyInstance(_) => KnownClass::Property
                 .to_instance(db)
@@ -2718,7 +2736,7 @@ impl<'db> Type<'db> {
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                Place::Unbound.into()
+                Ok(Place::Unbound.into())
             }
         }
     }
@@ -2737,7 +2755,9 @@ impl<'db> Type<'db> {
         {
             place
         } else {
-            self.instance_member(db, name).place
+            self.instance_member(db, name)
+                .unwrap_or_else(|(member, _)| member)
+                .place
         }
     }
 
@@ -3035,7 +3055,6 @@ impl<'db> Type<'db> {
     ///
     /// TODO: We should return a `Result` here to handle errors that can appear during attribute
     /// lookup, like a failed `__get__` call on a descriptor.
-    #[must_use]
     pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
     }
@@ -3210,7 +3229,9 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(..) => {
-                let fallback = self.instance_member(db, name_str);
+                let fallback = self
+                    .instance_member(db, name_str)
+                    .unwrap_or_else(|(member, _)| member);
 
                 let result = self.invoke_descriptor_protocol(
                     db,
