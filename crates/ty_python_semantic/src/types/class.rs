@@ -894,6 +894,9 @@ pub(crate) struct DataclassField<'db> {
     /// Whether or not this field is "init-only". If this is true, it only appears in the
     /// `__init__` signature, but is not accessible as a real field
     pub(crate) init_only: bool,
+
+    /// Whether or not this field should appear in the signature of `__init__`.
+    pub(crate) init: bool,
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1601,9 +1604,15 @@ impl<'db> ClassLiteral<'db> {
                     mut field_ty,
                     mut default_ty,
                     init_only: _,
+                    init,
                 },
             ) in self.fields(db, specialization, field_policy)
             {
+                if name == "__init__" && !init {
+                    // Skip fields with `init=False`
+                    continue;
+                }
+
                 if field_ty
                     .into_nominal_instance()
                     .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
@@ -1852,15 +1861,25 @@ impl<'db> ClassLiteral<'db> {
 
                 if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
+                    let mut default_ty =
+                        place_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                    default_ty =
+                        default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
+
+                    let mut init = true;
+                    if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
+                        default_ty = Some(field.default_type(db));
+                        init = field.init(db);
+                    }
 
                     attributes.insert(
                         symbol.name().clone(),
                         DataclassField {
                             field_ty: attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty: default_ty
-                                .map(|ty| ty.apply_optional_specialization(db, specialization)),
+                            default_ty,
                             init_only: attr.is_init_var(),
+                            init,
                         },
                     );
                 }
