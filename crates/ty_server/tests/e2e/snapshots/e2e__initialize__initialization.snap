@@ -28,6 +28,8 @@ expression: initialization_result
     "typeDefinitionProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
+    "documentSymbolProvider": true,
+    "workspaceSymbolProvider": true,
     "declarationProvider": true,
     "semanticTokensProvider": {
       "legend": {
