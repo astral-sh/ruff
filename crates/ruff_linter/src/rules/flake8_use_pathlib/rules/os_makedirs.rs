@@ -117,9 +117,11 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         let name_code = checker.locator().slice(name.range());
 
         let mkdir_args = if call.arguments.args.len() == 3 && call.arguments.keywords.is_empty() {
-            let mode = checker.locator().slice(call.arguments.args[1].range());
-            let exist_ok = checker.locator().slice(call.arguments.args[2].range());
-            format!("mode={mode}, exist_ok={exist_ok}, parents=True")
+            format!(
+                "mode={}, exist_ok={}, parents=True",
+                checker.locator().slice(call.arguments.args[1].range()),
+                checker.locator().slice(call.arguments.args[2].range()),
+            )
         } else {
             call.arguments
                 .args
