@@ -382,22 +382,14 @@ impl<'a> SourceCode<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use insta::assert_snapshot;
-    use rustc_hash::FxHashMap;
 
-    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
-
-    use crate::codes::Rule;
+    use crate::message::TextEmitter;
     use crate::message::tests::{
         capture_emitter_notebook_output, capture_emitter_output, create_diagnostics,
         create_notebook_diagnostics, create_syntax_error_diagnostics,
     };
-    use crate::message::{EmitterContext, TextEmitter};
-    use crate::settings::LinterSettings;
     use crate::settings::types::UnsafeFixes;
-    use crate::test::test_path;
 
     #[test]
     fn default() {
