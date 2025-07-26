@@ -154,3 +154,11 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
         });
     }
 }
+
+pub(crate) fn has_unknown_keywords(arguments: &ast::Arguments, allowed: &[&str]) -> bool {
+    arguments.keywords.iter().any(|kw| {
+        kw.arg
+            .as_deref()
+            .map_or(true, |arg| !allowed.contains(&arg))
+    })
+}

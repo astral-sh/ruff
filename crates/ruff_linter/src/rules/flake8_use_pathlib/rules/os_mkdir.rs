@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_mkdir_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    is_keyword_only_argument_non_default, is_pathlib_path_call,
+    has_unknown_keywords, is_keyword_only_argument_non_default, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -88,6 +88,14 @@ pub(crate) fn os_mkdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     };
 
     if !is_fix_os_mkdir_enabled(checker.settings()) {
+        return;
+    }
+
+    if call.arguments.args.len() > 2 {
+        return;
+    }
+
+    if has_unknown_keywords(&call.arguments, &["path", "mode"]) {
         return;
     }
 
