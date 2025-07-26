@@ -46,6 +46,7 @@ type Props = {
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
+  onBackToUserFile: () => void;
   isViewingVendoredFile: boolean;
 };
 
@@ -61,6 +62,7 @@ export default function Editor({
   onMount,
   onOpenFile,
   onVendoredFileChange,
+  onBackToUserFile,
   isViewingVendoredFile = false,
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
@@ -71,6 +73,7 @@ export default function Editor({
       workspace,
       onOpenFile,
       onVendoredFileChange,
+      onBackToUserFile,
     });
   }
 
@@ -109,11 +112,12 @@ export default function Editor({
     (editor, instance) => {
       serverRef.current?.dispose();
 
-      const server = new PlaygroundServer(instance, {
+      const server = new PlaygroundServer(instance, editor, {
         workspace,
         files,
         onOpenFile,
         onVendoredFileChange,
+        onBackToUserFile,
       });
 
       server.updateDiagnostics(diagnostics);
@@ -122,7 +126,15 @@ export default function Editor({
       onMount(editor, instance);
     },
 
-    [files, onOpenFile, workspace, onMount, diagnostics, onVendoredFileChange],
+    [
+      files,
+      onOpenFile,
+      workspace,
+      onMount,
+      diagnostics,
+      onVendoredFileChange,
+      onBackToUserFile,
+    ],
   );
 
   return (
@@ -154,6 +166,7 @@ interface PlaygroundServerProps {
   files: ReadonlyFiles;
   onOpenFile: (file: FileId) => void;
   onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
+  onBackToUserFile: () => void;
 }
 
 class PlaygroundServer
@@ -196,6 +209,7 @@ class PlaygroundServer
 
   constructor(
     private monaco: Monaco,
+    private editor: IStandaloneCodeEditor,
     private props: PlaygroundServerProps,
   ) {
     this.typeDefinitionProviderDisposable =
@@ -232,6 +246,9 @@ class PlaygroundServer
       monaco.languages.registerSignatureHelpProvider("python", this);
     this.documentHighlightDisposable =
       monaco.languages.registerDocumentHighlightProvider("python", this);
+
+    // Register Esc key command
+    editor.addCommand(monaco.KeyCode.Escape, this.props.onBackToUserFile);
   }
 
   triggerCharacters: string[] = ["."];
@@ -658,13 +675,10 @@ class PlaygroundServer
       if (selectionOrPosition != null) {
         if (Position.isIPosition(selectionOrPosition)) {
           source.setPosition(selectionOrPosition);
-          source.revealPosition(selectionOrPosition);
+          source.revealPositionInCenterIfOutsideViewport(selectionOrPosition);
         } else {
           source.setSelection(selectionOrPosition);
-          source.revealPosition({
-            lineNumber: selectionOrPosition.startLineNumber,
-            column: selectionOrPosition.startColumn,
-          });
+          source.revealRangeNearTopIfOutsideViewport(selectionOrPosition);
         }
       }
 

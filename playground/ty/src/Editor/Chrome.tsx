@@ -85,6 +85,24 @@ export default function Chrome({
     editorRef.current?.editor.focus();
   };
 
+  const handleBackToUserFile = useCallback(() => {
+    if (editorRef.current && files.selected != null) {
+      const selectedFile = files.index.find(
+        (file) => file.id === files.selected,
+      );
+      if (selectedFile != null) {
+        const monaco = editorRef.current.monaco;
+        const fileUri = monaco.Uri.file(selectedFile.name);
+        const userModel = monaco.editor.getModel(fileUri);
+
+        if (userModel != null) {
+          onClearVendoredFile();
+          editorRef.current.editor.setModel(userModel);
+        }
+      }
+    }
+  }, [files.selected, files.index, onClearVendoredFile]);
+
   const handleSecondaryToolSelected = useCallback(
     (tool: SecondaryTool | null) => {
       setSecondaryTool((secondaryTool) => {
@@ -181,8 +199,7 @@ export default function Chrome({
                         id: files.selected,
                         name: selectedFileName,
                       }}
-                      editorRef={editorRef}
-                      onClearVendoredFile={onClearVendoredFile}
+                      onBackToUserFile={handleBackToUserFile}
                     />
                   )}
                   <Editor
@@ -197,6 +214,7 @@ export default function Chrome({
                     onChange={(content) => onChangeFile(workspace, content)}
                     onOpenFile={onSelectFile}
                     onVendoredFileChange={onSelectVendoredFile}
+                    onBackToUserFile={handleBackToUserFile}
                     isViewingVendoredFile={files.currentVendoredFile != null}
                   />
                   {checkResult.error ? (
@@ -211,8 +229,8 @@ export default function Chrome({
                       <ErrorMessage>{checkResult.error}</ErrorMessage>
                     </div>
                   ) : null}
-                  <VerticalResizeHandle />
                 </Panel>
+                <VerticalResizeHandle />
                 <Panel
                   id="diagnostics"
                   minSize={3}
