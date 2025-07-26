@@ -69,7 +69,15 @@ pub(crate) fn path_constructor_current_directory(
 
     let arguments = &call.arguments;
 
-    if !matches!(segments, ["pathlib", "Path" | "PurePath"]) {
+    let is_pathlib = matches!(
+        segments,
+        [
+            "pathlib",
+            "Path" | "PurePath" | "PosixPath" | "PurePosixPath" | "WindowsPath" | "PureWindowsPath"
+        ]
+    );
+    let is_packagepath = matches!(segments, ["importlib", "metadata", "PackagePath"]);
+    if !(is_pathlib || is_packagepath) {
         return;
     }
 
