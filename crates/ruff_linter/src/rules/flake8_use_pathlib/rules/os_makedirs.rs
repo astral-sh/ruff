@@ -92,12 +92,14 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
     }
     // We should not offer autofixes if there are keyword arguments
     // that don't match the original function signature
-    if call.arguments.keywords.iter().any(|kw| {
-        !matches!(kw.arg.as_deref(), Some("name" | "mode" | "exist_ok"))
-    }) {
+    if call
+        .arguments
+        .keywords
+        .iter()
+        .any(|kw| !matches!(kw.arg.as_deref(), Some("name" | "mode" | "exist_ok")))
+    {
         return;
     }
-
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -124,15 +126,12 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
                 .iter()
                 .skip(1)
                 .map(|expr| checker.locator().slice(expr.range()).to_string())
-                .chain(
-                    call.arguments.keywords.iter().filter_map(|kw| {
-                        kw.arg.as_ref().and_then(|arg| {
-                            (arg != "name").then(|| {
-                                format!("{arg}={}", checker.locator().slice(kw.value.range()))
-                            })
-                        })
-                    }),
-                )
+                .chain(call.arguments.keywords.iter().filter_map(|kw| {
+                    kw.arg.as_ref().and_then(|arg| {
+                        (arg != "name")
+                            .then(|| format!("{arg}={}", checker.locator().slice(kw.value.range())))
+                    })
+                }))
                 .chain(std::iter::once("parents=True".to_string()))
                 .collect::<Vec<_>>()
                 .join(", ")
