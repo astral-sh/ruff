@@ -2694,7 +2694,7 @@ watermelon
         }
 
         /// Set the secondary code on the diagnostic.
-        pub(super) fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
+        fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
             self.diag
                 .set_secondary_code(SecondaryCode::new(secondary_code.to_string()));
             self

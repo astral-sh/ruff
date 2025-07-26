@@ -98,7 +98,6 @@ print()
                 "Expected an indented block",
             )
             .primary("example.py", "3:0", "3:0", "")
-            .secondary_code("E112")
             .build();
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
@@ -140,7 +139,6 @@ print()
                 r#"Invalid unescaped character SUB, use "\x1A" instead"#,
             )
             .primary("example.py", "1:24", "1:24", "")
-            .secondary_code("PLE2512")
             .build();
 
         insta::assert_snapshot!(env.render(&diagnostic), @r#"
