@@ -5424,51 +5424,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
         let ast::ExprTString { value, .. } = tstring;
-        for part in value {
-            match part {
-                ast::TStringPart::Literal(_) => {}
-                ast::TStringPart::FString(fstring) => {
-                    for element in &fstring.elements {
-                        match element {
-                            ast::InterpolatedStringElement::Interpolation(expression) => {
-                                let ast::InterpolatedElement {
-                                    expression,
-                                    format_spec,
-                                    ..
-                                } = expression;
-                                self.infer_expression(expression);
-
-                                if let Some(format_spec) = format_spec {
-                                    for element in format_spec.elements.interpolations() {
-                                        self.infer_expression(&element.expression);
-                                    }
-                                }
+        for tstring in value {
+            for element in &tstring.elements {
+                match element {
+                    ast::InterpolatedStringElement::Interpolation(
+                        tstring_interpolation_element,
+                    ) => {
+                        let ast::InterpolatedElement {
+                            expression,
+                            format_spec,
+                            ..
+                        } = tstring_interpolation_element;
+                        self.infer_expression(expression);
+                        if let Some(format_spec) = format_spec {
+                            for element in format_spec.elements.interpolations() {
+                                self.infer_expression(&element.expression);
                             }
-                            ast::InterpolatedStringElement::Literal(_) => {}
                         }
                     }
-                }
-                ast::TStringPart::TString(tstring) => {
-                    for element in &tstring.elements {
-                        match element {
-                            ast::InterpolatedStringElement::Interpolation(
-                                tstring_interpolation_element,
-                            ) => {
-                                let ast::InterpolatedElement {
-                                    expression,
-                                    format_spec,
-                                    ..
-                                } = tstring_interpolation_element;
-                                self.infer_expression(expression);
-                                if let Some(format_spec) = format_spec {
-                                    for element in format_spec.elements.interpolations() {
-                                        self.infer_expression(&element.expression);
-                                    }
-                                }
-                            }
-                            ast::InterpolatedStringElement::Literal(_) => {}
-                        }
-                    }
+                    ast::InterpolatedStringElement::Literal(_) => {}
                 }
             }
         }
