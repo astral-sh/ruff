@@ -69,16 +69,13 @@ mod tests {
     /// For example, without the fix, we get diagnostics like this:
     ///
     /// ```
-    ///  0 │+error[no-indented-block]: Expected an indented block
-    ///  1 │+  --> E11.py:9:1
-    ///  2 │+   |
-    ///  3 │+ 7 | #: E112
-    ///  4 │+ 8 | if False:
-    ///  5 │+   |          ^
-    ///  6 │+ 9 | print()
-    ///  7 │+10 | #: E113
-    ///  8 │+11 | print()
-    ///  9 │+   |
+    /// error[no-indented-block]: Expected an indented block
+    ///  --> example.py:3:1
+    ///   |
+    /// 2 | if False:
+    ///   |          ^
+    /// 3 | print()
+    ///   |
     ///  ```
     ///
     /// where the caret points to the end of the previous line instead of the start of the next.
@@ -120,8 +117,12 @@ print()
     /// For example, without the fix, we get diagnostics like this:
     ///
     /// ```
-    ///  55 | nested_fstrings = f'␈{f'^Z{f'␛'}'}'
-    ///     |                       ^ PLE2512
+    /// error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+    ///  --> example.py:1:25
+    ///   |
+    /// 1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+    ///   |                       ^
+    ///   |
     ///  ```
     ///
     /// where the caret points to the `f` in the f-string instead of the start of the invalid
