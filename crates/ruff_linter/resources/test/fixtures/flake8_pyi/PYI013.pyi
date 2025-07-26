@@ -2,10 +2,10 @@
 
 class OneAttributeClass:
     value: int
-    ...  # Error
+    ...
 
 class OneAttributeClass2:
-    ...  # Error
+    ...
     value: int
 
 class MyClass:
@@ -14,29 +14,33 @@ class MyClass:
 
 class TwoEllipsesClass:
     ...
-    ...  # Error
+    ...
 
 class DocstringClass:
     """
     My body only contains an ellipsis.
     """
 
-    ...  # Error
+    ...
 
 class NonEmptyChild(Exception):
     value: int
-    ...  # Error
+    ...
 
 class NonEmptyChild2(Exception):
-    ...  # Error
+    ...
     value: int
 
 class NonEmptyWithInit:
     value: int
-    ...  # Error
+    ...
 
     def __init__():
         pass
+
+class NonEmptyChildWithInlineComment:
+    value: int
+    ... # preserve me
 
 # Not violations
 
