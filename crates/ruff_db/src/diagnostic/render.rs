@@ -2587,7 +2587,7 @@ watermelon
         }
 
         /// Returns a builder for tersely constructing diagnostics.
-        fn builder(
+        pub(super) fn builder(
             &mut self,
             identifier: &'static str,
             severity: Severity,
@@ -2654,7 +2654,7 @@ watermelon
         ///
         /// See the docs on `TestEnvironment::span` for the meaning of
         /// `path`, `line_offset_start` and `line_offset_end`.
-        fn primary(
+        pub(super) fn primary(
             mut self,
             path: &str,
             line_offset_start: &str,
@@ -2694,7 +2694,7 @@ watermelon
         }
 
         /// Set the secondary code on the diagnostic.
-        fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
+        pub(super) fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
             self.diag
                 .set_secondary_code(SecondaryCode::new(secondary_code.to_string()));
             self
