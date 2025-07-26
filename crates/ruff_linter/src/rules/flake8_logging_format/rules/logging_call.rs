@@ -12,6 +12,56 @@ use crate::rules::flake8_logging_format::violations::{
 };
 use crate::{Edit, Fix};
 
+fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFString) {
+    let mut format_string = String::new();
+    let mut args = Vec::new();
+    let mut simple = true;
+
+    for f in f_string.value.f_strings() {
+        for element in &f.elements {
+            match element {
+                InterpolatedStringElement::Literal(lit) => {
+                    format_string.push_str(lit.value.as_ref());
+                }
+                InterpolatedStringElement::Interpolation(interpolated) => {
+                    if interpolated.format_spec.is_some()
+                        || !matches!(
+                            interpolated.conversion,
+                            ruff_python_ast::ConversionFlag::None
+                        )
+                    {
+                        simple = false;
+                        break;
+                    }
+                    match interpolated.expression.as_ref() {
+                        Expr::Name(name) => {
+                            format_string.push_str("%s");
+                            args.push(name.id.to_string());
+                        }
+                        _ => {
+                            simple = false;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if simple && !args.is_empty() {
+        let replacement = format!(
+            "\"{format_string}\"{sep}{args}",
+            sep = if args.is_empty() { "" } else { ", " },
+            args = args.join(", ")
+        );
+        let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
+        let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
+        diagnostic.set_fix(fix);
+    } else {
+        checker.report_diagnostic(LoggingFString, msg.range());
+    }
+}
+
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
 /// class.
 fn is_reserved_attr(attr: &str) -> bool {
@@ -58,56 +108,7 @@ fn check_msg(checker: &Checker, msg: &Expr) {
         // Check for f-strings.
         Expr::FString(f_string) => {
             if checker.is_rule_enabled(Rule::LoggingFString) {
-                let mut format_string = String::new();
-                let mut args = Vec::new();
-                let mut simple = true;
-
-                for f in f_string.value.f_strings() {
-                    for element in &f.elements {
-                        match element {
-                            InterpolatedStringElement::Literal(lit) => {
-                                format_string.push_str(lit.value.as_ref());
-                            }
-
-                            InterpolatedStringElement::Interpolation(interpolated) => {
-                                if interpolated.format_spec.is_some()
-                                    || !matches!(
-                                        interpolated.conversion,
-                                        ruff_python_ast::ConversionFlag::None
-                                    )
-                                {
-                                    simple = false;
-                                    break;
-                                }
-
-                                match interpolated.expression.as_ref() {
-                                    Expr::Name(name) => {
-                                        format_string.push_str("%s");
-                                        args.push(name.id.to_string());
-                                    }
-
-                                    _ => {
-                                        simple = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if simple && !args.is_empty() {
-                    let replacement = format!(
-                        "\"{format_string}\"{sep}{args}",
-                        sep = if args.is_empty() { "" } else { ", " },
-                        args = args.join(", ")
-                    );
-                    let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
-                    let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
-                    diagnostic.set_fix(fix);
-                } else {
-                    checker.report_diagnostic(LoggingFString, msg.range());
-                }
+                handle_logging_f_string(checker, msg, f_string);
             }
         }
         // Check for .format() calls.
