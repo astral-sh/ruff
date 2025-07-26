@@ -898,6 +898,8 @@ pub fn from_relative_import<'a>(
     import: &[&'a str],
     // The remaining segments to the call path (e.g., given `bar.baz`, `["baz"]`).
     tail: &[&'a str],
+    // Whether the module containing this import is the `__init__.py` for a package
+    module_is_package: bool,
 ) -> Option<QualifiedName<'a>> {
     let mut qualified_name_builder =
         QualifiedNameBuilder::with_capacity(module.len() + import.len() + tail.len());
@@ -906,12 +908,17 @@ pub fn from_relative_import<'a>(
     qualified_name_builder.extend(module.iter().map(String::as_str));
 
     // Remove segments based on the number of dots.
-    for segment in import {
+    for (i, segment) in import.iter().enumerate() {
         if *segment == "." {
             if qualified_name_builder.is_empty() {
                 return None;
             }
-            qualified_name_builder.pop();
+            // If the import is inside, say, `foo/__init__.py`
+            // then the module's qualified name is `foo` but the
+            // first `.` should not pop `foo`
+            if i > 0 || (i == 0 && !module_is_package) {
+                qualified_name_builder.pop();
+            }
         } else {
             qualified_name_builder.push(segment);
         }
