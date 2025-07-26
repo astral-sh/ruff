@@ -24,6 +24,7 @@ import {
   Severity,
   type Workspace,
   CompletionKind,
+  type FileHandle,
   DocumentHighlight,
   DocumentHighlightKind,
 } from "ty_wasm";
@@ -44,6 +45,9 @@ type Props = {
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
   onOpenFile(file: FileId): void;
+  onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
+  onBackToUserFile: () => void;
+  isViewingVendoredFile: boolean;
 };
 
 export default function Editor({
@@ -57,6 +61,9 @@ export default function Editor({
   onChange,
   onMount,
   onOpenFile,
+  onVendoredFileChange,
+  onBackToUserFile,
+  isViewingVendoredFile = false,
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
@@ -65,6 +72,8 @@ export default function Editor({
       files,
       workspace,
       onOpenFile,
+      onVendoredFileChange,
+      onBackToUserFile,
     });
   }
 
@@ -81,9 +90,12 @@ export default function Editor({
 
   const handleChange = useCallback(
     (value: string | undefined) => {
-      onChange(value ?? "");
+      // Don't update file content when viewing vendored files
+      if (!isViewingVendoredFile) {
+        onChange(value ?? "");
+      }
     },
-    [onChange],
+    [onChange, isViewingVendoredFile],
   );
 
   useEffect(() => {
@@ -100,10 +112,12 @@ export default function Editor({
     (editor, instance) => {
       serverRef.current?.dispose();
 
-      const server = new PlaygroundServer(instance, {
+      const server = new PlaygroundServer(instance, editor, {
         workspace,
         files,
         onOpenFile,
+        onVendoredFileChange,
+        onBackToUserFile,
       });
 
       server.updateDiagnostics(diagnostics);
@@ -112,7 +126,15 @@ export default function Editor({
       onMount(editor, instance);
     },
 
-    [files, onOpenFile, workspace, onMount, diagnostics],
+    [
+      files,
+      onOpenFile,
+      workspace,
+      onMount,
+      diagnostics,
+      onVendoredFileChange,
+      onBackToUserFile,
+    ],
   );
 
   return (
@@ -121,7 +143,7 @@ export default function Editor({
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,
-        readOnly: false,
+        readOnly: isViewingVendoredFile, // Make editor read-only for vendored files
         minimap: { enabled: false },
         fontSize: 14,
         roundedSelection: false,
@@ -143,6 +165,8 @@ interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
   onOpenFile: (file: FileId) => void;
+  onVendoredFileChange: (vendoredFileHandle: FileHandle) => void;
+  onBackToUserFile: () => void;
 }
 
 class PlaygroundServer
@@ -174,9 +198,18 @@ class PlaygroundServer
   private rangeSemanticTokensDisposable: IDisposable;
   private signatureHelpDisposable: IDisposable;
   private documentHighlightDisposable: IDisposable;
+  // Cache for vendored file handles
+  private vendoredFileHandles = new Map<string, FileHandle>();
+
+  private getVendoredPath(uri: Uri): string {
+    // Monaco parses "vendored://stdlib/typing.pyi" as authority="stdlib", path="/typing.pyi"
+    // We need to reconstruct the full path
+    return uri.authority ? `${uri.authority}${uri.path}` : uri.path;
+  }
 
   constructor(
     private monaco: Monaco,
+    private editor: IStandaloneCodeEditor,
     private props: PlaygroundServerProps,
   ) {
     this.typeDefinitionProviderDisposable =
@@ -213,6 +246,9 @@ class PlaygroundServer
       monaco.languages.registerSignatureHelpProvider("python", this);
     this.documentHighlightDisposable =
       monaco.languages.registerDocumentHighlightProvider("python", this);
+
+    // Register Esc key command
+    editor.addCommand(monaco.KeyCode.Escape, this.props.onBackToUserFile);
   }
 
   triggerCharacters: string[] = ["."];
@@ -229,19 +265,12 @@ class PlaygroundServer
   provideDocumentSemanticTokens(
     model: editor.ITextModel,
   ): languages.SemanticTokens | null {
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
       return null;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return null;
-    }
-
-    const tokens = this.props.workspace.semanticTokens(selectedHandle);
+    const tokens = this.props.workspace.semanticTokens(fileHandle);
     return generateMonacoTokens(tokens, model);
   }
 
@@ -251,25 +280,16 @@ class PlaygroundServer
     model: editor.ITextModel,
     range: Range,
   ): languages.SemanticTokens | null {
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
-      return null;
-    }
-
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
       return null;
     }
 
     const tyRange = monacoRangeToTyRange(range);
-
     const tokens = this.props.workspace.semanticTokensInRange(
-      selectedHandle,
+      fileHandle,
       tyRange,
     );
-
     return generateMonacoTokens(tokens, model);
   }
 
@@ -277,20 +297,13 @@ class PlaygroundServer
     model: editor.ITextModel,
     position: Position,
   ): languages.ProviderResult<languages.CompletionList> {
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
-      return;
-    }
-
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
     const completions = this.props.workspace.completions(
-      selectedHandle,
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -324,20 +337,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _context: languages.SignatureHelpContext,
   ): languages.ProviderResult<languages.SignatureHelpResult> {
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
-      return;
-    }
-
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
     const signatureHelp = this.props.workspace.signatureHelp(
-      selectedHandle,
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -345,30 +351,7 @@ class PlaygroundServer
       return undefined;
     }
 
-    return {
-      dispose() {},
-      value: {
-        signatures: signatureHelp.signatures.map((sig) => ({
-          label: sig.label,
-          documentation: sig.documentation
-            ? { value: sig.documentation }
-            : undefined,
-          parameters: sig.parameters.map((param) => ({
-            label: param.label,
-            documentation: param.documentation
-              ? { value: param.documentation }
-              : undefined,
-          })),
-          activeParameter: sig.active_parameter,
-        })),
-        activeSignature: signatureHelp.active_signature ?? 0,
-        activeParameter:
-          signatureHelp.active_signature != null
-            ? (signatureHelp.signatures[signatureHelp.active_signature]
-                ?.active_parameter ?? 0)
-            : 0,
-      },
-    };
+    return this.formatSignatureHelp(signatureHelp);
   }
 
   provideDocumentHighlights(
@@ -402,26 +385,18 @@ class PlaygroundServer
   }
 
   provideInlayHints(
-    _model: editor.ITextModel,
+    model: editor.ITextModel,
     range: Range,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.InlayHintList> {
-    const workspace = this.props.workspace;
-    const selectedFile = this.props.files.selected;
-
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const inlayHints = workspace.inlayHints(
-      selectedHandle,
+    const inlayHints = this.props.workspace.inlayHints(
+      fileHandle,
       monacoRangeToTyRange(range),
     );
 
@@ -452,6 +427,66 @@ class PlaygroundServer
 
   update(props: PlaygroundServerProps) {
     this.props = props;
+  }
+
+  private getOrCreateVendoredFileHandle(vendoredPath: string): FileHandle {
+    const cachedHandle = this.vendoredFileHandles.get(vendoredPath);
+    // Check if we already have a handle for this vendored file
+    if (cachedHandle != null) {
+      return cachedHandle;
+    }
+
+    // Use the new WASM method to get a proper file handle for the vendored file
+    const handle = this.props.workspace.getVendoredFile(vendoredPath);
+    this.vendoredFileHandles.set(vendoredPath, handle);
+    return handle;
+  }
+
+  private getFileHandleForModel(model: editor.ITextModel) {
+    // Handle vendored files
+    if (model.uri.scheme === "vendored") {
+      const vendoredPath = this.getVendoredPath(model.uri);
+
+      // If not cached, try to create it
+      return this.getOrCreateVendoredFileHandle(vendoredPath);
+    }
+
+    // Handle regular user files
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return null;
+    }
+
+    return this.props.files.handles[selectedFile];
+  }
+
+  private formatSignatureHelp(
+    signatureHelp: any,
+  ): languages.SignatureHelpResult {
+    return {
+      dispose() {},
+      value: {
+        signatures: signatureHelp.signatures.map((sig: any) => ({
+          label: sig.label,
+          documentation: sig.documentation
+            ? { value: sig.documentation }
+            : undefined,
+          parameters: sig.parameters.map((param: any) => ({
+            label: param.label,
+            documentation: param.documentation
+              ? { value: param.documentation }
+              : undefined,
+          })),
+          activeParameter: sig.active_parameter,
+        })),
+        activeSignature: signatureHelp.active_signature ?? 0,
+        activeParameter:
+          signatureHelp.active_signature != null
+            ? (signatureHelp.signatures[signatureHelp.active_signature]
+                ?.active_parameter ?? 0)
+            : 0,
+      },
+    };
   }
 
   updateDiagnostics(diagnostics: Array<Diagnostic>) {
@@ -513,26 +548,18 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     context?: languages.HoverContext<languages.Hover> | undefined,
   ): languages.ProviderResult<languages.Hover> {
-    const workspace = this.props.workspace;
-
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const hover = workspace.hover(
-      selectedHandle,
+    const hover = this.props.workspace.hover(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
     if (hover == null) {
-      return;
+      return undefined;
     }
 
     return {
@@ -547,21 +574,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
-    const workspace = this.props.workspace;
-
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const links = workspace.gotoTypeDefinition(
-      selectedHandle,
+    const links = this.props.workspace.gotoTypeDefinition(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -574,21 +593,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
-    const workspace = this.props.workspace;
-
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const links = workspace.gotoDeclaration(
-      selectedHandle,
+    const links = this.props.workspace.gotoDeclaration(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -601,21 +612,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
-    const workspace = this.props.workspace;
-
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const links = workspace.gotoDefinition(
-      selectedHandle,
+    const links = this.props.workspace.gotoDefinition(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -630,21 +633,13 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Location[]> {
-    const workspace = this.props.workspace;
-
-    const selectedFile = this.props.files.selected;
-    if (selectedFile == null) {
-      return;
+    const fileHandle = this.getFileHandleForModel(model);
+    if (fileHandle == null) {
+      return undefined;
     }
 
-    const selectedHandle = this.props.files.handles[selectedFile];
-
-    if (selectedHandle == null) {
-      return;
-    }
-
-    const links = workspace.gotoReferences(
-      selectedHandle,
+    const links = this.props.workspace.gotoReferences(
+      fileHandle,
       new TyPosition(position.lineNumber, position.column),
     );
 
@@ -658,34 +653,73 @@ class PlaygroundServer
   ): boolean {
     const files = this.props.files;
 
-    const fileId = files.index.find((file) => {
-      return Uri.file(file.name).toString() === resource.toString();
-    })?.id;
+    // Check if this is a vendored file
+    if (resource.scheme === "vendored") {
+      const vendoredPath = this.getVendoredPath(resource);
+      // Get a file handle for this vendored file
+      const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
 
-    if (fileId == null) {
-      return false;
-    }
+      // Create or get the model for the vendored file
+      let model = this.monaco.editor.getModel(resource);
 
-    const handle = files.handles[fileId];
+      if (model == null) {
+        // Read the vendored file content using the file handle
+        const content = this.props.workspace.sourceText(fileHandle);
+        // Ensure vendored files get proper Python language features
+        model = this.monaco.editor.createModel(content, "python", resource);
+      }
 
-    let model = this.monaco.editor.getModel(resource);
-    if (model == null) {
-      const language =
-        handle != null && isPythonFile(handle) ? "python" : undefined;
-      model = this.monaco.editor.createModel(
-        files.contents[fileId],
-        language,
-        resource,
-      );
-    }
-
-    // it's a bit hacky to create the model manually
-    // but only using `onOpenFile` isn't enough
-    // because the model doesn't get updated until the next render.
-    if (files.selected !== fileId) {
+      // Set the model and reveal the position
       source.setModel(model);
 
-      this.props.onOpenFile(fileId);
+      if (selectionOrPosition != null) {
+        if (Position.isIPosition(selectionOrPosition)) {
+          source.setPosition(selectionOrPosition);
+          source.revealPositionInCenterIfOutsideViewport(selectionOrPosition);
+        } else {
+          source.setSelection(selectionOrPosition);
+          source.revealRangeNearTopIfOutsideViewport(selectionOrPosition);
+        }
+      }
+
+      // Track that we're now viewing a vendored file
+      this.props.onVendoredFileChange(fileHandle);
+    } else {
+      // Handle regular files
+      const fileId = files.index.find((file) => {
+        return Uri.file(file.name).toString() === resource.toString();
+      })?.id;
+
+      if (fileId == null) {
+        return false;
+      }
+
+      const handle = files.handles[fileId];
+      if (handle == null) {
+        return false;
+      }
+
+      let model = this.monaco.editor.getModel(resource);
+      if (model == null) {
+        const language = isPythonFile(handle) ? "python" : undefined;
+        model = this.monaco.editor.createModel(
+          files.contents[fileId],
+          language,
+          resource,
+        );
+      } else {
+        // Update model content to match current file state
+        model.setValue(files.contents[fileId]);
+      }
+
+      // it's a bit hacky to create the model manually
+      // but only using `onOpenFile` isn't enough
+      // because the model doesn't get updated until the next render.
+      if (files.selected !== fileId) {
+        source.setModel(model);
+
+        this.props.onOpenFile(fileId);
+      }
     }
 
     if (selectionOrPosition != null) {
@@ -797,26 +831,28 @@ function generateMonacoTokens(
 }
 
 function mapNavigationTargets(links: any[]): languages.LocationLink[] {
-  return links
-    .map((link) => {
-      const targetSelection =
-        link.selection_range == null
-          ? undefined
-          : tyRangeToMonacoRange(link.selection_range);
+  const result = links.map((link) => {
+    const targetSelection =
+      link.selection_range == null
+        ? undefined
+        : tyRangeToMonacoRange(link.selection_range);
 
-      const originSelection =
-        link.origin_selection_range == null
-          ? undefined
-          : tyRangeToMonacoRange(link.origin_selection_range);
+    const originSelection =
+      link.origin_selection_range == null
+        ? undefined
+        : tyRangeToMonacoRange(link.origin_selection_range);
 
-      return {
-        uri: Uri.parse(link.path),
-        range: tyRangeToMonacoRange(link.full_range),
-        targetSelectionRange: targetSelection,
-        originSelectionRange: originSelection,
-      } as languages.LocationLink;
-    })
-    .filter((link) => link.uri.scheme !== "vendored");
+    const locationLink = {
+      uri: Uri.parse(link.path),
+      range: tyRangeToMonacoRange(link.full_range),
+      targetSelectionRange: targetSelection,
+      originSelectionRange: originSelection,
+    } as languages.LocationLink;
+
+    return locationLink;
+  });
+
+  return result;
 }
 
 function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
