@@ -828,44 +828,6 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
-/// A measure of the width of a line of text.
-#[derive(Clone, Copy, Default)]
-struct LineWidthBuilder {
-    /// The width of the line.
-    width: usize,
-    /// The column of the line.
-    /// This is used to calculate the width of tabs.
-    column: usize,
-}
-
-impl LineWidthBuilder {
-    fn get(&self) -> usize {
-        self.width
-    }
-
-    /// Adds the given character to the line width.
-    #[must_use]
-    fn add_char(mut self, c: char) -> Self {
-        const TAB_SIZE: usize = 4;
-        match c {
-            '\t' => {
-                let tab_offset = TAB_SIZE - (self.column % TAB_SIZE);
-                self.width += tab_offset;
-                self.column += tab_offset;
-            }
-            '\n' | '\r' => {
-                self.width = 0;
-                self.column = 0;
-            }
-            _ => {
-                self.width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-                self.column += 1;
-            }
-        }
-        self
-    }
-}
-
 /// Given some source code and annotation ranges, this routine replaces tabs
 /// with ASCII whitespace, and unprintable characters with printable
 /// representations of them.
@@ -876,10 +838,7 @@ fn replace_whitespace_and_unprintable<'r>(
     source: &'r str,
     mut annotations: Vec<RenderableAnnotation<'r>>,
 ) -> EscapedSourceCode<'r> {
-    let mut result = String::new();
-    let mut last_end = 0;
     let original_ranges: Vec<TextRange> = annotations.iter().map(|ann| ann.range).collect();
-    let mut line_width = LineWidthBuilder::default();
 
     // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
     // `source`) is replaced with `len` bytes.
@@ -909,13 +868,32 @@ fn replace_whitespace_and_unprintable<'r>(
         }
     };
 
+    const TAB_SIZE: usize = 4;
+    let mut width = 0;
+    let mut column = 0;
+    let mut last_end = 0;
+    let mut result = String::new();
     for (index, c) in source.char_indices() {
-        let old_width = line_width.get();
-        line_width = line_width.add_char(c);
+        let old_width = width;
+        match c {
+            '\t' => {
+                let tab_offset = TAB_SIZE - (column % TAB_SIZE);
+                width += tab_offset;
+                column += tab_offset;
+            }
+            '\n' | '\r' => {
+                width = 0;
+                column = 0;
+            }
+            _ => {
+                width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+                column += 1;
+            }
+        }
 
         if matches!(c, '\t') {
-            let tab_width = u32::try_from(line_width.get() - old_width)
-                .expect("small width because of tab size");
+            let tab_width =
+                u32::try_from(width - old_width).expect("small width because of tab size");
             result.push_str(&source[last_end..index]);
             for _ in 0..tab_width {
                 result.push(' ');
