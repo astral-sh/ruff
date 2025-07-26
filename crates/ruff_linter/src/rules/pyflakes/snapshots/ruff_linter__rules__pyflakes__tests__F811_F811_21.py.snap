@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811_21.py:32:5: F811 [*] Redefinition of unused `Sequence` from line 26
+F811 [*] Redefinition of unused `Sequence` from line 26
+  --> F811_21.py:32:5
    |
 30 | from typing import (
 31 |     List,  # noqa: F811
 32 |     Sequence,
-   |     ^^^^^^^^ F811
+   |     ^^^^^^^^
 33 | )
    |
-   = help: Remove definition: `Sequence`
+help: Remove definition: `Sequence`
 
 ℹ Safe fix
 27 27 | )

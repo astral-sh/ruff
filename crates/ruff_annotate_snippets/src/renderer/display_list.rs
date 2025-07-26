@@ -123,6 +123,7 @@ impl<'a> DisplayList<'a> {
         anonymized_line_numbers: bool,
         term_width: usize,
         cut_indicator: &'static str,
+        hide_severity: bool,
     ) -> DisplayList<'a> {
         let body = format_message(
             message,
@@ -130,6 +131,7 @@ impl<'a> DisplayList<'a> {
             anonymized_line_numbers,
             cut_indicator,
             true,
+            hide_severity,
         );
 
         Self {
@@ -166,6 +168,7 @@ impl<'a> DisplayList<'a> {
 pub(crate) struct DisplaySet<'a> {
     pub(crate) display_lines: Vec<DisplayLine<'a>>,
     pub(crate) margin: Margin,
+    pub(crate) hide_severity: bool,
 }
 
 impl DisplaySet<'_> {
@@ -195,7 +198,11 @@ impl DisplaySet<'_> {
     ) -> fmt::Result {
         let color = get_annotation_style(&annotation.annotation_type, stylesheet);
         let formatted_len = if let Some(id) = &annotation.id {
-            2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            if self.hide_severity {
+                id.len()
+            } else {
+                2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            }
         } else {
             annotation_type_len(&annotation.annotation_type)
         };
@@ -209,18 +216,52 @@ impl DisplaySet<'_> {
         if formatted_len == 0 {
             self.format_label(line_offset, &annotation.label, stylesheet, buffer)
         } else {
-            let id = match &annotation.id {
-                Some(id) => format!("[{id}]"),
-                None => String::new(),
-            };
-            buffer.append(
-                line_offset,
-                &format!("{}{}", annotation_type_str(&annotation.annotation_type), id),
-                *color,
-            );
+            // TODO(brent) All of this complicated checking of `hide_severity`, and the
+            // `hide_severity` flag itself, should be reverted once we have real severities in Ruff.
+            // This code is trying to account for three different cases:
+            //
+            // - main diagnostic message for a lint diagnostic
+            // - main diagnostic message for a syntax error diagnostic
+            // - subdiagnostic message
+            //
+            // In the first case, signaled by `hide_severity = true` and a non-empty ID, we want to
+            // print the ID (the noqa code for ruff, e.g. F401) without brackets. In the second
+            // case, signaled by `hide_severity = true` and an ID of `Some("")`, Ruff currently adds
+            // a `SyntaxError: ` prefix to all of its syntax error messages, so we want to avoid
+            // printing any ID or severity in front of this. Finally, for subdiagnostics, we
+            // actually want to print the severity (usually `help`) regardless of the
+            // `hide_severity` setting. This is signaled by an ID of `None`.
+            //
+            // With real severities these should be reported like in ty:
+            //
+            // ```
+            // error[F401]: `math` imported but unused
+            // error[invalid-syntax]: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // instead of the current versions intended to mimic the old Ruff output format:
+            //
+            // ```
+            // F401 `math` imported but unused
+            // SyntaxError: Cannot use `match` statement on Python 3.9...
+            // ```
+            let annotation_type = annotation_type_str(&annotation.annotation_type);
+            if let Some(id) = annotation.id {
+                if self.hide_severity {
+                    if !id.is_empty() {
+                        buffer.append(line_offset, &format!("{id} "), *color);
+                    }
+                } else {
+                    buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
+                }
+            } else {
+                buffer.append(line_offset, annotation_type, *color);
+            }
 
             if !is_annotation_empty(annotation) {
-                buffer.append(line_offset, ": ", stylesheet.none);
+                if annotation.id.is_none() || !self.hide_severity {
+                    buffer.append(line_offset, ": ", stylesheet.none);
+                }
                 self.format_label(line_offset, &annotation.label, stylesheet, buffer)?;
             }
             Ok(())
@@ -1008,6 +1049,7 @@ fn format_message<'m>(
     anonymized_line_numbers: bool,
     cut_indicator: &'static str,
     primary: bool,
+    hide_severity: bool,
 ) -> Vec<DisplaySet<'m>> {
     let snippet::Message {
         level,
@@ -1033,6 +1075,7 @@ fn format_message<'m>(
             term_width,
             anonymized_line_numbers,
             cut_indicator,
+            hide_severity,
         ));
     }
 
@@ -1044,6 +1087,7 @@ fn format_message<'m>(
         sets.push(DisplaySet {
             display_lines: body,
             margin: Margin::new(0, 0, 0, 0, DEFAULT_TERM_WIDTH, 0),
+            hide_severity,
         });
     }
 
@@ -1054,6 +1098,7 @@ fn format_message<'m>(
             anonymized_line_numbers,
             cut_indicator,
             false,
+            hide_severity,
         ));
     }
 
@@ -1107,6 +1152,7 @@ fn format_label(
     result
 }
 
+#[expect(clippy::fn_params_excessive_bools)]
 fn format_snippet<'m>(
     snippet: snippet::Snippet<'m>,
     is_first: bool,
@@ -1114,10 +1160,22 @@ fn format_snippet<'m>(
     term_width: usize,
     anonymized_line_numbers: bool,
     cut_indicator: &'static str,
+    hide_severity: bool,
 ) -> DisplaySet<'m> {
     let main_range = snippet.annotations.first().map(|x| x.range.start);
     let origin = snippet.origin;
     let need_empty_header = origin.is_some() || is_first;
+
+    let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
+    if is_file_level {
+        let header = format_header(origin, main_range, &[], is_first);
+        return DisplaySet {
+            display_lines: header.map_or_else(Vec::new, |header| vec![header]),
+            margin: Margin::new(0, 0, 0, 0, term_width, 0),
+            hide_severity,
+        };
+    }
+
     let mut body = format_body(
         snippet,
         need_empty_header,
@@ -1125,6 +1183,7 @@ fn format_snippet<'m>(
         term_width,
         anonymized_line_numbers,
         cut_indicator,
+        hide_severity,
     );
     let header = format_header(origin, main_range, &body.display_lines, is_first);
 
@@ -1297,6 +1356,7 @@ fn fold_body(body: Vec<DisplayLine<'_>>) -> Vec<DisplayLine<'_>> {
     lines
 }
 
+#[expect(clippy::fn_params_excessive_bools)]
 fn format_body<'m>(
     snippet: snippet::Snippet<'m>,
     need_empty_header: bool,
@@ -1304,6 +1364,7 @@ fn format_body<'m>(
     term_width: usize,
     anonymized_line_numbers: bool,
     cut_indicator: &'static str,
+    hide_severity: bool,
 ) -> DisplaySet<'m> {
     let source_len = snippet.source.len();
     if let Some(bigger) = snippet.annotations.iter().find_map(|x| {
@@ -1654,6 +1715,7 @@ fn format_body<'m>(
     DisplaySet {
         display_lines: body,
         margin,
+        hide_severity,
     }
 }
 

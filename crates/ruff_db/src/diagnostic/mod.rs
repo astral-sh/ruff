@@ -700,6 +700,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
+    /// Whether this annotation is a file-level or full-file annotation.
+    ///
+    /// When set, rendering will not include a file snippet but will still have the file's name and
+    /// (optional) range.
+    is_file_level: bool,
 }
 
 impl Annotation {
@@ -718,6 +723,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -734,6 +740,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -798,6 +805,10 @@ impl Annotation {
     /// Attaches an additional tag to this annotation.
     pub fn push_tag(&mut self, tag: DiagnosticTag) {
         self.tags.push(tag);
+    }
+
+    pub fn set_file_level(&mut self, yes: bool) {
+        self.is_file_level = yes;
     }
 }
 

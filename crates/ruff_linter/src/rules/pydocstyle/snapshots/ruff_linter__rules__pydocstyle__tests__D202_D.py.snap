@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D202 [*] No blank lines allowed after function docstring (found 1)
+   --> D.py:142:5
     |
 140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
 141 | def trailing_space():
 142 |     """Leading space."""
-    |     ^^^^^^^^^^^^^^^^^^^^ D202
+    |     ^^^^^^^^^^^^^^^^^^^^
 143 |
 144 |     pass
     |
-    = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 140 140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
@@ -21,16 +22,17 @@ D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
 145 144 | 
 146 145 | 
 
-D.py:151:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D202 [*] No blank lines allowed after function docstring (found 1)
+   --> D.py:151:5
     |
 149 | def trailing_and_leading_space():
 150 |
 151 |     """Trailing and leading space."""
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 152 |
 153 |     pass
     |
-    = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 149 149 | def trailing_and_leading_space():
@@ -41,7 +43,8 @@ D.py:151:5: D202 [*] No blank lines allowed after function docstring (found 1)
 154 153 | 
 155 154 | 
 
-D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D202 [*] No blank lines allowed after function docstring (found 1)
+   --> D.py:555:5
     |
 553 |   @expect('D213: Multi-line docstring summary should start at the second line')
 554 |   def multiline_trailing_space():
@@ -49,11 +52,11 @@ D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
 556 | |
 557 | |     More content.
 558 | |     """
-    | |_______^ D202
+    | |_______^
 559 |
 560 |       pass
     |
-    = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 556 556 | 
@@ -64,7 +67,8 @@ D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
 561 560 | 
 562 561 | 
 
-D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D202 [*] No blank lines allowed after function docstring (found 1)
+   --> D.py:568:5
     |
 566 |   def multiline_trailing_and_leading_space():
 567 |
@@ -72,11 +76,11 @@ D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
 569 | |
 570 | |     More content.
 571 | |     """
-    | |_______^ D202
+    | |_______^
 572 |
 573 |       pass
     |
-    = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 569 569 | 
@@ -87,13 +91,14 @@ D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
 574 573 | 
 575 574 | 
 
-D.py:729:5: D202 No blank lines allowed after function docstring (found 1)
+D202 No blank lines allowed after function docstring (found 1)
+   --> D.py:729:5
     |
 727 | def line_continuation_chars():\
 728 |
 729 |     """No fix should be offered for D201/D202 because of the line continuation chars."""\
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 730 |
 731 |     ...
     |
-    = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring

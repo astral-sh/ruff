@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT023.py:17:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+  --> PT023.py:17:1
    |
 17 | @pytest.mark.foo
-   | ^^^^^^^^^^^^^^^^ PT023
+   | ^^^^^^^^^^^^^^^^
 18 | def test_something():
 19 |     pass
    |
-   = help: Add parentheses
+help: Add parentheses
 
 ℹ Safe fix
 14 14 | # Without parentheses
@@ -20,14 +21,15 @@ PT023.py:17:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 19 19 |     pass
 20 20 | 
 
-PT023.py:22:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+  --> PT023.py:22:1
    |
 22 | @pytest.mark.foo
-   | ^^^^^^^^^^^^^^^^ PT023
+   | ^^^^^^^^^^^^^^^^
 23 | class TestClass:
 24 |     def test_something():
    |
-   = help: Add parentheses
+help: Add parentheses
 
 ℹ Safe fix
 19 19 |     pass
@@ -39,15 +41,16 @@ PT023.py:22:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 24 24 |     def test_something():
 25 25 |         pass
 
-PT023.py:29:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+  --> PT023.py:29:5
    |
 28 | class TestClass:
 29 |     @pytest.mark.foo
-   |     ^^^^^^^^^^^^^^^^ PT023
+   |     ^^^^^^^^^^^^^^^^
 30 |     def test_something():
 31 |         pass
    |
-   = help: Add parentheses
+help: Add parentheses
 
 ℹ Safe fix
 26 26 | 
@@ -59,15 +62,16 @@ PT023.py:29:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 31 31 |         pass
 32 32 | 
 
-PT023.py:35:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+  --> PT023.py:35:5
    |
 34 | class TestClass:
 35 |     @pytest.mark.foo
-   |     ^^^^^^^^^^^^^^^^ PT023
+   |     ^^^^^^^^^^^^^^^^
 36 |     class TestNestedClass:
 37 |         def test_something():
    |
-   = help: Add parentheses
+help: Add parentheses
 
 ℹ Safe fix
 32 32 | 
@@ -79,16 +83,17 @@ PT023.py:35:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
 37 37 |         def test_something():
 38 38 |             pass
 
-PT023.py:43:9: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+  --> PT023.py:43:9
    |
 41 | class TestClass:
 42 |     class TestNestedClass:
 43 |         @pytest.mark.foo
-   |         ^^^^^^^^^^^^^^^^ PT023
+   |         ^^^^^^^^^^^^^^^^
 44 |         def test_something():
 45 |             pass
    |
-   = help: Add parentheses
+help: Add parentheses
 
 ℹ Safe fix
 40 40 | 

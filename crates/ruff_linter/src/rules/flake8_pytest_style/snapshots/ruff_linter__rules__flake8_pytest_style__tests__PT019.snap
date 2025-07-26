@@ -1,32 +1,36 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT019.py:9:14: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+  --> PT019.py:9:14
    |
  9 | def test_xxx(_fixture):  # Error arg
-   |              ^^^^^^^^ PT019
+   |              ^^^^^^^^
 10 |     pass
    |
 
-PT019.py:13:17: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+  --> PT019.py:13:17
    |
 13 | def test_xxx(*, _fixture):  # Error kwonly
-   |                 ^^^^^^^^ PT019
+   |                 ^^^^^^^^
 14 |     pass
    |
 
-PT019.py:31:24: PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+  --> PT019.py:31:24
    |
 30 | @pytest.mark.parametrize("_foo", [1, 2, 3])
 31 | def test_thingy2(_foo, _bar):  # Error _bar is not defined in parametrize
-   |                        ^^^^ PT019
+   |                        ^^^^
 32 |     pass
    |
 
-PT019.py:39:24: PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+  --> PT019.py:39:24
    |
 38 | @pytest.mark.parametrize(("_foo"), [1, 2, 3])
 39 | def test_thingy4(_foo, _bar):  # Error _bar is not defined in parametrize
-   |                        ^^^^ PT019
+   |                        ^^^^
 40 |     pass
    |

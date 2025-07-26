@@ -1,15 +1,15 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use full::FullRenderer;
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
+    Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -110,37 +110,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                let mut renderer = if self.config.color {
-                    AnnotateRenderer::styled()
-                } else {
-                    AnnotateRenderer::plain()
-                }
-                .cut_indicator("…");
-
-                renderer = renderer
-                    .error(stylesheet.error)
-                    .warning(stylesheet.warning)
-                    .info(stylesheet.info)
-                    .note(stylesheet.note)
-                    .help(stylesheet.help)
-                    .line_no(stylesheet.line_no)
-                    .emphasis(stylesheet.emphasis)
-                    .none(stylesheet.none);
-
-                for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag);
-                    let renderable = resolved.to_renderable(self.config.context);
-                    for diag in renderable.diagnostics.iter() {
-                        writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
-                    }
-                    writeln!(f)?;
-                }
+                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
                 AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
@@ -190,9 +160,13 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(
+        resolver: &'a dyn FileResolver,
+        diag: &'a Diagnostic,
+        config: &DisplayDiagnosticConfig,
+    ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -228,6 +202,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
+        config: &DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -235,13 +210,39 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let id = Some(diag.inner.id.to_string());
-        let message = diag.inner.message.as_str().to_string();
+
+        let (id, message) = if config.hide_severity {
+            let id = Some(
+                diag.secondary_code()
+                    .map(|code| code.to_string())
+                    .unwrap_or_default(),
+            );
+            let message = &diag.inner.message;
+            let message = if diag
+                .fix()
+                .is_some_and(|fix| fix.applies(config.fix_applicability))
+            {
+                format!("[*] {}", message.as_str())
+            } else {
+                message.as_str().to_string()
+            };
+            (id, message)
+        } else {
+            let id = Some(diag.inner.id.to_string());
+            let message = diag.inner.message.as_str().to_string();
+            (id, message)
+        };
+
         ResolvedDiagnostic {
             level: diag.inner.severity.to_annotate(),
             id,
@@ -356,6 +357,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
+    is_file_level: bool,
 }
 
 impl<'a> ResolvedAnnotation<'a> {
@@ -401,6 +403,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         })
     }
 }
@@ -612,6 +615,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
+    /// Whether this annotation applies to an entire file, rather than a snippet within it.
+    is_file_level: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -629,6 +634,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         }
     }
 
@@ -654,7 +660,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann
+        ann.is_file_level(self.is_file_level)
     }
 }
 

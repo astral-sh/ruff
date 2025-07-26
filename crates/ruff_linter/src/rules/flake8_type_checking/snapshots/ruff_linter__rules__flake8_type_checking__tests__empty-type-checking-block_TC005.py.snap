@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC005.py:4:5: TC005 [*] Found empty type-checking block
+TC005 [*] Found empty type-checking block
+ --> TC005.py:4:5
   |
 3 | if TYPE_CHECKING:
 4 |     pass  # TC005
-  |     ^^^^ TC005
+  |     ^^^^
   |
-  = help: Delete empty type-checking block
+help: Delete empty type-checking block
 
 ℹ Safe fix
 1 1 | from typing import TYPE_CHECKING, List
@@ -18,15 +19,16 @@ TC005.py:4:5: TC005 [*] Found empty type-checking block
 6 4 | 
 7 5 | def example():
 
-TC005.py:9:9: TC005 [*] Found empty type-checking block
+TC005 [*] Found empty type-checking block
+  --> TC005.py:9:9
    |
  7 | def example():
  8 |     if TYPE_CHECKING:
  9 |         pass  # TC005
-   |         ^^^^ TC005
+   |         ^^^^
 10 |     return
    |
-   = help: Delete empty type-checking block
+help: Delete empty type-checking block
 
 ℹ Safe fix
 5  5  | 
@@ -38,15 +40,16 @@ TC005.py:9:9: TC005 [*] Found empty type-checking block
 11 9  | 
 12 10 | 
 
-TC005.py:15:9: TC005 [*] Found empty type-checking block
+TC005 [*] Found empty type-checking block
+  --> TC005.py:15:9
    |
 13 | class Test:
 14 |     if TYPE_CHECKING:
 15 |         pass  # TC005
-   |         ^^^^ TC005
+   |         ^^^^
 16 |     x = 2
    |
-   = help: Delete empty type-checking block
+help: Delete empty type-checking block
 
 ℹ Safe fix
 11 11 | 
@@ -58,15 +61,16 @@ TC005.py:15:9: TC005 [*] Found empty type-checking block
 17 15 | 
 18 16 | 
 
-TC005.py:31:5: TC005 [*] Found empty type-checking block
+TC005 [*] Found empty type-checking block
+  --> TC005.py:31:5
    |
 30 | if TYPE_CHECKING:
 31 |     pass  # TC005
-   |     ^^^^ TC005
+   |     ^^^^
 32 |
 33 | # https://github.com/astral-sh/ruff/issues/11368
    |
-   = help: Delete empty type-checking block
+help: Delete empty type-checking block
 
 ℹ Safe fix
 27 27 | 

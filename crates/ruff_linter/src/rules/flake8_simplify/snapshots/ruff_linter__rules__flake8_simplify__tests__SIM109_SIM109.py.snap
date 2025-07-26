@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
-SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+ --> SIM109.py:2:4
   |
 1 | # SIM109
 2 | if a == b or a == c:
-  |    ^^^^^^^^^^^^^^^^ SIM109
+  |    ^^^^^^^^^^^^^^^^
 3 |     d
   |
-  = help: Replace with `a in (b, c)`
+help: Replace with `a in (b, c)`
 
 ℹ Unsafe fix
 1 1 | # SIM109
@@ -19,14 +19,15 @@ SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 4 4 | 
 5 5 | # SIM109
 
-SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+ --> SIM109.py:6:5
   |
 5 | # SIM109
 6 | if (a == b or a == c) and None:
-  |     ^^^^^^^^^^^^^^^^ SIM109
+  |     ^^^^^^^^^^^^^^^^
 7 |     d
   |
-  = help: Replace with `a in (b, c)`
+help: Replace with `a in (b, c)`
 
 ℹ Unsafe fix
 3 3 |     d
@@ -38,14 +39,15 @@ SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality compari
 8 8 | 
 9 9 | # SIM109
 
-SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:10:4
    |
  9 | # SIM109
 10 | if a == b or a == c or None:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
 11 |     d
    |
-   = help: Replace with `a in (b, c)`
+help: Replace with `a in (b, c)`
 
 ℹ Unsafe fix
 7  7  |     d
@@ -57,14 +59,15 @@ SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
 12 12 | 
 13 13 | # SIM109
 
-SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  --> SIM109.py:14:4
    |
 13 | # SIM109
 14 | if a == b or None or a == c:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
 15 |     d
    |
-   = help: Replace with `a in (b, c)`
+help: Replace with `a in (b, c)`
 
 ℹ Unsafe fix
 11 11 |     d

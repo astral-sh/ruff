@@ -1,17 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
-E27.py:29:2: E274 [*] Tab before keyword
+E274 [*] Tab before keyword
+  --> E27.py:29:2
    |
-27 | a and   b
+27 | a and    b
 28 | #: E274
-29 | a       and b
-   |  ^^^^^^^ E274
+29 | a        and b
+   |  ^^^^^^^^
 30 | #: E273 E274
-31 | this        and False
+31 | this        and    False
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 26 26 | #: E273
@@ -23,16 +23,17 @@ E27.py:29:2: E274 [*] Tab before keyword
 31 31 | this		and	False
 32 32 | #: Okay
 
-E27.py:31:5: E274 [*] Tab before keyword
+E274 [*] Tab before keyword
+  --> E27.py:31:5
    |
-29 | a       and b
+29 | a        and b
 30 | #: E273 E274
-31 | this        and False
-   |     ^^^^^^^^ E274
+31 | this        and    False
+   |     ^^^^^^^^
 32 | #: Okay
 33 | from u import (a, b)
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 28 28 | #: E274
