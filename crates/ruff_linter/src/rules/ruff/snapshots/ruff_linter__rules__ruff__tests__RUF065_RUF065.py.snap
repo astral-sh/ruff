@@ -1,0 +1,419 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF065.py:5:11: RUF065 [*] Binary operation `&` between a value and itself can be simplified to `y`
+  |
+3 | result1 = x | x
+4 | y = 10
+5 | result2 = y & y
+  |           ^^^^^ RUF065
+6 | z = 15
+7 | result3 = z ^ z
+  |
+  = help: Replace with `y`
+
+ℹ Safe fix
+2 2 | x = 5
+3 3 | result1 = x | x
+4 4 | y = 10
+5   |-result2 = y & y
+  5 |+result2 = y
+6 6 | z = 15
+7 7 | result3 = z ^ z
+8 8 | a = 20
+
+RUF065.py:7:11: RUF065 [*] Binary operation `^` between a value and itself can be simplified to `0`
+  |
+5 | result2 = y & y
+6 | z = 15
+7 | result3 = z ^ z
+  |           ^^^^^ RUF065
+8 | a = 20
+9 | result4 = a - a
+  |
+  = help: Replace with `0`
+
+ℹ Safe fix
+4 4 | y = 10
+5 5 | result2 = y & y
+6 6 | z = 15
+7   |-result3 = z ^ z
+  7 |+result3 = 0
+8 8 | a = 20
+9 9 | result4 = a - a
+10 10 | b = 25
+
+RUF065.py:9:11: RUF065 [*] Binary operation `-` between a value and itself can be simplified to `0`
+   |
+ 7 | result3 = z ^ z
+ 8 | a = 20
+ 9 | result4 = a - a
+   |           ^^^^^ RUF065
+10 | b = 25
+11 | result5 = b / b
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+6  6  | z = 15
+7  7  | result3 = z ^ z
+8  8  | a = 20
+9     |-result4 = a - a
+   9  |+result4 = 0
+10 10 | b = 25
+11 11 | result5 = b / b
+12 12 | c = 30
+
+RUF065.py:11:11: RUF065 [*] Binary operation `/` between a value and itself can be simplified to `1`
+   |
+ 9 | result4 = a - a
+10 | b = 25
+11 | result5 = b / b
+   |           ^^^^^ RUF065
+12 | c = 30
+13 | result6 = c // c
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+8  8  | a = 20
+9  9  | result4 = a - a
+10 10 | b = 25
+11    |-result5 = b / b
+   11 |+result5 = 1
+12 12 | c = 30
+13 13 | result6 = c // c
+14 14 | d = 35
+
+RUF065.py:13:11: RUF065 [*] Binary operation `//` between a value and itself can be simplified to `1`
+   |
+11 | result5 = b / b
+12 | c = 30
+13 | result6 = c // c
+   |           ^^^^^^ RUF065
+14 | d = 35
+15 | result7 = d % d
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+10 10 | b = 25
+11 11 | result5 = b / b
+12 12 | c = 30
+13    |-result6 = c // c
+   13 |+result6 = 1
+14 14 | d = 35
+15 15 | result7 = d % d
+16 16 | 
+
+RUF065.py:20:9: RUF065 [*] Binary operation `&` between a value and itself can be simplified to `value`
+   |
+18 | value = 42
+19 | test1 = value | value
+20 | test2 = value & value
+   |         ^^^^^^^^^^^^^ RUF065
+21 | test3 = value ^ value
+22 | test4 = value - value
+   |
+   = help: Replace with `value`
+
+ℹ Safe fix
+17 17 | # Different variable names
+18 18 | value = 42
+19 19 | test1 = value | value
+20    |-test2 = value & value
+   20 |+test2 = value
+21 21 | test3 = value ^ value
+22 22 | test4 = value - value
+23 23 | test5 = value / value
+
+RUF065.py:21:9: RUF065 [*] Binary operation `^` between a value and itself can be simplified to `0`
+   |
+19 | test1 = value | value
+20 | test2 = value & value
+21 | test3 = value ^ value
+   |         ^^^^^^^^^^^^^ RUF065
+22 | test4 = value - value
+23 | test5 = value / value
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+18 18 | value = 42
+19 19 | test1 = value | value
+20 20 | test2 = value & value
+21    |-test3 = value ^ value
+   21 |+test3 = 0
+22 22 | test4 = value - value
+23 23 | test5 = value / value
+24 24 | test6 = value // value
+
+RUF065.py:22:9: RUF065 [*] Binary operation `-` between a value and itself can be simplified to `0`
+   |
+20 | test2 = value & value
+21 | test3 = value ^ value
+22 | test4 = value - value
+   |         ^^^^^^^^^^^^^ RUF065
+23 | test5 = value / value
+24 | test6 = value // value
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+19 19 | test1 = value | value
+20 20 | test2 = value & value
+21 21 | test3 = value ^ value
+22    |-test4 = value - value
+   22 |+test4 = 0
+23 23 | test5 = value / value
+24 24 | test6 = value // value
+25 25 | test7 = value % value
+
+RUF065.py:23:9: RUF065 [*] Binary operation `/` between a value and itself can be simplified to `1`
+   |
+21 | test3 = value ^ value
+22 | test4 = value - value
+23 | test5 = value / value
+   |         ^^^^^^^^^^^^^ RUF065
+24 | test6 = value // value
+25 | test7 = value % value
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+20 20 | test2 = value & value
+21 21 | test3 = value ^ value
+22 22 | test4 = value - value
+23    |-test5 = value / value
+   23 |+test5 = 1
+24 24 | test6 = value // value
+25 25 | test7 = value % value
+26 26 | 
+
+RUF065.py:24:9: RUF065 [*] Binary operation `//` between a value and itself can be simplified to `1`
+   |
+22 | test4 = value - value
+23 | test5 = value / value
+24 | test6 = value // value
+   |         ^^^^^^^^^^^^^^ RUF065
+25 | test7 = value % value
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+21 21 | test3 = value ^ value
+22 22 | test4 = value - value
+23 23 | test5 = value / value
+24    |-test6 = value // value
+   24 |+test6 = 1
+25 25 | test7 = value % value
+26 26 | 
+27 27 | # Complex expressions
+
+RUF065.py:29:15: RUF065 [*] Binary operation `&` between a value and itself can be simplified to `y * 2`
+   |
+27 | # Complex expressions
+28 | complex_expr = (x + 1) | (x + 1)
+29 | complex_and = (y * 2) & (y * 2)
+   |               ^^^^^^^^^^^^^^^^^ RUF065
+30 | complex_xor = (z - 3) ^ (z - 3)
+31 | complex_sub = (a + b) - (a + b)
+   |
+   = help: Replace with `y * 2`
+
+ℹ Safe fix
+26 26 | 
+27 27 | # Complex expressions
+28 28 | complex_expr = (x + 1) | (x + 1)
+29    |-complex_and = (y * 2) & (y * 2)
+   29 |+complex_and = y * 2
+30 30 | complex_xor = (z - 3) ^ (z - 3)
+31 31 | complex_sub = (a + b) - (a + b)
+32 32 | complex_div = (c * d) / (c * d)
+
+RUF065.py:30:15: RUF065 [*] Binary operation `^` between a value and itself can be simplified to `0`
+   |
+28 | complex_expr = (x + 1) | (x + 1)
+29 | complex_and = (y * 2) & (y * 2)
+30 | complex_xor = (z - 3) ^ (z - 3)
+   |               ^^^^^^^^^^^^^^^^^ RUF065
+31 | complex_sub = (a + b) - (a + b)
+32 | complex_div = (c * d) / (c * d)
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+27 27 | # Complex expressions
+28 28 | complex_expr = (x + 1) | (x + 1)
+29 29 | complex_and = (y * 2) & (y * 2)
+30    |-complex_xor = (z - 3) ^ (z - 3)
+   30 |+complex_xor = 0
+31 31 | complex_sub = (a + b) - (a + b)
+32 32 | complex_div = (c * d) / (c * d)
+33 33 | complex_floor = (value + 1) // (value + 1)
+
+RUF065.py:31:15: RUF065 [*] Binary operation `-` between a value and itself can be simplified to `0`
+   |
+29 | complex_and = (y * 2) & (y * 2)
+30 | complex_xor = (z - 3) ^ (z - 3)
+31 | complex_sub = (a + b) - (a + b)
+   |               ^^^^^^^^^^^^^^^^^ RUF065
+32 | complex_div = (c * d) / (c * d)
+33 | complex_floor = (value + 1) // (value + 1)
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+28 28 | complex_expr = (x + 1) | (x + 1)
+29 29 | complex_and = (y * 2) & (y * 2)
+30 30 | complex_xor = (z - 3) ^ (z - 3)
+31    |-complex_sub = (a + b) - (a + b)
+   31 |+complex_sub = 0
+32 32 | complex_div = (c * d) / (c * d)
+33 33 | complex_floor = (value + 1) // (value + 1)
+34 34 | complex_mod = (x + y) % (x + y)
+
+RUF065.py:32:15: RUF065 [*] Binary operation `/` between a value and itself can be simplified to `1`
+   |
+30 | complex_xor = (z - 3) ^ (z - 3)
+31 | complex_sub = (a + b) - (a + b)
+32 | complex_div = (c * d) / (c * d)
+   |               ^^^^^^^^^^^^^^^^^ RUF065
+33 | complex_floor = (value + 1) // (value + 1)
+34 | complex_mod = (x + y) % (x + y)
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+29 29 | complex_and = (y * 2) & (y * 2)
+30 30 | complex_xor = (z - 3) ^ (z - 3)
+31 31 | complex_sub = (a + b) - (a + b)
+32    |-complex_div = (c * d) / (c * d)
+   32 |+complex_div = 1
+33 33 | complex_floor = (value + 1) // (value + 1)
+34 34 | complex_mod = (x + y) % (x + y)
+35 35 | 
+
+RUF065.py:33:17: RUF065 [*] Binary operation `//` between a value and itself can be simplified to `1`
+   |
+31 | complex_sub = (a + b) - (a + b)
+32 | complex_div = (c * d) / (c * d)
+33 | complex_floor = (value + 1) // (value + 1)
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF065
+34 | complex_mod = (x + y) % (x + y)
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+30 30 | complex_xor = (z - 3) ^ (z - 3)
+31 31 | complex_sub = (a + b) - (a + b)
+32 32 | complex_div = (c * d) / (c * d)
+33    |-complex_floor = (value + 1) // (value + 1)
+   33 |+complex_floor = 1
+34 34 | complex_mod = (x + y) % (x + y)
+35 35 | 
+36 36 | # Literals
+
+RUF065.py:38:15: RUF065 [*] Binary operation `&` between a value and itself can be simplified to `10`
+   |
+36 | # Literals
+37 | literal_or = 5 | 5 
+38 | literal_and = 10 & 10
+   |               ^^^^^^^ RUF065
+39 | literal_xor = 15 ^ 15
+40 | literal_sub = 20 - 20
+   |
+   = help: Replace with `10`
+
+ℹ Safe fix
+35 35 | 
+36 36 | # Literals
+37 37 | literal_or = 5 | 5 
+38    |-literal_and = 10 & 10
+   38 |+literal_and = 10
+39 39 | literal_xor = 15 ^ 15
+40 40 | literal_sub = 20 - 20
+41 41 | literal_div = 25 / 25
+
+RUF065.py:39:15: RUF065 [*] Binary operation `^` between a value and itself can be simplified to `0`
+   |
+37 | literal_or = 5 | 5 
+38 | literal_and = 10 & 10
+39 | literal_xor = 15 ^ 15
+   |               ^^^^^^^ RUF065
+40 | literal_sub = 20 - 20
+41 | literal_div = 25 / 25
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+36 36 | # Literals
+37 37 | literal_or = 5 | 5 
+38 38 | literal_and = 10 & 10
+39    |-literal_xor = 15 ^ 15
+   39 |+literal_xor = 0
+40 40 | literal_sub = 20 - 20
+41 41 | literal_div = 25 / 25
+42 42 | literal_floor = 30 // 30
+
+RUF065.py:40:15: RUF065 [*] Binary operation `-` between a value and itself can be simplified to `0`
+   |
+38 | literal_and = 10 & 10
+39 | literal_xor = 15 ^ 15
+40 | literal_sub = 20 - 20
+   |               ^^^^^^^ RUF065
+41 | literal_div = 25 / 25
+42 | literal_floor = 30 // 30
+   |
+   = help: Replace with `0`
+
+ℹ Safe fix
+37 37 | literal_or = 5 | 5 
+38 38 | literal_and = 10 & 10
+39 39 | literal_xor = 15 ^ 15
+40    |-literal_sub = 20 - 20
+   40 |+literal_sub = 0
+41 41 | literal_div = 25 / 25
+42 42 | literal_floor = 30 // 30
+43 43 | literal_mod = 35 % 35
+
+RUF065.py:41:15: RUF065 [*] Binary operation `/` between a value and itself can be simplified to `1`
+   |
+39 | literal_xor = 15 ^ 15
+40 | literal_sub = 20 - 20
+41 | literal_div = 25 / 25
+   |               ^^^^^^^ RUF065
+42 | literal_floor = 30 // 30
+43 | literal_mod = 35 % 35
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+38 38 | literal_and = 10 & 10
+39 39 | literal_xor = 15 ^ 15
+40 40 | literal_sub = 20 - 20
+41    |-literal_div = 25 / 25
+   41 |+literal_div = 1
+42 42 | literal_floor = 30 // 30
+43 43 | literal_mod = 35 % 35
+44 44 | 
+
+RUF065.py:42:17: RUF065 [*] Binary operation `//` between a value and itself can be simplified to `1`
+   |
+40 | literal_sub = 20 - 20
+41 | literal_div = 25 / 25
+42 | literal_floor = 30 // 30
+   |                 ^^^^^^^^ RUF065
+43 | literal_mod = 35 % 35
+   |
+   = help: Replace with `1`
+
+ℹ Safe fix
+39 39 | literal_xor = 15 ^ 15
+40 40 | literal_sub = 20 - 20
+41 41 | literal_div = 25 / 25
+42    |-literal_floor = 30 // 30
+   42 |+literal_floor = 1
+43 43 | literal_mod = 35 % 35
+44 44 | 
+45 45 | # Cases that should NOT trigger the violation
