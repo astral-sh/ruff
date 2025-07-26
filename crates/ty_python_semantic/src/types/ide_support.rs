@@ -276,12 +276,12 @@ impl<'db> AllMembers<'db> {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
-                    let result = parent_instance.member(db, name.as_str());
+                    let result = parent_instance.member(db, name);
                     let Some(ty) = result.place.ignore_possibly_unbound() else {
                         continue;
                     };
                     self.members.insert(Member {
-                        name: name.clone(),
+                        name: Name::new(name),
                         ty,
                     });
                 }

@@ -1,7 +1,8 @@
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::name::Name;
+use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 use std::hash::{Hash as _, Hasher as _};
@@ -25,7 +26,7 @@ impl Member {
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
     ///
     /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &Name {
+    pub(crate) fn symbol_name(&self) -> &str {
         self.expression.symbol_name()
     }
 
@@ -78,9 +79,11 @@ impl Member {
     /// a method context, or whether the `<NAME>` actually refers to the first
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
-    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&Name> {
-        match &*self.expression.segments {
-            [MemberSegment::Attribute(name)] => Some(name),
+    pub(super) fn as_instance_attribute_candidate(&self) -> Option<&str> {
+        match self.expression().segments.as_slice() {
+            [only] if only.kind() == SegmentKind::Attribute => {
+                Some(self.expression().segment_str(0))
+            }
             _ => None,
         }
     }
@@ -100,11 +103,11 @@ impl Member {
 
     /// Does the place expression have the form `self.{name}` (`self` is the first parameter of the method)?
     pub(super) fn is_instance_attribute_named(&self, name: &str) -> bool {
-        self.as_instance_attribute().map(Name::as_str) == Some(name)
+        self.as_instance_attribute() == Some(name)
     }
 
     /// Return `Some(<ATTRIBUTE>)` if the place expression is an instance attribute.
-    pub(crate) fn as_instance_attribute(&self) -> Option<&Name> {
+    pub(crate) fn as_instance_attribute(&self) -> Option<&str> {
         if self.is_instance_attribute() {
             debug_assert!(self.as_instance_attribute_candidate().is_some());
             self.as_instance_attribute_candidate()
@@ -135,6 +138,56 @@ bitflags! {
 
 impl get_size2::GetSize for MemberFlags {}
 
+/// Segment metadata - packed into a single u32
+/// Layout: [kind: 2 bits][len: 30 bits]
+/// - Bits 0-1: SegmentKind (0=Attribute, 1=IntSubscript, 2=StringSubscript)
+/// - Bits 2-31: Length (up to 1,073,741,823 bytes)
+#[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub(crate) struct SegmentInfo(u32);
+
+const KIND_MASK: u32 = 0b11;
+const LEN_SHIFT: u32 = 2;
+const MAX_LEN: u32 = (1 << 30) - 1; // 2^30 - 1
+
+impl SegmentInfo {
+    pub(super) fn new(kind: SegmentKind, offset: TextSize) -> Self {
+        assert!(offset.to_u32() < MAX_LEN);
+
+        let value = (offset.to_u32() << LEN_SHIFT) | (kind as u32);
+        Self(value)
+    }
+
+    pub(super) fn kind(self) -> SegmentKind {
+        match self.0 & KIND_MASK {
+            0 => SegmentKind::Attribute,
+            1 => SegmentKind::IntSubscript,
+            2 => SegmentKind::StringSubscript,
+            _ => unreachable!("Invalid SegmentKind bits"),
+        }
+    }
+
+    pub(crate) fn offset(self) -> TextSize {
+        TextSize::from(self.0 >> LEN_SHIFT)
+    }
+}
+
+impl std::fmt::Debug for SegmentInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SegmentInfo")
+            .field("kind", &self.kind())
+            .field("offset", &self.offset())
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[repr(u8)]
+pub(super) enum SegmentKind {
+    Attribute = 0,
+    IntSubscript = 1,
+    StringSubscript = 2,
+}
+
 /// An expression accessing a member on a symbol named `symbol_name`, e.g. `x.y.z`.
 ///
 /// The parts after the symbol name are called segments, and they can be either:
@@ -142,63 +195,81 @@ impl get_size2::GetSize for MemberFlags {}
 /// * An integer-based subscript, e.g. `[1]` in `x[1]`
 /// * A string-based subscript, e.g. `["foo"]` in `x["foo"]`
 ///
-/// Internally, the segments are stored in reverse order. This allows constructing
-/// a `MemberExpr` from an ast expression without having to reverse the segments.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, Hash)]
+/// Uses a compact representation where the entire expression is stored as a single path.
+/// For example, `foo.bar[0]["baz"]` is stored as:
+/// - path: Name("foo.bar.0.baz")
+/// - segments: metadata describing each segment's type and length
+///
+/// The symbol name length is computed from the segment offsets.
+///
+/// TODO: Maybe use an enum where we store two segments inline (only 2 u32), and use a thin vec otherwise.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    symbol_name: Name,
-    segments: SmallVec<[MemberSegment; 1]>,
+    /// The entire path as a single Name (uses CompactString internally)
+    path: Name,
+    /// Metadata for each segment (in forward order)
+    segments: SmallVec<[SegmentInfo; 4]>,
 }
 
 impl MemberExpr {
-    pub(super) fn new(symbol_name: Name, segments: SmallVec<[MemberSegment; 1]>) -> Self {
+    /// Create a MemberExpr from symbol name and segment strings
+    pub(super) fn new(path: Name, segments: SmallVec<[SegmentInfo; 4]>) -> Self {
         debug_assert!(
             !segments.is_empty(),
-            "A member without segments is a symbol."
+            "Member expression without a member segment is a symbol"
         );
 
-        Self {
-            symbol_name,
-            segments,
-        }
+        Self { path, segments }
     }
 
     fn shrink_to_fit(&mut self) {
-        self.segments.shrink_to_fit();
+        self.path.shrink_to_fit();
         self.segments.shrink_to_fit();
     }
 
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
     ///
     /// This is the symbol on which the member access is performed.
-    pub(crate) fn symbol_name(&self) -> &Name {
-        &self.symbol_name
+    pub(crate) fn symbol_name(&self) -> &str {
+        self.as_ref().symbol_name()
+    }
+
+    /// Get the string content of a segment at the given index
+    fn segment_str(&self, index: usize) -> &str {
+        let start = self.segments[index].offset();
+        let end = self
+            .segments
+            .get(index + 1)
+            .map(|segment| segment.offset())
+            .unwrap_or(self.path.text_len());
+
+        &self.path[TextRange::new(start, end)]
     }
 
     /// Returns the segments of the member expression, e.g. `[MemberSegment::Attribute("y"), MemberSegment::IntSubscript(1)]` for `x.y[1]`.
-    pub(crate) fn member_segments(
-        &self,
-    ) -> impl ExactSizeIterator<Item = &MemberSegment> + DoubleEndedIterator {
-        self.segments.iter().rev()
+    pub(crate) fn segment_infos(&self) -> &[SegmentInfo] {
+        &self.segments
     }
 
     pub(crate) fn as_ref(&self) -> MemberExprRef {
         MemberExprRef {
-            name: self.symbol_name.as_str(),
-            segments: self.segments.as_slice(),
+            path: self.path.as_str(),
+            segments: &self.segments,
         }
     }
 }
 
 impl std::fmt::Display for MemberExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.symbol_name.as_str())?;
+        // TODO: Write less awkward
+        f.write_str(self.symbol_name())?;
 
-        for segment in self.member_segments() {
-            match segment {
-                MemberSegment::Attribute(name) => write!(f, ".{name}")?,
-                MemberSegment::IntSubscript(int) => write!(f, "[{int}]")?,
-                MemberSegment::StringSubscript(string) => write!(f, "[\"{string}\"]")?,
+        for (i, seg) in self.segments.iter().enumerate() {
+            let value = self.segment_str(i);
+            match seg.kind() {
+                SegmentKind::Attribute => write!(f, ".{}", value)?,
+                SegmentKind::IntSubscript => write!(f, "[{}]", value)?,
+                SegmentKind::StringSubscript => write!(f, "[\"{}\"]", value)?,
             }
         }
 
@@ -230,41 +301,41 @@ impl PartialEq<&MemberExpr> for MemberExprRef<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) enum MemberSegment {
-    /// An attribute access, e.g. `.y` in `x.y`
-    Attribute(Name),
-    /// An integer-based index access, e.g. `[1]` in `x[1]`
-    IntSubscript(ast::Int),
-    /// A string-based index access, e.g. `["foo"]` in `x["foo"]`
-    StringSubscript(String),
-}
-
 /// Reference to a member expression.
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub(crate) struct MemberExprRef<'a> {
-    name: &'a str,
-    segments: &'a [MemberSegment],
+    path: &'a str,
+    segments: &'a [SegmentInfo],
 }
 
 impl<'a> MemberExprRef<'a> {
     pub(super) fn symbol_name(&self) -> &'a str {
-        self.name
+        let end = self
+            .segments
+            .first()
+            .map(|segment| segment.offset())
+            .unwrap_or(self.path.text_len());
+
+        let range = TextRange::new(TextSize::default(), end);
+
+        &self.path[range]
     }
 
-    /// Create a new `MemberExprRef` from a name and segments.
-    ///
-    /// Note that the segments are expected to be in reverse order, i.e. the last segment is the first one in the expression.
-    pub(super) fn from_raw(name: &'a str, segments: &'a [MemberSegment]) -> Self {
+    pub(super) fn path(&self) -> &'a str {
+        self.path
+    }
+
+    /// Create a new `MemberExprRef` from a name, path, and segments.
+    pub(super) fn from_raw(path: &'a str, segments: &'a [SegmentInfo]) -> Self {
         debug_assert!(
             !segments.is_empty(),
             "A member without segments is a symbol."
         );
-        Self { name, segments }
+        Self { path, segments }
     }
 
-    /// Returns a slice over the member segments. The segments are in reverse order,
-    pub(super) fn rev_member_segments(&self) -> &'a [MemberSegment] {
+    /// Returns the compact segment info
+    pub(super) fn segments(&self) -> &'a [SegmentInfo] {
         self.segments
     }
 }
