@@ -129,26 +129,41 @@ fn is_sequential(indices: &[usize]) -> bool {
 static FORMAT_SPECIFIER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
 
+/// Replace the single brace with a formatted brace.
+fn replace_single_brace(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut last = 0;
+    for mat in FORMAT_SPECIFIER.find_iter(text) {
+        let start = mat.start();
+        let end = mat.end();
+        let is_double_open = start > 0 && &text[start - 1..start] == "{";
+        let is_double_close = end < text.len() && &text[end..end + 1.min(text.len() - end)] == "}";
+        if !is_double_open && !is_double_close {
+            result.push_str(&text[last..start]);
+            let caps = FORMAT_SPECIFIER.captures(&text[start..end]).unwrap();
+            let fmt = caps.name("fmt").map_or("", |m| m.as_str());
+            result.push('{');
+            result.push_str(fmt);
+            result.push('}');
+            last = end;
+        }
+    }
+    result.push_str(&text[last..]);
+    result
+}
+
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
-            expr.value = arena.alloc(
-                FORMAT_SPECIFIER
-                    .replace_all(expr.value, "{$fmt}")
-                    .to_string(),
-            );
+            expr.value = arena.alloc(replace_single_brace(expr.value));
         }
         Expression::ConcatenatedString(expr) => {
             let mut stack = vec![&mut expr.left, &mut expr.right];
             while let Some(string) = stack.pop() {
                 match string.as_mut() {
                     libcst_native::String::Simple(string) => {
-                        string.value = arena.alloc(
-                            FORMAT_SPECIFIER
-                                .replace_all(string.value, "{$fmt}")
-                                .to_string(),
-                        );
+                        string.value = arena.alloc(replace_single_brace(string.value));
                     }
                     libcst_native::String::Concatenated(string) => {
                         stack.push(&mut string.left);
