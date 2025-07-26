@@ -118,4 +118,10 @@ os.mkdir(
 
 os.mkdir("directory", mode=0o777, dir_fd=1)
 
-os.makedirs("name", mode=0o777, exist_ok=False)
+os.makedirs("name", 0o777, exist_ok=False)
+
+os.makedirs("name", 0o777, False)
+
+os.makedirs(name="name", mode=0o777, exist_ok=False)
+
+os.makedirs("name", unknown_kwarg=True)

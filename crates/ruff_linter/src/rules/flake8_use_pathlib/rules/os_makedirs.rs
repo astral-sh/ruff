@@ -80,6 +80,25 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
+    // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.readlink)
+    // ```text
+    //               0         1           2
+    //  os.makedirs(name, mode=0o777, exist_ok=False)
+    // ```
+    // We should not offer autofixes if there are more arguments
+    // than in the original signature
+    if call.arguments.args.len() > 3 {
+        return;
+    }
+    // We should not offer autofixes if there are keyword arguments
+    // that don't match the original function signature
+    if call.arguments.keywords.iter().any(|kw| {
+        !matches!(kw.arg.as_deref(), Some("name" | "mode" | "exist_ok"))
+    }) {
+        return;
+    }
+
+
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
             &ImportRequest::import("pathlib", "Path"),
@@ -95,15 +114,29 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
 
         let name_code = checker.locator().slice(name.range());
 
-        let mut args = vec!["parents=True".to_string()];
-
-        for (key, index) in [("mode", 1), ("exist_ok", 2)] {
-            if let Some(expr) = call.arguments.find_argument_value(key, index) {
-                let value = checker.locator().slice(expr.range());
-                args.push(format!("{key}={value}"));
-            }
-        }
-        let mkdir_args = args.join(", ");
+        let mkdir_args = if call.arguments.args.len() == 3 && call.arguments.keywords.is_empty() {
+            let mode = checker.locator().slice(call.arguments.args[1].range());
+            let exist_ok = checker.locator().slice(call.arguments.args[2].range());
+            format!("mode={mode}, exist_ok={exist_ok}, parents=True")
+        } else {
+            call.arguments
+                .args
+                .iter()
+                .skip(1)
+                .map(|expr| checker.locator().slice(expr.range()).to_string())
+                .chain(
+                    call.arguments.keywords.iter().filter_map(|kw| {
+                        kw.arg.as_ref().and_then(|arg| {
+                            (arg != "name").then(|| {
+                                format!("{arg}={}", checker.locator().slice(kw.value.range()))
+                            })
+                        })
+                    }),
+                )
+                .chain(std::iter::once("parents=True".to_string()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
 
         let replacement = if is_pathlib_path_call(checker, name) {
             format!("{name_code}.mkdir({mkdir_args})")

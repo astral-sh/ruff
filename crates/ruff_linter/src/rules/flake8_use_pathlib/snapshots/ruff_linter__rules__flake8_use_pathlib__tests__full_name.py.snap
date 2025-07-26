@@ -415,7 +415,40 @@ full_name.py:121:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(par
     |
 119 | os.mkdir("directory", mode=0o777, dir_fd=1)
 120 |
-121 | os.makedirs("name", mode=0o777, exist_ok=False)
+121 | os.makedirs("name", 0o777, exist_ok=False)
+    | ^^^^^^^^^^^ PTH103
+122 |
+123 | os.makedirs("name", 0o777, False)
+    |
+    = help: Replace with `Path(...).mkdir(parents=True)`
+
+full_name.py:123:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+    |
+121 | os.makedirs("name", 0o777, exist_ok=False)
+122 |
+123 | os.makedirs("name", 0o777, False)
+    | ^^^^^^^^^^^ PTH103
+124 |
+125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+    |
+    = help: Replace with `Path(...).mkdir(parents=True)`
+
+full_name.py:125:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+    |
+123 | os.makedirs("name", 0o777, False)
+124 |
+125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+    | ^^^^^^^^^^^ PTH103
+126 |
+127 | os.makedirs("name", unknown_kwarg=True)
+    |
+    = help: Replace with `Path(...).mkdir(parents=True)`
+
+full_name.py:127:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+    |
+125 | os.makedirs(name="name", mode=0o777, exist_ok=False)
+126 |
+127 | os.makedirs("name", unknown_kwarg=True)
     | ^^^^^^^^^^^ PTH103
     |
     = help: Replace with `Path(...).mkdir(parents=True)`
