@@ -3,21 +3,23 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, NavigationTargets, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints, signature_help,
+    MarkupKind, RangedValue, document_highlights, goto_declaration, goto_definition,
+    goto_references, goto_type_definition, hover, inlay_hints,
 };
+use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -158,28 +160,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: path.into(),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -198,18 +207,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -556,6 +569,22 @@ impl Workspace {
             })
             .collect())
     }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
+
+        Ok(FileHandle {
+            file,
+            path: vendored_path.to_path_buf().into(),
+        })
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -598,7 +627,7 @@ fn map_targets_to_links(
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: FilePath,
     file: File,
 }
 
