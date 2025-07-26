@@ -203,7 +203,7 @@ C409.py:24:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as 
 22 22 | ))
 23 23 | 
 24    |-t6 = tuple([1])
-   24 |+t6 = (1,)
+   24 |+t6 = (1)
 25 25 | t7 = tuple((1,))
 26 26 | t8 = tuple([1,])
 27 27 | 
@@ -344,3 +344,36 @@ C409.py:37:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewri
 41 41 |     {
 42 42 |         x for x in [1,2,3]
 43 43 |     }
+
+C409.py:46:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+   |
+44 | )
+45 |
+46 | t9 = tuple([1],)
+   |      ^^^^^^^^^^^ C409
+47 | t10 = tuple([1, 2],)
+   |
+   = help: Rewrite as a tuple literal
+
+ℹ Unsafe fix
+43 43 |     }
+44 44 | )
+45 45 | 
+46    |-t9 = tuple([1],)
+   46 |+t9 = (1,)
+47 47 | t10 = tuple([1, 2],)
+
+C409.py:47:7: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+   |
+46 | t9 = tuple([1],)
+47 | t10 = tuple([1, 2],)
+   |       ^^^^^^^^^^^^^^ C409
+   |
+   = help: Rewrite as a tuple literal
+
+ℹ Unsafe fix
+44 44 | )
+45 45 | 
+46 46 | t9 = tuple([1],)
+47    |-t10 = tuple([1, 2],)
+   47 |+t10 = (1, 2,)
