@@ -8,7 +8,7 @@ G004.py:4:14: G004 [*] Logging statement uses f-string
   |              ^^^^^^^^^^^^^^^ G004
 5 | logging.log(logging.INFO, f"Hello {name}")
   |
-  = help: Convert to lazy % formatting
+  = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 1 1 | import logging
@@ -29,7 +29,7 @@ G004.py:5:27: G004 [*] Logging statement uses f-string
 6 |
 7 | _LOGGER = logging.getLogger()
   |
-  = help: Convert to lazy % formatting
+  = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 2 2 | 
@@ -49,7 +49,7 @@ G004.py:8:14: G004 [*] Logging statement uses f-string
  9 |
 10 | logging.getLogger().info(f"{name}")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 5 5 | logging.log(logging.INFO, f"Hello {name}")
@@ -70,7 +70,7 @@ G004.py:10:26: G004 [*] Logging statement uses f-string
 11 |
 12 | from logging import info
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 7  7  | _LOGGER = logging.getLogger()
@@ -90,7 +90,7 @@ G004.py:14:6: G004 [*] Logging statement uses f-string
    |      ^^^^^^^^^ G004
 15 | info(f"{__name__}")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 11 11 | 
@@ -110,7 +110,7 @@ G004.py:15:6: G004 [*] Logging statement uses f-string
 16 |
 17 | # Don't trigger for t-strings
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 12 12 | from logging import info
@@ -129,7 +129,7 @@ G004.py:24:14: G004 [*] Logging statement uses f-string
 24 | logging.info(f"{count} out of {total} files in {directory_path} checked")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 ℹ Safe fix
 21 21 | count = 5
@@ -149,7 +149,7 @@ G004.py:30:13: G004 Logging statement uses f-string
    |             ^^^^^^^^^^^^^^ G004
 31 | logger.info(f"{x:>10} {x:{fmt}}")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:31:13: G004 Logging statement uses f-string
    |
@@ -160,7 +160,7 @@ G004.py:31:13: G004 Logging statement uses f-string
 32 |
 33 | logging.info(f"")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:33:14: G004 Logging statement uses f-string
    |
@@ -170,7 +170,7 @@ G004.py:33:14: G004 Logging statement uses f-string
    |              ^^^ G004
 34 | logging.info(f"This message doesn't have any variables.")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:34:14: G004 Logging statement uses f-string
    |
@@ -180,7 +180,7 @@ G004.py:34:14: G004 Logging statement uses f-string
 35 |
 36 | obj = {"key": "value"}
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:37:14: G004 Logging statement uses f-string
    |
@@ -190,7 +190,7 @@ G004.py:37:14: G004 Logging statement uses f-string
 38 |
 39 | items_count = 3
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:40:17: G004 Logging statement uses f-string
    |
@@ -200,7 +200,7 @@ G004.py:40:17: G004 Logging statement uses f-string
 41 |
 42 | data = {"status": "active"}
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:43:14: G004 Logging statement uses f-string
    |
@@ -209,7 +209,7 @@ G004.py:43:14: G004 Logging statement uses f-string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
 44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:44:14: G004 Logging statement uses f-string
    |
@@ -218,7 +218,7 @@ G004.py:44:14: G004 Logging statement uses f-string
 44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:48:14: G004 Logging statement uses f-string
    |
@@ -228,7 +228,7 @@ G004.py:48:14: G004 Logging statement uses f-string
 49 |
 50 | temperature = 123
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:51:14: G004 Logging statement uses f-string
    |
@@ -238,7 +238,7 @@ G004.py:51:14: G004 Logging statement uses f-string
 52 |
 53 | class FilePath:
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:57:14: G004 Logging statement uses f-string
    |
@@ -249,7 +249,7 @@ G004.py:57:14: G004 Logging statement uses f-string
 58 |
 59 | user = "tron"
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
 
 G004.py:61:15: G004 Logging statement uses f-string
    |
@@ -258,4 +258,4 @@ G004.py:61:15: G004 Logging statement uses f-string
 61 | logging.error(f"Error {404}: User {user} has insufficient balance ${balance:.2f}")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
    |
-   = help: Convert to lazy % formatting
+   = help: Convert to lazy `%` formatting
