@@ -96,6 +96,14 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
+    // Don't suggest `dict.fromkeys` if the target is an attribute, subscript, or slice (side-effecting assignment).
+    match &generator.target {
+        Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_) => {
+            return;
+        }
+        _ => {}
+    }
+
     // Don't suggest `dict.fromkeys` if the value is not a constant or constant-like.
     if !is_constant_like(dict_comp.value.as_ref()) {
         return;
