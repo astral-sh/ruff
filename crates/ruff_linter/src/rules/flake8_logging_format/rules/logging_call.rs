@@ -15,7 +15,6 @@ use crate::{Edit, Fix};
 fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFString) {
     let mut format_string = String::new();
     let mut args = Vec::new();
-    let mut simple = true;
 
     for f in f_string.value.f_strings() {
         for element in &f.elements {
@@ -30,8 +29,8 @@ fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFS
                             ruff_python_ast::ConversionFlag::None
                         )
                     {
-                        simple = false;
-                        break;
+                        checker.report_diagnostic(LoggingFString, msg.range());
+                        return;
                     }
                     match interpolated.expression.as_ref() {
                         Expr::Name(name) => {
@@ -39,8 +38,8 @@ fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFS
                             args.push(name.id.to_string());
                         }
                         _ => {
-                            simple = false;
-                            break;
+                            checker.report_diagnostic(LoggingFString, msg.range());
+                            return;
                         }
                     }
                 }
@@ -48,7 +47,9 @@ fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFS
         }
     }
 
-    if simple && !args.is_empty() {
+    if args.is_empty() {
+        checker.report_diagnostic(LoggingFString, msg.range());
+    } else {
         let replacement = format!(
             "\"{format_string}\"{sep}{args}",
             sep = if args.is_empty() { "" } else { ", " },
@@ -57,8 +58,6 @@ fn handle_logging_f_string(checker: &Checker, msg: &Expr, f_string: &ast::ExprFS
         let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
         let mut diagnostic = checker.report_diagnostic(LoggingFString, msg.range());
         diagnostic.set_fix(fix);
-    } else {
-        checker.report_diagnostic(LoggingFString, msg.range());
     }
 }
 
