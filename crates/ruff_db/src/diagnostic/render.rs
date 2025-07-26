@@ -876,37 +876,37 @@ fn replace_whitespace_and_unprintable<'r>(
     for (index, c) in source.char_indices() {
         let old_width = width;
         match c {
-            '\t' => {
-                let tab_offset = TAB_SIZE - (column % TAB_SIZE);
-                width += tab_offset;
-                column += tab_offset;
-            }
             '\n' | '\r' => {
                 width = 0;
                 column = 0;
             }
+            '\t' => {
+                let tab_offset = TAB_SIZE - (column % TAB_SIZE);
+                width += tab_offset;
+                column += tab_offset;
+
+                let tab_width =
+                    u32::try_from(width - old_width).expect("small width because of tab size");
+                result.push_str(&source[last_end..index]);
+                for _ in 0..tab_width {
+                    result.push(' ');
+                }
+                last_end = index + 1;
+                update_ranges(index, tab_width);
+            }
             _ => {
                 width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
                 column += 1;
-            }
-        }
 
-        if matches!(c, '\t') {
-            let tab_width =
-                u32::try_from(width - old_width).expect("small width because of tab size");
-            result.push_str(&source[last_end..index]);
-            for _ in 0..tab_width {
-                result.push(' ');
-            }
-            last_end = index + 1;
-            update_ranges(index, tab_width);
-        } else if let Some(printable) = unprintable_replacement(c) {
-            result.push_str(&source[last_end..index]);
-            result.push(printable);
-            last_end = index + 1;
+                if let Some(printable) = unprintable_replacement(c) {
+                    result.push_str(&source[last_end..index]);
+                    result.push(printable);
+                    last_end = index + 1;
 
-            let len = printable.text_len().to_u32();
-            update_ranges(index, len);
+                    let len = printable.text_len().to_u32();
+                    update_ranges(index, len);
+                }
+            }
         }
     }
 
