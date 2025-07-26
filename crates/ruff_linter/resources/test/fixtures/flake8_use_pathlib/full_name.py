@@ -107,3 +107,15 @@ os.replace("src", "dst", dst_dir_fd=2)
 
 os.getcwd()
 os.getcwdb()
+
+os.mkdir(path="directory")
+
+os.mkdir(
+    # comment 1
+    "directory",
+    mode=0o777
+)
+
+os.mkdir("directory", mode=0o777, dir_fd=1)
+
+os.makedirs("name", mode=0o777, exist_ok=False)

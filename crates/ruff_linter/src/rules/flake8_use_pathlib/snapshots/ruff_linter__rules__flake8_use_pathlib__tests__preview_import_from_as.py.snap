@@ -37,7 +37,7 @@ import_from_as.py:15:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
    |
    = help: Replace with `Path(...).chmod(...)`
 
-import_from_as.py:16:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+import_from_as.py:16:7: PTH102 [*] `os.mkdir()` should be replaced by `Path.mkdir()`
    |
 14 | a = xabspath(p)
 15 | aa = xchmod(p)
@@ -46,8 +46,26 @@ import_from_as.py:16:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
 17 | xmakedirs(p)
 18 | xrename(p)
    |
+   = help: Replace with `Path(...).mkdir()`
 
-import_from_as.py:17:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+ℹ Safe fix
+7  7  | from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
+8  8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
+9  9  | from os.path import samefile as xsamefile, splitext as xsplitext
+   10 |+import pathlib
+10 11 | 
+11 12 | p = "/foo"
+12 13 | q = "bar"
+13 14 | 
+14 15 | a = xabspath(p)
+15 16 | aa = xchmod(p)
+16    |-aaa = xmkdir(p)
+   17 |+aaa = pathlib.Path(p).mkdir()
+17 18 | xmakedirs(p)
+18 19 | xrename(p)
+19 20 | xreplace(p)
+
+import_from_as.py:17:1: PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    |
 15 | aa = xchmod(p)
 16 | aaa = xmkdir(p)
@@ -56,6 +74,25 @@ import_from_as.py:17:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir
 18 | xrename(p)
 19 | xreplace(p)
    |
+   = help: Replace with `Path(...).mkdir(parents=True)`
+
+ℹ Safe fix
+7  7  | from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
+8  8  | from os.path import join as xjoin, basename as xbasename, dirname as xdirname
+9  9  | from os.path import samefile as xsamefile, splitext as xsplitext
+   10 |+import pathlib
+10 11 | 
+11 12 | p = "/foo"
+12 13 | q = "bar"
+--------------------------------------------------------------------------------
+14 15 | a = xabspath(p)
+15 16 | aa = xchmod(p)
+16 17 | aaa = xmkdir(p)
+17    |-xmakedirs(p)
+   18 |+pathlib.Path(p).mkdir(parents=True)
+18 19 | xrename(p)
+19 20 | xreplace(p)
+20 21 | xrmdir(p)
 
 import_from_as.py:18:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
    |

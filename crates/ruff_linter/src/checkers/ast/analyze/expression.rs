@@ -1039,8 +1039,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 flake8_simplify::rules::zip_dict_keys_and_values(checker, call);
             }
             if checker.any_rule_enabled(&[
-                Rule::OsMkdir,
-                Rule::OsMakedirs,
                 Rule::OsStat,
                 Rule::OsPathJoin,
                 Rule::OsPathSplitext,
@@ -1119,6 +1117,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 }
                 if checker.is_rule_enabled(Rule::OsPathSamefile) {
                     flake8_use_pathlib::rules::os_path_samefile(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsMkdir) {
+                    flake8_use_pathlib::rules::os_mkdir(checker, call, segments);
+                }
+                if checker.is_rule_enabled(Rule::OsMakedirs) {
+                    flake8_use_pathlib::rules::os_makedirs(checker, call, segments);
                 }
                 if checker.is_rule_enabled(Rule::PathConstructorCurrentDirectory) {
                     flake8_use_pathlib::rules::path_constructor_current_directory(
