@@ -13,8 +13,9 @@ use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
+    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeRelationError, TypeTransformer,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
+    declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -515,10 +516,10 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> Result<(), TypeRelationError> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return false;
+            return Err(TypeRelationError::todo());
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -533,7 +534,7 @@ impl<'db> Specialization<'db> {
             if self_type.is_dynamic() || other_type.is_dynamic() {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return false,
+                    TypeRelation::Subtyping => return Err(TypeRelationError::todo()),
                 }
             }
 
@@ -545,24 +546,36 @@ impl<'db> Specialization<'db> {
             //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match typevar.variance(db) {
                 TypeVarVariance::Invariant => match relation {
-                    TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
+                    TypeRelation::Subtyping => {
+                        if self_type.is_equivalent_to(db, *other_type) {
+                            Ok(())
+                        } else {
+                            Err(TypeRelationError::todo())
+                        }
+                    }
                     TypeRelation::Assignability => {
-                        self_type.is_assignable_to(db, *other_type)
-                            && other_type.is_assignable_to(db, *self_type)
+                        match self_type.is_assignable_to(db, *other_type) {
+                            Ok(()) => other_type.is_assignable_to(db, *self_type),
+                            Err(mut e) => {
+                                e.add(other_type.is_assignable_to(db, *self_type));
+                                Err(e)
+                            }
+                        }
                     }
                 },
                 TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
                 TypeVarVariance::Contravariant => {
                     other_type.has_relation_to(db, *self_type, relation)
                 }
-                TypeVarVariance::Bivariant => true,
+                TypeVarVariance::Bivariant => Ok(()),
             };
-            if !compatible {
-                return false;
+
+            if compatible.is_err() {
+                return compatible;
             }
         }
 
-        true
+        Ok(())
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
@@ -723,7 +736,7 @@ impl<'db> SpecializationBuilder<'db> {
         // without specializing `T` to `None`.
         if !matches!(formal, Type::ProtocolInstance(_))
             && !actual.is_never()
-            && actual.is_subtype_of(self.db, formal)
+            && actual.is_subtype_of(self.db, formal).is_ok()
         {
             return Ok(());
         }
@@ -732,7 +745,7 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
                 match typevar.bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if !ty.is_assignable_to(self.db, bound) {
+                        if ty.is_assignable_to(self.db, bound).is_err() {
                             return Err(SpecializationError::MismatchedBound {
                                 typevar,
                                 argument: ty,
@@ -742,7 +755,7 @@ impl<'db> SpecializationBuilder<'db> {
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         for constraint in constraints.iter(self.db) {
-                            if ty.is_assignable_to(self.db, *constraint) {
+                            if ty.is_assignable_to(self.db, *constraint).is_ok() {
                                 self.add_type_mapping(typevar, *constraint);
                                 return Ok(());
                             }

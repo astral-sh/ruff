@@ -400,8 +400,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 else {
                     return false;
                 };
-                member_type.has_relation_to(db, attribute_type, relation)
-                    && attribute_type.has_relation_to(db, *member_type, relation)
+                member_type
+                    .has_relation_to(db, attribute_type, relation)
+                    .is_ok()
+                    && attribute_type
+                        .has_relation_to(db, *member_type, relation)
+                        .is_ok()
             }
         }
     }

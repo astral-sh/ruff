@@ -23,8 +23,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    TypeRelationError, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -408,7 +408,11 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_subclass_of(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> Result<(), TypeRelationError> {
         self.has_relation_to(db, other, TypeRelation::Subtyping)
     }
 
@@ -417,41 +421,64 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> Result<(), TypeRelationError> {
         // TODO: remove this branch once we have proper support for TypedDicts.
         if self.is_known(db, KnownClass::Dict)
             && other
                 .iter_mro(db)
                 .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
         {
-            return true;
+            return Ok(());
         }
 
-        self.iter_mro(db).any(|base| {
+        TypeRelationError::from_results(self.iter_mro(db).map(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => {
+                        if other.is_object(db) {
+                            Ok(())
+                        } else {
+                            Err(TypeRelationError::todo())
+                        }
+                    }
+                    TypeRelation::Assignability => {
+                        if other.is_final(db) {
+                            Err(TypeRelationError::todo())
+                        } else {
+                            Ok(())
+                        }
+                    }
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => Err(TypeRelationError::todo()),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        if base == other {
+                            Ok(())
+                        } else {
+                            Err(TypeRelationError::todo())
+                        }
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to(
+                        if base.origin(db) == other.origin(db) {
+                            base.specialization(db).has_relation_to(
                                 db,
                                 other.specialization(db),
                                 relation,
                             )
+                        } else {
+                            Err(TypeRelationError::todo())
+                        }
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
+                        Err(TypeRelationError::todo())
+                    }
                 },
             }
-        })
+        }))
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
@@ -502,10 +529,10 @@ impl<'db> ClassType<'db> {
 
         // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other);
+            return self.is_subclass_of(db, other).is_ok();
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self);
+            return other.is_subclass_of(db, self).is_ok();
         }
 
         // Two solid bases can only coexist in an MRO if one is a subclass of the other.
@@ -741,12 +768,14 @@ impl<'db> ClassType<'db> {
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
                 signature.return_ty.is_some_and(|return_ty| {
-                    !return_ty.is_assignable_to(
-                        db,
-                        self_ty
-                            .to_instance(db)
-                            .expect("ClassType should be instantiable"),
-                    )
+                    return_ty
+                        .is_assignable_to(
+                            db,
+                            self_ty
+                                .to_instance(db)
+                                .expect("ClassType should be instantiable"),
+                        )
+                        .is_err()
                 })
             });
 
@@ -1372,7 +1401,7 @@ impl<'db> ClassLiteral<'db> {
             let Some(metaclass) = metaclass.to_class_type(db) else {
                 continue;
             };
-            if metaclass.is_subclass_of(db, candidate.metaclass) {
+            if metaclass.is_subclass_of(db, candidate.metaclass).is_ok() {
                 let (base_class_literal, _) = base_class.class_literal(db);
                 candidate = MetaclassCandidate {
                     metaclass,
@@ -1380,7 +1409,7 @@ impl<'db> ClassLiteral<'db> {
                 };
                 continue;
             }
-            if candidate.metaclass.is_subclass_of(db, metaclass) {
+            if candidate.metaclass.is_subclass_of(db, metaclass).is_ok() {
                 continue;
             }
             let (base_class_literal, _) = base_class.class_literal(db);

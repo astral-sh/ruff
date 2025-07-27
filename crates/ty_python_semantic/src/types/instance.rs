@@ -9,7 +9,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
+use crate::types::{
+    DynamicType, TypeMapping, TypeRelation, TypeRelationError, TypeTransformer, TypeVarInstance,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -112,7 +114,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> Result<(), TypeRelationError> {
         self.class.has_relation_to(db, other.class, relation)
     }
 

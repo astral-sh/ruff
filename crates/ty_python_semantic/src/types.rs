@@ -1392,18 +1392,26 @@ impl<'db> Type<'db> {
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => TypeRelationError::from_results(
+            (_, Type::Intersection(intersection)) => match TypeRelationError::from_results(
                 intersection
                     .positive(db)
                     .iter()
                     .map(|&pos_ty| self.has_relation_to(db, pos_ty, relation)),
-            )
-            .extend(
-                intersection
-                    .negative(db)
-                    .iter()
-                    .map(|&neg_ty| self.is_disjoint_from(db, neg_ty)),
-            ),
+            ) {
+                Ok(()) => Ok(()),
+                Err(mut e) => {
+                    if intersection
+                        .negative(db)
+                        .iter()
+                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
+                    {
+                        Err(e)
+                    } else {
+                        e.extend(TypeRelationError::todo());
+                        Err(e)
+                    }
+                }
+            },
 
             (Type::Intersection(intersection), _) => TypeRelationError::from_results(
                 intersection
@@ -1421,11 +1429,27 @@ impl<'db> Type<'db> {
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => left.bool(db).is_always_false(),
-            (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
+            (left, Type::AlwaysFalsy) => {
+                if left.bool(db).is_always_false() {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
+            }
+            (left, Type::AlwaysTruthy) => {
+                if left.bool(db).is_always_true() {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
+            }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.is_equivalent_to(db, Type::object(db))
+                if target.is_equivalent_to(db, Type::object(db)) {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1462,36 +1486,52 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
-            ) => false,
+            ) => Err(TypeRelationError::todo()),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => {
                 self_callable.has_relation_to(db, other_callable, relation)
             }
 
-            (_, Type::Callable(_)) => self
-                .into_callable(db)
-                .is_some_and(|callable| callable.has_relation_to(db, target, relation)),
+            (_, Type::Callable(_)) => {
+                if let Some(callable) = self.into_callable(db) {
+                    callable.has_relation_to(db, target, relation)
+                } else {
+                    Err(TypeRelationError::todo())
+                }
+            }
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.has_relation_to(db, right, relation)
+                if left.has_relation_to(db, right, relation) {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            (Type::ProtocolInstance(_), _) => false,
+            (Type::ProtocolInstance(_), _) => Err(TypeRelationError::todo()),
             (_, Type::ProtocolInstance(protocol)) => {
-                self.satisfies_protocol(db, protocol, relation)
+                if self.satisfies_protocol(db, protocol, relation) {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::StringLiteral(_), Type::LiteralString) => true,
+            (Type::StringLiteral(_), Type::LiteralString) => Ok(()),
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
                 if target_enum_literal.enum_class_instance(db) != self {
-                    return false;
+                    return Err(TypeRelationError::todo());
                 }
 
-                is_single_member_enum(db, target_enum_literal.enum_class(db))
+                if is_single_member_enum(db, target_enum_literal.enum_class(db)) {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
             }
 
             // Except for the special `LiteralString` case above,
@@ -1506,8 +1546,13 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
                 _,
-            ) => (self.literal_fallback_instance(db))
-                .is_some_and(|instance| instance.has_relation_to(db, target, relation)),
+            ) => {
+                if let Some(instance) = self.literal_fallback_instance(db) {
+                    instance.has_relation_to(db, target, relation)
+                } else {
+                    Err(TypeRelationError::todo())
+                }
+            }
 
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
@@ -1528,16 +1573,24 @@ impl<'db> Type<'db> {
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
-                false
+                Err(TypeRelationError::todo())
             }
 
             // `TypeIs` is invariant.
             (Type::TypeIs(left), Type::TypeIs(right)) => {
-                left.return_type(db)
-                    .has_relation_to(db, right.return_type(db), relation)
-                    && right
-                        .return_type(db)
-                        .has_relation_to(db, left.return_type(db), relation)
+                if let Err(mut e) =
+                    left.return_type(db)
+                        .has_relation_to(db, right.return_type(db), relation)
+                {
+                    e.add(right.return_type(db).has_relation_to(
+                        db,
+                        left.return_type(db),
+                        relation,
+                    ));
+                    Err(e)
+                } else {
+                    Ok(())
+                }
             }
 
             // `TypeIs[T]` is a subtype of `bool`.
@@ -1550,32 +1603,40 @@ impl<'db> Type<'db> {
                 if callable.is_function_like(db)
                     && KnownClass::FunctionType
                         .to_instance(db)
-                        .has_relation_to(db, target, relation) =>
+                        .has_relation_to(db, target, relation)
+                        .is_ok() =>
             {
-                true
+                Ok(())
             }
 
-            (Type::Callable(_), _) => false,
+            (Type::Callable(_), _) => Err(TypeRelationError::todo()),
 
             (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
                 self_tuple.has_relation_to(db, target_tuple, relation)
             }
 
-            (Type::Tuple(self_tuple), Type::NominalInstance(target_instance)) => {
-                self_tuple.to_class_type(db).is_some_and(|self_class| {
-                    self_class.has_relation_to(db, target_instance.class, relation)
-                })
-            }
-            (Type::NominalInstance(self_instance), Type::Tuple(target_tuple)) => {
-                target_tuple.to_class_type(db).is_some_and(|target_class| {
+            (Type::Tuple(self_tuple), Type::NominalInstance(target_instance)) => self_tuple
+                .to_class_type(db)
+                .map(|self_class| self_class.has_relation_to(db, target_instance.class, relation))
+                .unwrap_or(Err(TypeRelationError::todo())),
+
+            (Type::NominalInstance(self_instance), Type::Tuple(target_tuple)) => target_tuple
+                .to_class_type(db)
+                .map(|target_class| {
                     self_instance
                         .class
                         .has_relation_to(db, target_class, relation)
                 })
-            }
-            (Type::Tuple(_), _) => false,
+                .unwrap_or(Err(TypeRelationError::todo())),
+            (Type::Tuple(_), _) => Err(TypeRelationError::todo()),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
+                if self.is_equivalent_to(db, target) {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
+            }
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
                 .has_relation_to(db, target, relation),
@@ -1588,14 +1649,23 @@ impl<'db> Type<'db> {
                 .map(|subclass_of_class| {
                     ClassType::NonGeneric(class).has_relation_to(db, subclass_of_class, relation)
                 })
-                .unwrap_or(relation.is_assignability()),
+                .unwrap_or(if relation.is_assignability() {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }),
+
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
                     ClassType::Generic(alias).has_relation_to(db, subclass_of_class, relation)
                 })
-                .unwrap_or(relation.is_assignability()),
+                .unwrap_or(if relation.is_assignability() {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
@@ -1614,11 +1684,29 @@ impl<'db> Type<'db> {
 
             // `type[Any]` is a subtype of `type[object]`, and is assignable to any `type[...]`
             (Type::SubclassOf(subclass_of_ty), other) if subclass_of_ty.is_dynamic() => {
-                KnownClass::Type
+                match KnownClass::Type
                     .to_instance(db)
                     .has_relation_to(db, other, relation)
-                    || (relation.is_assignability()
-                        && other.has_relation_to(db, KnownClass::Type.to_instance(db), relation))
+                {
+                    Ok(()) => Ok(()),
+                    Err(mut e1) => {
+                        if relation.is_assignability() {
+                            match other.has_relation_to(
+                                db,
+                                KnownClass::Type.to_instance(db),
+                                relation,
+                            ) {
+                                Ok(()) => Ok(()),
+                                Err(e2) => {
+                                    e1.add(Err(e2));
+                                    Err(e1)
+                                }
+                            }
+                        } else {
+                            Err(e1)
+                        }
+                    }
+                }
             }
 
             // Any `type[...]` type is assignable to `type[Any]`
@@ -1668,7 +1756,7 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
-            (Type::NominalInstance(_) | Type::TypeVar(_), _) => false,
+            (Type::NominalInstance(_) | Type::TypeVar(_), _) => Err(TypeRelationError::todo()),
         }
     }
 
@@ -1845,7 +1933,7 @@ impl<'db> Type<'db> {
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|&neg_ty| other.is_subtype_of(db, neg_ty))
+                        .any(|&neg_ty| other.is_subtype_of(db, neg_ty).is_ok())
             }
 
             // any single-valued type is disjoint from another single-valued type
@@ -2061,7 +2149,7 @@ impl<'db> Type<'db> {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => false,
                     SubclassOfInner::Class(class_a) => {
-                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
+                        ClassType::from(alias_b).is_subclass_of(db, class_a).is_err()
                     }
                 }
             }
@@ -2141,7 +2229,7 @@ impl<'db> Type<'db> {
 
             (Type::EnumLiteral(enum_literal), instance@Type::NominalInstance(_))
             | (instance@Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
-                !enum_literal.enum_class_instance(db).is_subtype_of(db, instance)
+                enum_literal.enum_class_instance(db).is_subtype_of(db, instance).is_err()
             }
             (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => true,
 
@@ -2149,14 +2237,14 @@ impl<'db> Type<'db> {
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
             (Type::ClassLiteral(class), instance @ Type::NominalInstance(_))
-            | (instance @ Type::NominalInstance(_), Type::ClassLiteral(class)) => !class
+            | (instance @ Type::NominalInstance(_), Type::ClassLiteral(class)) => class
                 .metaclass_instance_type(db)
-                .is_subtype_of(db, instance),
+                .is_subtype_of(db, instance).is_err(),
             (Type::GenericAlias(alias), instance @ Type::NominalInstance(_))
             | (instance @ Type::NominalInstance(_), Type::GenericAlias(alias)) => {
-                !ClassType::from(alias)
+                ClassType::from(alias)
                     .metaclass_instance_type(db)
-                    .is_subtype_of(db, instance)
+                    .is_subtype_of(db, instance).is_err()
             }
 
             (Type::FunctionLiteral(..), Type::NominalInstance(instance))
@@ -2223,7 +2311,7 @@ impl<'db> Type<'db> {
                 .place
                 .ignore_possibly_unbound()
                 .is_none_or(|dunder_call| {
-                    !dunder_call.is_assignable_to(db, CallableType::unknown(db))
+                    dunder_call.is_assignable_to(db, CallableType::unknown(db)).is_err()
                 }),
 
             (
@@ -3442,7 +3530,10 @@ impl<'db> Type<'db> {
             match self.try_call_dunder(db, "__bool__", CallArguments::none()) {
                 Ok(outcome) => {
                     let return_type = outcome.return_type(db);
-                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                    if return_type
+                        .is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                        .is_err()
+                    {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
@@ -3455,7 +3546,10 @@ impl<'db> Type<'db> {
 
                 Err(CallDunderError::PossiblyUnbound(outcome)) => {
                     let return_type = outcome.return_type(db);
-                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                    if return_type
+                        .is_assignable_to(db, KnownClass::Bool.to_instance(db))
+                        .is_err()
+                    {
                         // The type has a `__bool__` method, but it doesn't return a
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
@@ -7418,6 +7512,7 @@ impl TypeRelationError {
     pub(crate) fn todo() -> Self {
         Self(vec![TypeRelationErrorKind::Todo])
     }
+
     pub(crate) fn from_results(
         results: impl IntoIterator<Item = Result<(), TypeRelationError>>,
     ) -> Result<(), TypeRelationError> {
@@ -7434,12 +7529,22 @@ impl TypeRelationError {
         }
     }
 
-    pub(crate) fn extend(self, other: impl IntoIterator<Item = TypeRelationErrorKind>) -> Self {
-        Self(self.0.into_iter().chain(other).collect())
+    pub(crate) fn extend(&mut self, other: impl IntoIterator<Item = TypeRelationErrorKind>) {
+        self.0.extend(other);
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &TypeRelationErrorKind> {
-        self.0.iter()
+    pub(crate) fn add(&mut self, other: Result<(), TypeRelationError>) {
+        if let Err(e) = other {
+            self.0.extend(e.0);
+        }
+    }
+}
+
+impl Iterator for TypeRelationError {
+    type Item = TypeRelationErrorKind;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop()
     }
 }
 
@@ -7589,16 +7694,30 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> Result<(), TypeRelationError> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
-        self.function(db)
+
+        if let Err(mut e) = self
+            .function(db)
             .has_relation_to(db, other.function(db), relation)
-            && other
-                .self_instance(db)
-                .has_relation_to(db, self.self_instance(db), relation)
+        {
+            e.add(
+                other
+                    .self_instance(db)
+                    .has_relation_to(db, self.self_instance(db), relation),
+            );
+            return Err(e);
+        }
+
+        Ok(())
     }
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -7725,9 +7844,14 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> Result<(), TypeRelationError> {
         if other.is_function_like(db) && !self.is_function_like(db) {
-            return false;
+            return Err(TypeRelationError::todo());
         }
         self.signatures(db)
             .has_relation_to(db, other.signatures(db), relation)
@@ -7794,7 +7918,12 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> Result<(), TypeRelationError> {
         match (self, other) {
             (
                 MethodWrapperKind::FunctionTypeDunderGet(self_function),
@@ -7809,7 +7938,11 @@ impl<'db> MethodWrapperKind<'db> {
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
             | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
-                self == other
+                if self == other {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::todo())
+                }
             }
 
             (
@@ -7823,7 +7956,7 @@ impl<'db> MethodWrapperKind<'db> {
                 | MethodWrapperKind::PropertyDunderGet(_)
                 | MethodWrapperKind::PropertyDunderSet(_)
                 | MethodWrapperKind::StrStartswith(_),
-            ) => false,
+            ) => Err(TypeRelationError::todo()),
         }
     }
 
@@ -8815,7 +8948,7 @@ impl<'db> BoundSuperType<'db> {
                 let Some(owner_class) = owner.into_class() else {
                     return Some(owner);
                 };
-                if owner_class.is_subclass_of(db, pivot_class) {
+                if owner_class.is_subclass_of(db, pivot_class).is_ok() {
                     Some(owner)
                 } else {
                     None

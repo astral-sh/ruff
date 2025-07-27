@@ -745,7 +745,7 @@ impl ReachabilityConstraints {
                 let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
 
                 class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
-                    if subject_ty.is_subtype_of(db, class_ty) {
+                    if subject_ty.is_subtype_of(db, class_ty).is_ok() {
                         if kind.is_irrefutable() {
                             Truthiness::AlwaysTrue
                         } else {

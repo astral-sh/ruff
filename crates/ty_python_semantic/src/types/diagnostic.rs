@@ -2390,7 +2390,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
     let db = context.db();
     let instance_of_type = KnownClass::Type.to_instance(db);
 
-    if base_type.is_assignable_to(db, instance_of_type) {
+    if base_type.is_assignable_to(db, instance_of_type).is_ok() {
         report_unsupported_base(context, base_node, base_type, class);
         return;
     }
@@ -2410,7 +2410,11 @@ pub(crate) fn report_invalid_or_unsupported_base(
         CallArguments::positional([tuple_of_types]),
     ) {
         Ok(ret) => {
-            if ret.return_type(db).is_assignable_to(db, tuple_of_types) {
+            if ret
+                .return_type(db)
+                .is_assignable_to(db, tuple_of_types)
+                .is_ok()
+            {
                 report_unsupported_base(context, base_node, base_type, class);
             } else {
                 let Some(mut diagnostic) =
