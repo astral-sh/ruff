@@ -253,7 +253,7 @@ does["not"]["exist"] = 0
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
 non_subscriptable = 1
-# error: [non-subscriptable]
+# error: [invalid-item-assignment]
 non_subscriptable[0] = 0
 # error: [non-subscriptable]
 reveal_type(non_subscriptable[0])  # revealed: Unknown
@@ -318,7 +318,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # TODO: This assignment is invalid and should result in an error.
+    # error: [call-non-callable] "Method `__setitem__` of type `Overload[(key: SupportsIndex, value: int, /) -> None, (key: slice[Any, Any, Any], value: Iterable[int], /) -> None]` is not callable on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```
