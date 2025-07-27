@@ -148,8 +148,8 @@ pub(crate) struct PlaceTable {
 
 impl get_size2::GetSize for PlaceTable {
     fn get_heap_size(&self) -> usize {
-        let symbols = self.symbols.get_size();
-        let members = self.members.get_size();
+        let symbols = self.symbols.get_heap_size();
+        let members = self.members.get_heap_size();
 
         increment_memory_usage("symbols", symbols);
         increment_memory_usage("members", members);
@@ -558,7 +558,7 @@ impl Iterator for ParentPlaceIter<'_> {
                         members,
                     ));
 
-                    if let Some(id) = members.member_id(next_member.clone()) {
+                    if let Some(id) = members.member_id(next_member) {
                         break Some(id.into());
                     }
                 }
