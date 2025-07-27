@@ -142,7 +142,7 @@ impl get_size2::GetSize for MemberFlags {}
 
 /// Segment metadata - packed into a single u32
 /// Layout: [kind: 2 bits][len: 30 bits]
-/// - Bits 0-1: SegmentKind (0=Attribute, 1=IntSubscript, 2=StringSubscript)
+/// - Bits 0-1: `SegmentKind` (0=Attribute, 1=IntSubscript, 2=StringSubscript)
 /// - Bits 2-31: Length (up to 1,073,741,823 bytes)
 #[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct SegmentInfo(u32);
@@ -152,24 +152,24 @@ const LEN_SHIFT: u32 = 2;
 const MAX_LEN: u32 = (1 << 30) - 1; // 2^30 - 1
 
 impl SegmentInfo {
-    fn new(kind: SegmentKind, offset: TextSize) -> Self {
+    const fn new(kind: SegmentKind, offset: TextSize) -> Self {
         assert!(offset.to_u32() < MAX_LEN);
 
         let value = (offset.to_u32() << LEN_SHIFT) | (kind as u32);
         Self(value)
     }
 
-    fn kind(self) -> SegmentKind {
+    const fn kind(self) -> SegmentKind {
         match self.0 & KIND_MASK {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
             2 => SegmentKind::StringSubscript,
-            _ => unreachable!("Invalid SegmentKind bits"),
+            _ => panic!("Invalid SegmentKind bits"),
         }
     }
 
-    fn offset(self) -> TextSize {
-        TextSize::from(self.0 >> LEN_SHIFT)
+    const fn offset(self) -> TextSize {
+        TextSize::new(self.0 >> LEN_SHIFT)
     }
 }
 
@@ -195,6 +195,148 @@ struct Segment<'a> {
     text: &'a str,
 }
 
+const INLINE_COUNT_BITS: u32 = 4;
+const INLINE_COUNT_MASK: u64 = (1 << INLINE_COUNT_BITS) - 1;
+const INLINE_SEGMENT_BITS: u32 = 12;
+const INLINE_SEGMENT_MASK: u64 = (1 << INLINE_SEGMENT_BITS) - 1;
+const INLINE_KIND_BITS: u32 = 2;
+const INLINE_KIND_MASK: u64 = (1 << INLINE_KIND_BITS) - 1;
+const INLINE_OFFSET_BITS: u32 = 10;
+const INLINE_OFFSET_MASK: u64 = (1 << INLINE_OFFSET_BITS) - 1;
+const INLINE_MAX_SEGMENTS: usize = 5;
+const INLINE_MAX_OFFSET: u32 = (1 << INLINE_OFFSET_BITS) - 1; // 1023
+
+/// Compact representation that can store up to 5 segments inline in a u64.
+///
+/// Layout:
+/// - Bits 0-3: Number of segments (0-15, but we only use 0-5)
+/// - Remaining 60 bits: Up to 5 segments, each using 12 bits:
+///   - Bits 0-1: SegmentKind (2 bits)
+///   - Bits 2-11: Offset/length (10 bits, max 1023)
+#[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+struct SmallSegments(u64);
+
+impl SmallSegments {
+    fn try_from_slice(segments: &[SegmentInfo]) -> Option<Self> {
+        if segments.len() > INLINE_MAX_SEGMENTS {
+            return None;
+        }
+
+        // Check if all segments fit inline
+        for segment in segments {
+            if segment.offset() > TextSize::from(INLINE_MAX_OFFSET) {
+                return None;
+            }
+        }
+
+        // Pack into inline representation
+        let mut packed = segments.len() as u64;
+        for (i, segment) in segments.iter().enumerate() {
+            let kind = segment.kind() as u64;
+            let offset = segment.offset().to_u32() as u64;
+            let segment_data = (offset << INLINE_KIND_BITS) | kind;
+            let shift = INLINE_COUNT_BITS + (i as u32 * INLINE_SEGMENT_BITS);
+            packed |= segment_data << shift;
+        }
+
+        Some(Self(packed))
+    }
+
+    const fn len(&self) -> usize {
+        (self.0 & INLINE_COUNT_MASK) as usize
+    }
+
+    const fn get(&self, index: usize) -> Option<SegmentInfo> {
+        let count = self.len();
+        if index >= count {
+            return None;
+        }
+
+        let shift = INLINE_COUNT_BITS + (index as u32 * INLINE_SEGMENT_BITS);
+        let segment_data = (self.0 >> shift) & INLINE_SEGMENT_MASK;
+        let kind = (segment_data & INLINE_KIND_MASK) as u8;
+        let offset = ((segment_data >> INLINE_KIND_BITS) & INLINE_OFFSET_MASK) as u32;
+
+        let kind = match kind {
+            0 => SegmentKind::Attribute,
+            1 => SegmentKind::IntSubscript,
+            2 => SegmentKind::StringSubscript,
+            _ => panic!("Invalid SegmentKind bits"),
+        };
+
+        Some(SegmentInfo::new(kind, TextSize::new(offset)))
+    }
+
+    fn iter(&self) -> SmallSegmentsIter {
+        SmallSegmentsIter {
+            segments: *self,
+            index: 0,
+        }
+    }
+}
+
+impl std::fmt::Debug for SmallSegments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+struct SmallSegmentsIter {
+    segments: SmallSegments,
+    index: usize,
+}
+
+impl Iterator for SmallSegmentsIter {
+    type Item = SegmentInfo;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let result = self.segments.get(self.index)?;
+        self.index += 1;
+        Some(result)
+    }
+}
+
+/// Representation of segments that can be either inline or heap-allocated.
+#[derive(Clone, PartialEq, Eq, get_size2::GetSize, Debug)]
+enum Segments {
+    /// Inline storage for up to 5 segments
+    Small(SmallSegments),
+    /// Heap storage for expressions that don't fit inline
+    Heap(Box<[SegmentInfo]>),
+}
+
+impl Segments {
+    fn from_vec(segments: SmallVec<[SegmentInfo; 4]>) -> Self {
+        debug_assert!(
+            !segments.is_empty(),
+            "Segments cannot be empty. A member without segments is a symbol"
+        );
+        if let Some(small) = SmallSegments::try_from_slice(&segments) {
+            Self::Small(small)
+        } else {
+            Self::Heap(segments.into_vec().into_boxed_slice())
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Small(small) => small.len(),
+            Self::Heap(segments) => segments.len(),
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = SegmentInfo> + '_ {
+        match self {
+            Self::Small(small) => itertools::Either::Left(small.iter()),
+            Self::Heap(heap) => itertools::Either::Right(heap.iter().copied()),
+        }
+    }
+
+    fn shrink_to_fit(&mut self) {
+        // No-op for inline storage, already optimal for heap storage
+    }
+}
+
 /// An expression accessing a member on a symbol named `symbol_name`, e.g. `x.y.z`.
 ///
 /// The parts after the symbol name are called segments, and they can be either:
@@ -208,20 +350,17 @@ struct Segment<'a> {
 /// - segments: metadata describing each segment's type and length
 ///
 /// The symbol name length is computed from the segment offsets.
-///
-/// TODO: Maybe use an enum where we store two segments inline (only 2 u32), and use a thin vec otherwise.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
-    /// The entire path as a single Name (uses CompactString internally)
+    /// The entire path as a single Name (uses `CompactString` internally)
     path: Name,
     /// Metadata for each segment (in forward order)
-    segments: SmallVec<[SegmentInfo; 4]>,
+    segments: Segments,
 }
 
 impl MemberExpr {
     pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 4]>)> {
-            // TODO: Move to `MemberExpr`
             use std::fmt::Write as _;
 
             match expr {
@@ -246,7 +385,7 @@ impl MemberExpr {
                             value: ast::Number::Int(index),
                             ..
                         }) => {
-                            let _ = write!(path, "{}", index);
+                            let _ = write!(path, "{index}");
                             segments
                                 .push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
                         }
@@ -271,12 +410,15 @@ impl MemberExpr {
         if segments.is_empty() {
             None
         } else {
-            Some(Self { segments, path })
+            Some(Self {
+                path,
+                segments: Segments::from_vec(segments),
+            })
         }
     }
 
-    fn segment_infos(&self) -> impl Iterator<Item = SegmentInfo> {
-        self.segments.iter().copied()
+    fn segment_infos(&self) -> impl Iterator<Item = SegmentInfo> + '_ {
+        self.segments.iter()
     }
 
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> + '_ {
@@ -287,7 +429,7 @@ impl MemberExpr {
         std::iter::from_fn(move || {
             let info = current.take()?;
             let end = next
-                .map(|next| next.offset())
+                .map(SegmentInfo::offset)
                 .unwrap_or(self.path.text_len());
 
             current = next;
@@ -319,14 +461,13 @@ impl MemberExpr {
     pub(crate) fn as_ref(&self) -> MemberExprRef {
         MemberExprRef {
             path: self.path.as_str(),
-            segments: &self.segments,
+            segments: SegmentsRef::from(&self.segments),
         }
     }
 }
 
 impl std::fmt::Display for MemberExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // TODO: Write less awkward
         f.write_str(self.symbol_name())?;
 
         for segment in self.segments() {
@@ -365,18 +506,110 @@ impl PartialEq<&MemberExpr> for MemberExprRef<'_> {
     }
 }
 
+/// Reference view of segments, can be either small (inline) or heap-allocated.
+#[derive(Clone, Copy, Debug)]
+enum SegmentsRef<'a> {
+    Small(SmallSegments),
+    Heap(&'a [SegmentInfo]),
+}
+
+impl<'a> SegmentsRef<'a> {
+    fn len(&self) -> usize {
+        match self {
+            Self::Small(small) => small.len(),
+            Self::Heap(segments) => segments.len(),
+        }
+    }
+
+    fn get(&self, index: usize) -> Option<SegmentInfo> {
+        match self {
+            Self::Small(small) => small.get(index),
+            Self::Heap(segments) => segments.get(index).copied(),
+        }
+    }
+
+    fn iter(&self) -> impl Iterator<Item = SegmentInfo> + '_ {
+        match self {
+            Self::Small(small) => itertools::Either::Left(small.iter()),
+            Self::Heap(heap) => itertools::Either::Right(heap.iter().copied()),
+        }
+    }
+
+    /// Returns a parent view with one fewer segment, or None if <= 1 segment
+    fn parent(&self) -> Option<SegmentsRef<'a>> {
+        let len = self.len();
+        if len <= 1 {
+            return None;
+        }
+
+        match self {
+            Self::Small(small) => {
+                // Create a new SmallSegments with one fewer segment
+                let new_count = len - 1;
+                let mut new_packed = new_count as u64;
+
+                // Copy all segments except the last one
+                for i in 0..new_count {
+                    if let Some(segment) = small.get(i) {
+                        let kind = segment.kind() as u64;
+                        let offset = segment.offset().to_u32() as u64;
+                        let segment_data = (offset << INLINE_KIND_BITS) | kind;
+                        let shift = INLINE_COUNT_BITS + (i as u32 * INLINE_SEGMENT_BITS);
+                        new_packed |= segment_data << shift;
+                    }
+                }
+
+                Some(SegmentsRef::Small(SmallSegments(new_packed)))
+            }
+            Self::Heap(segments) => Some(SegmentsRef::Heap(&segments[..len - 1])),
+        }
+    }
+}
+
+impl<'a> From<&'a Segments> for SegmentsRef<'a> {
+    fn from(segments: &'a Segments) -> Self {
+        match segments {
+            Segments::Small(small) => SegmentsRef::Small(*small),
+            Segments::Heap(heap) => SegmentsRef::Heap(heap),
+        }
+    }
+}
+
+impl<'a> PartialEq for SegmentsRef<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        let len = self.len();
+        if len != other.len() {
+            return false;
+        }
+        self.iter().eq(other.iter())
+    }
+}
+
+impl<'a> Eq for SegmentsRef<'a> {}
+
+impl<'a> std::hash::Hash for SegmentsRef<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let len = self.len();
+        len.hash(state);
+        for segment in self.iter() {
+            segment.hash(state);
+        }
+    }
+}
+
 /// Reference to a member expression.
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct MemberExprRef<'a> {
     path: &'a str,
-    segments: &'a [SegmentInfo],
+    segments: SegmentsRef<'a>,
 }
 
 impl<'a> MemberExprRef<'a> {
     pub(super) fn symbol_name(&self) -> &'a str {
         let end = self
             .segments
-            .first()
+            .iter()
+            .next()
             .map(|segment| segment.offset())
             .unwrap_or(self.path.text_len());
 
@@ -386,17 +619,19 @@ impl<'a> MemberExprRef<'a> {
     }
 
     pub(super) fn parent(&self) -> Option<MemberExprRef<'a>> {
-        let Some((current_segment, parent_segments)) = self.segments.split_last() else {
-            return None;
-        };
+        let parent_segments = self.segments.parent()?;
 
-        // Parent is a symbol and not a member
-        if parent_segments.is_empty() {
+        // Get the last segment from the current segments to find where to cut the path
+        // The parent path should end at the start of the last segment
+        let current_len = self.segments.len();
+        if current_len == 0 {
             return None;
         }
 
-        let path_end = current_segment.offset();
-        Some(Self {
+        let last_segment = self.segments.get(current_len - 1)?;
+        let path_end = last_segment.offset();
+
+        Some(MemberExprRef {
             path: &self.path[TextRange::new(TextSize::default(), path_end)],
             segments: parent_segments,
         })
@@ -449,7 +684,7 @@ impl MemberTable {
         self.members.iter()
     }
 
-    fn hash_member_expression_ref(member: MemberExprRef) -> u64 {
+    fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
         let mut h = FxHasher::default();
         member.hash(&mut h);
         h.finish()
@@ -461,7 +696,7 @@ impl MemberTable {
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(member);
+        let hash = Self::hash_member_expression_ref(&member);
         self.map
             .find(hash, |id| self.members[*id].expression == member)
             .copied()
@@ -503,12 +738,14 @@ impl MemberTableBuilder {
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
-        let hash = MemberTable::hash_member_expression_ref(member.expression.as_ref());
+        let member_ref = member.expression.as_ref();
+        let hash = MemberTable::hash_member_expression_ref(&member_ref);
         let entry = self.table.map.entry(
             hash,
             |id| self.table.members[*id].expression == member.expression,
             |id| {
-                MemberTable::hash_member_expression_ref(self.table.members[*id].expression.as_ref())
+                let ref_expr = self.table.members[*id].expression.as_ref();
+                MemberTable::hash_member_expression_ref(&ref_expr)
             },
         );
 
@@ -536,7 +773,8 @@ impl MemberTableBuilder {
         let mut table = self.table;
         table.members.shrink_to_fit();
         table.map.shrink_to_fit(|id| {
-            MemberTable::hash_member_expression_ref(table.members[*id].expression.as_ref())
+            let ref_expr = table.members[*id].expression.as_ref();
+            MemberTable::hash_member_expression_ref(&ref_expr)
         });
         table
     }
