@@ -51,9 +51,8 @@ class Identity:
         return index
 
 a = Identity()
-a[
-    "a"
-]  # error: [call-non-callable] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` is not callable on object of type `Identity`"
+# error: [call-non-callable] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` is not callable on object of type `Identity`"
+a["a"]
 ```
 
 ## Setitem with no getitem
