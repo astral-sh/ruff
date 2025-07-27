@@ -7728,19 +7728,15 @@ impl<'db> BoundMethodType<'db> {
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
 
-        if let Err(mut e) = self
+        match self
             .function(db)
             .has_relation_to(db, other.function(db), relation)
         {
-            e.add(
-                other
-                    .self_instance(db)
-                    .has_relation_to(db, self.self_instance(db), relation),
-            );
-            return Err(e);
+            Err(e) => Err(e),
+            Ok(()) => other
+                .self_instance(db)
+                .has_relation_to(db, self.self_instance(db), relation),
         }
-
-        Ok(())
     }
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {

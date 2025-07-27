@@ -556,10 +556,7 @@ impl<'db> Specialization<'db> {
                     TypeRelation::Assignability => {
                         match self_type.is_assignable_to(db, *other_type) {
                             Ok(()) => other_type.is_assignable_to(db, *self_type),
-                            Err(mut e) => {
-                                e.add(other_type.is_assignable_to(db, *self_type));
-                                Err(e)
-                            }
+                            Err(e) => Err(e),
                         }
                     }
                 },

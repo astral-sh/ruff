@@ -405,11 +405,18 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 if self.0.len() != other.0.len() {
                     return Err(TypeRelationError::todo());
                 }
-                TypeRelationError::from_results(
-                    (self.0.iter()).zip(&other.0).map(|(self_ty, other_ty)| {
-                        self_ty.has_relation_to(db, *other_ty, relation)
-                    }),
-                )
+                let results = self
+                    .0
+                    .iter()
+                    .zip(&other.0)
+                    .map(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                    .collect::<Vec<_>>();
+
+                if results.iter().all(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
             }
 
             Tuple::Variable(other) => {
@@ -435,9 +442,15 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                TypeRelationError::from_results(
-                    self_iter.map(|self_ty| self_ty.has_relation_to(db, other.variable, relation)),
-                )
+                let results = self_iter
+                    .map(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                    .collect::<Vec<_>>();
+
+                if results.iter().all(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
             }
         }
     }
@@ -805,25 +818,29 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                TypeRelationError::from_results(
-                    self.prenormalized_prefix_elements(db, self_prenormalize_variable)
-                        .zip_longest(
-                            other.prenormalized_prefix_elements(db, other_prenormalize_variable),
-                        )
-                        .map(|pair| match pair {
-                            EitherOrBoth::Both(self_ty, other_ty) => {
-                                self_ty.has_relation_to(db, other_ty, relation)
-                            }
-                            EitherOrBoth::Left(self_ty) => {
-                                self_ty.has_relation_to(db, other.variable, relation)
-                            }
-                            EitherOrBoth::Right(_) => {
-                                // The rhs has a required element that the lhs is not guaranteed to
-                                // provide.
-                                Err(TypeRelationError::todo())
-                            }
-                        }),
-                )?;
+                let results = self
+                    .prenormalized_prefix_elements(db, self_prenormalize_variable)
+                    .zip_longest(
+                        other.prenormalized_prefix_elements(db, other_prenormalize_variable),
+                    )
+                    .map(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(_) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide.
+                            Err(TypeRelationError::todo())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                if !results.iter().all(Result::is_ok) {
+                    return TypeRelationError::from_results(results);
+                }
 
                 let self_suffix: Vec<_> = self
                     .prenormalized_suffix_elements(db, self_prenormalize_variable)
@@ -832,23 +849,26 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
 
-                TypeRelationError::from_results(
-                    (self_suffix.iter().rev())
-                        .zip_longest(other_suffix.iter().rev())
-                        .map(|pair| match pair {
-                            EitherOrBoth::Both(self_ty, other_ty) => {
-                                self_ty.has_relation_to(db, *other_ty, relation)
-                            }
-                            EitherOrBoth::Left(self_ty) => {
-                                self_ty.has_relation_to(db, other.variable, relation)
-                            }
-                            EitherOrBoth::Right(_) => {
-                                // The rhs has a required element that the lhs is not guaranteed to
-                                // provide.
-                                Err(TypeRelationError::todo())
-                            }
-                        }),
-                )?;
+                let results = (self_suffix.iter().rev())
+                    .zip_longest(other_suffix.iter().rev())
+                    .map(|pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to(db, *other_ty, relation)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to(db, other.variable, relation)
+                        }
+                        EitherOrBoth::Right(_) => {
+                            // The rhs has a required element that the lhs is not guaranteed to
+                            // provide.
+                            Err(TypeRelationError::todo())
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                if !results.iter().all(Result::is_ok) {
+                    return TypeRelationError::from_results(results);
+                }
 
                 // And lastly, the variable-length portions must satisfy the relation.
                 self.variable.has_relation_to(db, other.variable, relation)

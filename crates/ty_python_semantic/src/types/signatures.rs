@@ -163,38 +163,65 @@ impl<'db> CallableSignature<'db> {
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
             (_, [_]) => {
-                TypeRelationError::from_results(self_signatures.iter().map(|self_signature| {
-                    Self::has_relation_to_impl(
-                        db,
-                        std::slice::from_ref(self_signature),
-                        other_signatures,
-                        relation,
-                    )
-                }))
+                let results = self_signatures
+                    .iter()
+                    .map(|self_signature| {
+                        Self::has_relation_to_impl(
+                            db,
+                            std::slice::from_ref(self_signature),
+                            other_signatures,
+                            relation,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                if results.iter().any(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
             }
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => {
-                TypeRelationError::from_results(other_signatures.iter().map(|other_signature| {
-                    Self::has_relation_to_impl(
-                        db,
-                        self_signatures,
-                        std::slice::from_ref(other_signature),
-                        relation,
-                    )
-                }))
+                let results = other_signatures
+                    .iter()
+                    .map(|other_signature| {
+                        Self::has_relation_to_impl(
+                            db,
+                            self_signatures,
+                            std::slice::from_ref(other_signature),
+                            relation,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                if results.iter().all(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
             }
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
             (_, _) => {
-                TypeRelationError::from_results(other_signatures.iter().map(|other_signature| {
-                    Self::has_relation_to_impl(
-                        db,
-                        self_signatures,
-                        std::slice::from_ref(other_signature),
-                        relation,
-                    )
-                }))
+                let results = other_signatures
+                    .iter()
+                    .map(|other_signature| {
+                        Self::has_relation_to_impl(
+                            db,
+                            self_signatures,
+                            std::slice::from_ref(other_signature),
+                            relation,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                if results.iter().all(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
             }
         }
     }
