@@ -103,8 +103,8 @@ use crate::types::diagnostic::{
     report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
     report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_return_type,
-    report_possibly_unbound_attribute,
+    report_invalid_generator_function_return_type, report_invalid_item_assignment,
+    report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1905,8 +1905,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let value_ty = self.infer_expression(value);
                             let slice_ty = self.infer_expression(slice);
-                            let result_ty =
-                                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                            let result_ty = self
+                                .infer_subscript_expression_types(value, value_ty, slice_ty, None);
                             return (result_ty, is_modifiable);
                         }
                     }
@@ -3628,6 +3628,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_target_impl(target, assigned_ty);
     }
 
+    /// Make sure that the subscript assignment `obj[slice] = value` is valid.
+    fn validate_subscript_assignment(
+        &mut self,
+        target: &ast::ExprSubscript,
+        assigned_ty: Type<'db>,
+    ) -> bool {
+        let ast::ExprSubscript {
+            range: _,
+            node_index: _,
+            value,
+            slice,
+            ctx: _,
+        } = target;
+
+        let value_ty = self.infer_expression(value);
+        let slice_ty = self.infer_expression(slice);
+
+        match value_ty.try_call_dunder(
+            self.db(),
+            "__setitem__",
+            CallArguments::positional([slice_ty, assigned_ty]),
+        ) {
+            Ok(_) => true,
+            Err(_err @ CallDunderError::PossiblyUnbound { .. }) => {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, &**value)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Method `__setitem__` of type `{}` is possibly unbound",
+                        value_ty.display(self.db()),
+                    ));
+                }
+                false
+            }
+            Err(CallDunderError::CallError(_, bindings)) => {
+                if let Some(builder) = self.context.report_lint(&CALL_NON_CALLABLE, &**value) {
+                    builder.into_diagnostic(format_args!(
+                        "Method `__setitem__` of type `{}` \
+                        is not callable on object of type `{}`",
+                        bindings.callable_type().display(self.db()),
+                        value_ty.display(self.db()),
+                    ));
+                }
+                false
+            }
+            Err(CallDunderError::MethodNotAvailable) => {
+                report_invalid_item_assignment(&self.context, AnyNodeRef::from(&**value), value_ty);
+                false
+            }
+        }
+    }
+
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
     ///
     /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
@@ -4198,6 +4251,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         assigned_ty,
                         true,
                     );
+                }
+            }
+            ast::Expr::Subscript(subscript_expr) => {
+                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
+
+                if let Some(assigned_ty) = assigned_ty {
+                    self.validate_subscript_assignment(subscript_expr, assigned_ty);
                 }
             }
             _ => {
@@ -8308,7 +8368,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
                 Type::Never
             }
             ExprContext::Del => {
@@ -8318,7 +8378,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
                 Type::unknown()
             }
         }
@@ -8330,7 +8390,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
             slice,
-            ctx: _,
+            ctx,
         } = subscript;
         let value_ty = self.infer_expression(value);
         let mut constraint_keys = vec![];
@@ -8347,7 +8407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice);
-                    self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                    self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
                     return ty;
                 }
             }
@@ -8381,7 +8441,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty);
+        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
 
@@ -8435,6 +8495,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_node: &ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
+        expr_context: Option<&ExprContext>,
     ) -> Type<'db> {
         match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
             (Type::NominalInstance(instance), _, _)
@@ -8444,11 +8505,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
+                    expr_context,
                 )
             }
 
             (Type::Union(union), _, _) => union.map(self.db(), |element| {
-                self.infer_subscript_expression_types(value_node, *element, slice_ty)
+                self.infer_subscript_expression_types(value_node, *element, slice_ty, expr_context)
             }),
 
             // TODO: we can map over the intersection and fold the results back into an intersection,
@@ -8579,6 +8641,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value_node,
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
+                expr_context,
             ),
 
             (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => {
@@ -8771,12 +8834,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 } else {
-                    report_non_subscriptable(
-                        &self.context,
-                        value_node.into(),
-                        value_ty,
-                        "__getitem__",
-                    );
+                    if let Some(expr_context) = expr_context {
+                        if !matches!(expr_context, ExprContext::Store) {
+                            report_non_subscriptable(
+                                &self.context,
+                                value_node.into(),
+                                value_ty,
+                                "__getitem__",
+                            );
+                        }
+                    }
                 }
 
                 Type::unknown()

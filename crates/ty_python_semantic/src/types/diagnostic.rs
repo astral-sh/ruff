@@ -44,6 +44,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_ITEM_ASSIGNMENT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
@@ -547,6 +548,24 @@ declare_lint! {
     /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid item assignments.
+    ///
+    /// ## Why is this bad?
+    /// Invalid item assignments will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// 4[1] = 2  # TypeError: 'int' object does not support item assignment
+    /// ```
+    pub(crate) static INVALID_ITEM_ASSIGNMENT = {
+        summary: "detects invalid item assignments",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1819,6 +1838,21 @@ pub(super) fn report_invalid_attribute_assignment(
             target_ty.display(context.db()),
         ),
     );
+}
+
+pub(super) fn report_invalid_item_assignment(
+    context: &InferContext,
+    node: AnyNodeRef,
+    source_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ITEM_ASSIGNMENT, node) else {
+        return;
+    };
+
+    builder.into_diagnostic(format_args!(
+        "Cannot assign to object of type `{}` with no `__setitem__` method",
+        source_ty.display(context.db()),
+    ));
 }
 
 pub(super) fn report_invalid_return_type(
