@@ -847,10 +847,10 @@ fn replace_whitespace_and_unprintable<'r>(
     // offset by `len`. When the range occurs after or at the start but before
     // the end, then the end of the range only is offset by `len`.
     let mut update_ranges = |index: usize, len: u32| {
-        for (ann, &_original_range) in annotations.iter_mut().zip(&original_ranges) {
-            if index < usize::from(ann.range.start()) {
+        for (ann, &original_range) in annotations.iter_mut().zip(&original_ranges) {
+            if index < usize::from(original_range.start()) {
                 ann.range += TextSize::new(len - 1);
-            } else if index < usize::from(ann.range.end()) {
+            } else if index < usize::from(original_range.end()) {
                 ann.range = ann.range.add_end(TextSize::new(len - 1));
             }
         }

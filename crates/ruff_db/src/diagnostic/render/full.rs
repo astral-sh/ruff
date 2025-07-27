@@ -166,7 +166,14 @@ print()
             .primary("example.py", "1:1", "1:1", "")
             .build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r#""#);
+        insta::assert_snapshot!(env.render(&diagnostic), @r#"
+        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+         --> example.py:1:2
+          |
+        1 | ␈␛
+          |  ^
+          |
+        "#);
 
         Ok(())
     }
