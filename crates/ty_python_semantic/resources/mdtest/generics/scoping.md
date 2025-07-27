@@ -152,7 +152,7 @@ already solved and specialized when the class was specialized:
 from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
-reveal_type(legacy.m)  # revealed: bound method Legacy[int].m(x: int, y: S) -> S
+reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
 reveal_type(generic_context(Legacy))  # revealed: tuple[T]
 reveal_type(generic_context(legacy.m))  # revealed: tuple[S]
 ```
