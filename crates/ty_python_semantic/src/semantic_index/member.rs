@@ -5,10 +5,9 @@ use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
-use std::hash::{Hash as _, Hasher as _};
+use std::hash::{Hash, Hasher as _};
 use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
-use thin_vec::ThinVec;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -197,27 +196,37 @@ struct Segment<'a> {
     text: &'a str,
 }
 
-const INLINE_COUNT_BITS: u32 = 4;
+const INLINE_COUNT_BITS: u32 = 3;
 const INLINE_COUNT_MASK: u64 = (1 << INLINE_COUNT_BITS) - 1;
-const INLINE_SEGMENT_BITS: u32 = 12;
+const INLINE_SEGMENT_BITS: u32 = 8;
 const INLINE_SEGMENT_MASK: u64 = (1 << INLINE_SEGMENT_BITS) - 1;
 const INLINE_KIND_BITS: u32 = 2;
 const INLINE_KIND_MASK: u64 = (1 << INLINE_KIND_BITS) - 1;
-const INLINE_OFFSET_BITS: u32 = 10;
+const INLINE_OFFSET_BITS: u32 = 6;
 const INLINE_OFFSET_MASK: u64 = (1 << INLINE_OFFSET_BITS) - 1;
-const INLINE_MAX_SEGMENTS: usize = 5;
-const INLINE_MAX_OFFSET: u32 = (1 << INLINE_OFFSET_BITS) - 1; // 1023
+const INLINE_MAX_SEGMENTS: usize = 7;
+const INLINE_MAX_OFFSET: u32 = (1 << INLINE_OFFSET_BITS) - 1; // 63
 
-/// Compact representation that can store up to 5 segments inline in a u64.
+/// Compact representation that can store up to 7 segments inline in a u64.
 ///
 /// Layout:
-/// - Bits 0-3: Number of segments (0-15, but we only use 0-5)
-/// - Remaining 60 bits: Up to 5 segments, each using 12 bits:
-///   - Bits 0-1: SegmentKind (2 bits)
-///   - Bits 2-11: Offset/length (10 bits, max 1023)
+/// - Bits 0-2: Number of segments minus 1 (0-6, representing 1-7 segments)
+/// - Bits 3-10: Segment 0 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 11-18: Segment 1 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 19-26: Segment 2 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 27-34: Segment 3 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 35-42: Segment 4 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 43-50: Segment 5 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 51-58: Segment 6 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 59-63: Unused (5 bits)
+///
+/// Constraints:
+/// - Maximum 7 segments (realistic limit for member access chains)
+/// - Maximum 64-byte offset per segment (sufficient for most identifiers)
+/// - Never empty (segments.len() >= 1, enforced by MemberExpr construction)
 ///
 /// Uses NonZeroU64 to create a niche for enum optimization.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Copy, get_size2::GetSize)]
 #[repr(transparent)]
 struct SmallSegments(NonZeroU64);
 
@@ -227,17 +236,15 @@ impl SmallSegments {
             return None;
         }
 
-        // Check if all segments fit inline
-        for segment in segments {
+        // Pack into inline representation
+        // Store count minus 1 (since segments are never empty, range 0-6 represents 1-7 segments)
+        let mut packed = (segments.len() - 1) as u64;
+
+        for (i, segment) in segments.iter().enumerate() {
             if segment.offset() > TextSize::from(INLINE_MAX_OFFSET) {
                 return None;
             }
-        }
 
-        // Pack into inline representation
-        // Start with count (never 0, so safe for NonZeroU64)
-        let mut packed = segments.len() as u64;
-        for (i, segment) in segments.iter().enumerate() {
             let kind = segment.kind() as u64;
             let offset = segment.offset().to_u32() as u64;
             let segment_data = (offset << INLINE_KIND_BITS) | kind;
@@ -245,12 +252,13 @@ impl SmallSegments {
             packed |= segment_data << shift;
         }
 
-        // Safe because segments.len() > 0 (checked by debug_assert in from_vec)
+        // Safe because segments.len() > 0 and we're storing count-1
         Some(Self(NonZeroU64::new(packed).unwrap()))
     }
 
     const fn len(&self) -> usize {
-        (self.0.get() & INLINE_COUNT_MASK) as usize
+        // Add 1 because we store count minus 1
+        ((self.0.get() & INLINE_COUNT_MASK) + 1) as usize
     }
 
     const fn get(&self, index: usize) -> Option<SegmentInfo> {
@@ -304,31 +312,35 @@ impl Iterator for SmallSegmentsIter {
 }
 
 /// Representation of segments that can be either inline or heap-allocated.
-#[derive(Clone, PartialEq, Eq, Debug)]
+///
+/// Design choices:
+/// - Uses `Box<[SegmentInfo]>` instead of `ThinVec` for heap allocation to avoid dependency overhead
+/// - Uses `NonZeroU64` for inline storage to enable niche optimization (though not achieved here due to Box's 16-byte size)
+/// - ThinVec + u32 combination doesn't provide enum niche optimization since neither has a zero bit pattern
+/// - Final enum size is 16 bytes: optimal given Rust's layout constraints with fat pointer (Box<[T]>)
+#[derive(Clone, Debug, get_size2::GetSize)]
 enum Segments {
-    /// Inline storage for up to 5 segments
+    /// Inline storage for up to 7 segments with 6-bit offsets (max 64 bytes)
     Small(SmallSegments),
     /// Heap storage for expressions that don't fit inline
-    Heap(ThinVec<SegmentInfo>),
+    Heap(Box<[SegmentInfo]>),
 }
 
 // Size assertions for optimization verification
 static_assertions::assert_eq_size!(SmallSegments, u64);
-static_assertions::assert_eq_size!(Segments, u128);
-static_assertions::assert_eq_size!(ThinVec<SegmentInfo>, usize);
+static_assertions::const_assert_eq!(std::mem::size_of::<Box<[SegmentInfo]>>(), 16);
 
-impl get_size2::GetSize for Segments {
-    fn get_heap_size(&self) -> usize {
-        match self {
-            Self::Small(_) => 0,
-            Self::Heap(thin_vec) => {
-                // ThinVec has a pointer to heap-allocated data
-                thin_vec.capacity() * std::mem::size_of::<SegmentInfo>()
-                    + 3 * std::mem::size_of::<usize>()
-            }
-        }
-    }
-}
+// Final state: Segments enum is 16 bytes
+// - SmallSegments: 8 bytes (NonZeroU64 with 7 segments, 64-byte max offset)
+// - Box<[SegmentInfo]>: 16 bytes (fat pointer with data ptr + length)
+// - Total enum: 16 bytes (no niche optimization possible with these sizes)
+//
+// Benefits achieved:
+// 1. Increased inline capacity (7 segments vs previous 5 segments)
+// 2. Realistic offset range (64 bytes, sufficient for most identifiers)
+// 3. Efficient bit usage (58/64 bits used, 5 bits spare for future use)
+// 4. Cleaner heap allocation with Box<[T]> (exact size, no capacity waste)
+static_assertions::assert_eq_size!(Segments, u128);
 
 impl Segments {
     fn from_vec(segments: SmallVec<[SegmentInfo; 8]>) -> Self {
@@ -339,7 +351,7 @@ impl Segments {
         if let Some(small) = SmallSegments::try_from_slice(&segments) {
             Self::Small(small)
         } else {
-            Self::Heap(ThinVec::from(segments.into_vec()))
+            Self::Heap(segments.into_vec().into_boxed_slice())
         }
     }
 
@@ -354,13 +366,6 @@ impl Segments {
         match self {
             Self::Small(small) => itertools::Either::Left(small.iter()),
             Self::Heap(heap) => itertools::Either::Right(heap.iter().copied()),
-        }
-    }
-
-    fn shrink_to_fit(&mut self) {
-        match self {
-            Self::Small(_) => {}
-            Self::Heap(segments) => segments.shrink_to_fit(),
         }
     }
 }
@@ -378,7 +383,7 @@ impl Segments {
 /// - segments: metadata describing each segment's type and length
 ///
 /// The symbol name length is computed from the segment offsets.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
     /// The entire path as a single Name (uses `CompactString` internally)
     path: Name,
@@ -472,7 +477,6 @@ impl MemberExpr {
 
     fn shrink_to_fit(&mut self) {
         self.path.shrink_to_fit();
-        self.segments.shrink_to_fit();
     }
 
     /// Returns the left most part of the member expression, e.g. `x` in `x.y.z`.
@@ -577,7 +581,9 @@ impl<'a> SegmentsRef<'a> {
                 if new_count == 0 {
                     return None;
                 }
-                let mut new_packed = new_count as u64;
+
+                // Store count minus 1 (since segments are never empty)
+                let mut new_packed = (new_count - 1) as u64;
 
                 // Copy all segments except the last one
                 for i in 0..new_count {
@@ -621,18 +627,8 @@ impl<'a> PartialEq for SegmentsRef<'a> {
 
 impl<'a> Eq for SegmentsRef<'a> {}
 
-impl<'a> std::hash::Hash for SegmentsRef<'a> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let len = self.len();
-        len.hash(state);
-        for segment in self.iter() {
-            segment.hash(state);
-        }
-    }
-}
-
 /// Reference to a member expression.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MemberExprRef<'a> {
     path: &'a str,
     segments: SegmentsRef<'a>,
@@ -675,6 +671,14 @@ impl<'a> MemberExprRef<'a> {
 impl<'a> From<&'a MemberExpr> for MemberExprRef<'a> {
     fn from(value: &'a MemberExpr) -> Self {
         value.as_ref()
+    }
+}
+
+impl Hash for MemberExprRef<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Path on its own isn't 100% unique, but it should avoid
+        // most collisions and avoids iterating all segments.
+        self.path.hash(state);
     }
 }
 

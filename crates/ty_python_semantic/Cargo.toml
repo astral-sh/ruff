@@ -50,7 +50,6 @@ memchr = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 strsim = "0.11.1"
-thin-vec = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
