@@ -1350,12 +1350,17 @@ impl<'db> Type<'db> {
                         bound.has_relation_to(db, target, relation)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        TypeRelationError::from_results(
-                            constraints
-                                .elements(db)
-                                .iter()
-                                .map(|constraint| constraint.has_relation_to(db, target, relation)),
-                        )
+                        let results = constraints
+                            .elements(db)
+                            .iter()
+                            .map(|constraint| constraint.has_relation_to(db, target, relation))
+                            .collect::<Vec<_>>();
+
+                        if results.iter().all(Result::is_ok) {
+                            Ok(())
+                        } else {
+                            TypeRelationError::from_results(results)
+                        }
                     }
                 }
             }
@@ -1409,13 +1414,14 @@ impl<'db> Type<'db> {
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => match TypeRelationError::from_results(
-                intersection
+            (_, Type::Intersection(intersection)) => {
+                let results = intersection
                     .positive(db)
                     .iter()
-                    .map(|&pos_ty| self.has_relation_to(db, pos_ty, relation)),
-            ) {
-                Ok(()) => {
+                    .map(|&pos_ty| self.has_relation_to(db, pos_ty, relation))
+                    .collect::<Vec<_>>();
+
+                if results.iter().all(Result::is_ok) {
                     if intersection
                         .negative(db)
                         .iter()
@@ -1425,9 +1431,10 @@ impl<'db> Type<'db> {
                     } else {
                         Err(TypeRelationError::todo())
                     }
+                } else {
+                    TypeRelationError::from_results(results)
                 }
-                Err(e) => Err(e),
-            },
+            }
 
             (Type::Intersection(intersection), _) => {
                 let results = intersection
