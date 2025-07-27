@@ -105,7 +105,6 @@ class Identity:
         pass
 
 a = Identity()
-a["a"] = (
-    0  # error: [call-non-callable] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` is not callable on object of type `Identity`"
-)
+# error: [call-non-callable] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` is not callable on object of type `Identity`"
+a["a"] = 0
 ```
