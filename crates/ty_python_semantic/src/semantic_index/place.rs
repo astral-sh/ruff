@@ -1,12 +1,11 @@
 use crate::semantic_index::member::{
-    Member, MemberExpr, MemberExprRef, MemberTable, MemberTableBuilder, ScopedMemberId, SegmentInfo,
+    Member, MemberExpr, MemberExprRef, MemberTable, MemberTableBuilder, ScopedMemberId,
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
+use ruff_db::increment_memory_usage;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
-use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
@@ -38,62 +37,14 @@ impl PlaceExpr {
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
-        fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 4]>)> {
-            // TODO: Move to `MemberExpr`
-            use std::fmt::Write as _;
-
-            match expr {
-                ast::ExprRef::Name(name) => {
-                    Some((name.id.clone(), smallvec::SmallVec::new_const()))
-                }
-                ast::ExprRef::Attribute(attribute) => {
-                    let (mut path, mut segments) = visit(ast::ExprRef::from(&attribute.value))?;
-
-                    let start_offset = path.text_len();
-                    let _ = write!(path, "{}", attribute.attr.id);
-                    segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
-
-                    Some((path, segments))
-                }
-                ast::ExprRef::Subscript(subscript) => {
-                    let (mut path, mut segments) = visit((&subscript.value).into())?;
-                    let start_offset = path.text_len();
-
-                    match &*subscript.slice {
-                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(index),
-                            ..
-                        }) => {
-                            let _ = write!(path, "{}", index);
-                            segments
-                                .push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
-                        }
-                        ast::Expr::StringLiteral(string) => {
-                            let _ = write!(path, "{}", string.value);
-                            segments
-                                .push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
-                        }
-                        _ => {
-                            return None;
-                        }
-                    }
-
-                    Some((path, segments))
-                }
-                _ => None,
-            }
-        }
-
-        use crate::semantic_index::member::SegmentKind;
         let expr = expr.into();
 
         if let ast::ExprRef::Name(name) = expr {
             return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
 
-        let (path, segments) = visit(expr)?;
-        let member = MemberExpr::new(path, segments);
-        Some(PlaceExpr::Member(Member::new(member)))
+        let member_expression = MemberExpr::try_from_expr(expr)?;
+        Some(Self::Member(Member::new(member_expression)))
     }
 }
 
@@ -147,7 +98,7 @@ impl<'a> PlaceExprRef<'a> {
     pub(crate) fn num_member_segments(self) -> usize {
         match self {
             PlaceExprRef::Symbol(_) => 0,
-            PlaceExprRef::Member(member) => member.expression().segment_infos().len(),
+            PlaceExprRef::Member(member) => member.expression().num_segments(),
         }
     }
 }
@@ -189,10 +140,22 @@ pub enum ScopedPlaceId {
     Member(ScopedMemberId),
 }
 
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, salsa::Update)]
 pub(crate) struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
+}
+
+impl get_size2::GetSize for PlaceTable {
+    fn get_heap_size(&self) -> usize {
+        let symbols = self.symbols.get_size();
+        let members = self.members.get_size();
+
+        increment_memory_usage("symbols", symbols);
+        increment_memory_usage("members", members);
+
+        symbols + members
+    }
 }
 
 impl PlaceTable {
@@ -536,29 +499,16 @@ impl<'a> ParentPlaceIterState<'a> {
         symbols: &'a SymbolTable,
         members: &'a MemberTable,
     ) -> Self {
-        let segments = expression.segments();
-        let segments = &segments[0..segments.len() - 1];
-
-        if segments.is_empty() {
-            Self::Symbol {
-                symbol_name: expression.symbol_name(),
-                symbols,
-            }
-        } else {
-            // TODO: Cleanup
-            let path_end = expression
-                .segments()
-                .last()
-                .map(|segment| segment.offset())
-                .unwrap();
-            Self::Member {
-                next_member: MemberExprRef::from_raw(
-                    &expression.path()[TextRange::new(TextSize::default(), path_end)],
-                    segments,
-                ),
+        match expression.parent() {
+            Some(parent) => Self::Member {
+                next_member: parent,
                 symbols,
                 members,
-            }
+            },
+            None => Self::Symbol {
+                symbol_name: expression.symbol_name(),
+                symbols,
+            },
         }
     }
 }

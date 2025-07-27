@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
@@ -80,11 +80,13 @@ impl Member {
     /// parameter of the method (i.e. `self`). To answer those questions,
     /// use [`Self::as_instance_attribute`].
     pub(super) fn as_instance_attribute_candidate(&self) -> Option<&str> {
-        match self.expression().segments.as_slice() {
-            [only] if only.kind() == SegmentKind::Attribute => {
-                Some(self.expression().segment_str(0))
-            }
-            _ => None,
+        let mut segments = self.expression().segments();
+        let first_segment = segments.next()?;
+
+        if first_segment.kind == SegmentKind::Attribute && segments.next().is_none() {
+            Some(first_segment.text)
+        } else {
+            None
         }
     }
 
@@ -143,21 +145,21 @@ impl get_size2::GetSize for MemberFlags {}
 /// - Bits 0-1: SegmentKind (0=Attribute, 1=IntSubscript, 2=StringSubscript)
 /// - Bits 2-31: Length (up to 1,073,741,823 bytes)
 #[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) struct SegmentInfo(u32);
+struct SegmentInfo(u32);
 
 const KIND_MASK: u32 = 0b11;
 const LEN_SHIFT: u32 = 2;
 const MAX_LEN: u32 = (1 << 30) - 1; // 2^30 - 1
 
 impl SegmentInfo {
-    pub(super) fn new(kind: SegmentKind, offset: TextSize) -> Self {
+    fn new(kind: SegmentKind, offset: TextSize) -> Self {
         assert!(offset.to_u32() < MAX_LEN);
 
         let value = (offset.to_u32() << LEN_SHIFT) | (kind as u32);
         Self(value)
     }
 
-    pub(super) fn kind(self) -> SegmentKind {
+    fn kind(self) -> SegmentKind {
         match self.0 & KIND_MASK {
             0 => SegmentKind::Attribute,
             1 => SegmentKind::IntSubscript,
@@ -166,7 +168,7 @@ impl SegmentInfo {
         }
     }
 
-    pub(crate) fn offset(self) -> TextSize {
+    fn offset(self) -> TextSize {
         TextSize::from(self.0 >> LEN_SHIFT)
     }
 }
@@ -182,10 +184,15 @@ impl std::fmt::Debug for SegmentInfo {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[repr(u8)]
-pub(super) enum SegmentKind {
+enum SegmentKind {
     Attribute = 0,
     IntSubscript = 1,
     StringSubscript = 2,
+}
+
+struct Segment<'a> {
+    kind: SegmentKind,
+    text: &'a str,
 }
 
 /// An expression accessing a member on a symbol named `symbol_name`, e.g. `x.y.z`.
@@ -212,14 +219,85 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
-    /// Create a MemberExpr from symbol name and segment strings
-    pub(super) fn new(path: Name, segments: SmallVec<[SegmentInfo; 4]>) -> Self {
-        debug_assert!(
-            !segments.is_empty(),
-            "Member expression without a member segment is a symbol"
-        );
+    pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
+        fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 4]>)> {
+            // TODO: Move to `MemberExpr`
+            use std::fmt::Write as _;
 
-        Self { path, segments }
+            match expr {
+                ast::ExprRef::Name(name) => {
+                    Some((name.id.clone(), smallvec::SmallVec::new_const()))
+                }
+                ast::ExprRef::Attribute(attribute) => {
+                    let (mut path, mut segments) = visit(ast::ExprRef::from(&attribute.value))?;
+
+                    let start_offset = path.text_len();
+                    let _ = write!(path, "{}", attribute.attr.id);
+                    segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
+
+                    Some((path, segments))
+                }
+                ast::ExprRef::Subscript(subscript) => {
+                    let (mut path, mut segments) = visit((&subscript.value).into())?;
+                    let start_offset = path.text_len();
+
+                    match &*subscript.slice {
+                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(index),
+                            ..
+                        }) => {
+                            let _ = write!(path, "{}", index);
+                            segments
+                                .push(SegmentInfo::new(SegmentKind::IntSubscript, start_offset));
+                        }
+                        ast::Expr::StringLiteral(string) => {
+                            let _ = write!(path, "{}", string.value);
+                            segments
+                                .push(SegmentInfo::new(SegmentKind::StringSubscript, start_offset));
+                        }
+                        _ => {
+                            return None;
+                        }
+                    }
+
+                    Some((path, segments))
+                }
+                _ => None,
+            }
+        }
+
+        let (path, segments) = visit(expression)?;
+
+        if segments.is_empty() {
+            None
+        } else {
+            Some(Self { segments, path })
+        }
+    }
+
+    fn segment_infos(&self) -> impl Iterator<Item = SegmentInfo> {
+        self.segments.iter().copied()
+    }
+
+    fn segments(&self) -> impl Iterator<Item = Segment<'_>> + '_ {
+        let mut infos = self.segment_infos();
+        let mut current = infos.next();
+        let mut next = infos.next();
+
+        std::iter::from_fn(move || {
+            let info = current.take()?;
+            let end = next
+                .map(|next| next.offset())
+                .unwrap_or(self.path.text_len());
+
+            current = next;
+            next = infos.next();
+
+            Some(Segment {
+                kind: info.kind(),
+                text: &self.path[TextRange::new(info.offset(), end)],
+            })
+        })
     }
 
     fn shrink_to_fit(&mut self) {
@@ -234,21 +312,8 @@ impl MemberExpr {
         self.as_ref().symbol_name()
     }
 
-    /// Get the string content of a segment at the given index
-    fn segment_str(&self, index: usize) -> &str {
-        let start = self.segments[index].offset();
-        let end = self
-            .segments
-            .get(index + 1)
-            .map(|segment| segment.offset())
-            .unwrap_or(self.path.text_len());
-
-        &self.path[TextRange::new(start, end)]
-    }
-
-    /// Returns the segments of the member expression, e.g. `[MemberSegment::Attribute("y"), MemberSegment::IntSubscript(1)]` for `x.y[1]`.
-    pub(crate) fn segment_infos(&self) -> &[SegmentInfo] {
-        &self.segments
+    pub(super) fn num_segments(&self) -> usize {
+        self.segments.len()
     }
 
     pub(crate) fn as_ref(&self) -> MemberExprRef {
@@ -264,12 +329,11 @@ impl std::fmt::Display for MemberExpr {
         // TODO: Write less awkward
         f.write_str(self.symbol_name())?;
 
-        for (i, seg) in self.segments.iter().enumerate() {
-            let value = self.segment_str(i);
-            match seg.kind() {
-                SegmentKind::Attribute => write!(f, ".{}", value)?,
-                SegmentKind::IntSubscript => write!(f, "[{}]", value)?,
-                SegmentKind::StringSubscript => write!(f, "[\"{}\"]", value)?,
+        for segment in self.segments() {
+            match segment.kind {
+                SegmentKind::Attribute => write!(f, ".{}", segment.text)?,
+                SegmentKind::IntSubscript => write!(f, "[{}]", segment.text)?,
+                SegmentKind::StringSubscript => write!(f, "[\"{}\"]", segment.text)?,
             }
         }
 
@@ -321,22 +385,21 @@ impl<'a> MemberExprRef<'a> {
         &self.path[range]
     }
 
-    pub(super) fn path(&self) -> &'a str {
-        self.path
-    }
+    pub(super) fn parent(&self) -> Option<MemberExprRef<'a>> {
+        let Some((current_segment, parent_segments)) = self.segments.split_last() else {
+            return None;
+        };
 
-    /// Create a new `MemberExprRef` from a name, path, and segments.
-    pub(super) fn from_raw(path: &'a str, segments: &'a [SegmentInfo]) -> Self {
-        debug_assert!(
-            !segments.is_empty(),
-            "A member without segments is a symbol."
-        );
-        Self { path, segments }
-    }
+        // Parent is a symbol and not a member
+        if parent_segments.is_empty() {
+            return None;
+        }
 
-    /// Returns the compact segment info
-    pub(super) fn segments(&self) -> &'a [SegmentInfo] {
-        self.segments
+        let path_end = current_segment.offset();
+        Some(Self {
+            path: &self.path[TextRange::new(TextSize::default(), path_end)],
+            segments: parent_segments,
+        })
     }
 }
 
