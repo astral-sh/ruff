@@ -1246,34 +1246,47 @@ impl<'db> Type<'db> {
     /// P`, but not `B <: P`. Losing transitivity of subtyping is not tenable (it makes union and
     /// intersection simplification dependent on the order in which elements are added), so we do
     /// not use this more general definition of subtyping.
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_subtype_of(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> Result<(), TypeRelationError> {
         self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
 
     /// Return true if this type is [assignable to] type `target`.
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> Result<(), TypeRelationError> {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        relation: TypeRelation,
+    ) -> Result<(), TypeRelationError> {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
         if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
-            return true;
+            return Ok(());
         }
 
         match (self, target) {
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => true,
+            (_, Type::NominalInstance(instance)) if instance.class.is_object(db) => Ok(()),
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
-            (Type::Never, _) => true,
+            (Type::Never, _) => Ok(()),
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
@@ -1296,16 +1309,16 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
-            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
+            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => Ok(()),
             (Type::Intersection(intersection), Type::TypeVar(_))
                 if intersection.positive(db).contains(&target) =>
             {
-                true
+                Ok(())
             }
             (Type::Intersection(intersection), Type::TypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                false
+                Err(TypeRelationError::Todo)
             }
 
             // Two identical typevars must always solve to the same type, so they are always
@@ -7375,6 +7388,11 @@ impl<'db> ConstructorCallError<'db> {
             }
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum TypeRelationError {
+    Todo,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
