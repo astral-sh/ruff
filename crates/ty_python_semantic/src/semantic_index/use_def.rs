@@ -271,7 +271,7 @@ use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constr
 mod place_state;
 
 /// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
@@ -346,6 +346,64 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// This is used by [`UseDefMap::can_implicitly_return_none`].
     end_of_scope_reachability: ScopedReachabilityConstraintId,
+}
+
+pub(crate) fn use_def_map_size(map: &UseDefMap<'_>) -> usize {
+    use ruff_db::increment_memory_usage;
+
+    let all_definitions = ::get_size2::GetSize::get_heap_size(&map.all_definitions);
+    increment_memory_usage("all_definitions", all_definitions);
+    let predicates = ::get_size2::GetSize::get_heap_size(&map.predicates);
+    increment_memory_usage("predicates", predicates);
+    let narrowing_constraints = ::get_size2::GetSize::get_heap_size(&map.narrowing_constraints);
+    increment_memory_usage("narrowing_constraints", narrowing_constraints);
+    let reachability_constraints =
+        ::get_size2::GetSize::get_heap_size(&map.reachability_constraints);
+    increment_memory_usage("reachability_constraints", reachability_constraints);
+    let bindings_by_use = ::get_size2::GetSize::get_heap_size(&map.bindings_by_use);
+    increment_memory_usage("bindings_by_use", bindings_by_use);
+    let node_reachability = ::get_size2::GetSize::get_heap_size(&map.node_reachability);
+    increment_memory_usage("node_reachability", node_reachability);
+    let declarations_by_binding = ::get_size2::GetSize::get_heap_size(&map.declarations_by_binding);
+    increment_memory_usage("declarations_by_binding", declarations_by_binding);
+    let bindings_by_definition = ::get_size2::GetSize::get_heap_size(&map.bindings_by_definition);
+    increment_memory_usage("bindings_by_definition", bindings_by_definition);
+    let end_of_scope_symbols = ::get_size2::GetSize::get_heap_size(&map.end_of_scope_symbols);
+    increment_memory_usage("end_of_scope_symbols", end_of_scope_symbols);
+    let end_of_scope_members = ::get_size2::GetSize::get_heap_size(&map.end_of_scope_members);
+    increment_memory_usage("end_of_scope_members", end_of_scope_symbols);
+    let reachable_definitions_by_symbol =
+        ::get_size2::GetSize::get_heap_size(&map.reachable_definitions_by_symbol);
+    increment_memory_usage(
+        "reachable_definitions_by_symbol",
+        reachable_definitions_by_symbol,
+    );
+    let reachable_definitions_by_member =
+        ::get_size2::GetSize::get_heap_size(&map.reachable_definitions_by_member);
+    increment_memory_usage(
+        "reachable_definitions_by_member",
+        reachable_definitions_by_member,
+    );
+    let enclosing_snapshots = ::get_size2::GetSize::get_heap_size(&map.enclosing_snapshots);
+    increment_memory_usage("enclosing_snapshots", enclosing_snapshots);
+    let end_of_scope_reachability =
+        ::get_size2::GetSize::get_heap_size(&map.end_of_scope_reachability);
+    increment_memory_usage("end_of_scope_reachability", end_of_scope_reachability);
+
+    all_definitions
+        + predicates
+        + narrowing_constraints
+        + reachability_constraints
+        + bindings_by_use
+        + node_reachability
+        + declarations_by_binding
+        + bindings_by_definition
+        + end_of_scope_symbols
+        + end_of_scope_members
+        + reachable_definitions_by_symbol
+        + reachable_definitions_by_member
+        + enclosing_snapshots
+        + end_of_scope_reachability
 }
 
 pub(crate) enum ApplicableConstraints<'map, 'db> {
