@@ -59,3 +59,8 @@ logging.info(f"No changes made to {file_path.name}.")
 user = "tron"
 balance = 123.45
 logging.error(f"Error {404}: User {user} has insufficient balance ${balance:.2f}")
+
+import logging
+
+x = 1
+logging.error(f"{x} -> %s", x)

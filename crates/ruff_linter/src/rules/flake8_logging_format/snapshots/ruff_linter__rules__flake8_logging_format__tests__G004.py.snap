@@ -257,5 +257,22 @@ G004.py:61:15: G004 Logging statement uses f-string
 60 | balance = 123.45
 61 | logging.error(f"Error {404}: User {user} has insufficient balance ${balance:.2f}")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ G004
+62 |
+63 | import logging
    |
    = help: Convert to lazy `%` formatting
+
+G004.py:66:15: G004 [*] Logging statement uses f-string
+   |
+65 | x = 1
+66 | logging.error(f"{x} -> %s", x)
+   |               ^^^^^^^^^^^^ G004
+   |
+   = help: Convert to lazy `%` formatting
+
+ℹ Safe fix
+63 63 | import logging
+64 64 | 
+65 65 | x = 1
+66    |-logging.error(f"{x} -> %s", x)
+   66 |+logging.error("%s -> %s", x, x)
