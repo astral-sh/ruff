@@ -1290,7 +1290,12 @@ impl<'db> Type<'db> {
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => match relation.is_assignability() {
+                true => Ok(()),
+                false => Err(TypeRelationError::single(
+                    TypeRelationErrorKind::GradualTypeInSubTyping,
+                )),
+            },
 
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
@@ -1318,7 +1323,7 @@ impl<'db> Type<'db> {
             (Type::Intersection(intersection), Type::TypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                Err(TypeRelationError::Todo)
+                Err(TypeRelationError::todo())
             }
 
             // Two identical typevars must always solve to the same type, so they are always
@@ -1329,7 +1334,7 @@ impl<'db> Type<'db> {
             (Type::TypeVar(lhs_typevar), Type::TypeVar(rhs_typevar))
                 if lhs_typevar == rhs_typevar =>
             {
-                true
+                Ok(())
             }
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
@@ -1341,10 +1346,14 @@ impl<'db> Type<'db> {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.has_relation_to(db, target, relation)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .elements(db)
-                        .iter()
-                        .all(|constraint| constraint.has_relation_to(db, target, relation)),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeRelationError::from_results(
+                            constraints
+                                .elements(db)
+                                .iter()
+                                .map(|constraint| constraint.has_relation_to(db, target, relation)),
+                        )
+                    }
                 }
             }
 
@@ -1355,52 +1364,60 @@ impl<'db> Type<'db> {
                 if typevar.constraints(db).is_some_and(|constraints| {
                     constraints
                         .iter()
-                        .all(|constraint| self.has_relation_to(db, *constraint, relation))
+                        .all(|constraint| self.has_relation_to(db, *constraint, relation).is_ok())
                 }) =>
             {
-                true
+                Ok(())
             }
 
             // `Never` is the bottom type, the empty set.
             // Other than one unlikely edge case (TypeVars bound to `Never`),
             // no other type is a subtype of or assignable to `Never`.
-            (_, Type::Never) => false,
+            (_, Type::Never) => Err(TypeRelationError::todo()),
 
-            (Type::Union(union), _) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
+            (Type::Union(union), _) => TypeRelationError::from_results(
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
+            ),
 
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| self.has_relation_to(db, elem_ty, relation)),
+            (_, Type::Union(union)) => TypeRelationError::from_results(
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|&elem_ty| self.has_relation_to(db, elem_ty, relation)),
+            ),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => {
+            (_, Type::Intersection(intersection)) => TypeRelationError::from_results(
                 intersection
                     .positive(db)
                     .iter()
-                    .all(|&pos_ty| self.has_relation_to(db, pos_ty, relation))
-                    && intersection
-                        .negative(db)
-                        .iter()
-                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
-            }
+                    .map(|&pos_ty| self.has_relation_to(db, pos_ty, relation)),
+            )
+            .extend(
+                intersection
+                    .negative(db)
+                    .iter()
+                    .map(|&neg_ty| self.is_disjoint_from(db, neg_ty)),
+            ),
 
-            (Type::Intersection(intersection), _) => intersection
-                .positive(db)
-                .iter()
-                .any(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
+            (Type::Intersection(intersection), _) => TypeRelationError::from_results(
+                intersection
+                    .positive(db)
+                    .iter()
+                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
+            ),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(_)) => false,
+            (_, Type::TypeVar(_)) => Err(TypeRelationError::todo()),
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -7390,9 +7407,46 @@ impl<'db> ConstructorCallError<'db> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TypeRelationError(pub(crate) Vec<TypeRelationErrorKind>);
+
+impl TypeRelationError {
+    pub(crate) fn single(kind: TypeRelationErrorKind) -> Self {
+        Self(vec![kind])
+    }
+
+    pub(crate) fn todo() -> Self {
+        Self(vec![TypeRelationErrorKind::Todo])
+    }
+    pub(crate) fn from_results(
+        results: impl IntoIterator<Item = Result<(), TypeRelationError>>,
+    ) -> Result<(), TypeRelationError> {
+        let mut errors = Vec::new();
+        for result in results {
+            if let Err(err) = result {
+                errors.extend(err.0);
+            }
+        }
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(TypeRelationError(errors))
+        }
+    }
+
+    pub(crate) fn extend(self, other: impl IntoIterator<Item = TypeRelationErrorKind>) -> Self {
+        Self(self.0.into_iter().chain(other).collect())
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &TypeRelationErrorKind> {
+        self.0.iter()
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) enum TypeRelationError {
+pub(crate) enum TypeRelationErrorKind {
     Todo,
+    GradualTypeInSubTyping,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
