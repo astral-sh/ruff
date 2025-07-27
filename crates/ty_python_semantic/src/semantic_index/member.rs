@@ -6,7 +6,6 @@ use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher as _};
-use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
@@ -142,21 +141,21 @@ bitflags! {
 impl get_size2::GetSize for MemberFlags {}
 
 /// Segment metadata - packed into a single u32
-/// Layout: [kind: 2 bits][len: 30 bits]
+/// Layout: [kind: 2 bits][offset: 30 bits]
 /// - Bits 0-1: `SegmentKind` (0=Attribute, 1=IntSubscript, 2=StringSubscript)
-/// - Bits 2-31: Length (up to 1,073,741,823 bytes)
+/// - Bits 2-31: Absolute offset from start of path (up to 1,073,741,823 bytes)
 #[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 struct SegmentInfo(u32);
 
 const KIND_MASK: u32 = 0b11;
-const LEN_SHIFT: u32 = 2;
-const MAX_LEN: u32 = (1 << 30) - 1; // 2^30 - 1
+const OFFSET_SHIFT: u32 = 2;
+const MAX_OFFSET: u32 = (1 << 30) - 1; // 2^30 - 1
 
 impl SegmentInfo {
     const fn new(kind: SegmentKind, offset: TextSize) -> Self {
-        assert!(offset.to_u32() < MAX_LEN);
+        assert!(offset.to_u32() < MAX_OFFSET);
 
-        let value = (offset.to_u32() << LEN_SHIFT) | (kind as u32);
+        let value = (offset.to_u32() << OFFSET_SHIFT) | (kind as u32);
         Self(value)
     }
 
@@ -170,7 +169,7 @@ impl SegmentInfo {
     }
 
     const fn offset(self) -> TextSize {
-        TextSize::new(self.0 >> LEN_SHIFT)
+        TextSize::new(self.0 >> OFFSET_SHIFT)
     }
 }
 
@@ -202,91 +201,95 @@ const INLINE_SEGMENT_BITS: u32 = 8;
 const INLINE_SEGMENT_MASK: u64 = (1 << INLINE_SEGMENT_BITS) - 1;
 const INLINE_KIND_BITS: u32 = 2;
 const INLINE_KIND_MASK: u64 = (1 << INLINE_KIND_BITS) - 1;
-const INLINE_OFFSET_BITS: u32 = 6;
-const INLINE_OFFSET_MASK: u64 = (1 << INLINE_OFFSET_BITS) - 1;
+const INLINE_PREV_LEN_BITS: u32 = 6;
+const INLINE_PREV_LEN_MASK: u64 = (1 << INLINE_PREV_LEN_BITS) - 1;
 const INLINE_MAX_SEGMENTS: usize = 7;
-const INLINE_MAX_OFFSET: u32 = (1 << INLINE_OFFSET_BITS) - 1; // 63
+const INLINE_MAX_PREV_LEN: u32 = (1 << INLINE_PREV_LEN_BITS) - 1; // 63
 
 /// Compact representation that can store up to 7 segments inline in a u64.
 ///
 /// Layout:
 /// - Bits 0-2: Number of segments minus 1 (0-6, representing 1-7 segments)
-/// - Bits 3-10: Segment 0 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 11-18: Segment 1 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 19-26: Segment 2 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 27-34: Segment 3 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 35-42: Segment 4 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 43-50: Segment 5 (2 bits kind + 6 bits offset, max 64 bytes)
-/// - Bits 51-58: Segment 6 (2 bits kind + 6 bits offset, max 64 bytes)
+/// - Bits 3-10: Segment 0 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 11-18: Segment 1 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 19-26: Segment 2 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 27-34: Segment 3 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 35-42: Segment 4 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 43-50: Segment 5 (2 bits kind + 6 bits relative offset, max 64 bytes)
+/// - Bits 51-58: Segment 6 (2 bits kind + 6 bits relative offset, max 64 bytes)
 /// - Bits 59-63: Unused (5 bits)
 ///
 /// Constraints:
 /// - Maximum 7 segments (realistic limit for member access chains)
-/// - Maximum 64-byte offset per segment (sufficient for most identifiers)
-/// - Never empty (segments.len() >= 1, enforced by MemberExpr construction)
+/// - Maximum 64-byte relative offset per segment (sufficient for most identifiers)
+/// - Never empty (`segments.len()` >= 1, enforced by `MemberExpr` construction)
 ///
-/// Uses NonZeroU64 to create a niche for enum optimization.
-#[derive(Clone, Copy, get_size2::GetSize)]
+#[derive(Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 #[repr(transparent)]
-struct SmallSegments(NonZeroU64);
+struct SmallSegments(u64);
 
 impl SmallSegments {
     fn try_from_slice(segments: &[SegmentInfo]) -> Option<Self> {
-        if segments.len() == 0 || segments.len() > INLINE_MAX_SEGMENTS {
+        if segments.is_empty() || segments.len() > INLINE_MAX_SEGMENTS {
             return None;
         }
 
         // Pack into inline representation
         // Store count minus 1 (since segments are never empty, range 0-6 represents 1-7 segments)
         let mut packed = (segments.len() - 1) as u64;
+        let mut prev_offset = TextSize::new(0);
 
         for (i, segment) in segments.iter().enumerate() {
-            if segment.offset() > TextSize::from(INLINE_MAX_OFFSET) {
+            // Compute relative offset on-the-fly
+            let relative_offset = segment.offset() - prev_offset;
+            if relative_offset > TextSize::from(INLINE_MAX_PREV_LEN) {
                 return None;
             }
 
             let kind = segment.kind() as u64;
-            let offset = segment.offset().to_u32() as u64;
-            let segment_data = (offset << INLINE_KIND_BITS) | kind;
-            let shift = INLINE_COUNT_BITS + (i as u32 * INLINE_SEGMENT_BITS);
+            let relative_offset_val = u64::from(relative_offset.to_u32());
+            let segment_data = (relative_offset_val << INLINE_KIND_BITS) | kind;
+            let shift = INLINE_COUNT_BITS
+                + (u32::try_from(i).expect("i is bounded by INLINE_MAX_SEGMENTS")
+                    * INLINE_SEGMENT_BITS);
             packed |= segment_data << shift;
+
+            prev_offset = segment.offset();
         }
 
-        // Safe because segments.len() > 0 and we're storing count-1
-        Some(Self(NonZeroU64::new(packed).unwrap()))
+        // Check if we can fit in inline storage
+        Some(Self(packed))
     }
 
-    const fn len(&self) -> usize {
+    #[allow(clippy::cast_possible_truncation)] // Safe: INLINE_COUNT_MASK ensures value is at most 7
+    const fn len(self) -> usize {
         // Add 1 because we store count minus 1
-        ((self.0.get() & INLINE_COUNT_MASK) + 1) as usize
+        ((self.0 & INLINE_COUNT_MASK) + 1) as usize
     }
 
-    const fn get(&self, index: usize) -> Option<SegmentInfo> {
-        let count = self.len();
-        if index >= count {
+    fn iter(self) -> SmallSegmentsIter {
+        SmallSegmentsIter {
+            segments: self,
+            index: 0,
+            next_offset: TextSize::new(0),
+        }
+    }
+
+    /// Returns a new `SmallSegments` with the last segment removed, or None if only one segment remains
+    const fn parent(self) -> Option<Self> {
+        let len = self.len();
+        if len <= 1 {
             return None;
         }
 
-        let shift = INLINE_COUNT_BITS + (index as u32 * INLINE_SEGMENT_BITS);
-        let segment_data = (self.0.get() >> shift) & INLINE_SEGMENT_MASK;
-        let kind = (segment_data & INLINE_KIND_MASK) as u8;
-        let offset = ((segment_data >> INLINE_KIND_BITS) & INLINE_OFFSET_MASK) as u32;
+        // Simply copy the packed value but update the count
+        let mut new_packed = self.0;
 
-        let kind = match kind {
-            0 => SegmentKind::Attribute,
-            1 => SegmentKind::IntSubscript,
-            2 => SegmentKind::StringSubscript,
-            _ => panic!("Invalid SegmentKind bits"),
-        };
+        // Clear the count bits and set the new count (len - 2, since we store count - 1)
+        new_packed &= !INLINE_COUNT_MASK;
+        new_packed |= (len - 2) as u64;
 
-        Some(SegmentInfo::new(kind, TextSize::new(offset)))
-    }
-
-    fn iter(&self) -> SmallSegmentsIter {
-        SmallSegmentsIter {
-            segments: *self,
-            index: 0,
-        }
+        Some(Self(new_packed))
     }
 }
 
@@ -299,15 +302,38 @@ impl std::fmt::Debug for SmallSegments {
 struct SmallSegmentsIter {
     segments: SmallSegments,
     index: usize,
+    next_offset: TextSize,
 }
 
 impl Iterator for SmallSegmentsIter {
     type Item = SegmentInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.segments.get(self.index)?;
+        let count = self.segments.len();
+        if self.index >= count {
+            return None;
+        }
+
+        // Extract the relative offset and kind for the current segment
+        let shift = INLINE_COUNT_BITS
+            + (u32::try_from(self.index).expect("index is bounded by INLINE_MAX_SEGMENTS")
+                * INLINE_SEGMENT_BITS);
+        let segment_data = (self.segments.0 >> shift) & INLINE_SEGMENT_MASK;
+        let kind = (segment_data & INLINE_KIND_MASK) as u8;
+        let relative_offset = ((segment_data >> INLINE_KIND_BITS) & INLINE_PREV_LEN_MASK) as u32;
+
+        // Update the running absolute offset
+        self.next_offset += TextSize::new(relative_offset);
+
+        let kind = match kind {
+            0 => SegmentKind::Attribute,
+            1 => SegmentKind::IntSubscript,
+            2 => SegmentKind::StringSubscript,
+            _ => panic!("Invalid SegmentKind bits"),
+        };
+
         self.index += 1;
-        Some(result)
+        Some(SegmentInfo::new(kind, self.next_offset))
     }
 }
 
@@ -315,12 +341,12 @@ impl Iterator for SmallSegmentsIter {
 ///
 /// Design choices:
 /// - Uses `Box<[SegmentInfo]>` instead of `ThinVec` for heap allocation to avoid dependency overhead
-/// - Uses `NonZeroU64` for inline storage to enable niche optimization (though not achieved here due to Box's 16-byte size)
-/// - ThinVec + u32 combination doesn't provide enum niche optimization since neither has a zero bit pattern
+/// - Uses u64 for inline storage
+/// - `ThinVec` + u32 combination doesn't provide enum niche optimization since neither has a zero bit pattern
 /// - Final enum size is 16 bytes: optimal given Rust's layout constraints with fat pointer (Box<[T]>)
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 enum Segments {
-    /// Inline storage for up to 7 segments with 6-bit offsets (max 64 bytes)
+    /// Inline storage for up to 7 segments with 6-bit relative offsets (max 64 bytes per segment)
     Small(SmallSegments),
     /// Heap storage for expressions that don't fit inline
     Heap(Box<[SegmentInfo]>),
@@ -328,16 +354,16 @@ enum Segments {
 
 // Size assertions for optimization verification
 static_assertions::assert_eq_size!(SmallSegments, u64);
-static_assertions::const_assert_eq!(std::mem::size_of::<Box<[SegmentInfo]>>(), 16);
+static_assertions::assert_eq_size!(Segments, [usize; 2]);
 
 // Final state: Segments enum is 16 bytes
-// - SmallSegments: 8 bytes (NonZeroU64 with 7 segments, 64-byte max offset)
+// - SmallSegments: 8 bytes (u64 with 7 segments, 64-byte max relative offset per segment)
 // - Box<[SegmentInfo]>: 16 bytes (fat pointer with data ptr + length)
 // - Total enum: 16 bytes (no niche optimization possible with these sizes)
 //
 // Benefits achieved:
 // 1. Increased inline capacity (7 segments vs previous 5 segments)
-// 2. Realistic offset range (64 bytes, sufficient for most identifiers)
+// 2. Realistic relative offset range (64 bytes per segment, sufficient for most identifiers)
 // 3. Efficient bit usage (58/64 bits used, 5 bits spare for future use)
 // 4. Cleaner heap allocation with Box<[T]> (exact size, no capacity waste)
 static_assertions::assert_eq_size!(Segments, u128);
@@ -380,10 +406,10 @@ impl Segments {
 /// Uses a compact representation where the entire expression is stored as a single path.
 /// For example, `foo.bar[0]["baz"]` is stored as:
 /// - path: Name("foo.bar.0.baz")
-/// - segments: metadata describing each segment's type and length
+/// - segments: metadata describing each segment's type and length (stored as relative offset)
 ///
-/// The symbol name length is computed from the segment offsets.
-#[derive(Clone, Debug, get_size2::GetSize)]
+/// The symbol name length is computed by subtracting all segment lengths from the total path length.
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
     /// The entire path as a single Name (uses `CompactString` internally)
     path: Name,
@@ -553,13 +579,6 @@ impl<'a> SegmentsRef<'a> {
         }
     }
 
-    fn get(&self, index: usize) -> Option<SegmentInfo> {
-        match self {
-            Self::Small(small) => small.get(index),
-            Self::Heap(segments) => segments.get(index).copied(),
-        }
-    }
-
     fn iter(&self) -> impl Iterator<Item = SegmentInfo> + '_ {
         match self {
             Self::Small(small) => itertools::Either::Left(small.iter()),
@@ -569,39 +588,16 @@ impl<'a> SegmentsRef<'a> {
 
     /// Returns a parent view with one fewer segment, or None if <= 1 segment
     fn parent(&self) -> Option<SegmentsRef<'a>> {
-        let len = self.len();
-        if len <= 1 {
-            return None;
-        }
-
         match self {
-            Self::Small(small) => {
-                // Create a new SmallSegments with one fewer segment
-                let new_count = len - 1;
-                if new_count == 0 {
-                    return None;
+            Self::Small(small) => small.parent().map(SegmentsRef::Small),
+            Self::Heap(segments) => {
+                let len = segments.len();
+                if len <= 1 {
+                    None
+                } else {
+                    Some(SegmentsRef::Heap(&segments[..len - 1]))
                 }
-
-                // Store count minus 1 (since segments are never empty)
-                let mut new_packed = (new_count - 1) as u64;
-
-                // Copy all segments except the last one
-                for i in 0..new_count {
-                    if let Some(segment) = small.get(i) {
-                        let kind = segment.kind() as u64;
-                        let offset = segment.offset().to_u32() as u64;
-                        let segment_data = (offset << INLINE_KIND_BITS) | kind;
-                        let shift = INLINE_COUNT_BITS + (i as u32 * INLINE_SEGMENT_BITS);
-                        new_packed |= segment_data << shift;
-                    }
-                }
-
-                // Safe because new_count > 0 (checked above)
-                Some(SegmentsRef::Small(SmallSegments(
-                    NonZeroU64::new(new_packed).unwrap(),
-                )))
             }
-            Self::Heap(segments) => Some(SegmentsRef::Heap(&segments[..len - 1])),
         }
     }
 }
@@ -615,7 +611,7 @@ impl<'a> From<&'a Segments> for SegmentsRef<'a> {
     }
 }
 
-impl<'a> PartialEq for SegmentsRef<'a> {
+impl PartialEq for SegmentsRef<'_> {
     fn eq(&self, other: &Self) -> bool {
         let len = self.len();
         if len != other.len() {
@@ -625,7 +621,7 @@ impl<'a> PartialEq for SegmentsRef<'a> {
     }
 }
 
-impl<'a> Eq for SegmentsRef<'a> {}
+impl Eq for SegmentsRef<'_> {}
 
 /// Reference to a member expression.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -640,7 +636,7 @@ impl<'a> MemberExprRef<'a> {
             .segments
             .iter()
             .next()
-            .map(|segment| segment.offset())
+            .map(SegmentInfo::offset)
             .unwrap_or(self.path.text_len());
 
         let range = TextRange::new(TextSize::default(), end);
@@ -651,14 +647,8 @@ impl<'a> MemberExprRef<'a> {
     pub(super) fn parent(&self) -> Option<MemberExprRef<'a>> {
         let parent_segments = self.segments.parent()?;
 
-        // Get the last segment from the current segments to find where to cut the path
-        // The parent path should end at the start of the last segment
-        let current_len = self.segments.len();
-        if current_len == 0 {
-            return None;
-        }
-
-        let last_segment = self.segments.get(current_len - 1)?;
+        // The removed segment is always the last one. Find its start offset.
+        let last_segment = self.segments.iter().last()?;
         let path_end = last_segment.offset();
 
         Some(MemberExprRef {
@@ -780,7 +770,7 @@ impl MemberTableBuilder {
         let hash = MemberTable::hash_member_expression_ref(&member_ref);
         let entry = self.table.map.entry(
             hash,
-            |id| self.table.members[*id].expression == member.expression,
+            |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
             |id| {
                 let ref_expr = self.table.members[*id].expression.as_ref();
                 MemberTable::hash_member_expression_ref(&ref_expr)
