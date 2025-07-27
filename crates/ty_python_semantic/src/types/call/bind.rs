@@ -28,7 +28,7 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, KnownClass, KnownInstanceType,
+    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
     MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
@@ -623,19 +623,38 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::GenericContext) => {
                             if let [Some(ty)] = overload.parameter_types() {
+                                let function_generic_context = |function: FunctionType<'db>| {
+                                    let union = UnionType::from_elements(
+                                        db,
+                                        function
+                                            .signature(db)
+                                            .overloads
+                                            .iter()
+                                            .filter_map(|signature| signature.generic_context)
+                                            .map(|generic_context| generic_context.as_tuple(db)),
+                                    );
+                                    if union.is_never() {
+                                        Type::none(db)
+                                    } else {
+                                        union
+                                    }
+                                };
+
                                 // TODO: Handle generic functions, and unions/intersections of
                                 // generic types
                                 overload.set_return_type(match ty {
-                                    Type::ClassLiteral(class) => match class.generic_context(db) {
-                                        Some(generic_context) => TupleType::from_elements(
-                                            db,
-                                            generic_context
-                                                .variables(db)
-                                                .iter()
-                                                .map(|typevar| Type::TypeVar(*typevar)),
-                                        ),
-                                        None => Type::none(db),
-                                    },
+                                    Type::ClassLiteral(class) => class
+                                        .generic_context(db)
+                                        .map(|generic_context| generic_context.as_tuple(db))
+                                        .unwrap_or_else(|| Type::none(db)),
+
+                                    Type::FunctionLiteral(function) => {
+                                        function_generic_context(*function)
+                                    }
+
+                                    Type::BoundMethod(bound_method) => {
+                                        function_generic_context(bound_method.function(db))
+                                    }
 
                                     _ => Type::none(db),
                                 });
@@ -896,6 +915,36 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 overload.set_return_type(Type::DataclassTransformer(params));
+                            }
+                        }
+
+                        Some(KnownFunction::Field) => {
+                            if let [default, default_factory, init, ..] = overload.parameter_types()
+                            {
+                                let default_ty = match (default, default_factory) {
+                                    (Some(default_ty), _) => *default_ty,
+                                    (_, Some(default_factory_ty)) => default_factory_ty
+                                        .try_call(db, &CallArguments::none())
+                                        .map_or(Type::unknown(), |binding| binding.return_type(db)),
+                                    _ => Type::unknown(),
+                                };
+
+                                let init = init
+                                    .map(|init| !init.bool(db).is_always_false())
+                                    .unwrap_or(true);
+
+                                // `typeshed` pretends that `dataclasses.field()` returns the type of the
+                                // default value directly. At runtime, however, this function returns an
+                                // instance of `dataclasses.Field`. We also model it this way and return
+                                // a known-instance type with information about the field. The drawback
+                                // of this approach is that we need to pretend that instances of `Field`
+                                // are assignable to `T` if the default type of the field is assignable
+                                // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::Field(FieldInstance::new(
+                                        db, default_ty, init,
+                                    )),
+                                ));
                             }
                         }
 

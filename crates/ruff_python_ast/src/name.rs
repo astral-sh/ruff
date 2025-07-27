@@ -29,6 +29,10 @@ impl Name {
         Self(compact_str::CompactString::const_new(name))
     }
 
+    pub fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }

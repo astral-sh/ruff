@@ -250,7 +250,7 @@ def outer():
     x = 1
 
     def inner():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     while True:
         pass
 ```

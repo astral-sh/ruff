@@ -123,7 +123,7 @@ def enclosing():
         nonlocal x
         def bar():
             # allowed, refers to `x` in `enclosing`
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+            reveal_type(x)  # revealed: Literal[2]
         bar()
         del x  # allowed, deletes `x` in `enclosing` (though we don't track that)
 ```

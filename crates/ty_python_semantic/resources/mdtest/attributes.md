@@ -1451,6 +1451,21 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
+### Negation types
+
+Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
+which is equivalent to `object & ~P`:
+
+```py
+class P: ...
+
+def _(obj: object):
+    if not isinstance(obj, P):
+        reveal_type(obj)  # revealed: ~P
+
+        reveal_type(obj.__dict__)  # revealed: dict[str, Any]
+```
+
 ### Possible unboundness
 
 ```py

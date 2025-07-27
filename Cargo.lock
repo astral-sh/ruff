@@ -4305,7 +4305,6 @@ dependencies = [
  "strum_macros",
  "tempfile",
  "test-case",
- "thin-vec",
  "thiserror 2.0.12",
  "tracing",
  "ty_python_semantic",
@@ -4345,7 +4344,6 @@ dependencies = [
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
- "ty_server",
  "ty_vendored",
 ]
 
