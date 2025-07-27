@@ -150,4 +150,24 @@ print()
           |
         "#);
     }
+
+    #[test]
+    fn multiple_unprintable_characters() -> std::io::Result<()> {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "");
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env
+            .builder(
+                "invalid-character-sub",
+                Severity::Error,
+                r#"Invalid unescaped character SUB, use "\x1A" instead"#,
+            )
+            .primary("example.py", "1:1", "1:1", "")
+            .build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r#""#);
+
+        Ok(())
+    }
 }
