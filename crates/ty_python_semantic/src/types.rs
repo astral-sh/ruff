@@ -1290,12 +1290,15 @@ impl<'db> Type<'db> {
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => match relation.is_assignability() {
-                true => Ok(()),
-                false => Err(TypeRelationError::single(
-                    TypeRelationErrorKind::GradualTypeInSubTyping,
-                )),
-            },
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+                if relation.is_assignability() {
+                    Ok(())
+                } else {
+                    Err(TypeRelationError::single(
+                        TypeRelationErrorKind::GradualTypeInSubTyping,
+                    ))
+                }
+            }
 
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
@@ -1375,19 +1378,33 @@ impl<'db> Type<'db> {
             // no other type is a subtype of or assignable to `Never`.
             (_, Type::Never) => Err(TypeRelationError::todo()),
 
-            (Type::Union(union), _) => TypeRelationError::from_results(
-                union
+            (Type::Union(union), _) => {
+                let results = union
                     .elements(db)
                     .iter()
-                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
-            ),
+                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation))
+                    .collect::<Vec<_>>();
 
-            (_, Type::Union(union)) => TypeRelationError::from_results(
-                union
+                if results.iter().all(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
+            }
+
+            (_, Type::Union(union)) => {
+                let results = union
                     .elements(db)
                     .iter()
-                    .map(|&elem_ty| self.has_relation_to(db, elem_ty, relation)),
-            ),
+                    .map(|&elem_ty| self.has_relation_to(db, elem_ty, relation))
+                    .collect::<Vec<_>>();
+
+                if results.iter().any(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -1398,27 +1415,33 @@ impl<'db> Type<'db> {
                     .iter()
                     .map(|&pos_ty| self.has_relation_to(db, pos_ty, relation)),
             ) {
-                Ok(()) => Ok(()),
-                Err(mut e) => {
+                Ok(()) => {
                     if intersection
                         .negative(db)
                         .iter()
                         .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
                     {
-                        Err(e)
+                        Ok(())
                     } else {
-                        e.extend(TypeRelationError::todo());
-                        Err(e)
+                        Err(TypeRelationError::todo())
                     }
                 }
+                Err(e) => Err(e),
             },
 
-            (Type::Intersection(intersection), _) => TypeRelationError::from_results(
-                intersection
+            (Type::Intersection(intersection), _) => {
+                let results = intersection
                     .positive(db)
                     .iter()
-                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation)),
-            ),
+                    .map(|&elem_ty| elem_ty.has_relation_to(db, target, relation))
+                    .collect::<Vec<_>>();
+
+                if results.iter().any(Result::is_ok) {
+                    Ok(())
+                } else {
+                    TypeRelationError::from_results(results)
+                }
+            }
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
@@ -1578,18 +1601,15 @@ impl<'db> Type<'db> {
 
             // `TypeIs` is invariant.
             (Type::TypeIs(left), Type::TypeIs(right)) => {
-                if let Err(mut e) =
+                if let Err(e) =
                     left.return_type(db)
                         .has_relation_to(db, right.return_type(db), relation)
                 {
-                    e.add(right.return_type(db).has_relation_to(
-                        db,
-                        left.return_type(db),
-                        relation,
-                    ));
                     Err(e)
                 } else {
-                    Ok(())
+                    right
+                        .return_type(db)
+                        .has_relation_to(db, left.return_type(db), relation)
                 }
             }
 
@@ -7529,10 +7549,6 @@ impl TypeRelationError {
         }
     }
 
-    pub(crate) fn extend(&mut self, other: impl IntoIterator<Item = TypeRelationErrorKind>) {
-        self.0.extend(other);
-    }
-
     pub(crate) fn add(&mut self, other: Result<(), TypeRelationError>) {
         if let Err(e) = other {
             self.0.extend(e.0);
@@ -9266,9 +9282,9 @@ pub(crate) mod tests {
 
         let int = KnownClass::Int.to_instance(&db);
 
-        assert!(int.is_assignable_to(&db, todo1));
+        assert!(int.is_assignable_to(&db, todo1).is_ok());
 
-        assert!(todo1.is_assignable_to(&db, int));
+        assert!(todo1.is_assignable_to(&db, int).is_ok());
 
         // We lose information when combining several `Todo` types. This is an
         // acknowledged limitation of the current implementation. We can not

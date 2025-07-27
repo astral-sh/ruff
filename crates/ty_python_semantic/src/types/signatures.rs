@@ -619,9 +619,7 @@ impl<'db> Signature<'db> {
         };
 
         // Return types are covariant.
-        if let Err(e) = check_types(self.return_ty, other.return_ty) {
-            return Err(e);
-        }
+        check_types(self.return_ty, other.return_ty)?;
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
@@ -718,12 +716,10 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return Err(TypeRelationError::todo());
                             }
-                            if let Err(e) = check_types(
+                            check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            ) {
-                                return Err(e);
-                            }
+                            )?;
                         }
 
                         (
@@ -743,12 +739,10 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return Err(TypeRelationError::todo());
                             }
-                            if let Err(e) = check_types(
+                            check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            ) {
-                                return Err(e);
-                            }
+                            )?;
                         }
 
                         (
@@ -756,12 +750,10 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if let Err(e) = check_types(
+                            check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            ) {
-                                return Err(e);
-                            }
+                            )?;
 
                             if matches!(
                                 other_parameter.kind(),
@@ -796,23 +788,19 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if let Err(e) = check_types(
+                                check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
-                                ) {
-                                    return Err(e);
-                                }
+                                )?;
                                 parameters.next_other();
                             }
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if let Err(e) = check_types(
+                            check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            ) {
-                                return Err(e);
-                            }
+                            )?;
                         }
 
                         (
@@ -889,24 +877,17 @@ impl<'db> Signature<'db> {
                                 if self_default.is_none() && other_default.is_some() {
                                     return Err(TypeRelationError::todo());
                                 }
-                                if let Err(e) = check_types(
+                                check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
-                                ) {
-                                    return Err(e);
-                                }
+                                )?;
                             }
                             _ => unreachable!(
                                 "`self_keywords` should only contain keyword-only or standard parameters"
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if let Err(e) = check_types(
-                            other_parameter.annotated_type(),
-                            self_keyword_variadic_type,
-                        ) {
-                            return Err(e);
-                        }
+                        check_types(other_parameter.annotated_type(), self_keyword_variadic_type)?;
                     } else {
                         return Err(TypeRelationError::todo());
                     }
@@ -917,11 +898,7 @@ impl<'db> Signature<'db> {
                         // parameter, `self` must also have a keyword variadic parameter.
                         return Err(TypeRelationError::todo());
                     };
-                    if let Err(e) =
-                        check_types(other_parameter.annotated_type(), self_keyword_variadic_type)
-                    {
-                        return Err(e);
-                    }
+                    check_types(other_parameter.annotated_type(), self_keyword_variadic_type)?;
                 }
                 _ => {
                     // This can only occur in case of a syntax error.

@@ -570,9 +570,7 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Bivariant => Ok(()),
             };
 
-            if compatible.is_err() {
-                return compatible;
-            }
+            compatible?;
         }
 
         Ok(())

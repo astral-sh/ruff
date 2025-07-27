@@ -805,7 +805,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if let Err(e) = TypeRelationError::from_results(
+                TypeRelationError::from_results(
                     self.prenormalized_prefix_elements(db, self_prenormalize_variable)
                         .zip_longest(
                             other.prenormalized_prefix_elements(db, other_prenormalize_variable),
@@ -823,9 +823,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                                 Err(TypeRelationError::todo())
                             }
                         }),
-                ) {
-                    return Err(e);
-                }
+                )?;
 
                 let self_suffix: Vec<_> = self
                     .prenormalized_suffix_elements(db, self_prenormalize_variable)
@@ -834,7 +832,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
 
-                if let Err(e) = TypeRelationError::from_results(
+                TypeRelationError::from_results(
                     (self_suffix.iter().rev())
                         .zip_longest(other_suffix.iter().rev())
                         .map(|pair| match pair {
@@ -850,9 +848,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                                 Err(TypeRelationError::todo())
                             }
                         }),
-                ) {
-                    return Err(e);
-                }
+                )?;
 
                 // And lastly, the variable-length portions must satisfy the relation.
                 self.variable.has_relation_to(db, other.variable, relation)
