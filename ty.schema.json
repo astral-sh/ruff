@@ -521,6 +521,16 @@
             }
           ]
         },
+        "invalid-item-assignment": {
+          "title": "detects invalid item assignments",
+          "description": "## What it does\nChecks for invalid item assignments.\n\n## Why is this bad?\nInvalid item assignments will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1] = 2  # TypeError: 'int' object does not support item assignment\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-legacy-type-variable": {
           "title": "detects invalid legacy type variables",
           "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
