@@ -150,10 +150,9 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
-# revealed: bound method <class 'Person'>._make[Self: NamedTupleFallback](iterable: Iterable[Any]) -> Self
-reveal_type(Person._make)
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace[Self: NamedTupleFallback](self, **kwargs: Any) -> Self
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self
 
 # TODO: should be `Person` once we support `Self`
 reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown

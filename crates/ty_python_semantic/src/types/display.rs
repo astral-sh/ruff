@@ -433,8 +433,19 @@ pub struct DisplayGenericContext<'db> {
 
 impl Display for DisplayGenericContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let variables = self.generic_context.variables(self.db);
+
+        let non_implicit_variables: Vec<_> = variables
+            .iter()
+            .filter(|var| !var.is_implicit(self.db))
+            .collect();
+
+        if non_implicit_variables.is_empty() {
+            return Ok(());
+        }
+
         f.write_char('[')?;
-        for (idx, var) in self.generic_context.variables(self.db).iter().enumerate() {
+        for (idx, var) in non_implicit_variables.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }

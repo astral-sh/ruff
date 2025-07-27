@@ -701,7 +701,7 @@ impl<'db> Type<'db> {
                     None,
                     variance,
                     None,
-                    TypeVarKind::Pep695,
+                    TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy),
                 )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
@@ -5166,7 +5166,7 @@ impl<'db> Type<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Legacy,
+                        TypeVarKind::Implicit,
                     )))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
@@ -5557,7 +5557,7 @@ impl<'db> Type<'db> {
     ) {
         match self {
             Type::TypeVar(typevar) => {
-                if typevar.is_legacy(db) {
+                if typevar.is_legacy(db) || typevar.is_implicit(db) {
                     typevars.insert(typevar);
                 }
             }
@@ -6370,11 +6370,18 @@ pub struct DeprecatedInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
-/// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
+/// Whether this typevar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum TypeVarKind {
+pub enum ExplicitTypeVarKind {
     Legacy,
     Pep695,
+}
+
+/// Whether this typevar was explicitly created, or an implicit typevar like `Self` was used.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TypeVarKind {
+    Explicit(ExplicitTypeVarKind),
+    Implicit,
 }
 
 /// Data regarding a single type variable.
@@ -6428,7 +6435,14 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), TypeVarKind::Legacy)
+        matches!(
+            self.kind(db),
+            TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy)
+        )
+    }
+
+    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), TypeVarKind::Implicit)
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
