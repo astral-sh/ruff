@@ -6,7 +6,9 @@ use ruff_text_size::{TextLen as _, TextRange, TextSize};
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 use std::hash::{Hash as _, Hasher as _};
+use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
+use thin_vec::ThinVec;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -213,12 +215,15 @@ const INLINE_MAX_OFFSET: u32 = (1 << INLINE_OFFSET_BITS) - 1; // 1023
 /// - Remaining 60 bits: Up to 5 segments, each using 12 bits:
 ///   - Bits 0-1: SegmentKind (2 bits)
 ///   - Bits 2-11: Offset/length (10 bits, max 1023)
+///
+/// Uses NonZeroU64 to create a niche for enum optimization.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-struct SmallSegments(u64);
+#[repr(transparent)]
+struct SmallSegments(NonZeroU64);
 
 impl SmallSegments {
     fn try_from_slice(segments: &[SegmentInfo]) -> Option<Self> {
-        if segments.len() > INLINE_MAX_SEGMENTS {
+        if segments.len() == 0 || segments.len() > INLINE_MAX_SEGMENTS {
             return None;
         }
 
@@ -230,6 +235,7 @@ impl SmallSegments {
         }
 
         // Pack into inline representation
+        // Start with count (never 0, so safe for NonZeroU64)
         let mut packed = segments.len() as u64;
         for (i, segment) in segments.iter().enumerate() {
             let kind = segment.kind() as u64;
@@ -239,11 +245,12 @@ impl SmallSegments {
             packed |= segment_data << shift;
         }
 
-        Some(Self(packed))
+        // Safe because segments.len() > 0 (checked by debug_assert in from_vec)
+        Some(Self(NonZeroU64::new(packed).unwrap()))
     }
 
     const fn len(&self) -> usize {
-        (self.0 & INLINE_COUNT_MASK) as usize
+        (self.0.get() & INLINE_COUNT_MASK) as usize
     }
 
     const fn get(&self, index: usize) -> Option<SegmentInfo> {
@@ -253,7 +260,7 @@ impl SmallSegments {
         }
 
         let shift = INLINE_COUNT_BITS + (index as u32 * INLINE_SEGMENT_BITS);
-        let segment_data = (self.0 >> shift) & INLINE_SEGMENT_MASK;
+        let segment_data = (self.0.get() >> shift) & INLINE_SEGMENT_MASK;
         let kind = (segment_data & INLINE_KIND_MASK) as u8;
         let offset = ((segment_data >> INLINE_KIND_BITS) & INLINE_OFFSET_MASK) as u32;
 
@@ -297,16 +304,34 @@ impl Iterator for SmallSegmentsIter {
 }
 
 /// Representation of segments that can be either inline or heap-allocated.
-#[derive(Clone, PartialEq, Eq, get_size2::GetSize, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 enum Segments {
     /// Inline storage for up to 5 segments
     Small(SmallSegments),
     /// Heap storage for expressions that don't fit inline
-    Heap(Box<[SegmentInfo]>),
+    Heap(ThinVec<SegmentInfo>),
+}
+
+// Size assertions for optimization verification
+static_assertions::assert_eq_size!(SmallSegments, u64);
+static_assertions::assert_eq_size!(Segments, u128);
+static_assertions::assert_eq_size!(ThinVec<SegmentInfo>, usize);
+
+impl get_size2::GetSize for Segments {
+    fn get_heap_size(&self) -> usize {
+        match self {
+            Self::Small(_) => 0,
+            Self::Heap(thin_vec) => {
+                // ThinVec has a pointer to heap-allocated data
+                thin_vec.capacity() * std::mem::size_of::<SegmentInfo>()
+                    + 3 * std::mem::size_of::<usize>()
+            }
+        }
+    }
 }
 
 impl Segments {
-    fn from_vec(segments: SmallVec<[SegmentInfo; 4]>) -> Self {
+    fn from_vec(segments: SmallVec<[SegmentInfo; 8]>) -> Self {
         debug_assert!(
             !segments.is_empty(),
             "Segments cannot be empty. A member without segments is a symbol"
@@ -314,7 +339,7 @@ impl Segments {
         if let Some(small) = SmallSegments::try_from_slice(&segments) {
             Self::Small(small)
         } else {
-            Self::Heap(segments.into_vec().into_boxed_slice())
+            Self::Heap(ThinVec::from(segments.into_vec()))
         }
     }
 
@@ -333,7 +358,10 @@ impl Segments {
     }
 
     fn shrink_to_fit(&mut self) {
-        // No-op for inline storage, already optimal for heap storage
+        match self {
+            Self::Small(_) => {}
+            Self::Heap(segments) => segments.shrink_to_fit(),
+        }
     }
 }
 
@@ -360,7 +388,7 @@ pub(crate) struct MemberExpr {
 
 impl MemberExpr {
     pub(super) fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
-        fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 4]>)> {
+        fn visit(expr: ast::ExprRef) -> Option<(Name, SmallVec<[SegmentInfo; 8]>)> {
             use std::fmt::Write as _;
 
             match expr {
@@ -546,6 +574,9 @@ impl<'a> SegmentsRef<'a> {
             Self::Small(small) => {
                 // Create a new SmallSegments with one fewer segment
                 let new_count = len - 1;
+                if new_count == 0 {
+                    return None;
+                }
                 let mut new_packed = new_count as u64;
 
                 // Copy all segments except the last one
@@ -559,7 +590,10 @@ impl<'a> SegmentsRef<'a> {
                     }
                 }
 
-                Some(SegmentsRef::Small(SmallSegments(new_packed)))
+                // Safe because new_count > 0 (checked above)
+                Some(SegmentsRef::Small(SmallSegments(
+                    NonZeroU64::new(new_packed).unwrap(),
+                )))
             }
             Self::Heap(segments) => Some(SegmentsRef::Heap(&segments[..len - 1])),
         }
