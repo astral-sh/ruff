@@ -708,23 +708,10 @@ pub struct ComparableTString<'a> {
 }
 
 impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
-    // The approach taken below necessarily deviates from the
-    // corresponding implementation for [`ast::FStringValue`].
-    // The reason is that a t-string value is composed of _three_
-    // non-comparable parts: literals, f-string expressions, and
-    // t-string interpolations. Since we have merged the AST nodes
-    // that capture f-string expressions and t-string interpolations
-    // into the shared [`ast::InterpolatedElement`], we must
-    // be careful to distinguish between them here.
+    // We model a [`ComparableTString`] on the actual
+    // [CPython implementation] of a `string.templatelib.Template` object.
     //
-    // Consequently, we model a [`ComparableTString`] on the actual
-    // [CPython implementation] of a `string.templatelib.Template` object:
-    // it is composed of `strings` and `interpolations`. In CPython,
-    // the `strings` field is a tuple of honest strings (since f-strings
-    // are evaluated). Our `strings` field will house both f-string
-    // expressions and string literals.
-    //
-    // Finally, as in CPython, we must be careful to ensure that the length
+    // As in CPython, we must be careful to ensure that the length
     // of `strings` is always one more than the length of `interpolations` -
     // that way we can recover the original reading order by interleaving
     // starting with `strings`. This is how we can tell the
@@ -768,19 +755,6 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
                     .push(ComparableInterpolatedStringElement::Literal("".into()));
             }
 
-            fn push_fstring_expression(&mut self, expression: &'a ast::InterpolatedElement) {
-                if let Some(ComparableInterpolatedStringElement::Literal(last_literal)) =
-                    self.strings.last()
-                {
-                    // Recall that we insert empty strings after
-                    // each interpolation. If we encounter an f-string
-                    // expression, we replace the empty string with it.
-                    if last_literal.is_empty() {
-                        self.strings.pop();
-                    }
-                }
-                self.strings.push(expression.into());
-            }
             fn push_tstring_interpolation(&mut self, expression: &'a ast::InterpolatedElement) {
                 self.interpolations.push(expression.into());
                 self.start_new_literal();
@@ -789,34 +763,13 @@ impl<'a> From<&'a ast::TStringValue> for ComparableTString<'a> {
 
         let mut collector = Collector::default();
 
-        for part in value {
-            match part {
-                ast::TStringPart::Literal(string_literal) => {
-                    collector.push_literal(&string_literal.value);
+        for element in value.elements() {
+            match element {
+                ast::InterpolatedStringElement::Literal(literal) => {
+                    collector.push_literal(&literal.value);
                 }
-                ast::TStringPart::TString(fstring) => {
-                    for element in &fstring.elements {
-                        match element {
-                            ast::InterpolatedStringElement::Literal(literal) => {
-                                collector.push_literal(&literal.value);
-                            }
-                            ast::InterpolatedStringElement::Interpolation(interpolation) => {
-                                collector.push_tstring_interpolation(interpolation);
-                            }
-                        }
-                    }
-                }
-                ast::TStringPart::FString(fstring) => {
-                    for element in &fstring.elements {
-                        match element {
-                            ast::InterpolatedStringElement::Literal(literal) => {
-                                collector.push_literal(&literal.value);
-                            }
-                            ast::InterpolatedStringElement::Interpolation(expression) => {
-                                collector.push_fstring_expression(expression);
-                            }
-                        }
-                    }
+                ast::InterpolatedStringElement::Interpolation(interpolation) => {
+                    collector.push_tstring_interpolation(interpolation);
                 }
             }
         }
