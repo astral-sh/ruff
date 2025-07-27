@@ -189,41 +189,28 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use schemars::_serde_json::Value;
-    use schemars::JsonSchema;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
+    use schemars::{json_schema, JsonSchema, Schema};
 
     impl JsonSchema for PythonVersion {
-        fn schema_name() -> String {
-            "PythonVersion".to_string()
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            "PythonVersion".into()
         }
 
-        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-            let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
-                instance_type: Some(schemars::schema::InstanceType::String.into()),
-                string: Some(Box::new(schemars::schema::StringValidation {
-                    pattern: Some(r"^\d+\.\d+$".to_string()),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            }))
-            .chain(Self::iter().map(|v| {
-                Schema::Object(SchemaObject {
-                    const_value: Some(Value::String(v.to_string())),
-                    metadata: Some(Box::new(Metadata {
-                        description: Some(format!("Python {v}")),
-                        ..Metadata::default()
-                    })),
-                    ..SchemaObject::default()
+        fn json_schema(_gen: &mut schemars::SchemaGenerator) -> Schema {
+            let mut sub_schemas = vec![json_schema!({
+                "type": "string",
+                "pattern": r"^\d+\.\d+$"
+            })];
+
+            sub_schemas.extend(Self::iter().map(|v| {
+                json_schema!({
+                    "const": v.to_string(),
+                    "description": format!("Python {v}")
                 })
             }));
 
-            Schema::Object(SchemaObject {
-                subschemas: Some(Box::new(SubschemaValidation {
-                    any_of: Some(sub_schemas.collect()),
-                    ..Default::default()
-                })),
-                ..SchemaObject::default()
+            json_schema!({
+                "anyOf": sub_schemas
             })
         }
     }
