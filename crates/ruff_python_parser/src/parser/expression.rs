@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::ops::Deref;
 
 use bitflags::bitflags;
@@ -1335,76 +1334,69 @@ impl<'src> Parser<'src> {
         let has_tstring = tstring_count > 0;
 
         if has_bytes {
-            match byte_literal_count.cmp(&strings.len()) {
-                Ordering::Less => {
-                    // TODO(dhruvmanila): This is not an ideal recovery because the parser
-                    // replaces the byte literals with an invalid string literal node. Any
-                    // downstream tools can extract the raw bytes from the range.
-                    //
-                    // We could convert the node into a string and mark it as invalid
-                    // and would be clever to mark the type which is fewer in quantity.
+            if byte_literal_count < strings.len() {
+                // TODO(dhruvmanila): This is not an ideal recovery because the parser
+                // replaces the byte literals with an invalid string literal node. Any
+                // downstream tools can extract the raw bytes from the range.
+                //
+                // We could convert the node into a string and mark it as invalid
+                // and would be clever to mark the type which is fewer in quantity.
 
-                    // test_err mixed_bytes_and_non_bytes_literals
-                    // 'first' b'second'
-                    // f'first' b'second'
-                    // 'first' f'second' b'third'
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "Bytes literal cannot be mixed with non-bytes literals".to_string(),
-                        ),
-                        range,
-                    );
-                }
-                // Only construct a byte expression if all the literals are bytes
-                // otherwise, we'll try either string, t-string, or f-string. This is to retain
-                // as much information as possible.
-                Ordering::Equal => {
-                    let mut values = Vec::with_capacity(strings.len());
-                    for string in strings {
-                        values.push(match string {
-                            StringType::Bytes(value) => value,
-                            _ => unreachable!("Expected `StringType::Bytes`"),
-                        });
-                    }
-                    return Expr::from(ast::ExprBytesLiteral {
-                        value: ast::BytesLiteralValue::concatenated(values),
-                        range,
-                        node_index: AtomicNodeIndex::dummy(),
+                // test_err mixed_bytes_and_non_bytes_literals
+                // 'first' b'second'
+                // f'first' b'second'
+                // 'first' f'second' b'third'
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
+                    ),
+                    range,
+                );
+            }
+            // Only construct a byte expression if all the literals are bytes
+            // otherwise, we'll try either string, t-string, or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::Bytes(value) => value,
+                        _ => unreachable!("Expected `StringType::Bytes`"),
                     });
                 }
-                Ordering::Greater => unreachable!(),
+                return Expr::from(ast::ExprBytesLiteral {
+                    value: ast::BytesLiteralValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::dummy(),
+                });
             }
         }
 
         if has_tstring {
-            match tstring_count.cmp(&strings.len()) {
-                Ordering::Less => {
-                    self.add_error(
-                        ParseErrorType::OtherError(
-                            "cannot mix t-string literals with string or bytes literals"
-                                .to_string(),
-                        ),
-                        range,
-                    );
-                }
-                // Only construct a t-string expression if all the literals are t-strings
-                // otherwise, we'll try either string or f-string. This is to retain
-                // as much information as possible.
-                Ordering::Equal => {
-                    let mut values = Vec::with_capacity(strings.len());
-                    for string in strings {
-                        values.push(match string {
-                            StringType::TString(value) => value,
-                            _ => unreachable!("Expected `StringType::TString`"),
-                        });
-                    }
-                    return Expr::from(ast::ExprTString {
-                        value: ast::TStringValue::concatenated(values),
-                        range,
-                        node_index: AtomicNodeIndex::dummy(),
+            if tstring_count < strings.len() {
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "cannot mix t-string literals with string or bytes literals".to_string(),
+                    ),
+                    range,
+                );
+            }
+            // Only construct a t-string expression if all the literals are t-strings
+            // otherwise, we'll try either string or f-string. This is to retain
+            // as much information as possible.
+            else {
+                let mut values = Vec::with_capacity(strings.len());
+                for string in strings {
+                    values.push(match string {
+                        StringType::TString(value) => value,
+                        _ => unreachable!("Expected `StringType::TString`"),
                     });
                 }
-                Ordering::Greater => unreachable!(),
+                return Expr::from(ast::ExprTString {
+                    value: ast::TStringValue::concatenated(values),
+                    range,
+                    node_index: AtomicNodeIndex::dummy(),
+                });
             }
         }
 
