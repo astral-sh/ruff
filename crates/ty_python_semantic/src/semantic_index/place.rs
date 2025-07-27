@@ -495,7 +495,7 @@ enum ParentPlaceIterState<'a> {
 
 impl<'a> ParentPlaceIterState<'a> {
     fn parent_state(
-        expression: MemberExprRef<'a>,
+        expression: &MemberExprRef<'a>,
         symbols: &'a SymbolTable,
         members: &'a MemberTable,
     ) -> Self {
@@ -523,9 +523,10 @@ impl<'a> ParentPlaceIter<'a> {
         symbol_table: &'a SymbolTable,
         member_table: &'a MemberTable,
     ) -> Self {
+        let expr_ref = expression.as_ref();
         ParentPlaceIter {
             state: Some(ParentPlaceIterState::parent_state(
-                expression.as_ref(),
+                &expr_ref,
                 symbol_table,
                 member_table,
             )),
@@ -552,12 +553,12 @@ impl Iterator for ParentPlaceIter<'_> {
                     next_member,
                 } => {
                     self.state = Some(ParentPlaceIterState::parent_state(
-                        next_member,
+                        &next_member,
                         symbols,
                         members,
                     ));
 
-                    if let Some(id) = members.member_id(next_member) {
+                    if let Some(id) = members.member_id(next_member.clone()) {
                         break Some(id.into());
                     }
                 }
