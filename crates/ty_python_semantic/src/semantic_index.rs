@@ -5,12 +5,6 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
-use ruff_python_ast::NodeIndex;
-use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::Update;
-use salsa::plumbing::AsId;
-
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
@@ -28,6 +22,12 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
+use ruff_db::increment_memory_usage;
+use ruff_python_ast::NodeIndex;
+use ruff_python_parser::semantic_errors::SemanticSyntaxError;
+use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::Update;
+use salsa::plumbing::AsId;
 
 pub mod ast_ids;
 mod builder;
@@ -198,7 +198,7 @@ pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update, get_size2::GetSize)]
+#[derive(Debug, Update)]
 pub(crate) struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
@@ -244,6 +244,59 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Set of all generator functions in this file.
     generator_functions: FxHashSet<FileScopeId>,
+}
+
+pub(crate) fn semantic_index_size(index: &SemanticIndex<'_>) -> usize {
+    let place_tables = ::get_size2::GetSize::get_heap_size(&index.place_tables);
+    increment_memory_usage("places_tables", place_tables);
+    let scopes = ::get_size2::GetSize::get_heap_size(&index.scopes);
+    increment_memory_usage("scopes", scopes);
+    let scopes_by_expression = ::get_size2::GetSize::get_heap_size(&index.scopes_by_expression);
+    increment_memory_usage("scopes_by_expression", scopes_by_expression);
+    let definitions_by_node = ::get_size2::GetSize::get_heap_size(&index.definitions_by_node);
+    increment_memory_usage("definitions_by_node", definitions_by_node);
+    let expressions_by_node = ::get_size2::GetSize::get_heap_size(&index.expressions_by_node);
+    increment_memory_usage("expressions_by_node", expressions_by_node);
+    let scopes_by_node = ::get_size2::GetSize::get_heap_size(&index.scopes_by_node);
+    increment_memory_usage("scopes_by_node", scopes_by_node);
+    let scope_ids_by_scope = ::get_size2::GetSize::get_heap_size(&index.scope_ids_by_scope);
+    increment_memory_usage("scope_ids_by_scope", scope_ids_by_scope);
+    let use_def_maps = ::get_size2::GetSize::get_heap_size(&index.use_def_maps);
+    increment_memory_usage("use_def_maps", use_def_maps);
+    let ast_ids = ::get_size2::GetSize::get_heap_size(&index.ast_ids);
+    increment_memory_usage("ast_ids", ast_ids);
+    let imported_modules = ::get_size2::GetSize::get_heap_size(&index.imported_modules);
+    increment_memory_usage("imported_modules", imported_modules);
+    let has_future_annotations = ::get_size2::GetSize::get_heap_size(&index.has_future_annotations);
+    increment_memory_usage("has_future_annotations", has_future_annotations);
+    let enclosing_snapshots = ::get_size2::GetSize::get_heap_size(&index.enclosing_snapshots);
+    increment_memory_usage("enclosing_snapshots", enclosing_snapshots);
+    let semantic_syntax_errors = ::get_size2::GetSize::get_heap_size(&index.semantic_syntax_errors);
+    increment_memory_usage("semantic_syntax_errors", semantic_syntax_errors);
+    let generator_functions = ::get_size2::GetSize::get_heap_size(&index.generator_functions);
+    increment_memory_usage("generator_functions", generator_functions);
+
+    let total = place_tables
+        + scopes
+        + scopes_by_expression
+        + definitions_by_node
+        + expressions_by_node
+        + use_def_maps
+        + ast_ids
+        + scopes_by_node
+        + scope_ids_by_scope
+        + imported_modules
+        + has_future_annotations
+        + enclosing_snapshots
+        + semantic_syntax_errors
+        + generator_functions;
+
+    increment_memory_usage("semantic_index", total);
+    total
+}
+
+pub(crate) fn use_def_map_heap_size(map: &ArcUseDefMap<'_>) -> usize {
+    crate::semantic_index::use_def::use_def_map_size(&map.inner)
 }
 
 impl<'db> SemanticIndex<'db> {
