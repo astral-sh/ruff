@@ -24,7 +24,7 @@ use ruff_linter::rules::{
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
     flake8_import_conventions, flake8_pytest_style, flake8_quotes, flake8_self,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
+    pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 use ruff_linter::settings::types::{
     IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
@@ -497,6 +497,10 @@ pub struct LintOptions {
     /// Options for the `pydoclint` plugin.
     #[option_group]
     pub pydoclint: Option<PydoclintOptions>,
+
+    /// Options for the `refurb` plugin
+    #[option_group]
+    pub refurb: Option<RefurbOptions>,
 
     /// Options for the `ruff` plugin
     #[option_group]
@@ -3403,6 +3407,69 @@ impl PyUpgradeOptions {
     }
 }
 
+/// Options for the `refurb` plugin
+#[derive(
+    Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct RefurbOptions {
+    /// Define a list of classes. If a class `C` is a subclass of at least one class in this list,
+    /// `refurb` will allow `C` to explicitly set its metaclass to `abc.ABCMeta`, instead of
+    /// insisting on inheriting from `abc.ABC` instead.
+    ///
+    /// This is useful for classes that validate their base-classes at runtime.
+    ///
+    /// For example, if `SpecialBaseClass` is in the list, while `OtherBaseClass`
+    /// is not:
+    ///
+    /// ```python
+    /// class MyClass1(SpecialBaseClass, metaclass=abc.ABCMeta):  # this is allowed
+    ///    pass
+    ///
+    ///
+    /// class MyClass2(OtherBaseClass, metaclass=abc.ABCMeta):  # this will be linted
+    ///     pass
+    ///
+    ///
+    /// class MyClass2(OtherBaseClass, abc.ABC):  # instead this is the way to go
+    ///     pass
+    /// ```
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than
+    /// `Protocol`).
+    #[option(
+        default = r#"["typing.Protocol", "typing_extensions.Protocol"]"#,
+        value_type = "list[str]",
+        example = r#"allowed-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+    )]
+    pub allowed_abc_meta_bases: Option<FxHashSet<String>>,
+
+    /// A list of additional classes to [`allowed_abc_meta_bases`](#lint_refurb_allowed-abc-meta-bases).
+    ///
+    /// Expects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than
+    /// `Protocol`).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"extend-allowed-abc-meta-bases = ["my_package.SpecialBaseClass"]"#
+    )]
+    pub extend_allowed_abc_meta_bases: Option<FxHashSet<String>>,
+}
+
+impl RefurbOptions {
+    pub fn into_settings(self) -> refurb::settings::Settings {
+        refurb::settings::Settings {
+            allowed_abc_meta_bases: self
+                .allowed_abc_meta_bases
+                .unwrap_or_else(refurb::settings::default_allowed_abc_meta_bases)
+                .into_iter()
+                .chain(self.extend_allowed_abc_meta_bases.unwrap_or_default())
+                .collect(),
+        }
+    }
+}
+
 /// Options for the `ruff` plugin
 #[derive(
     Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
@@ -3917,6 +3984,7 @@ pub struct LintOptionsWire {
 
     exclude: Option<Vec<String>>,
     pydoclint: Option<PydoclintOptions>,
+    refurb: Option<RefurbOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
     typing_extensions: Option<bool>,
@@ -3973,6 +4041,7 @@ impl From<LintOptionsWire> for LintOptions {
             extend_per_file_ignores,
             exclude,
             pydoclint,
+            refurb,
             ruff,
             preview,
             typing_extensions,
@@ -4030,6 +4099,7 @@ impl From<LintOptionsWire> for LintOptions {
             },
             exclude,
             pydoclint,
+            refurb,
             ruff,
             preview,
             typing_extensions,

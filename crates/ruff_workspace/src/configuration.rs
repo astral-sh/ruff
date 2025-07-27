@@ -52,7 +52,8 @@ use crate::options::{
     Flake8QuotesOptions, Flake8SelfOptions, Flake8TidyImportsOptions, Flake8TypeCheckingOptions,
     Flake8UnusedArgumentsOptions, FormatOptions, IsortOptions, LintCommonOptions, LintOptions,
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
-    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
+    PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RefurbOptions,
+    RuffOptions,
 };
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, LineEnding, Settings,
@@ -440,6 +441,10 @@ impl Configuration {
                     .pyupgrade
                     .map(PyUpgradeOptions::into_settings)
                     .unwrap_or_default(),
+                refurb: lint
+                    .refurb
+                    .map(RefurbOptions::into_settings)
+                    .unwrap_or_default(),
                 ruff: lint
                     .ruff
                     .map(RuffOptions::into_settings)
@@ -679,6 +684,7 @@ pub struct LintConfiguration {
     pub pyflakes: Option<PyflakesOptions>,
     pub pylint: Option<PylintOptions>,
     pub pyupgrade: Option<PyUpgradeOptions>,
+    pub refurb: Option<RefurbOptions>,
     pub ruff: Option<RuffOptions>,
 }
 
@@ -796,6 +802,7 @@ impl LintConfiguration {
             pyflakes: options.common.pyflakes,
             pylint: options.common.pylint,
             pyupgrade: options.common.pyupgrade,
+            refurb: options.refurb,
             ruff: options.ruff,
         })
     }
@@ -1193,6 +1200,7 @@ impl LintConfiguration {
             pyflakes: self.pyflakes.combine(config.pyflakes),
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
+            refurb: self.refurb.combine(config.refurb),
             ruff: self.ruff.combine(config.ruff),
             typing_extensions: self.typing_extensions.or(config.typing_extensions),
             future_annotations: self.future_annotations.or(config.future_annotations),
