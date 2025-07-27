@@ -198,7 +198,7 @@ pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
 }
 
 /// The place tables and use-def maps for all scopes in a file.
-#[derive(Debug, Update)]
+#[derive(Debug, Update, get_size2::GetSize)]
 pub(crate) struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
     place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
