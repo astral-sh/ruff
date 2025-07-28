@@ -5,6 +5,8 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::preview::is_trailing_comma_type_params_enabled;
+use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -24,6 +26,8 @@ enum TokenType {
     Def,
     For,
     Lambda,
+    Class,
+    Type,
     Irrelevant,
 }
 
@@ -69,6 +73,8 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Lbrace => TokenType::OpeningCurlyBracket,
             TokenKind::Rbrace => TokenType::ClosingBracket,
             TokenKind::Def => TokenType::Def,
+            TokenKind::Class => TokenType::Class,
+            TokenKind::Type => TokenType::Type,
             TokenKind::For => TokenType::For,
             TokenKind::Lambda => TokenType::Lambda,
             // Import treated like a function.
@@ -98,6 +104,8 @@ enum ContextType {
     Dict,
     /// Lambda parameter list, e.g. `lambda a, b`.
     LambdaParameters,
+    /// Type parameter list, e.g. `def foo[T, U](): ...`
+    TypeParameters,
 }
 
 /// Comma context - described a comma-delimited "situation".
@@ -243,6 +251,7 @@ pub(crate) fn trailing_commas(
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
+    settings: &LinterSettings,
 ) {
     let mut fstrings = 0u32;
     let simple_tokens = tokens.iter().filter_map(|token| {
@@ -290,7 +299,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack);
+        let context = update_context(token, prev, prev_prev, &mut stack, settings);
 
         check_token(token, prev, prev_prev, context, locator, lint_context);
 
@@ -326,6 +335,7 @@ fn check_token(
             ContextType::No => false,
             ContextType::FunctionParameters => true,
             ContextType::CallArguments => true,
+            ContextType::TypeParameters => true,
             // `(1)` is not equivalent to `(1,)`.
             ContextType::Tuple => context.num_commas != 0,
             // `x[1]` is not equivalent to `x[1,]`.
@@ -408,6 +418,7 @@ fn update_context(
     prev: SimpleToken,
     prev_prev: SimpleToken,
     stack: &mut Vec<Context>,
+    settings: &LinterSettings,
 ) -> Context {
     let new_context = match token.ty {
         TokenType::OpeningBracket => match (prev.ty, prev_prev.ty) {
@@ -417,6 +428,17 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
+        TokenType::OpeningSquareBracket if is_trailing_comma_type_params_enabled(settings) => {
+            match (prev.ty, prev_prev.ty) {
+                (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
+                    Context::new(ContextType::TypeParameters)
+                }
+                (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
+                    Context::new(ContextType::Subscript)
+                }
+                _ => Context::new(ContextType::List),
+            }
+        }
         TokenType::OpeningSquareBracket => match prev.ty {
             TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
                 Context::new(ContextType::Subscript)
