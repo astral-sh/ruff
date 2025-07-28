@@ -3368,7 +3368,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default,
         } = node;
 
-        // My kingdom to be able to walk AST parent nodes.
+        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
+        // scope should have a child containing the class, function, or type alias definition. Find
+        // that scope and use its definition as the binding context.
         let typevar_scope = definition.file_scope(self.db());
         let child_scopes = self.index.child_scopes(typevar_scope);
         let binding_context = child_scopes
