@@ -2,6 +2,7 @@
 
 Implements the Distutils 'build_scripts' command.
 """
+
 from _typeshed import Incomplete
 from typing import ClassVar
 

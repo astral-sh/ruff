@@ -1,5 +1,5 @@
-"""create and manipulate C data types in Python
-"""
+"""create and manipulate C data types in Python"""
+
 import sys
 from _ctypes import (
     RTLD_GLOBAL as RTLD_GLOBAL,
@@ -50,9 +50,10 @@ if sys.version_info >= (3, 14):
     def POINTER(cls: str) -> type[Any]:
         """Create and return a new ctypes pointer type.
 
-Pointer types are cached and reused internally,
-so calling this function repeatedly is cheap.
-"""
+        Pointer types are cached and reused internally,
+        so calling this function repeatedly is cheap.
+        """
+
     @overload
     def POINTER(cls: None) -> type[c_void_p]: ...
     @overload
@@ -60,10 +61,10 @@ so calling this function repeatedly is cheap.
     def pointer(obj: _CT) -> _Pointer[_CT]:
         """Create a new pointer instance, pointing to 'obj'.
 
-The returned object is of the type POINTER(type(obj)). Note that if you
-just want to pass a pointer to an object to a foreign function call, you
-should use byref(obj) which is much faster.
-"""
+        The returned object is of the type POINTER(type(obj)). Note that if you
+        just want to pass a pointer to an object to a foreign function call, you
+        should use byref(obj) which is much faster.
+        """
 
 else:
     from _ctypes import POINTER as POINTER, pointer as pointer
@@ -91,18 +92,19 @@ else:
 
 class CDLL:
     """An instance of this class represents a loaded dll/shared
-library, exporting functions using the standard C calling
-convention (named 'cdecl' on Windows).
+    library, exporting functions using the standard C calling
+    convention (named 'cdecl' on Windows).
 
-The exported functions can be accessed as attributes, or by
-indexing with the function name.  Examples:
+    The exported functions can be accessed as attributes, or by
+    indexing with the function name.  Examples:
 
-<obj>.qsort -> callable object
-<obj>['qsort'] -> callable object
+    <obj>.qsort -> callable object
+    <obj>['qsort'] -> callable object
 
-Calling the functions releases the Python GIL during the call and
-reacquires it afterwards.
-"""
+    Calling the functions releases the Python GIL during the call and
+    reacquires it afterwards.
+    """
+
     _func_flags_: ClassVar[int]
     _func_restype_: ClassVar[type[_CDataType]]
     _name: str
@@ -123,20 +125,21 @@ reacquires it afterwards.
 if sys.platform == "win32":
     class OleDLL(CDLL):
         """This class represents a dll exporting functions using the
-Windows stdcall calling convention, and returning HRESULT.
-HRESULT error values are automatically raised as OSError
-exceptions.
-"""
+        Windows stdcall calling convention, and returning HRESULT.
+        HRESULT error values are automatically raised as OSError
+        exceptions.
+        """
+
     class WinDLL(CDLL):
         """This class represents a dll exporting functions using the
-Windows stdcall calling convention.
-"""
+        Windows stdcall calling convention.
+        """
 
 class PyDLL(CDLL):
     """This class represents the Python library itself.  It allows
-accessing Python API functions.  The GIL is not released, and
-Python exceptions are handled correctly.
-"""
+    accessing Python API functions.  The GIL is not released, and
+    Python exceptions are handled correctly.
+    """
 
 class LibraryLoader(Generic[_DLLT]):
     def __init__(self, dlltype: type[_DLLT]) -> None: ...
@@ -146,8 +149,8 @@ class LibraryLoader(Generic[_DLLT]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        """
 
 cdll: LibraryLoader[CDLL]
 if sys.platform == "win32":
@@ -177,20 +180,20 @@ def CFUNCTYPE(
     use_last_error: bool = False,
 ) -> type[_CFunctionType]:
     """CFUNCTYPE(restype, *argtypes,
-             use_errno=False, use_last_error=False) -> function prototype.
+                 use_errno=False, use_last_error=False) -> function prototype.
 
-restype: the result type
-argtypes: a sequence specifying the argument types
+    restype: the result type
+    argtypes: a sequence specifying the argument types
 
-The function prototype can be called in different ways to create a
-callable object:
+    The function prototype can be called in different ways to create a
+    callable object:
 
-prototype(integer address) -> foreign function
-prototype(callable) -> create and return a C callable function from callable
-prototype(integer index, method name[, paramflags]) -> foreign function calling a COM method
-prototype((ordinal number, dll object)[, paramflags]) -> foreign function exported by ordinal
-prototype((function name, dll object)[, paramflags]) -> foreign function exported by name
-"""
+    prototype(integer address) -> foreign function
+    prototype(callable) -> create and return a C callable function from callable
+    prototype(integer index, method name[, paramflags]) -> foreign function calling a COM method
+    prototype((ordinal number, dll object)[, paramflags]) -> foreign function exported by ordinal
+    prototype((function name, dll object)[, paramflags]) -> foreign function exported by name
+    """
 
 if sys.platform == "win32":
     def WINFUNCTYPE(
@@ -216,17 +219,18 @@ _CastT = TypeVar("_CastT", bound=_CanCastTo)
 def cast(obj: _CData | _CDataType | _CArgObject | int, typ: type[_CastT]) -> _CastT: ...
 def create_string_buffer(init: int | bytes, size: int | None = None) -> Array[c_char]:
     """create_string_buffer(aBytes) -> character array
-create_string_buffer(anInteger) -> character array
-create_string_buffer(aBytes, anInteger) -> character array
-"""
+    create_string_buffer(anInteger) -> character array
+    create_string_buffer(aBytes, anInteger) -> character array
+    """
 
 c_buffer = create_string_buffer
 
 def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_wchar]:
     """create_unicode_buffer(aString) -> character array
-create_unicode_buffer(anInteger) -> character array
-create_unicode_buffer(aString, anInteger) -> character array
-"""
+    create_unicode_buffer(anInteger) -> character array
+    create_unicode_buffer(aString, anInteger) -> character array
+    """
+
 @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
 def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
 def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to remove
@@ -262,8 +266,8 @@ memset: _MemsetFunctionType
 def string_at(ptr: _CVoidConstPLike, size: int = -1) -> bytes:
     """string_at(ptr[, size]) -> string
 
-Return the byte string at void *ptr.
-"""
+    Return the byte string at void *ptr.
+    """
 
 if sys.platform == "win32":
     def WinError(code: int | None = None, descr: str | None = None) -> OSError: ...
@@ -271,15 +275,15 @@ if sys.platform == "win32":
 def wstring_at(ptr: _CVoidConstPLike, size: int = -1) -> str:
     """wstring_at(ptr[, size]) -> string
 
-Return the wide-character string at void *ptr.
-"""
+    Return the wide-character string at void *ptr.
+    """
 
 if sys.version_info >= (3, 14):
     def memoryview_at(ptr: _CVoidConstPLike, size: int, readonly: bool = False) -> memoryview:
         """memoryview_at(ptr, size[, readonly]) -> memoryview
 
-Return a memoryview representing the memory at void *ptr.
-"""
+        Return a memoryview representing the memory at void *ptr.
+        """
 
 class py_object(_CanCastTo, _SimpleCData[_T]):
     _type_: ClassVar[Literal["O"]]
@@ -287,8 +291,8 @@ class py_object(_CanCastTo, _SimpleCData[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
-"""
+            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            """
 
 class c_bool(_SimpleCData[bool]):
     _type_: ClassVar[Literal["?"]]

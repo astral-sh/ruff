@@ -335,6 +335,7 @@ a 'global' command, e.g.:
 (Pdb) global list_options; list_options = ['-l']
 (Pdb)
 """
+
 import signal
 import sys
 from bdb import Bdb, _Backend
@@ -357,87 +358,89 @@ _Mode: TypeAlias = Literal["inline", "cli"]
 line_prefix: str  # undocumented
 
 class Restart(Exception):
-    """Causes a debugger to be restarted for the debugged python program.
-"""
+    """Causes a debugger to be restarted for the debugged python program."""
 
 def run(statement: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
     """Execute the *statement* (given as a string or a code object)
-under debugger control.
+    under debugger control.
 
-The debugger prompt appears before any code is executed; you can set
-breakpoints and type continue, or you can step through the statement
-using step or next.
+    The debugger prompt appears before any code is executed; you can set
+    breakpoints and type continue, or you can step through the statement
+    using step or next.
 
-The optional *globals* and *locals* arguments specify the
-environment in which the code is executed; by default the
-dictionary of the module __main__ is used (see the explanation of
-the built-in exec() or eval() functions.).
-"""
+    The optional *globals* and *locals* arguments specify the
+    environment in which the code is executed; by default the
+    dictionary of the module __main__ is used (see the explanation of
+    the built-in exec() or eval() functions.).
+    """
+
 def runeval(expression: str, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> Any:
     """Evaluate the *expression* (given as a string or a code object)
-under debugger control.
+    under debugger control.
 
-When runeval() returns, it returns the value of the expression.
-Otherwise this function is similar to run().
-"""
+    When runeval() returns, it returns the value of the expression.
+    Otherwise this function is similar to run().
+    """
+
 def runctx(statement: str, globals: dict[str, Any], locals: Mapping[str, Any]) -> None: ...
 def runcall(func: Callable[_P, _T], *args: _P.args, **kwds: _P.kwargs) -> _T | None:
     """Call the function (a function or method object, not a string)
-with the given arguments.
+    with the given arguments.
 
-When runcall() returns, it returns whatever the function call
-returned. The debugger prompt appears as soon as the function is
-entered.
-"""
+    When runcall() returns, it returns whatever the function call
+    returned. The debugger prompt appears as soon as the function is
+    entered.
+    """
 
 if sys.version_info >= (3, 14):
     def set_default_backend(backend: _Backend) -> None:
-        """Set the default backend to use for Pdb instances.
-"""
+        """Set the default backend to use for Pdb instances."""
+
     def get_default_backend() -> _Backend:
-        """Get the default backend to use for Pdb instances.
-"""
+        """Get the default backend to use for Pdb instances."""
+
     def set_trace(*, header: str | None = None, commands: Iterable[str] | None = None) -> None:
         """Enter the debugger at the calling stack frame.
 
-This is useful to hard-code a breakpoint at a given point in a
-program, even if the code is not otherwise being debugged (e.g. when
-an assertion fails). If given, *header* is printed to the console
-just before debugging begins. *commands* is an optional list of
-pdb commands to run when the debugger starts.
-"""
+        This is useful to hard-code a breakpoint at a given point in a
+        program, even if the code is not otherwise being debugged (e.g. when
+        an assertion fails). If given, *header* is printed to the console
+        just before debugging begins. *commands* is an optional list of
+        pdb commands to run when the debugger starts.
+        """
+
     async def set_trace_async(*, header: str | None = None, commands: Iterable[str] | None = None) -> None:
         """Enter the debugger at the calling stack frame, but in async mode.
 
-This should be used as await pdb.set_trace_async(). Users can do await
-if they enter the debugger with this function. Otherwise it's the same
-as set_trace().
-"""
+        This should be used as await pdb.set_trace_async(). Users can do await
+        if they enter the debugger with this function. Otherwise it's the same
+        as set_trace().
+        """
 
 else:
     def set_trace(*, header: str | None = None) -> None:
         """Enter the debugger at the calling stack frame.
 
-This is useful to hard-code a breakpoint at a given point in a
-program, even if the code is not otherwise being debugged (e.g. when
-an assertion fails). If given, *header* is printed to the console
-just before debugging begins.
-"""
+        This is useful to hard-code a breakpoint at a given point in a
+        program, even if the code is not otherwise being debugged (e.g. when
+        an assertion fails). If given, *header* is printed to the console
+        just before debugging begins.
+        """
 
 def post_mortem(t: TracebackType | None = None) -> None:
     """Enter post-mortem debugging of the given *traceback*, or *exception*
-object.
+    object.
 
-If no traceback is given, it uses the one of the exception that is
-currently being handled (an exception must be being handled if the
-default is to be used).
+    If no traceback is given, it uses the one of the exception that is
+    currently being handled (an exception must be being handled if the
+    default is to be used).
 
-If `t` is an exception object, the `exceptions` command makes it possible to
-list and inspect its chained exceptions (if any).
-"""
+    If `t` is an exception object, the `exceptions` command makes it possible to
+    list and inspect its chained exceptions (if any).
+    """
+
 def pm() -> None:
-    """Enter post-mortem debugging of the traceback found in sys.last_exc.
-"""
+    """Enter post-mortem debugging of the traceback found in sys.last_exc."""
 
 class Pdb(Bdb, Cmd):
     # Everything here is undocumented, except for __init__
@@ -500,12 +503,11 @@ class Pdb(Bdb, Cmd):
 
     def bp_commands(self, frame: FrameType) -> bool:
         """Call every command that was set for the current active breakpoint
-(if there is one).
+        (if there is one).
 
-Returns True if the normal interaction function must be called,
-False otherwise.
-"""
-
+        Returns True if the normal interaction function must be called,
+        False otherwise.
+        """
     if sys.version_info >= (3, 13):
         def interaction(self, frame: FrameType | None, tb_or_exc: TracebackType | BaseException | None) -> None: ...
     else:
@@ -513,29 +515,30 @@ False otherwise.
 
     def displayhook(self, obj: object) -> None:
         """Custom displayhook for the exec in default(), which prevents
-assignment of the _ variable in the builtins.
-"""
+        assignment of the _ variable in the builtins.
+        """
+
     def handle_command_def(self, line: str) -> bool:
-        """Handles one command line during command list definition.
-"""
+        """Handles one command line during command list definition."""
+
     def defaultFile(self) -> str:
-        """Produce a reasonable default.
-"""
+        """Produce a reasonable default."""
+
     def lineinfo(self, identifier: str) -> tuple[None, None, None] | tuple[str, str, int]: ...
     if sys.version_info >= (3, 14):
         def checkline(self, filename: str, lineno: int, module_globals: _ModuleGlobals | None = None) -> int:
             """Check whether specified line seems to be executable.
 
-Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
-line or EOF). Warning: testing is not comprehensive.
-"""
+            Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
+            line or EOF). Warning: testing is not comprehensive.
+            """
     else:
         def checkline(self, filename: str, lineno: int) -> int:
             """Check whether specified line seems to be executable.
 
-Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
-line or EOF). Warning: testing is not comprehensive.
-"""
+            Return `lineno` if it is, 0 if not (e.g. a docstring, comment, blank
+            line or EOF). Warning: testing is not comprehensive.
+            """
 
     def _getval(self, arg: str) -> object: ...
     if sys.version_info >= (3, 14):
@@ -547,16 +550,16 @@ line or EOF). Warning: testing is not comprehensive.
     def lookupmodule(self, filename: str) -> str | None:
         """Helper function for break/clear parsing -- may be overridden.
 
-lookupmodule() translates (possibly incomplete) file or module name
-into an absolute file name.
+        lookupmodule() translates (possibly incomplete) file or module name
+        into an absolute file name.
 
-filename could be in format of:
-    * an absolute path like '/path/to/file.py'
-    * a relative path like 'file.py' or 'dir/file.py'
-    * a module name like 'module' or 'package.module'
+        filename could be in format of:
+            * an absolute path like '/path/to/file.py'
+            * a relative path like 'file.py' or 'dir/file.py'
+            * a module name like 'module' or 'package.module'
 
-files and modules will be searched in sys.path.
-"""
+        files and modules will be searched in sys.path.
+        """
     if sys.version_info < (3, 11):
         def _runscript(self, filename: str) -> None: ...
 
@@ -568,286 +571,314 @@ files and modules will be searched in sys.path.
 
     def do_commands(self, arg: str) -> bool | None:
         """(Pdb) commands [bpnumber]
-(com) ...
-(com) end
-(Pdb)
+        (com) ...
+        (com) end
+        (Pdb)
 
-Specify a list of commands for breakpoint number bpnumber.
-The commands themselves are entered on the following lines.
-Type a line containing just 'end' to terminate the commands.
-The commands are executed when the breakpoint is hit.
+        Specify a list of commands for breakpoint number bpnumber.
+        The commands themselves are entered on the following lines.
+        Type a line containing just 'end' to terminate the commands.
+        The commands are executed when the breakpoint is hit.
 
-To remove all commands from a breakpoint, type commands and
-follow it immediately with end; that is, give no commands.
+        To remove all commands from a breakpoint, type commands and
+        follow it immediately with end; that is, give no commands.
 
-With no bpnumber argument, commands refers to the last
-breakpoint set.
+        With no bpnumber argument, commands refers to the last
+        breakpoint set.
 
-You can use breakpoint commands to start your program up
-again.  Simply use the continue command, or step, or any other
-command that resumes execution.
+        You can use breakpoint commands to start your program up
+        again.  Simply use the continue command, or step, or any other
+        command that resumes execution.
 
-Specifying any command resuming execution (currently continue,
-step, next, return, jump, quit and their abbreviations)
-terminates the command list (as if that command was
-immediately followed by end).  This is because any time you
-resume execution (even with a simple next or step), you may
-encounter another breakpoint -- which could have its own
-command list, leading to ambiguities about which list to
-execute.
+        Specifying any command resuming execution (currently continue,
+        step, next, return, jump, quit and their abbreviations)
+        terminates the command list (as if that command was
+        immediately followed by end).  This is because any time you
+        resume execution (even with a simple next or step), you may
+        encounter another breakpoint -- which could have its own
+        command list, leading to ambiguities about which list to
+        execute.
 
-If you use the 'silent' command in the command list, the usual
-message about stopping at a breakpoint is not printed.  This
-may be desirable for breakpoints that are to print a specific
-message and then continue.  If none of the other commands
-print anything, you will see no sign that the breakpoint was
-reached.
-"""
+        If you use the 'silent' command in the command list, the usual
+        message about stopping at a breakpoint is not printed.  This
+        may be desirable for breakpoints that are to print a specific
+        message and then continue.  If none of the other commands
+        print anything, you will see no sign that the breakpoint was
+        reached.
+        """
+
     def do_break(self, arg: str, temporary: bool = ...) -> bool | None:
         """b(reak) [ ([filename:]lineno | function) [, condition] ]
 
-Without argument, list all breaks.
+        Without argument, list all breaks.
 
-With a line number argument, set a break at this line in the
-current file.  With a function name, set a break at the first
-executable line of that function.  If a second argument is
-present, it is a string specifying an expression which must
-evaluate to true before the breakpoint is honored.
+        With a line number argument, set a break at this line in the
+        current file.  With a function name, set a break at the first
+        executable line of that function.  If a second argument is
+        present, it is a string specifying an expression which must
+        evaluate to true before the breakpoint is honored.
 
-The line number may be prefixed with a filename and a colon,
-to specify a breakpoint in another file (probably one that
-hasn't been loaded yet).  The file is searched for on
-sys.path; the .py suffix may be omitted.
-"""
+        The line number may be prefixed with a filename and a colon,
+        to specify a breakpoint in another file (probably one that
+        hasn't been loaded yet).  The file is searched for on
+        sys.path; the .py suffix may be omitted.
+        """
+
     def do_tbreak(self, arg: str) -> bool | None:
         """tbreak [ ([filename:]lineno | function) [, condition] ]
 
-Same arguments as break, but sets a temporary breakpoint: it
-is automatically deleted when first hit.
-"""
+        Same arguments as break, but sets a temporary breakpoint: it
+        is automatically deleted when first hit.
+        """
+
     def do_enable(self, arg: str) -> bool | None:
         """enable bpnumber [bpnumber ...]
 
-Enables the breakpoints given as a space separated list of
-breakpoint numbers.
-"""
+        Enables the breakpoints given as a space separated list of
+        breakpoint numbers.
+        """
+
     def do_disable(self, arg: str) -> bool | None:
         """disable bpnumber [bpnumber ...]
 
-Disables the breakpoints given as a space separated list of
-breakpoint numbers.  Disabling a breakpoint means it cannot
-cause the program to stop execution, but unlike clearing a
-breakpoint, it remains in the list of breakpoints and can be
-(re-)enabled.
-"""
+        Disables the breakpoints given as a space separated list of
+        breakpoint numbers.  Disabling a breakpoint means it cannot
+        cause the program to stop execution, but unlike clearing a
+        breakpoint, it remains in the list of breakpoints and can be
+        (re-)enabled.
+        """
+
     def do_condition(self, arg: str) -> bool | None:
         """condition bpnumber [condition]
 
-Set a new condition for the breakpoint, an expression which
-must evaluate to true before the breakpoint is honored.  If
-condition is absent, any existing condition is removed; i.e.,
-the breakpoint is made unconditional.
-"""
+        Set a new condition for the breakpoint, an expression which
+        must evaluate to true before the breakpoint is honored.  If
+        condition is absent, any existing condition is removed; i.e.,
+        the breakpoint is made unconditional.
+        """
+
     def do_ignore(self, arg: str) -> bool | None:
         """ignore bpnumber [count]
 
-Set the ignore count for the given breakpoint number.  If
-count is omitted, the ignore count is set to 0.  A breakpoint
-becomes active when the ignore count is zero.  When non-zero,
-the count is decremented each time the breakpoint is reached
-and the breakpoint is not disabled and any associated
-condition evaluates to true.
-"""
+        Set the ignore count for the given breakpoint number.  If
+        count is omitted, the ignore count is set to 0.  A breakpoint
+        becomes active when the ignore count is zero.  When non-zero,
+        the count is decremented each time the breakpoint is reached
+        and the breakpoint is not disabled and any associated
+        condition evaluates to true.
+        """
+
     def do_clear(self, arg: str) -> bool | None:
         """cl(ear) [filename:lineno | bpnumber ...]
 
-With a space separated list of breakpoint numbers, clear
-those breakpoints.  Without argument, clear all breaks (but
-first ask confirmation).  With a filename:lineno argument,
-clear all breaks at that line in that file.
-"""
+        With a space separated list of breakpoint numbers, clear
+        those breakpoints.  Without argument, clear all breaks (but
+        first ask confirmation).  With a filename:lineno argument,
+        clear all breaks at that line in that file.
+        """
+
     def do_where(self, arg: str) -> bool | None:
         """w(here) [count]
 
-Print a stack trace. If count is not specified, print the full stack.
-If count is 0, print the current frame entry. If count is positive,
-print count entries from the most recent frame. If count is negative,
-print -count entries from the least recent frame.
-An arrow indicates the "current frame", which determines the
-context of most commands.  'bt' is an alias for this command.
-"""
+        Print a stack trace. If count is not specified, print the full stack.
+        If count is 0, print the current frame entry. If count is positive,
+        print count entries from the most recent frame. If count is negative,
+        print -count entries from the least recent frame.
+        An arrow indicates the "current frame", which determines the
+        context of most commands.  'bt' is an alias for this command.
+        """
     if sys.version_info >= (3, 13):
         def do_exceptions(self, arg: str) -> bool | None:
             """exceptions [number]
 
-List or change current exception in an exception chain.
+            List or change current exception in an exception chain.
 
-Without arguments, list all the current exception in the exception
-chain. Exceptions will be numbered, with the current exception indicated
-with an arrow.
+            Without arguments, list all the current exception in the exception
+            chain. Exceptions will be numbered, with the current exception indicated
+            with an arrow.
 
-If given an integer as argument, switch to the exception at that index.
-"""
+            If given an integer as argument, switch to the exception at that index.
+            """
 
     def do_up(self, arg: str) -> bool | None:
         """u(p) [count]
 
-Move the current frame count (default one) levels up in the
-stack trace (to an older frame).
-"""
+        Move the current frame count (default one) levels up in the
+        stack trace (to an older frame).
+        """
+
     def do_down(self, arg: str) -> bool | None:
         """d(own) [count]
 
-Move the current frame count (default one) levels down in the
-stack trace (to a newer frame).
-"""
+        Move the current frame count (default one) levels down in the
+        stack trace (to a newer frame).
+        """
+
     def do_until(self, arg: str) -> bool | None:
         """unt(il) [lineno]
 
-Without argument, continue execution until the line with a
-number greater than the current one is reached.  With a line
-number, continue execution until a line with a number greater
-or equal to that is reached.  In both cases, also stop when
-the current frame returns.
-"""
+        Without argument, continue execution until the line with a
+        number greater than the current one is reached.  With a line
+        number, continue execution until a line with a number greater
+        or equal to that is reached.  In both cases, also stop when
+        the current frame returns.
+        """
+
     def do_step(self, arg: str) -> bool | None:
         """s(tep)
 
-Execute the current line, stop at the first possible occasion
-(either in a function that is called or in the current
-function).
-"""
+        Execute the current line, stop at the first possible occasion
+        (either in a function that is called or in the current
+        function).
+        """
+
     def do_next(self, arg: str) -> bool | None:
         """n(ext)
 
-Continue execution until the next line in the current function
-is reached or it returns.
-"""
+        Continue execution until the next line in the current function
+        is reached or it returns.
+        """
+
     def do_run(self, arg: str) -> bool | None:
         """run [args...]
 
-Restart the debugged python program. If a string is supplied
-it is split with "shlex", and the result is used as the new
-sys.argv.  History, breakpoints, actions and debugger options
-are preserved.  "restart" is an alias for "run".
-"""
+        Restart the debugged python program. If a string is supplied
+        it is split with "shlex", and the result is used as the new
+        sys.argv.  History, breakpoints, actions and debugger options
+        are preserved.  "restart" is an alias for "run".
+        """
+
     def do_return(self, arg: str) -> bool | None:
         """r(eturn)
 
-Continue execution until the current function returns.
-"""
+        Continue execution until the current function returns.
+        """
+
     def do_continue(self, arg: str) -> bool | None:
         """c(ont(inue))
 
-Continue execution, only stop when a breakpoint is encountered.
-"""
+        Continue execution, only stop when a breakpoint is encountered.
+        """
+
     def do_jump(self, arg: str) -> bool | None:
         """j(ump) lineno
 
-Set the next line that will be executed.  Only available in
-the bottom-most frame.  This lets you jump back and execute
-code again, or jump forward to skip code that you don't want
-to run.
+        Set the next line that will be executed.  Only available in
+        the bottom-most frame.  This lets you jump back and execute
+        code again, or jump forward to skip code that you don't want
+        to run.
 
-It should be noted that not all jumps are allowed -- for
-instance it is not possible to jump into the middle of a
-for loop or out of a finally clause.
-"""
+        It should be noted that not all jumps are allowed -- for
+        instance it is not possible to jump into the middle of a
+        for loop or out of a finally clause.
+        """
+
     def do_debug(self, arg: str) -> bool | None:
         """debug code
 
-Enter a recursive debugger that steps through the code
-argument (which is an arbitrary expression or statement to be
-executed in the current environment).
-"""
+        Enter a recursive debugger that steps through the code
+        argument (which is an arbitrary expression or statement to be
+        executed in the current environment).
+        """
+
     def do_quit(self, arg: str) -> bool | None:
         """q(uit) | exit
 
-Quit from the debugger. The program being executed is aborted.
-"""
+        Quit from the debugger. The program being executed is aborted.
+        """
+
     def do_EOF(self, arg: str) -> bool | None:
         """EOF
 
-Handles the receipt of EOF as a command.
-"""
+        Handles the receipt of EOF as a command.
+        """
+
     def do_args(self, arg: str) -> bool | None:
         """a(rgs)
 
-Print the argument list of the current function.
-"""
+        Print the argument list of the current function.
+        """
+
     def do_retval(self, arg: str) -> bool | None:
         """retval
 
-Print the return value for the last return of a function.
-"""
+        Print the return value for the last return of a function.
+        """
+
     def do_p(self, arg: str) -> bool | None:
         """p expression
 
-Print the value of the expression.
-"""
+        Print the value of the expression.
+        """
+
     def do_pp(self, arg: str) -> bool | None:
         """pp expression
 
-Pretty-print the value of the expression.
-"""
+        Pretty-print the value of the expression.
+        """
+
     def do_list(self, arg: str) -> bool | None:
         """l(ist) [first[, last] | .]
 
-List source code for the current file.  Without arguments,
-list 11 lines around the current line or continue the previous
-listing.  With . as argument, list 11 lines around the current
-line.  With one argument, list 11 lines starting at that line.
-With two arguments, list the given range; if the second
-argument is less than the first, it is a count.
+        List source code for the current file.  Without arguments,
+        list 11 lines around the current line or continue the previous
+        listing.  With . as argument, list 11 lines around the current
+        line.  With one argument, list 11 lines starting at that line.
+        With two arguments, list the given range; if the second
+        argument is less than the first, it is a count.
 
-The current line in the current frame is indicated by "->".
-If an exception is being debugged, the line where the
-exception was originally raised or propagated is indicated by
-">>", if it differs from the current line.
-"""
+        The current line in the current frame is indicated by "->".
+        If an exception is being debugged, the line where the
+        exception was originally raised or propagated is indicated by
+        ">>", if it differs from the current line.
+        """
+
     def do_whatis(self, arg: str) -> bool | None:
         """whatis expression
 
-Print the type of the argument.
-"""
+        Print the type of the argument.
+        """
+
     def do_alias(self, arg: str) -> bool | None:
         """alias [name [command]]
 
-Create an alias called 'name' that executes 'command'.  The
-command must *not* be enclosed in quotes.  Replaceable
-parameters can be indicated by %1, %2, and so on, while %* is
-replaced by all the parameters.  If no command is given, the
-current alias for name is shown. If no name is given, all
-aliases are listed.
+        Create an alias called 'name' that executes 'command'.  The
+        command must *not* be enclosed in quotes.  Replaceable
+        parameters can be indicated by %1, %2, and so on, while %* is
+        replaced by all the parameters.  If no command is given, the
+        current alias for name is shown. If no name is given, all
+        aliases are listed.
 
-Aliases may be nested and can contain anything that can be
-legally typed at the pdb prompt.  Note!  You *can* override
-internal pdb commands with aliases!  Those internal commands
-are then hidden until the alias is removed.  Aliasing is
-recursively applied to the first word of the command line; all
-other words in the line are left alone.
+        Aliases may be nested and can contain anything that can be
+        legally typed at the pdb prompt.  Note!  You *can* override
+        internal pdb commands with aliases!  Those internal commands
+        are then hidden until the alias is removed.  Aliasing is
+        recursively applied to the first word of the command line; all
+        other words in the line are left alone.
 
-As an example, here are two useful aliases (especially when
-placed in the .pdbrc file):
+        As an example, here are two useful aliases (especially when
+        placed in the .pdbrc file):
 
-# Print instance variables (usage "pi classInst")
-alias pi for k in %1.__dict__.keys(): print("%1.",k,"=",%1.__dict__[k])
-# Print instance variables in self
-alias ps pi self
-"""
+        # Print instance variables (usage "pi classInst")
+        alias pi for k in %1.__dict__.keys(): print("%1.",k,"=",%1.__dict__[k])
+        # Print instance variables in self
+        alias ps pi self
+        """
+
     def do_unalias(self, arg: str) -> bool | None:
         """unalias name
 
-Delete the specified alias.
-"""
+        Delete the specified alias.
+        """
+
     def do_help(self, arg: str) -> bool | None:
         """h(elp)
 
-Without argument, print the list of available commands.
-With a command name as argument, print help about that command.
-"help pdb" shows the full pdb documentation.
-"help exec" gives help on the ! command.
-"""
+        Without argument, print the list of available commands.
+        With a command name as argument, print help about that command.
+        "help pdb" shows the full pdb documentation.
+        "help exec" gives help on the ! command.
+        """
     do_b = do_break
     do_cl = do_clear
     do_w = do_where
@@ -871,17 +902,18 @@ With a command name as argument, print help about that command.
     def help_exec(self) -> None:
         """(!) statement
 
-Execute the (one-line) statement in the context of the current
-stack frame.  The exclamation point can be omitted unless the
-first word of the statement resembles a debugger command, e.g.:
-(Pdb) ! n=42
-(Pdb)
+        Execute the (one-line) statement in the context of the current
+        stack frame.  The exclamation point can be omitted unless the
+        first word of the statement resembles a debugger command, e.g.:
+        (Pdb) ! n=42
+        (Pdb)
 
-To assign to a global variable you must always prefix the command with
-a 'global' command, e.g.:
-(Pdb) global list_options; list_options = ['-l']
-(Pdb)
-"""
+        To assign to a global variable you must always prefix the command with
+        a 'global' command, e.g.:
+        (Pdb) global list_options; list_options = ['-l']
+        (Pdb)
+        """
+
     def help_pdb(self) -> None: ...
     def sigint_handler(self, signum: signal.Signals, frame: FrameType) -> None: ...
     if sys.version_info >= (3, 13):
@@ -897,43 +929,45 @@ a 'global' command, e.g.:
 
     def _select_frame(self, number: int) -> None: ...
     def _getval_except(self, arg: str, frame: FrameType | None = None) -> object: ...
-    def _print_lines(
-        self, lines: Sequence[str], start: int, breaks: Sequence[int] = (), frame: FrameType | None = None
-    ) -> None:
-        """Print a range of lines.
-"""
+    def _print_lines(self, lines: Sequence[str], start: int, breaks: Sequence[int] = (), frame: FrameType | None = None) -> None:
+        """Print a range of lines."""
+
     def _cmdloop(self) -> None: ...
     def do_display(self, arg: str) -> bool | None:
         """display [expression]
 
-Display the value of the expression if it changed, each time execution
-stops in the current frame.
+        Display the value of the expression if it changed, each time execution
+        stops in the current frame.
 
-Without expression, list all display expressions for the current frame.
-"""
+        Without expression, list all display expressions for the current frame.
+        """
+
     def do_interact(self, arg: str) -> bool | None:
         """interact
 
-Start an interactive interpreter whose global namespace
-contains all the (global and local) names found in the current scope.
-"""
+        Start an interactive interpreter whose global namespace
+        contains all the (global and local) names found in the current scope.
+        """
+
     def do_longlist(self, arg: str) -> bool | None:
         """ll | longlist
 
-List the whole source code for the current function or frame.
-"""
+        List the whole source code for the current function or frame.
+        """
+
     def do_source(self, arg: str) -> bool | None:
         """source expression
 
-Try to get source code for the given object and display it.
-"""
+        Try to get source code for the given object and display it.
+        """
+
     def do_undisplay(self, arg: str) -> bool | None:
         """undisplay [expression]
 
-Do not display the expression any more in the current frame.
+        Do not display the expression any more in the current frame.
 
-Without expression, clear all display expressions for the current frame.
-"""
+        Without expression, clear all display expressions for the current frame.
+        """
     do_ll = do_longlist
     def _complete_location(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
     def _complete_bpnumber(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...
@@ -973,6 +1007,6 @@ if sys.version_info < (3, 10):
 def lasti2lineno(code: CodeType, lasti: int) -> int: ...
 
 class _rstr(str):
-    """String that doesn't quote its repr.
-"""
+    """String that doesn't quote its repr."""
+
     def __repr__(self) -> Self: ...

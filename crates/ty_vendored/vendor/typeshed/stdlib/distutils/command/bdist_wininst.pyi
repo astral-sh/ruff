@@ -3,6 +3,7 @@
 Implements the Distutils 'bdist_wininst' command: create a windows installer
 exe-program.
 """
+
 from _typeshed import StrOrBytesPath
 from distutils.cmd import Command
 from typing import ClassVar

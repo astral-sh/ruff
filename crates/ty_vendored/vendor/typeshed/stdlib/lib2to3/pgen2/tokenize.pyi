@@ -22,6 +22,7 @@ are the same, except instead of generating tokens, tokeneater is a callback
 function to which the 5 fields described above are passed as 5 arguments,
 each time a new token is found.
 """
+
 from collections.abc import Callable, Iterable, Iterator
 from typing_extensions import TypeAlias
 
@@ -146,6 +147,7 @@ def untokenize(iterable: Iterable[_TokenInfo]) -> str:
         t2 = [tok[:2] for tokin generate_tokens(readline)]
         assert t1 == t2
     """
+
 def generate_tokens(readline: Callable[[], str]) -> Iterator[_TokenInfo]:
     """
     The generate_tokens() generator requires one argument, readline, which
