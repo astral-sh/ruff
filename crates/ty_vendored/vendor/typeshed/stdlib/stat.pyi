@@ -1,3 +1,7 @@
+"""Constants/functions for interpreting results of os.stat() and os.lstat().
+
+Suggested usage: from stat import *
+"""
 import sys
 from _stat import *
 from typing import Final

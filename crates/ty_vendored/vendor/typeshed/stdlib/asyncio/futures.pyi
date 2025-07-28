@@ -1,3 +1,5 @@
+"""A Future class similar to the one in PEP 3148.
+"""
 import sys
 from _asyncio import Future as Future
 from concurrent.futures._base import Future as _ConcurrentFuture
@@ -16,4 +18,6 @@ else:
 
 _T = TypeVar("_T")
 
-def wrap_future(future: _ConcurrentFuture[_T] | Future[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]: ...
+def wrap_future(future: _ConcurrentFuture[_T] | Future[_T], *, loop: AbstractEventLoop | None = None) -> Future[_T]:
+    """Wrap concurrent.futures.Future object.
+"""
