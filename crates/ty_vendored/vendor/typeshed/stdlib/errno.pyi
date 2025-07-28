@@ -1,17 +1,3 @@
-"""This module makes available standard errno system symbols.
-
-The value of each symbol is the corresponding integer value,
-e.g., on most systems, errno.ENOENT equals the integer 2.
-
-The dictionary errno.errorcode maps numeric codes to symbol names,
-e.g., errno.errorcode[2] could be the string 'ENOENT'.
-
-Symbols that are not relevant to the underlying system are not defined.
-
-To map error codes to error messages, use the function os.strerror(),
-e.g. os.strerror(2) could return 'No such file or directory'.
-"""
-
 import sys
 from collections.abc import Mapping
 
