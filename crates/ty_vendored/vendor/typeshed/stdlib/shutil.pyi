@@ -344,7 +344,16 @@ else:
 if sys.platform == "win32" and sys.version_info < (3, 12):
     @overload
     @deprecated("On Windows before Python 3.12, using a PathLike as `cmd` would always fail or return `None`.")
-    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn: ...
+    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn:
+        """Given a command, mode, and a PATH string, return the path which
+    conforms to the given mode on the PATH, or None if there is no such
+    file.
+
+    `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
+    of os.environ.get("PATH"), or can be overridden with a custom search
+    path.
+
+    """
 
 @overload
 def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | None:
