@@ -57,6 +57,8 @@ jobs:
       - name: Compute diagnostic diff
         shell: bash
         run: |
+          RUFF_DIR="$GITHUB_WORKSPACE/ruff"
+
           # Build the executable for the old and new commit
           (
             cd ruff
@@ -76,13 +78,13 @@ jobs:
           )
 
           (
-            cd conformance/tests
+            cd typing/conformance/tests
 
             echo "Running ty on old commit (merge base)"
-            ../../../ruff/ty-old check --color=never --output-format=concise . > ../../../old-output.txt 2>&1 || true
+            "$RUFF_DIR/ty-old" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/old-output.txt" 2>&1 || true
 
             echo "Running ty on new commit"
-            ../../../ruff/ty-new check --color=never --output-format=concise . > ../../../new-output.txt 2>&1 || true
+            "$RUFF_DIR/ty-new" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/new-output.txt" 2>&1 || true
           )
 
           if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
