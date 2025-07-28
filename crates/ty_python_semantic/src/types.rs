@@ -1730,8 +1730,6 @@ impl<'db> Type<'db> {
                     Ok(()) => Ok(()),
                     Err(mut e1) => {
                         if relation.is_assignability() {
-                            Ok(())
-                        } else {
                             match other.try_has_relation_to(
                                 db,
                                 KnownClass::Type.to_instance(db),
@@ -1743,6 +1741,8 @@ impl<'db> Type<'db> {
                                     Err(e1)
                                 }
                             }
+                        } else {
+                            Err(e1)
                         }
                     }
                 }
