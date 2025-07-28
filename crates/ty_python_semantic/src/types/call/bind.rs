@@ -1026,10 +1026,7 @@ impl<'db> Bindings<'db> {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
                             if let [Some(argument)] = overload.parameter_types() {
-                                let tuple_spec = argument.try_iterate(db).expect(
-                                    "try_iterate() should not fail on a type \
-                                        assignable to `Iterable`",
-                                );
+                                let tuple_spec = argument.iterate(db);
                                 overload.set_return_type(Type::tuple(TupleType::new(
                                     db,
                                     tuple_spec.as_ref(),
