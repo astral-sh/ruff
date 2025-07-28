@@ -571,10 +571,20 @@ impl<'db> ClassType<'db> {
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as ClassVars are considered.
     ///
+    /// You must provide the `inherited_generic_context` that we should use for the `__new__` or
+    /// `__init__` member. This is inherited from the containing class -­but importantly, from the
+    /// class that the lookup is being performed on, and not the class containing the (possibly
+    /// inherited) member.
+    ///
     /// Returns [`Place::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
         fn synthesize_getitem_overload_signature<'db>(
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
@@ -590,7 +600,7 @@ impl<'db> ClassType<'db> {
 
         let fallback_member_lookup = || {
             class_literal
-                .own_class_member(db, specialization, name)
+                .own_class_member(db, inherited_generic_context, specialization, name)
                 .map_type(|ty| ty.apply_optional_specialization(db, specialization))
         };
 
@@ -1668,7 +1678,10 @@ impl<'db> ClassLiteral<'db> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                        lookup_error.or_fall_back_to(
+                            db,
+                            class.own_class_member(db, self.generic_context(db), name),
+                        )
                     });
                 }
             }
@@ -1716,6 +1729,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn own_class_member(
         self,
         db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
@@ -1744,7 +1758,7 @@ impl<'db> ClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (self.generic_context(db), ty, specialization, name) {
+            match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
                     Type::FunctionLiteral(function),
@@ -1926,7 +1940,7 @@ impl<'db> ClassLiteral<'db> {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
                     .into_class_literal()?
-                    .own_class_member(db, None, name)
+                    .own_class_member(db, self.generic_context(db), None, name)
                     .place
                     .ignore_possibly_unbound()
             }
@@ -4321,7 +4335,9 @@ enum SlotsKind {
 
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
-        let Place::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").place
+        let Place::Type(slots_ty, bound) = base
+            .own_class_member(db, base.generic_context(db), None, "__slots__")
+            .place
         else {
             return Self::NotSpecified;
         };
