@@ -1,5 +1,3 @@
-use std::panic::AssertUnwindSafe;
-
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
@@ -25,7 +23,7 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     fn run(
-        snapshot: AssertUnwindSafe<SessionSnapshot>,
+        snapshot: SessionSnapshot,
         _client: &Client,
         _params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
