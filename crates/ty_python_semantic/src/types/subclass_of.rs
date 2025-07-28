@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
-    TypeRelationError, TypeTransformer, TypeVarInstance,
+    TypeRelationResult, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -148,28 +148,16 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                if relation.is_assignability() {
-                    Ok(())
-                } else {
-                    Err(TypeRelationError::todo())
-                }
+                relation.is_assignability().into()
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                if other_class.is_object(db) || relation.is_assignability() {
-                    Ok(())
-                } else {
-                    Err(TypeRelationError::todo())
-                }
+                (other_class.is_object(db) || relation.is_assignability()).into()
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                if relation.is_assignability() {
-                    Ok(())
-                } else {
-                    Err(TypeRelationError::todo())
-                }
+                relation.is_assignability().into()
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,

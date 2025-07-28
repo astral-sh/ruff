@@ -19,7 +19,8 @@ use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expr
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    TypeMapping, TypeRelation, TypeRelationError, TypeRelationErrorKind, TypeVarInstance, todo_type,
+    TypeMapping, TypeRelation, TypeRelationError, TypeRelationErrorKind, TypeRelationResult,
+    TypeVarInstance, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -104,7 +105,7 @@ impl<'db> CallableSignature<'db> {
     }
 
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.try_is_subtype_of(db, other).is_ok()
+        self.try_is_subtype_of(db, other).is_pass()
     }
 
     pub(crate) fn try_has_relation_to(
@@ -112,7 +113,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         match relation {
             TypeRelation::Subtyping => self.try_is_subtype_of(db, other),
             TypeRelation::Assignability => self.try_is_assignable_to(db, other),
@@ -122,11 +123,7 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
-    pub(crate) fn try_is_subtype_of(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-    ) -> Result<(), TypeRelationError> {
+    pub(crate) fn try_is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> TypeRelationResult {
         Self::try_has_relation_to_impl(
             db,
             &self.overloads,
@@ -138,11 +135,7 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
-    pub(crate) fn try_is_assignable_to(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-    ) -> Result<(), TypeRelationError> {
+    pub(crate) fn try_is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> TypeRelationResult {
         Self::try_has_relation_to_impl(
             db,
             &self.overloads,
@@ -158,7 +151,7 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
@@ -179,11 +172,7 @@ impl<'db> CallableSignature<'db> {
                     })
                     .collect::<Vec<_>>();
 
-                if results.iter().any(Result::is_ok) {
-                    Ok(())
-                } else {
-                    TypeRelationError::from_results(results)
-                }
+                TypeRelationResult::any_pass(results)
             }
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
@@ -200,11 +189,7 @@ impl<'db> CallableSignature<'db> {
                     })
                     .collect::<Vec<_>>();
 
-                if results.iter().all(Result::is_ok) {
-                    Ok(())
-                } else {
-                    TypeRelationError::from_results(results)
-                }
+                TypeRelationResult::all_pass(results)
             }
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
@@ -221,11 +206,7 @@ impl<'db> CallableSignature<'db> {
                     })
                     .collect::<Vec<_>>();
 
-                if results.iter().all(Result::is_ok) {
-                    Ok(())
-                } else {
-                    TypeRelationError::from_results(results)
-                }
+                TypeRelationResult::all_pass(results)
             }
         }
     }
@@ -579,7 +560,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -650,7 +631,9 @@ impl<'db> Signature<'db> {
         };
 
         // Return types are covariant.
-        check_types(self.return_ty, other.return_ty)?;
+        if let TypeRelationResult::Fail(e) = check_types(self.return_ty, other.return_ty) {
+            return TypeRelationResult::Fail(e);
+        }
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
@@ -664,16 +647,16 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
         {
-            return Ok(());
+            return TypeRelationResult::Pass;
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
             if relation.is_assignability() {
-                return Ok(());
+                return TypeRelationResult::Pass;
             }
-            return Err(TypeRelationError::single(
+            return TypeRelationResult::Fail(TypeRelationError::single(
                 TypeRelationErrorKind::GradualTypeInSubTyping,
             ));
         }
@@ -693,7 +676,7 @@ impl<'db> Signature<'db> {
             let Some(next_parameter) = parameters.next() else {
                 // All parameters have been checked or both the parameter lists were empty. In
                 // either case, `self` is a subtype of `other`.
-                return Ok(());
+                return TypeRelationResult::Pass;
             };
 
             match next_parameter {
@@ -713,7 +696,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
-                            return Err(TypeRelationError::todo());
+                            return TypeRelationResult::todo_fail();
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -725,7 +708,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return Err(TypeRelationError::todo());
+                    return TypeRelationResult::todo_fail();
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -745,12 +728,14 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
-                                return Err(TypeRelationError::todo());
+                                return TypeRelationResult::todo_fail();
                             }
-                            check_types(
+                            if let TypeRelationResult::Fail(e) = check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            )?;
+                            ) {
+                                return TypeRelationResult::Fail(e);
+                            }
                         }
 
                         (
@@ -764,16 +749,18 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
-                                return Err(TypeRelationError::todo());
+                                return TypeRelationResult::todo_fail();
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
-                                return Err(TypeRelationError::todo());
+                                return TypeRelationResult::todo_fail();
                             }
-                            check_types(
+                            if let TypeRelationResult::Fail(e) = check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            )?;
+                            ) {
+                                return TypeRelationResult::Fail(e);
+                            }
                         }
 
                         (
@@ -781,10 +768,12 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            check_types(
+                            if let TypeRelationResult::Fail(e) = check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            )?;
+                            ) {
+                                return TypeRelationResult::Fail(e);
+                            }
 
                             if matches!(
                                 other_parameter.kind(),
@@ -819,19 +808,23 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                check_types(
+                                if let TypeRelationResult::Fail(e) = check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
-                                )?;
+                                ) {
+                                    return TypeRelationResult::Fail(e);
+                                }
                                 parameters.next_other();
                             }
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            check_types(
+                            if let TypeRelationResult::Fail(e) = check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
-                            )?;
+                            ) {
+                                return TypeRelationResult::Fail(e);
+                            }
                         }
 
                         (
@@ -845,7 +838,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return Err(TypeRelationError::todo()),
+                        _ => return TypeRelationResult::todo_fail(),
                     }
                 }
             }
@@ -879,7 +872,7 @@ impl<'db> Signature<'db> {
                     // previous loop. They cannot be matched against any parameter in `other` which
                     // only contains keyword-only and keyword-variadic parameters so the subtype
                     // relation is invalid.
-                    return Err(TypeRelationError::todo());
+                    return TypeRelationResult::todo_fail();
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -906,34 +899,45 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return Err(TypeRelationError::todo());
+                                    return TypeRelationResult::todo_fail();
                                 }
-                                check_types(
+                                if let TypeRelationResult::Fail(e) = check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
-                                )?;
+                                ) {
+                                    return TypeRelationResult::Fail(e);
+                                }
                             }
                             _ => unreachable!(
                                 "`self_keywords` should only contain keyword-only or standard parameters"
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        check_types(other_parameter.annotated_type(), self_keyword_variadic_type)?;
+                        if let TypeRelationResult::Fail(e) = check_types(
+                            other_parameter.annotated_type(),
+                            self_keyword_variadic_type,
+                        ) {
+                            return TypeRelationResult::Fail(e);
+                        }
                     } else {
-                        return Err(TypeRelationError::todo());
+                        return TypeRelationResult::todo_fail();
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return Err(TypeRelationError::todo());
+                        return TypeRelationResult::todo_fail();
                     };
-                    check_types(other_parameter.annotated_type(), self_keyword_variadic_type)?;
+                    if let TypeRelationResult::Fail(e) =
+                        check_types(other_parameter.annotated_type(), self_keyword_variadic_type)
+                    {
+                        return TypeRelationResult::Fail(e);
+                    }
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return Err(TypeRelationError::todo());
+                    return TypeRelationResult::todo_fail();
                 }
             }
         }
@@ -942,11 +946,11 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return Err(TypeRelationError::todo());
+                return TypeRelationResult::todo_fail();
             }
         }
 
-        Ok(())
+        TypeRelationResult::Pass
     }
 
     /// Create a new signature with the given definition.

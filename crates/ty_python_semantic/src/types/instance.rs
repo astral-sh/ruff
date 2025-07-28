@@ -10,7 +10,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    DynamicType, TypeMapping, TypeRelation, TypeRelationError, TypeTransformer, TypeVarInstance,
+    DynamicType, TypeMapping, TypeRelation, TypeRelationResult, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -114,7 +114,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         self.class.try_has_relation_to(db, other.class, relation)
     }
 

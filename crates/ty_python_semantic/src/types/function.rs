@@ -77,7 +77,7 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeRelationError, TypeTransformer,
+    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeRelationResult, TypeTransformer,
     TypeVarInstance, UnionBuilder, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
@@ -810,44 +810,36 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         match relation {
             TypeRelation::Subtyping => self.try_is_subtype_of(db, other),
             TypeRelation::Assignability => self.try_is_assignable_to(db, other),
         }
     }
 
-    pub(crate) fn try_is_subtype_of(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-    ) -> Result<(), TypeRelationError> {
+    pub(crate) fn try_is_subtype_of(self, db: &'db dyn Db, other: Self) -> TypeRelationResult {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
         if self.normalized(db) == other.normalized(db) {
-            return Ok(());
+            return TypeRelationResult::Pass;
         }
         if self.literal(db) != other.literal(db) {
-            return Err(TypeRelationError::todo());
+            return TypeRelationResult::todo_fail();
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
         self_signature.try_is_subtype_of(db, other_signature)
     }
 
-    pub(crate) fn try_is_assignable_to(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-    ) -> Result<(), TypeRelationError> {
+    pub(crate) fn try_is_assignable_to(self, db: &'db dyn Db, other: Self) -> TypeRelationResult {
         // A function type is assignable to itself, and not to any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only
         // assignable to each other if they result in assignable signatures.
         if self.literal(db) != other.literal(db) {
-            return Err(TypeRelationError::todo());
+            return TypeRelationResult::todo_fail();
         }
         self.signature(db)
             .try_is_assignable_to(db, other.signature(db))

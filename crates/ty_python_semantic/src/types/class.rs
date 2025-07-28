@@ -23,7 +23,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeRelationError, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeRelationResult, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
     declaration_type, infer_definition_types,
 };
 use crate::{
@@ -409,14 +409,14 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_is_subclass_of(db, other).is_ok()
+        self.try_is_subclass_of(db, other).is_pass()
     }
 
     pub(super) fn try_is_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         self.try_has_relation_to(db, other, TypeRelation::Subtyping)
     }
 
@@ -425,14 +425,14 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         // TODO: remove this branch once we have proper support for TypedDicts.
         if self.is_known(db, KnownClass::Dict)
             && other
                 .iter_mro(db)
                 .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
         {
-            return Ok(());
+            return TypeRelationResult::Pass;
         }
 
         let results = self
@@ -440,32 +440,16 @@ impl<'db> ClassType<'db> {
             .map(|base| {
                 match base {
                     ClassBase::Dynamic(_) => match relation {
-                        TypeRelation::Subtyping => {
-                            if other.is_object(db) {
-                                Ok(())
-                            } else {
-                                Err(TypeRelationError::todo())
-                            }
-                        }
-                        TypeRelation::Assignability => {
-                            if other.is_final(db) {
-                                Err(TypeRelationError::todo())
-                            } else {
-                                Ok(())
-                            }
-                        }
+                        TypeRelation::Subtyping => other.is_object(db).into(),
+                        TypeRelation::Assignability => (!other.is_final(db)).into(),
                     },
 
                     // Protocol and Generic are not represented by a ClassType.
-                    ClassBase::Protocol | ClassBase::Generic => Err(TypeRelationError::todo()),
+                    ClassBase::Protocol | ClassBase::Generic => TypeRelationResult::todo_fail(),
 
                     ClassBase::Class(base) => match (base, other) {
                         (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
-                            if base == other {
-                                Ok(())
-                            } else {
-                                Err(TypeRelationError::todo())
-                            }
+                            (base == other).into()
                         }
                         (ClassType::Generic(base), ClassType::Generic(other)) => {
                             if base.origin(db) == other.origin(db) {
@@ -475,23 +459,19 @@ impl<'db> ClassType<'db> {
                                     relation,
                                 )
                             } else {
-                                Err(TypeRelationError::todo())
+                                TypeRelationResult::todo_fail()
                             }
                         }
                         (ClassType::Generic(_), ClassType::NonGeneric(_))
                         | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
-                            Err(TypeRelationError::todo())
+                            TypeRelationResult::todo_fail()
                         }
                     },
                 }
             })
             .collect::<Vec<_>>();
 
-        if results.iter().any(Result::is_ok) {
-            Ok(())
-        } else {
-            TypeRelationError::from_results(results)
-        }
+        TypeRelationResult::any_pass(results)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {

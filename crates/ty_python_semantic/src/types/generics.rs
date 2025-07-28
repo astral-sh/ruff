@@ -13,7 +13,7 @@ use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeRelationError, TypeTransformer,
+    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeRelationResult, TypeTransformer,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
     declaration_type,
 };
@@ -516,10 +516,10 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> Result<(), TypeRelationError> {
+    ) -> TypeRelationResult {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return Err(TypeRelationError::todo());
+            return TypeRelationResult::todo_fail();
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -534,7 +534,7 @@ impl<'db> Specialization<'db> {
             if self_type.is_dynamic() || other_type.is_dynamic() {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return Err(TypeRelationError::todo()),
+                    TypeRelation::Subtyping => return TypeRelationResult::todo_fail(),
                 }
             }
 
@@ -548,15 +548,17 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Invariant => match relation {
                     TypeRelation::Subtyping => {
                         if self_type.is_equivalent_to(db, *other_type) {
-                            Ok(())
+                            TypeRelationResult::Pass
                         } else {
-                            Err(TypeRelationError::todo())
+                            TypeRelationResult::todo_fail()
                         }
                     }
                     TypeRelation::Assignability => {
                         match self_type.try_is_assignable_to(db, *other_type) {
-                            Ok(()) => other_type.try_is_assignable_to(db, *self_type),
-                            Err(e) => Err(e),
+                            TypeRelationResult::Pass => {
+                                other_type.try_is_assignable_to(db, *self_type)
+                            }
+                            TypeRelationResult::Fail(e) => TypeRelationResult::Fail(e),
                         }
                     }
                 },
@@ -566,13 +568,15 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => {
                     other_type.try_has_relation_to(db, *self_type, relation)
                 }
-                TypeVarVariance::Bivariant => Ok(()),
+                TypeVarVariance::Bivariant => TypeRelationResult::Pass,
             };
 
-            compatible?;
+            if let TypeRelationResult::Fail(e) = compatible {
+                return TypeRelationResult::Fail(e);
+            }
         }
 
-        Ok(())
+        TypeRelationResult::Pass
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
