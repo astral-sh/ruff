@@ -1720,7 +1720,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_function_deferred(definition, function.node(self.module()));
             }
             DefinitionKind::Class(class) => {
-                self.infer_class_deferred(definition, class.node(self.module()))
+                self.infer_class_deferred(definition, class.node(self.module()));
             }
             _ => {}
         }
@@ -2602,7 +2602,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.deferred.insert(definition);
             } else {
                 let previous_legacy_typevar_binding_context =
-                    std::mem::replace(&mut self.legacy_typevar_binding_context, Some(definition));
+                    self.legacy_typevar_binding_context.replace(definition);
                 self.infer_return_type_annotation(
                     returns.as_deref(),
                     DeferredExpressionState::None,
@@ -3021,7 +3021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.deferred.insert(definition);
             } else {
                 let previous_legacy_typevar_binding_context =
-                    std::mem::replace(&mut self.legacy_typevar_binding_context, Some(definition));
+                    self.legacy_typevar_binding_context.replace(definition);
                 for base in class_node.bases() {
                     self.infer_expression(base);
                 }
@@ -3036,7 +3036,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
     ) {
         let previous_legacy_typevar_binding_context =
-            std::mem::replace(&mut self.legacy_typevar_binding_context, Some(definition));
+            self.legacy_typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
@@ -3047,7 +3047,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
         let previous_legacy_typevar_binding_context =
-            std::mem::replace(&mut self.legacy_typevar_binding_context, Some(definition));
+            self.legacy_typevar_binding_context.replace(definition);
         for base in class.bases() {
             self.infer_expression(base);
         }
@@ -6327,10 +6327,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.index,
                         file_scope_id,
                     )
-                    .filter_map(|enclosing_context| {
+                    .find_map(|enclosing_context| {
                         enclosing_context.binds_legacy_typevar(self.db(), typevar)
                     })
-                    .next()
                 };
 
                 match ty {
