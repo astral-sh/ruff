@@ -61,10 +61,8 @@ pub(crate) fn ellipsis_in_non_empty_class_body(checker: &Checker, body: &[Stmt])
 
             // Try to preserve trailing comment if it exists
             let edit = if let Some(index) = trailing_comment_start_offset(stmt, checker.source()) {
-                // Only delete up to the comment start
                 Edit::range_deletion(stmt.range().add_end(index))
             } else {
-                // Default full-statement deletion
                 fix::edits::delete_stmt(stmt, Some(stmt), checker.locator(), checker.indexer())
             };
 
