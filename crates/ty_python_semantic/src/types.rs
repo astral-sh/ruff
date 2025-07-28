@@ -5455,6 +5455,9 @@ impl<'db> Type<'db> {
                     partial.get(db, typevar).unwrap_or(self)
                 }
                 TypeMapping::PromoteLiterals => self,
+                TypeMapping::BindLegacyTypevars(binding_context) => {
+                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
+                }
             }
 
             Type::FunctionLiteral(function) => {
@@ -5542,7 +5545,8 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) => self,
+                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
             }
@@ -5891,6 +5895,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
     /// to `str`)
     PromoteLiterals,
+    /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
+    /// being used in.
+    BindLegacyTypevars(Definition<'db>),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -5905,7 +5912,7 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::PartialSpecialization(specialization) => {
             walk_partial_specialization(db, specialization, visitor);
         }
-        TypeMapping::PromoteLiterals => {}
+        TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) => {}
     }
 }
 
@@ -5919,6 +5926,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.to_owned())
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 
@@ -5931,6 +5941,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 }
@@ -6509,7 +6522,9 @@ impl<'db> TypeVarInstance<'db> {
             Some(binding_context),
             self.bound_or_constraints(db),
             self.variance(db),
-            self.default_ty(db),
+            self.default_ty(db).map(|ty| {
+                ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context))
+            }),
             self.kind(db),
         )
     }
