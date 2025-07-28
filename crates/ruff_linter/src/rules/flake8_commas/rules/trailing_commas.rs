@@ -428,29 +428,23 @@ fn update_context(
             }
             _ => Context::new(ContextType::Tuple),
         },
-        TokenType::OpeningSquareBracket => {
-            if is_trailing_comma_type_params_enabled(settings) {
-                match (prev.ty, prev_prev.ty) {
-                    (TokenType::Named, TokenType::Def) => Context::new(ContextType::TypeParameters),
-                    (TokenType::Named, TokenType::Class) => {
-                        Context::new(ContextType::TypeParameters)
-                    }
-                    (TokenType::Named, TokenType::Type) => {
-                        Context::new(ContextType::TypeParameters)
-                    }
-                    (TokenType::Named | TokenType::String, _) => Context::new(ContextType::List),
-                    (TokenType::ClosingBracket, _) => Context::new(ContextType::Subscript),
-                    _ => Context::new(ContextType::List),
+        TokenType::OpeningSquareBracket if is_trailing_comma_type_params_enabled(settings) => {
+            match (prev.ty, prev_prev.ty) {
+                (TokenType::Named, TokenType::Def | TokenType::Class | TokenType::Type) => {
+                    Context::new(ContextType::TypeParameters)
                 }
-            } else {
-                match prev.ty {
-                    TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
-                        Context::new(ContextType::Subscript)
-                    }
-                    _ => Context::new(ContextType::List),
+                (TokenType::ClosingBracket | TokenType::Named | TokenType::String, _) => {
+                    Context::new(ContextType::Subscript)
                 }
+                _ => Context::new(ContextType::List),
             }
         }
+        TokenType::OpeningSquareBracket => match prev.ty {
+            TokenType::ClosingBracket | TokenType::Named | TokenType::String => {
+                Context::new(ContextType::Subscript)
+            }
+            _ => Context::new(ContextType::List),
+        },
         TokenType::OpeningCurlyBracket => Context::new(ContextType::Dict),
         TokenType::Lambda => Context::new(ContextType::LambdaParameters),
         TokenType::For => {
