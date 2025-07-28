@@ -1533,7 +1533,7 @@ impl<'db> Type<'db> {
             ) => Err(TypeRelationError::todo()),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => {
-                self_callable.has_relation_to(db, other_callable, relation)
+                self_callable.try_has_relation_to(db, other_callable, relation)
             }
 
             (_, Type::Callable(_)) => {
@@ -1622,15 +1622,16 @@ impl<'db> Type<'db> {
 
             // `TypeIs` is invariant.
             (Type::TypeIs(left), Type::TypeIs(right)) => {
-                if let Err(e) =
-                    left.return_type(db)
-                        .try_has_relation_to(db, right.return_type(db), relation)
+                match left
+                    .return_type(db)
+                    .try_has_relation_to(db, right.return_type(db), relation)
                 {
-                    Err(e)
-                } else {
-                    right
-                        .return_type(db)
-                        .try_has_relation_to(db, left.return_type(db), relation)
+                    Ok(()) => right.return_type(db).try_has_relation_to(
+                        db,
+                        left.return_type(db),
+                        relation,
+                    ),
+                    Err(e) => Err(e),
                 }
             }
 
@@ -1652,7 +1653,7 @@ impl<'db> Type<'db> {
             (Type::Callable(_), _) => Err(TypeRelationError::todo()),
 
             (Type::Tuple(self_tuple), Type::Tuple(target_tuple)) => {
-                self_tuple.has_relation_to(db, target_tuple, relation)
+                self_tuple.try_has_relation_to(db, target_tuple, relation)
             }
 
             (Type::Tuple(self_tuple), Type::NominalInstance(target_instance)) => self_tuple
@@ -1737,6 +1738,8 @@ impl<'db> Type<'db> {
                     Ok(()) => Ok(()),
                     Err(mut e1) => {
                         if relation.is_assignability() {
+                            Ok(())
+                        } else {
                             match other.try_has_relation_to(
                                 db,
                                 KnownClass::Type.to_instance(db),
@@ -1748,8 +1751,6 @@ impl<'db> Type<'db> {
                                     Err(e1)
                                 }
                             }
-                        } else {
-                            Err(e1)
                         }
                     }
                 }
@@ -2195,7 +2196,7 @@ impl<'db> Type<'db> {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => false,
                     SubclassOfInner::Class(class_a) => {
-                        ClassType::from(alias_b).try_is_subclass_of(db, class_a).is_err()
+                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
                     }
                 }
             }
@@ -7878,7 +7879,7 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to(
+    fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -8982,7 +8983,7 @@ impl<'db> BoundSuperType<'db> {
                 let Some(owner_class) = owner.into_class() else {
                     return Some(owner);
                 };
-                if owner_class.try_is_subclass_of(db, pivot_class).is_ok() {
+                if owner_class.is_subclass_of(db, pivot_class) {
                     Some(owner)
                 } else {
                     None

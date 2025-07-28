@@ -229,7 +229,7 @@ impl<'db> TupleType<'db> {
         self.tuple(db).find_legacy_typevars(db, typevars);
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
