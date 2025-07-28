@@ -427,17 +427,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return Err(TypeRelationError::todo());
-                    }
+                    self_ty.try_has_relation_to(db, *other_ty, relation)?;
                 }
                 for other_ty in other.suffix.iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return Err(TypeRelationError::todo());
-                    }
+                    self_ty.try_has_relation_to(db, *other_ty, relation)?;
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
@@ -786,18 +782,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return Err(TypeRelationError::todo());
-                    }
+                    self_ty.try_has_relation_to(db, other_ty, relation)?;
                 }
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return Err(TypeRelationError::todo());
-                    }
+                    self_ty.try_has_relation_to(db, other_ty, relation)?;
                 }
 
                 Ok(())

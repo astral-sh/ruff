@@ -1508,7 +1508,7 @@ impl<'db> Type<'db> {
                 self_method.try_has_relation_to(db, target_method, relation)
             }
             (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
-                self_method.has_relation_to(db, target_method, relation)
+                self_method.try_has_relation_to(db, target_method, relation)
             }
 
             // No literal type is a subtype of any other literal type, unless they are the same
@@ -7952,7 +7952,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn has_relation_to(
+    fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
