@@ -6315,44 +6315,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         resolved
             .map_type(|ty| {
+                // If the expression resolves to a legacy typevar, we will have the TypeVarInstance
+                // that was created when the typevar was created, which will not have an associated
+                // binding context. If this expression appears inside of a generic context that
+                // binds that typevar, we need to update the TypeVarInstance to include that
+                // binding context. To do that, we walk the enclosing scopes, looking for the
+                // nearest generic context that binds the typevar.
+                //
+                // If the legacy typevar is still unbound after that search, and we are in a
+                // context that binds unbound legacy typevars (i.e., the signature of a generic
+                // function), bind it with that context.
                 let find_legacy_typevar_binding = |typevar: TypeVarInstance<'db>| {
-                    let scope = self.scope();
-                    let file_scope_id = scope.file_scope_id(self.db());
                     enclosing_generic_contexts(
                         self.db(),
                         self.context.module(),
                         self.index,
-                        file_scope_id,
+                        self.scope().file_scope_id(self.db()),
                     )
                     .find_map(|enclosing_context| {
                         enclosing_context.binds_legacy_typevar(self.db(), typevar)
                     })
+                    .or_else(|| {
+                        self.legacy_typevar_binding_context
+                            .map(|legacy_typevar_binding_context| {
+                                typevar
+                                    .with_binding_context(self.db(), legacy_typevar_binding_context)
+                            })
+                    })
                 };
 
                 match ty {
-                    // If the expression resolves to a legacy typevar, we will have the
-                    // TypeVarInstance that was created when the typevar was created, which will
-                    // not have an associated binding context. If this expression appears inside of
-                    // a generic context that binds that typevar, we need to update the
-                    // TypeVarInstance to include that binding context. To do that, we walk the
-                    // enclosing scopes, looking for the nearest generic context that binds the
-                    // typevar.
-                    //
-                    // If the legacy typevar is still unbound after that search, and we are in a
-                    // context that binds unbound legacy typevars (i.e., the signature of a generic
-                    // function), bind it with that context.
                     Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => {
                         find_legacy_typevar_binding(typevar)
-                            .or_else(|| {
-                                self.legacy_typevar_binding_context.map(
-                                    |legacy_typevar_binding_context| {
-                                        typevar.with_binding_context(
-                                            self.db(),
-                                            legacy_typevar_binding_context,
-                                        )
-                                    },
-                                )
-                            })
                             .map(Type::TypeVar)
                             .unwrap_or(ty)
                     }
@@ -6360,16 +6354,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if typevar.is_legacy(self.db()) =>
                     {
                         find_legacy_typevar_binding(typevar)
-                            .or_else(|| {
-                                self.legacy_typevar_binding_context.map(
-                                    |legacy_typevar_binding_context| {
-                                        typevar.with_binding_context(
-                                            self.db(),
-                                            legacy_typevar_binding_context,
-                                        )
-                                    },
-                                )
-                            })
                             .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
                             .unwrap_or(ty)
                     }
