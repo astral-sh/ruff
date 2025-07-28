@@ -502,6 +502,7 @@ UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
    61 |+"{}_{}".format(2, 1)
 62 62 | 
 63 63 | r"\d{{1,2}} {0}".format(42)
+64 64 | 
 
 UP030_0.py:63:1: UP030 [*] Use implicit references for positional format fields
    |
@@ -509,6 +510,8 @@ UP030_0.py:63:1: UP030 [*] Use implicit references for positional format fields
 62 |
 63 | r"\d{{1,2}} {0}".format(42)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP030
+64 |
+65 | "{{{0}}}".format(123)
    |
    = help: Remove explicit positional indices
 
@@ -518,3 +521,21 @@ UP030_0.py:63:1: UP030 [*] Use implicit references for positional format fields
 62 62 | 
 63    |-r"\d{{1,2}} {0}".format(42)
    63 |+r"\d{{1,2}} {}".format(42)
+64 64 | 
+65 65 | "{{{0}}}".format(123)
+
+UP030_0.py:65:1: UP030 [*] Use implicit references for positional format fields
+   |
+63 | r"\d{{1,2}} {0}".format(42)
+64 |
+65 | "{{{0}}}".format(123)
+   | ^^^^^^^^^^^^^^^^^^^^^ UP030
+   |
+   = help: Remove explicit positional indices
+
+ℹ Unsafe fix
+62 62 | 
+63 63 | r"\d{{1,2}} {0}".format(42)
+64 64 | 
+65    |-"{{{0}}}".format(123)
+   65 |+"{{{}}}".format(123)

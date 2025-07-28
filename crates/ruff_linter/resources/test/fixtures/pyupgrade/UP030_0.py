@@ -61,3 +61,5 @@ kwargs = {x: x for x in range(10)}
 "{1}_{0}".format(1, 2)
 
 r"\d{{1,2}} {0}".format(42)
+
+"{{{0}}}".format(123)

@@ -126,30 +126,26 @@ fn is_sequential(indices: &[usize]) -> bool {
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
-static FORMAT_SPECIFIER: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\{(?P<int>\d+)(?P<fmt>.*?)}").unwrap());
+static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?x)
+            (?P<prefix>
+                ^|[^{]|(?:\{{2})+  # preceded by nothing, a non-brace, or an even number of braces
+            )
+            \{                     # opening curly brace
+                (?P<int>\d+)       # followed by any integer
+                (?P<fmt>.*?)       # followed by any text
+            }                      # followed by a closing brace
+        ",
+    )
+    .unwrap()
+});
 
 /// Replace the single brace with a formatted brace.
 fn replace_single_brace(text: &str) -> String {
-    let mut result = String::with_capacity(text.len());
-    let mut last = 0;
-    for mat in FORMAT_SPECIFIER.find_iter(text) {
-        let start = mat.start();
-        let end = mat.end();
-        let is_double_open = start > 0 && &text[start - 1..start] == "{";
-        let is_double_close = end < text.len() && &text[end..end + 1.min(text.len() - end)] == "}";
-        if !is_double_open && !is_double_close {
-            result.push_str(&text[last..start]);
-            let caps = FORMAT_SPECIFIER.captures(&text[start..end]).unwrap();
-            let fmt = caps.name("fmt").map_or("", |m| m.as_str());
-            result.push('{');
-            result.push_str(fmt);
-            result.push('}');
-            last = end;
-        }
-    }
-    result.push_str(&text[last..]);
-    result
+    FORMAT_SPECIFIER
+        .replace_all(text, "$prefix{$fmt}")
+        .to_string()
 }
 
 /// Remove the explicit positional indices from a format string.
