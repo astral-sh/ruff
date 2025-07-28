@@ -703,7 +703,7 @@ impl<'db> Type<'db> {
                     None,
                     variance,
                     None,
-                    TypeVarKind::Legacy,
+                    TypeVarKind::Pep695,
                 )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,

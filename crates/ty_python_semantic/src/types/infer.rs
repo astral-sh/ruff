@@ -3431,9 +3431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )),
             None => None,
         };
-
         let default_ty = self.infer_optional_type_expression(default.as_deref());
-
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             &name.id,
