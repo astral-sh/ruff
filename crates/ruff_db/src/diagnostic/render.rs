@@ -838,8 +838,6 @@ fn replace_whitespace_and_unprintable<'r>(
     source: &'r str,
     mut annotations: Vec<RenderableAnnotation<'r>>,
 ) -> EscapedSourceCode<'r> {
-    let original_ranges: Vec<TextRange> = annotations.iter().map(|ann| ann.range).collect();
-
     // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
     // `source`) is replaced with `len` bytes.
     //
@@ -847,10 +845,10 @@ fn replace_whitespace_and_unprintable<'r>(
     // offset by `len`. When the range occurs after or at the start but before
     // the end, then the end of the range only is offset by `len`.
     let mut update_ranges = |index: usize, len: u32| {
-        for (ann, &original_range) in annotations.iter_mut().zip(&original_ranges) {
-            if index < usize::from(original_range.start()) {
+        for ann in &mut annotations {
+            if index < usize::from(ann.range.start()) {
                 ann.range += TextSize::new(len - 1);
-            } else if index < usize::from(original_range.end()) {
+            } else if index < usize::from(ann.range.end()) {
                 ann.range = ann.range.add_end(TextSize::new(len - 1));
             }
         }
@@ -888,11 +886,13 @@ fn replace_whitespace_and_unprintable<'r>(
                 let tab_width =
                     u32::try_from(width - old_width).expect("small width because of tab size");
                 result.push_str(&source[last_end..index]);
+
+                update_ranges(result.text_len().to_usize(), tab_width);
+
                 for _ in 0..tab_width {
                     result.push(' ');
                 }
                 last_end = index + 1;
-                update_ranges(index, tab_width);
             }
             _ => {
                 width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
@@ -900,11 +900,12 @@ fn replace_whitespace_and_unprintable<'r>(
 
                 if let Some(printable) = unprintable_replacement(c) {
                     result.push_str(&source[last_end..index]);
-                    result.push(printable);
-                    last_end = index + 1;
 
                     let len = printable.text_len().to_u32();
-                    update_ranges(index, len);
+                    update_ranges(result.text_len().to_usize(), len);
+
+                    result.push(printable);
+                    last_end = index + 1;
                 }
             }
         }
