@@ -252,6 +252,31 @@ impl ModulePath {
             relative_path: relative_path.with_extension("py"),
         })
     }
+
+    /*
+    /// Queries the typeshed `VERSIONS` file to determine whether this module
+    /// ought to be treated as existing or not.
+    ///
+    /// If the search path isn't the standard library, then this returns `None`
+    /// (as `VERSIONS` is not applicable).
+    #[expect(dead_code)]
+    #[must_use]
+    pub(crate) fn query_stdlib_version(
+        &self,
+        resolver: &ResolverContext,
+    ) -> Option<TypeshedVersionsQueryResult> {
+        match *self.search_path.0 {
+            SearchPathInner::Extra(_)
+            | SearchPathInner::FirstParty(_)
+            | SearchPathInner::SitePackages(_)
+            | SearchPathInner::Editable(_) => None,
+            SearchPathInner::StandardLibraryCustom(_)
+            | SearchPathInner::StandardLibraryVendored(_) => {
+                Some(query_stdlib_version(&self.relative_path, resolver))
+            }
+        }
+    }
+    */
 }
 
 impl PartialEq<SystemPathBuf> for ModulePath {
@@ -594,6 +619,22 @@ impl SearchPath {
     pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
         self.as_path().as_vendored_path()
     }
+
+    /// Returns a succinct string representing the *internal kind* of this
+    /// search path. This is useful in snapshot tests where one wants to
+    /// capture this specific detail about search paths.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn debug_kind(&self) -> &'static str {
+        match *self.0 {
+            SearchPathInner::Extra(_) => "extra",
+            SearchPathInner::FirstParty(_) => "first-party",
+            SearchPathInner::StandardLibraryCustom(_) => "std-custom",
+            SearchPathInner::SitePackages(_) => "site-packages",
+            SearchPathInner::Editable(_) => "editable",
+            SearchPathInner::StandardLibraryVendored(_) => "std-vendored",
+        }
+    }
 }
 
 impl PartialEq<SystemPath> for SearchPath {
@@ -672,10 +713,33 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         }
     }
 
+    #[expect(dead_code)]
+    pub(super) fn to_file(&self, db: &dyn Db) -> Result<File, FileError> {
+        match self {
+            Self::System(system) => system_path_to_file(db, system),
+            Self::Vendored(vendored) => vendored_path_to_file(db, vendored),
+        }
+    }
+
     pub(super) fn file_name(&self) -> Option<&str> {
         match self {
             Self::System(system) => system.file_name(),
             Self::Vendored(vendored) => vendored.file_name(),
+        }
+    }
+
+    #[expect(dead_code)]
+    pub(super) fn file_stem(&self) -> Option<&str> {
+        match self {
+            Self::System(system) => system.file_stem(),
+            Self::Vendored(vendored) => vendored.file_stem(),
+        }
+    }
+
+    pub(super) fn extension(&self) -> Option<&str> {
+        match self {
+            Self::System(system) => system.extension(),
+            Self::Vendored(vendored) => vendored.extension(),
         }
     }
 
@@ -701,6 +765,18 @@ impl<'db> SystemOrVendoredPathRef<'db> {
             SystemOrVendoredPathRef::Vendored(path) => Some(path),
             _ => None,
         }
+    }
+}
+
+impl<'a> From<&'a SystemPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a SystemPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::System(path)
+    }
+}
+
+impl<'a> From<&'a VendoredPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a VendoredPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::Vendored(path)
     }
 }
 

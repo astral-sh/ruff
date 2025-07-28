@@ -6,7 +6,7 @@ use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, Module, resolve_module};
+use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -40,8 +40,28 @@ impl<'db> SemanticModel<'db> {
         resolve_module(self.db, module_name)
     }
 
-    /// Returns completions for symbols available in a `from module import <CURSOR>` context.
+    /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(
+        &self,
+        _import: &ast::StmtImport,
+        _name: Option<usize>,
+    ) -> Vec<Completion<'db>> {
+        list_modules(self.db)
+            .into_iter()
+            .map(|module| {
+                let builtin = module.is_known(self.db, KnownModule::Builtins);
+                let ty = Type::module_literal(self.db, self.file, module);
+                Completion {
+                    name: Name::new(module.name(self.db).as_str()),
+                    ty,
+                    builtin,
+                }
+            })
+            .collect()
+    }
+
+    /// Returns completions for symbols available in a `from module import <CURSOR>` context.
+    pub fn from_import_completions(
         &self,
         import: &ast::StmtImportFrom,
         _name: Option<usize>,

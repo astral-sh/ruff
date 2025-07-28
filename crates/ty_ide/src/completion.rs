@@ -23,7 +23,10 @@ pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'
     let model = SemanticModel::new(db, file);
     let mut completions = match target {
         CompletionTargetAst::ObjectDot { expr } => model.attribute_completions(expr),
-        CompletionTargetAst::ImportFrom { import, name } => model.import_completions(import, name),
+        CompletionTargetAst::ImportFrom { import, name } => {
+            model.from_import_completions(import, name)
+        }
+        CompletionTargetAst::Import { import, name } => model.import_completions(import, name),
         CompletionTargetAst::Scoped { node } => model.scoped_completions(node),
     };
     completions.sort_by(compare_suggestions);
@@ -63,6 +66,18 @@ enum CompletionTargetTokens<'t> {
         /// The module being imported from.
         module: &'t Token,
     },
+    /// A `import module` token form was found, where `module` may be
+    /// empty.
+    Import {
+        /// The `module` token, if present.
+        ///
+        /// This is currently unused, but we should use this
+        /// eventually to remove completions that aren't a
+        /// prefix of what has already been typed. (We are
+        /// currently relying on the LSP client to do this.)
+        #[expect(dead_code)]
+        module: Option<&'t Token>,
+    },
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
@@ -76,6 +91,8 @@ impl<'t> CompletionTargetTokens<'t> {
     fn find(parsed: &ParsedModuleRef, offset: TextSize) -> Option<CompletionTargetTokens<'_>> {
         static OBJECT_DOT_EMPTY: [TokenKind; 1] = [TokenKind::Dot];
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
+        static IMPORT_EMPTY: [TokenKind; 1] = [TokenKind::Import];
+        static IMPORT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Import, TokenKind::Name];
 
         let offset = match parsed.tokens().at_offset(offset) {
             TokenAt::None => return Some(CompletionTargetTokens::Unknown),
@@ -105,6 +122,13 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             } else if let Some(module) = import_from_tokens(before) {
                 CompletionTargetTokens::ImportFrom { module }
+            } else if let Some([_import]) = token_suffix_by_kinds(before, IMPORT_EMPTY) {
+                CompletionTargetTokens::Import { module: None }
+            } else if let Some([_import, module]) = token_suffix_by_kinds(before, IMPORT_NON_EMPTY)
+            {
+                CompletionTargetTokens::Import {
+                    module: Some(module),
+                }
             } else if let Some([_]) = token_suffix_by_kinds(before, [TokenKind::Float]) {
                 // If we're writing a `float`, then we should
                 // specifically not offer completions. This wouldn't
@@ -165,6 +189,16 @@ impl<'t> CompletionTargetTokens<'t> {
                 };
                 Some(CompletionTargetAst::ImportFrom { import, name: None })
             }
+            CompletionTargetTokens::Import { .. } => {
+                let range = TextRange::empty(offset);
+                let covering_node = covering_node(parsed.syntax().into(), range)
+                    .find_first(|node| node.is_stmt_import())
+                    .ok()?;
+                let ast::AnyNodeRef::StmtImport(import) = covering_node.node() else {
+                    return None;
+                };
+                Some(CompletionTargetAst::Import { import, name: None })
+            }
             CompletionTargetTokens::Generic { token } => {
                 let covering_node = covering_node(parsed.syntax().into(), token.range());
                 Some(CompletionTargetAst::Scoped {
@@ -193,6 +227,15 @@ enum CompletionTargetAst<'t> {
     ImportFrom {
         /// The import statement.
         import: &'t ast::StmtImportFrom,
+        /// An index into `import.names` if relevant. When this is
+        /// set, the index is guaranteed to be valid.
+        name: Option<usize>,
+    },
+    /// A `import attribute` scenario, where we want to
+    /// list available modules for completions.
+    Import {
+        /// The import statement.
+        import: &'t ast::StmtImport,
         /// An index into `import.names` if relevant. When this is
         /// set, the index is guaranteed to be valid.
         name: Option<usize>,
