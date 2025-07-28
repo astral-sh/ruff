@@ -584,7 +584,7 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return mapNavigationTargets(links);
+    return this.mapNavigationTargets(links);
   }
 
   provideDeclaration(
@@ -603,7 +603,7 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return mapNavigationTargets(links);
+    return this.mapNavigationTargets(links);
   }
 
   provideDefinition(
@@ -622,7 +622,7 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return mapNavigationTargets(links);
+    return this.mapNavigationTargets(links);
   }
 
   provideReferences(
@@ -643,7 +643,7 @@ class PlaygroundServer
       new TyPosition(position.lineNumber, position.column),
     );
 
-    return mapNavigationTargets(links);
+    return this.mapNavigationTargets(links);
   }
 
   openCodeEditor(
@@ -653,36 +653,18 @@ class PlaygroundServer
   ): boolean {
     const files = this.props.files;
 
-    // Check if this is a vendored file
+    // Model should already exist from mapNavigationTargets for both vendored and regular files
+    const model = this.monaco.editor.getModel(resource);
+    if (model == null) {
+      // Model should have been created by mapNavigationTargets
+      return false;
+    }
+
+    // Handle file-specific logic
     if (resource.scheme === "vendored") {
+      // Get the file handle to track that we're viewing a vendored file
       const vendoredPath = this.getVendoredPath(resource);
-      // Get a file handle for this vendored file
       const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
-
-      // Create or get the model for the vendored file
-      let model = this.monaco.editor.getModel(resource);
-
-      if (model == null) {
-        // Read the vendored file content using the file handle
-        const content = this.props.workspace.sourceText(fileHandle);
-        // Ensure vendored files get proper Python language features
-        model = this.monaco.editor.createModel(content, "python", resource);
-      }
-
-      // Set the model and reveal the position
-      source.setModel(model);
-
-      if (selectionOrPosition != null) {
-        if (Position.isIPosition(selectionOrPosition)) {
-          source.setPosition(selectionOrPosition);
-          source.revealPositionInCenterIfOutsideViewport(selectionOrPosition);
-        } else {
-          source.setSelection(selectionOrPosition);
-          source.revealRangeNearTopIfOutsideViewport(selectionOrPosition);
-        }
-      }
-
-      // Track that we're now viewing a vendored file
       this.props.onVendoredFileChange(fileHandle);
     } else {
       // Handle regular files
@@ -694,44 +676,21 @@ class PlaygroundServer
         return false;
       }
 
-      const handle = files.handles[fileId];
-      if (handle == null) {
-        return false;
-      }
-
-      let model = this.monaco.editor.getModel(resource);
-      if (model == null) {
-        const language = isPythonFile(handle) ? "python" : undefined;
-        model = this.monaco.editor.createModel(
-          files.contents[fileId],
-          language,
-          resource,
-        );
-      } else {
-        // Update model content to match current file state
-        model.setValue(files.contents[fileId]);
-      }
-
-      // it's a bit hacky to create the model manually
-      // but only using `onOpenFile` isn't enough
-      // because the model doesn't get updated until the next render.
+      // Set the model and trigger UI updates
       if (files.selected !== fileId) {
-        source.setModel(model);
-
         this.props.onOpenFile(fileId);
       }
     }
 
+    source.setModel(model);
+
     if (selectionOrPosition != null) {
       if (Position.isIPosition(selectionOrPosition)) {
         source.setPosition(selectionOrPosition);
-        source.revealPosition(selectionOrPosition);
+        source.revealPositionInCenterIfOutsideViewport(selectionOrPosition);
       } else {
         source.setSelection(selectionOrPosition);
-        source.revealPosition({
-          lineNumber: selectionOrPosition.startLineNumber,
-          column: selectionOrPosition.startColumn,
-        });
+        source.revealRangeNearTopIfOutsideViewport(selectionOrPosition);
       }
     }
 
@@ -762,6 +721,59 @@ class PlaygroundServer
     }
 
     return null;
+  }
+
+  private mapNavigationTargets(links: any[]): languages.LocationLink[] {
+    const result = links.map((link) => {
+      const uri = Uri.parse(link.path);
+
+      // Pre-create models to ensure peek definition works
+      if (this.monaco.editor.getModel(uri) == null) {
+        if (uri.scheme === "vendored") {
+          // Handle vendored files
+          const vendoredPath = this.getVendoredPath(uri);
+          const fileHandle = this.getOrCreateVendoredFileHandle(vendoredPath);
+          const content = this.props.workspace.sourceText(fileHandle);
+          this.monaco.editor.createModel(content, "python", uri);
+        } else {
+          // Handle regular files
+          const fileId = this.props.files.index.find((file) => {
+            return Uri.file(file.name).toString() === uri.toString();
+          })?.id;
+
+          if (fileId != null) {
+            const handle = this.props.files.handles[fileId];
+            if (handle != null) {
+              const language = isPythonFile(handle) ? "python" : undefined;
+              this.monaco.editor.createModel(
+                this.props.files.contents[fileId],
+                language,
+                uri,
+              );
+            }
+          }
+        }
+      }
+
+      const targetSelection =
+        link.selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.selection_range);
+
+      const originSelection =
+        link.origin_selection_range == null
+          ? undefined
+          : tyRangeToMonacoRange(link.origin_selection_range);
+
+      return {
+        uri: uri,
+        range: tyRangeToMonacoRange(link.full_range),
+        targetSelectionRange: targetSelection,
+        originSelectionRange: originSelection,
+      } as languages.LocationLink;
+    });
+
+    return result;
   }
 
   dispose() {
@@ -828,31 +840,6 @@ function generateMonacoTokens(
   }
 
   return { data: Uint32Array.from(result) };
-}
-
-function mapNavigationTargets(links: any[]): languages.LocationLink[] {
-  const result = links.map((link) => {
-    const targetSelection =
-      link.selection_range == null
-        ? undefined
-        : tyRangeToMonacoRange(link.selection_range);
-
-    const originSelection =
-      link.origin_selection_range == null
-        ? undefined
-        : tyRangeToMonacoRange(link.origin_selection_range);
-
-    const locationLink = {
-      uri: Uri.parse(link.path),
-      range: tyRangeToMonacoRange(link.full_range),
-      targetSelectionRange: targetSelection,
-      originSelectionRange: originSelection,
-    } as languages.LocationLink;
-
-    return locationLink;
-  });
-
-  return result;
 }
 
 function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
