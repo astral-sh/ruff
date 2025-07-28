@@ -3370,27 +3370,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // My kingdom to be able to walk AST parent nodes.
         let typevar_scope = definition.file_scope(self.db());
-        let mut child_scopes = self.index.child_scopes(typevar_scope);
-        let (_, binding_scope) =
-            (child_scopes.next()).expect("typevar scope should have one child");
-        assert!(
-            child_scopes.next().is_none(),
-            "typevar scope should have one child"
-        );
-        let binding_node = binding_scope.node();
-        let binding_context_key = match binding_node {
-            NodeWithScopeKind::Class(class) => {
-                DefinitionNodeKey::from(class.node(self.context.module()))
-            }
-            NodeWithScopeKind::Function(function) => {
-                DefinitionNodeKey::from(function.node(self.context.module()))
-            }
-            NodeWithScopeKind::TypeAlias(alias) => {
-                DefinitionNodeKey::from(alias.node(self.context.module()))
-            }
-            _ => panic!("typevar scope should be in class or function definition"),
-        };
-        let binding_context = self.index.expect_single_definition(binding_context_key);
+        let child_scopes = self.index.child_scopes(typevar_scope);
+        let binding_context = child_scopes
+            .filter_map(|(_, binding_scope)| match binding_scope.node() {
+                NodeWithScopeKind::Class(class) => {
+                    Some(DefinitionNodeKey::from(class.node(self.context.module())))
+                }
+                NodeWithScopeKind::Function(function) => Some(DefinitionNodeKey::from(
+                    function.node(self.context.module()),
+                )),
+                NodeWithScopeKind::TypeAlias(alias) => {
+                    Some(DefinitionNodeKey::from(alias.node(self.context.module())))
+                }
+                _ => None,
+            })
+            .map(|key| self.index.expect_single_definition(key))
+            .next();
 
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
@@ -3436,7 +3431,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             &name.id,
             Some(definition),
-            Some(binding_context),
+            binding_context,
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
