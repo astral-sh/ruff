@@ -433,6 +433,8 @@ def f(cond: bool) -> str:
 
 <!-- snapshot-diagnostics -->
 
+### Synchronous
+
 A function with a `yield` or `yield from` expression anywhere in its body is a
 [generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
 implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
@@ -460,6 +462,8 @@ def i2() -> typing.Generator:
 def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
+
+### Asynchronous
 
 If it is an `async` function with a `yield` statement in its body, it is an
 [asynchronous generator function](https://docs.python.org/3/glossary.html#term-asynchronous-generator).
