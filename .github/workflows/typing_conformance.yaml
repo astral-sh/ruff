@@ -37,6 +37,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: python/typing
+          ref: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+          path: typing
+          persist-credentials: false
+
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
 
@@ -50,35 +57,33 @@ jobs:
       - name: Compute diagnostic diff
         shell: bash
         run: |
-          cd ruff
+          # Build the executable for the old and new commit
+          (
+            cd ruff
 
-          echo "new commit"
-          git checkout -b new_commit "${{ github.event.pull_request.head.sha }}"
-          git rev-list --format=%s --max-count=1 new_commit
-          cargo build --release --bin ty
-          mv target/release/ty ty-new
+            echo "new commit"
+            git checkout -b new_commit "${{ github.event.pull_request.head.sha }}"
+            git rev-list --format=%s --max-count=1 new_commit
+            cargo build --release --bin ty
+            mv target/release/ty ty-new
 
-          echo "old commit (merge base)"
-          MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
-          git checkout -b old_commit "$MERGE_BASE"
-          git rev-list --format=%s --max-count=1 old_commit
-          cargo build --release --bin ty
-          mv target/release/ty ty-old
+            echo "old commit (merge base)"
+            MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+            git checkout -b old_commit "$MERGE_BASE"
+            git rev-list --format=%s --max-count=1 old_commit
+            cargo build --release --bin ty
+            mv target/release/ty ty-old
+          )
 
-          cd ..
+          (
+            cd conformance/tests
 
-          git clone https://github.com/python/typing.git
-          cd typing
-          git checkout d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+            echo "Running ty on old commit (merge base)"
+            ../../../ruff/ty-old check --color=never --output-format=concise . > ../../../old-output.txt 2>&1 || true
 
-          echo "Running ty on old commit (merge base)"
-          cd conformance/tests
-          ../../../ruff/ty-old check --color=never --output-format=concise . > ../../../old-output.txt 2>&1 || true
-
-          echo "Running ty on new commit"
-          ../../../ruff/ty-new check --color=never --output-format=concise . > ../../../new-output.txt 2>&1 || true
-
-          cd ../../..
+            echo "Running ty on new commit"
+            ../../../ruff/ty-new check --color=never --output-format=concise . > ../../../new-output.txt 2>&1 || true
+          )
 
           if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
             echo "Differences found between base and PR"
