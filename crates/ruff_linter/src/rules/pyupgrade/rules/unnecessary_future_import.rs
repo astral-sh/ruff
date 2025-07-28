@@ -85,6 +85,36 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
+pub(crate) fn is_import_required_by_isort(checker: &Checker, stmt: &Stmt, alias: &Alias) -> bool {
+    let name_import = match stmt {
+        ruff_python_ast::Stmt::ImportFrom(ruff_python_ast::StmtImportFrom {
+            module,
+            level,
+            ..
+        }) => NameImport::ImportFrom(MemberNameImport {
+            module: module.as_ref().map(std::string::ToString::to_string),
+            name: ruff_python_semantic::Alias {
+                name: alias.name.to_string(),
+                as_name: None,
+            },
+            level: *level,
+        }),
+        ruff_python_ast::Stmt::Import(_) => NameImport::Import(ModuleNameImport {
+            name: ruff_python_semantic::Alias {
+                name: alias.name.to_string(),
+                as_name: None,
+            },
+        }),
+        _ => return false,
+    };
+
+    checker
+        .settings()
+        .isort
+        .required_imports
+        .contains(&name_import)
+}
+
 /// UP010
 pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
     let mut unused_imports: Vec<&Alias> = vec![];
@@ -92,44 +122,11 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
         if alias.asname.is_some() {
             continue;
         }
-        let is_required = match stmt {
-            ruff_python_ast::Stmt::ImportFrom(ruff_python_ast::StmtImportFrom {
-                module,
-                level,
-                ..
-            }) => {
-                let name_import = NameImport::ImportFrom(MemberNameImport {
-                    module: module.as_ref().map(std::string::ToString::to_string),
-                    name: ruff_python_semantic::Alias {
-                        name: alias.name.to_string(),
-                        as_name: None,
-                    },
-                    level: *level,
-                });
-                checker
-                    .settings()
-                    .isort
-                    .required_imports
-                    .contains(&name_import)
-            }
-            ruff_python_ast::Stmt::Import(_) => {
-                let name_import = NameImport::Import(ModuleNameImport {
-                    name: ruff_python_semantic::Alias {
-                        name: alias.name.to_string(),
-                        as_name: None,
-                    },
-                });
-                checker
-                    .settings()
-                    .isort
-                    .required_imports
-                    .contains(&name_import)
-            }
-            _ => false,
-        };
-        if is_required {
+
+        if is_import_required_by_isort(checker, stmt, alias) {
             continue;
         }
+
         if PY33_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
             || PY37_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
         {

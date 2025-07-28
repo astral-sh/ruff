@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Alias, StmtImportFrom};
+use ruff_python_ast::{Alias, Stmt, StmtImportFrom};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes;
+use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -717,6 +718,13 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
 
     if !is_relevant_module(module) {
         return;
+    }
+
+    let stmt = Stmt::ImportFrom(import_from_stmt.clone());
+    for alias in &import_from_stmt.names {
+        if is_import_required_by_isort(checker, &stmt, alias) {
+            return;
+        }
     }
 
     let fixer = ImportReplacer::new(
