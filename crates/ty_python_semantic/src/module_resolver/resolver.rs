@@ -194,19 +194,19 @@ impl SearchPaths {
 
         for path in extra_paths {
             let path = canonicalize(path, system);
-            tracing::debug!("Adding extra search-path '{path}'");
+            tracing::debug!("Adding extra search-path `{path}`");
 
             static_paths.push(SearchPath::extra(system, path)?);
         }
 
         for src_root in src_roots {
-            tracing::debug!("Adding first-party search path '{src_root}'");
+            tracing::debug!("Adding first-party search path `{src_root}`");
             static_paths.push(SearchPath::first_party(system, src_root.to_path_buf())?);
         }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path '{typeshed}'");
+            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
 
             let versions_path = typeshed.join("stdlib/VERSIONS");
 
@@ -235,7 +235,7 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
-            tracing::debug!("Adding site-packages search path '{path}'");
+            tracing::debug!("Adding site-packages search path `{path}`");
             site_packages.push(SearchPath::site_packages(system, path.clone())?);
         }
 
@@ -527,7 +527,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
             let contents = match system.read_to_string(&path) {
                 Ok(contents) => contents,
                 Err(error) => {
-                    tracing::warn!("Failed to read .pth file '{path}': {error}");
+                    tracing::warn!("Failed to read .pth file `{path}`: {error}");
                     continue;
                 }
             };
@@ -588,7 +588,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
-                            "Search path '{search_path} contains a module \
+                            "Search path `{search_path}` contains a module \
                              named `{stub_name}` but a standalone module isn't a valid stub."
                         );
                     } else {
@@ -600,12 +600,12 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 }
                 Err(PackageKind::Root) => {
                     tracing::trace!(
-                        "Search path '{search_path}' contains no stub package named `{stub_name}`."
+                        "Search path `{search_path}` contains no stub package named `{stub_name}`."
                     );
                 }
                 Err(PackageKind::Regular) => {
                     tracing::trace!(
-                        "Stub-package in `{search_path} doesn't contain module: `{name}`"
+                        "Stub-package in `{search_path}` doesn't contain module: `{name}`"
                     );
                     // stub exists, but the module doesn't.
                     // TODO: Support partial packages.
@@ -613,7 +613,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 }
                 Err(PackageKind::Namespace) => {
                     tracing::trace!(
-                        "Stub-package in `{search_path} doesn't contain module: \
+                        "Stub-package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
@@ -633,18 +633,18 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
             Err(kind) => match kind {
                 PackageKind::Root => {
                     tracing::trace!(
-                        "Search path '{search_path}' contains no package named `{name}`."
+                        "Search path `{search_path}` contains no package named `{name}`."
                     );
                 }
                 PackageKind::Regular => {
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
-                    tracing::trace!("Package in `{search_path} doesn't contain module: `{name}`");
+                    tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
                     return None;
                 }
                 PackageKind::Namespace => {
                     tracing::trace!(
-                        "Package in `{search_path} doesn't contain module: \
+                        "Package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
                     );
                 }
