@@ -1261,14 +1261,6 @@ impl<'db> Type<'db> {
         self.try_has_relation_to(db, target, relation).is_ok()
     }
 
-    pub(crate) fn try_is_subtype_of(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-    ) -> Result<(), TypeRelationError> {
-        self.try_has_relation_to(db, target, TypeRelation::Subtyping)
-    }
-
     pub(crate) fn try_is_assignable_to(
         self,
         db: &'db dyn Db,
@@ -7563,11 +7555,7 @@ impl TypeRelationError {
                 errors.extend(err.0);
             }
         }
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(TypeRelationError(errors))
-        }
+        Err(TypeRelationError(errors))
     }
 
     pub(crate) fn add(&mut self, other: Result<(), TypeRelationError>) {
