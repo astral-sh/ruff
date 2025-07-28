@@ -1029,7 +1029,8 @@ impl<'db> Bindings<'db> {
                                 let Ok(tuple_spec) = argument.try_iterate(db) else {
                                     tracing::debug!(
                                         "type" = %argument.display(db),
-                                        "Cannot iterate over type that satisfies `Iterable`",
+                                        "try_iterate() should not fail on a type \
+                                            assignable to `Iterable`",
                                     );
                                     continue;
                                 };
