@@ -1,0 +1,109 @@
+name: Run typing conformance
+
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - "crates/ty*/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - ".github/workflows/typing_conformance.yaml"
+      - ".github/workflows/typing_conformance_comment.yaml"
+      - "Cargo.lock"
+      - "!**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+
+jobs:
+  typing_conformance:
+    name: Compute diagnostic diff
+    runs-on: depot-ubuntu-22.04-32
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: python/typing
+          ref: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+          path: typing
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+
+      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "ruff"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Compute diagnostic diff
+        shell: bash
+        run: |
+          RUFF_DIR="$GITHUB_WORKSPACE/ruff"
+
+          # Build the executable for the old and new commit
+          (
+            cd ruff
+
+            echo "new commit"
+            git checkout -b new_commit "${{ github.event.pull_request.head.sha }}"
+            git rev-list --format=%s --max-count=1 new_commit
+            cargo build --release --bin ty
+            mv target/release/ty ty-new
+
+            echo "old commit (merge base)"
+            MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+            git checkout -b old_commit "$MERGE_BASE"
+            git rev-list --format=%s --max-count=1 old_commit
+            cargo build --release --bin ty
+            mv target/release/ty ty-old
+          )
+
+          (
+            cd typing/conformance/tests
+
+            echo "Running ty on old commit (merge base)"
+            "$RUFF_DIR/ty-old" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/old-output.txt" 2>&1 || true
+
+            echo "Running ty on new commit"
+            "$RUFF_DIR/ty-new" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/new-output.txt" 2>&1 || true
+          )
+
+          if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
+            echo "Differences found between base and PR"
+          else
+            echo "No differences found"
+            touch typing_conformance_diagnostics.diff
+          fi
+
+          echo ${{ github.event.number }} > pr-number
+
+      - name: Upload diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: typing_conformance_diagnostics_diff
+          path: typing_conformance_diagnostics.diff
+
+      - name: Upload pr-number
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pr-number
+          path: pr-number
