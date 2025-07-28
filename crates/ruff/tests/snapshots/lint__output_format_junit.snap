@@ -25,7 +25,7 @@ exit_code: 1
         <testcase name="org.ruff.F821" classname="[TMP]/input" line="2" column="5">
             <failure message="Undefined name `y`">line 2, col 5, Undefined name `y`</failure>
         </testcase>
-        <testcase name="org.ruff" classname="[TMP]/input" line="3" column="1">
+        <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="3" column="1">
             <failure message="SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)">line 3, col 1, SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)</failure>
         </testcase>
     </testsuite>

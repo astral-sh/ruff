@@ -1,4 +1,4 @@
-# Narrowing for `!=` conditionals
+# Narrowing for `!=` and `==` conditionals
 
 ## `x != None`
 
@@ -14,14 +14,97 @@ def _(flag: bool):
 
 ## `!=` for other singleton types
 
-```py
-def _(flag: bool):
-    x = True if flag else False
+### Bool
 
+```py
+def _(x: bool):
     if x != False:
         reveal_type(x)  # revealed: Literal[True]
     else:
         reveal_type(x)  # revealed: Literal[False]
+
+def _(x: bool):
+    if x == False:
+        reveal_type(x)  # revealed: Literal[False]
+    else:
+        reveal_type(x)  # revealed: Literal[True]
+```
+
+### Enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: Answer):
+    if answer != Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+
+def _(answer: Answer):
+    if answer == Answer.NO:
+        reveal_type(answer)  # revealed: Literal[Answer.NO]
+    else:
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x != Single.VALUE:
+        reveal_type(x)  # revealed: int
+    else:
+        # `int` is not eliminated here because there could be subclasses of `int` with custom `__eq__`/`__ne__` methods
+        reveal_type(x)  # revealed: Single | int
+
+def _(x: Single | int):
+    if x == Single.VALUE:
+        reveal_type(x)  # revealed: Single | int
+    else:
+        reveal_type(x)  # revealed: int
+```
+
+This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
+
+```py
+from enum import Enum
+
+class AmbiguousEnum(Enum):
+    NO = 0
+    YES = 1
+
+    def __ne__(self, other) -> bool:
+        return True
+
+def _(answer: AmbiguousEnum):
+    if answer != AmbiguousEnum.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+    else:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+```
+
+Similar if that method is inherited from a base class:
+
+```py
+from enum import Enum
+
+class Mixin:
+    def __eq__(self, other) -> bool:
+        return True
+
+class AmbiguousEnum(Mixin, Enum):
+    NO = 0
+    YES = 1
+
+def _(answer: AmbiguousEnum):
+    if answer == AmbiguousEnum.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum
+    else:
+        reveal_type(answer)  # revealed: AmbiguousEnum
 ```
 
 ## `x != y` where `y` is of literal type

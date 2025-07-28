@@ -1274,6 +1274,7 @@ impl Truthiness {
                     Self::Unknown
                 }
             }
+            Expr::TString(_) => Self::Truthy,
             Expr::List(ast::ExprList { elts, .. })
             | Expr::Set(ast::ExprSet { elts, .. })
             | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
@@ -1362,6 +1363,7 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::EllipsisLiteral(_) => true,
             Expr::List(_) => true,
             Expr::Tuple(_) => true,
+            Expr::TString(_) => true,
 
             // These expressions must resolve to the inner expression.
             Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
@@ -1386,7 +1388,6 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             // These literals may or may not be empty.
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
             // These literals may or may not be empty.
-            Expr::TString(f_string) => is_non_empty_t_string(f_string),
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
         }
@@ -1395,76 +1396,6 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
     expr.value.iter().any(|part| match part {
         ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
         ast::FStringPart::FString(f_string) => {
-            f_string.elements.iter().all(|element| match element {
-                InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
-            })
-        }
-    })
-}
-
-/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
-/// f-string expression, or `false` if the expression may resolve to an empty string.
-fn is_non_empty_t_string(expr: &ast::ExprTString) -> bool {
-    fn inner(expr: &Expr) -> bool {
-        match expr {
-            // When stringified, these expressions are always non-empty.
-            Expr::Lambda(_) => true,
-            Expr::Dict(_) => true,
-            Expr::Set(_) => true,
-            Expr::ListComp(_) => true,
-            Expr::SetComp(_) => true,
-            Expr::DictComp(_) => true,
-            Expr::Compare(_) => true,
-            Expr::NumberLiteral(_) => true,
-            Expr::BooleanLiteral(_) => true,
-            Expr::NoneLiteral(_) => true,
-            Expr::EllipsisLiteral(_) => true,
-            Expr::List(_) => true,
-            Expr::Tuple(_) => true,
-
-            // These expressions must resolve to the inner expression.
-            Expr::If(ast::ExprIf { body, orelse, .. }) => inner(body) && inner(orelse),
-            Expr::Named(ast::ExprNamed { value, .. }) => inner(value),
-
-            // These expressions are complex. We can't determine whether they're empty or not.
-            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
-            Expr::BinOp(ast::ExprBinOp { .. }) => false,
-            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
-            Expr::Generator(_) => false,
-            Expr::Await(_) => false,
-            Expr::Yield(_) => false,
-            Expr::YieldFrom(_) => false,
-            Expr::Call(_) => false,
-            Expr::Attribute(_) => false,
-            Expr::Subscript(_) => false,
-            Expr::Starred(_) => false,
-            Expr::Name(_) => false,
-            Expr::Slice(_) => false,
-            Expr::IpyEscapeCommand(_) => false,
-
-            // These literals may or may not be empty.
-            Expr::FString(f_string) => is_non_empty_f_string(f_string),
-            // These literals may or may not be empty.
-            Expr::TString(t_string) => is_non_empty_t_string(t_string),
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
-        }
-    }
-
-    expr.value.iter().any(|part| match part {
-        ast::TStringPart::Literal(string_literal) => !string_literal.is_empty(),
-        ast::TStringPart::TString(t_string) => {
-            t_string.elements.iter().all(|element| match element {
-                ast::InterpolatedStringElement::Literal(string_literal) => {
-                    !string_literal.is_empty()
-                }
-                ast::InterpolatedStringElement::Interpolation(t_string) => {
-                    inner(&t_string.expression)
-                }
-            })
-        }
-        ast::TStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
                 InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),

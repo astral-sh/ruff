@@ -7,8 +7,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::place::ScopeId;
-use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleUnpacker};
+use crate::semantic_index::scope::ScopeId;
+use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -64,14 +64,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(
-                    &self.context,
-                    value_type,
-                    value.as_any_node_ref(self.db(), self.module()),
-                );
-                err.fallback_element_type(self.db())
-            }),
+            UnpackKind::Iterable => value_type
+                .try_iterate(self.db())
+                .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_element_type(self.db())
+                }),
             UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(
                     &self.context,
@@ -118,30 +121,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = match ty {
-                        Type::Tuple(tuple_ty) => Cow::Borrowed(tuple_ty.tuple(self.db())),
-                        Type::StringLiteral(string_literal_ty) => {
-                            // We could go further and deconstruct to an array of `StringLiteral`
-                            // with each individual character, instead of just an array of
-                            // `LiteralString`, but there would be a cost and it's not clear that
-                            // it's worth it.
-                            Cow::Owned(Tuple::from_elements(std::iter::repeat_n(
-                                Type::LiteralString,
-                                string_literal_ty.python_len(self.db()),
-                            )))
-                        }
-                        Type::LiteralString => Cow::Owned(Tuple::homogeneous(Type::LiteralString)),
-                        _ => {
-                            // TODO: Update our iterator protocol machinery to return a tuple
-                            // describing the returned values in more detail, when we can.
-                            Cow::Owned(Tuple::homogeneous(
-                                ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                                    err.report_diagnostic(&self.context, ty, value_expr);
-                                    err.fallback_element_type(self.db())
-                                }),
-                            ))
-                        }
-                    };
+                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, ty, value_expr);
+                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
+                    });
 
                     if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
                         unpacker

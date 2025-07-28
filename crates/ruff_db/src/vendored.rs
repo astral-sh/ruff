@@ -21,6 +21,19 @@ type LockedZipArchive<'a> = MutexGuard<'a, VendoredZipArchive>;
 ///
 /// "Files" in the `VendoredFileSystem` are read-only and immutable.
 /// Directories are supported, but symlinks and hardlinks cannot exist.
+///
+/// # Path separators
+///
+/// At time of writing (2025-07-11), this implementation always uses `/` as a
+/// path separator, even in Windows environments where `\` is traditionally
+/// used as a file path separator. Namely, this is only currently used with zip
+/// files built by `crates/ty_vendored/build.rs`.
+///
+/// Callers using this may provide paths that use a `\` as a separator. It will
+/// be transparently normalized to `/`.
+///
+/// This is particularly important because the presence of a trailing separator
+/// in a zip file is conventionally used to indicate a directory entry.
 #[derive(Clone)]
 pub struct VendoredFileSystem {
     inner: Arc<Mutex<VendoredZipArchive>>,
@@ -115,6 +128,68 @@ impl VendoredFileSystem {
         read_to_string(self, path.as_ref())
     }
 
+    /// Read the direct children of the directory
+    /// identified by `path`.
+    ///
+    /// If `path` is not a directory, then this will
+    /// return an empty `Vec`.
+    pub fn read_directory(&self, dir: impl AsRef<VendoredPath>) -> Vec<DirectoryEntry> {
+        // N.B. We specifically do not return an iterator here to avoid
+        // holding a lock for the lifetime of the iterator returned.
+        // That is, it seems like a footgun to keep the zip archive
+        // locked during iteration, since the unit of work for each
+        // item in the iterator could be arbitrarily long. Allocating
+        // up front and stuffing all entries into it is probably the
+        // simplest solution and what we do here. If this becomes
+        // a problem, there are other strategies we could pursue.
+        // (Amortizing allocs, using a different synchronization
+        // behavior or even exposing additional APIs.) ---AG
+
+        fn read_directory(fs: &VendoredFileSystem, dir: &VendoredPath) -> Vec<DirectoryEntry> {
+            let mut normalized = NormalizedVendoredPath::from(dir);
+            if !normalized.as_str().ends_with('/') {
+                normalized = normalized.with_trailing_slash();
+            }
+            let archive = fs.lock_archive();
+            let mut entries = vec![];
+            for name in archive.0.file_names() {
+                // Any entry that doesn't have the `path` (with a
+                // trailing slash) as a prefix cannot possibly be in
+                // the directory referenced by `path`.
+                let Some(without_dir_prefix) = name.strip_prefix(normalized.as_str()) else {
+                    continue;
+                };
+                // Filter out an entry equivalent to the path given
+                // since we only want children of the directory.
+                if without_dir_prefix.is_empty() {
+                    continue;
+                }
+                // We only want *direct* children. Files that are
+                // direct children cannot have any slashes (or else
+                // they are not direct children). Directories that
+                // are direct children can only have one slash and
+                // it must be at the end.
+                //
+                // (We do this manually ourselves to avoid doing a
+                // full file lookup and metadata retrieval via the
+                // `zip` crate.)
+                let file_type = FileType::from_zip_file_name(without_dir_prefix);
+                let slash_count = without_dir_prefix.matches('/').count();
+                match file_type {
+                    FileType::File if slash_count > 0 => continue,
+                    FileType::Directory if slash_count > 1 => continue,
+                    _ => {}
+                }
+                entries.push(DirectoryEntry {
+                    path: VendoredPathBuf::from(name),
+                    file_type,
+                });
+            }
+            entries
+        }
+        read_directory(self, dir.as_ref())
+    }
+
     /// Acquire a lock on the underlying zip archive.
     /// The call will block until it is able to acquire the lock.
     ///
@@ -206,6 +281,14 @@ pub enum FileType {
 }
 
 impl FileType {
+    fn from_zip_file_name(name: &str) -> FileType {
+        if name.ends_with('/') {
+            FileType::Directory
+        } else {
+            FileType::File
+        }
+    }
+
     pub const fn is_file(self) -> bool {
         matches!(self, Self::File)
     }
@@ -241,6 +324,30 @@ impl Metadata {
 
     pub fn revision(&self) -> FileRevision {
         self.revision
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct DirectoryEntry {
+    path: VendoredPathBuf,
+    file_type: FileType,
+}
+
+impl DirectoryEntry {
+    pub fn new(path: VendoredPathBuf, file_type: FileType) -> Self {
+        Self { path, file_type }
+    }
+
+    pub fn into_path(self) -> VendoredPathBuf {
+        self.path
+    }
+
+    pub fn path(&self) -> &VendoredPath {
+        &self.path
+    }
+
+    pub fn file_type(&self) -> FileType {
+        self.file_type
     }
 }
 
@@ -496,6 +603,60 @@ pub(crate) mod tests {
     #[test]
     fn asyncio_dir_odd_components() {
         test_directory("./stdlib/asyncio/../asyncio/")
+    }
+
+    fn readdir_snapshot(fs: &VendoredFileSystem, path: &str) -> String {
+        let mut paths = fs
+            .read_directory(VendoredPath::new(path))
+            .into_iter()
+            .map(|entry| entry.path().to_string())
+            .collect::<Vec<String>>();
+        paths.sort();
+        paths.join("\n")
+    }
+
+    #[test]
+    fn read_directory_stdlib() {
+        let mock_typeshed = mock_typeshed();
+
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib"), @r"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib/"), @r"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib"), @r"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib/"), @r"
+        vendored://stdlib/asyncio/
+        vendored://stdlib/functools.pyi
+        ");
+    }
+
+    #[test]
+    fn read_directory_asyncio() {
+        let mock_typeshed = mock_typeshed();
+
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "stdlib/asyncio"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "./stdlib/asyncio"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "stdlib/asyncio/"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
+        assert_snapshot!(
+            readdir_snapshot(&mock_typeshed, "./stdlib/asyncio/"),
+            @"vendored://stdlib/asyncio/tasks.pyi",
+        );
     }
 
     fn test_nonexistent_path(path: &str) {

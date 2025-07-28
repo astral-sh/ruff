@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
 B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |

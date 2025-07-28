@@ -6,13 +6,12 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::Locator;
-use crate::fs::relativize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
@@ -21,8 +20,6 @@ use crate::settings::types::UnsafeFixes;
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS   = 1 << 0;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
         const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
@@ -30,17 +27,27 @@ bitflags! {
     }
 }
 
-#[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
-    unsafe_fixes: UnsafeFixes,
+    config: DisplayDiagnosticConfig,
+}
+
+impl Default for TextEmitter {
+    fn default() -> Self {
+        Self {
+            flags: EmitterFlags::default(),
+            config: DisplayDiagnosticConfig::default()
+                .format(DiagnosticFormat::Concise)
+                .hide_severity(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize()),
+        }
+    }
 }
 
 impl TextEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
+        self.config = self.config.show_fix_status(show_fix_status);
         self
     }
 
@@ -58,7 +65,21 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.unsafe_fixes = unsafe_fixes;
+        self.config = self
+            .config
+            .fix_applicability(unsafe_fixes.required_applicability());
+        self
+    }
+
+    #[must_use]
+    pub fn with_preview(mut self, preview: bool) -> Self {
+        self.config = self.config.preview(preview);
+        self
+    }
+
+    #[must_use]
+    pub fn with_color(mut self, color: bool) -> Self {
+        self.config = self.config.color(color);
         self
     }
 }
@@ -71,51 +92,10 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in diagnostics {
+            write!(writer, "{}", message.display(context, &self.config))?;
+
             let filename = message.expect_ruff_filename();
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(&filename).bold(),
-                sep = ":".cyan(),
-            )?;
-
-            let start_location = message.expect_ruff_start_location();
             let notebook_index = context.notebook_index(&filename);
-
-            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(notebook_index) = notebook_index {
-                write!(
-                    writer,
-                    "cell {cell}{sep}",
-                    cell = notebook_index
-                        .cell(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    sep = ":".cyan(),
-                )?;
-
-                LineColumn {
-                    line: notebook_index
-                        .cell_row(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    column: start_location.column,
-                }
-            } else {
-                start_location
-            };
-
-            writeln!(
-                writer,
-                "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.line,
-                col = diagnostic_location.column,
-                sep = ":".cyan(),
-                code_and_body = RuleCodeAndBody {
-                    message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
-                    unsafe_fixes: self.unsafe_fixes,
-                }
-            )?;
-
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 // The `0..0` range is used to highlight file-level diagnostics.
                 if message.expect_range() != TextRange::default() {
@@ -186,7 +166,7 @@ pub(super) struct MessageCodeFrame<'a> {
 
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let suggestion = self.message.suggestion();
+        let suggestion = self.message.first_help_text();
         let footers = if let Some(suggestion) = suggestion {
             vec![Level::Help.title(suggestion)]
         } else {

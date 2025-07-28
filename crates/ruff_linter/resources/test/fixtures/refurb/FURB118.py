@@ -143,3 +143,23 @@ class NotAMethodButHardToDetect:
     # without risking false positives elsewhere or introducing complex heuristics
     # that users would find surprising and confusing
     FOO = sorted([x for x in BAR], key=lambda x: x.baz)
+
+# https://github.com/astral-sh/ruff/issues/19305
+import pytest
+
+@pytest.fixture
+def my_fixture_with_param(request):
+    return request.param
+
+@pytest.fixture()
+def my_fixture_with_param2(request):
+    return request.param
+
+
+# Decorated function (should be ignored)
+def custom_decorator(func):
+    return func
+
+@custom_decorator
+def add(x, y):
+    return x + y

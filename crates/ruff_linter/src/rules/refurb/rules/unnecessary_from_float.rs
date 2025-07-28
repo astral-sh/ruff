@@ -1,10 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::linter::float::as_non_finite_float_string_literal;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unnecessary `from_float` and `from_decimal` usages to construct
@@ -15,6 +17,12 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// by passing float or decimal instances to the constructor directly. As such,
 /// the use of `from_float` and `from_decimal` methods is unnecessary, and
 /// should be avoided in favor of the more concise constructor syntax.
+///
+/// However, there are important behavioral differences between the `from_*` methods
+/// and the constructors:
+/// - The `from_*` methods validate their argument types and raise `TypeError` for invalid types
+/// - The constructors accept broader argument types without validation
+/// - The `from_*` methods have different parameter names than the constructors
 ///
 /// ## Example
 /// ```python
@@ -31,6 +39,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Fraction(4.2)
 /// Fraction(Decimal(4.2))
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe by default because:
+/// - The `from_*` methods provide type validation that the constructors don't
+/// - Removing type validation can change program behavior
+/// - The parameter names are different between methods and constructors
+///
+/// The fix is marked as safe only when:
+/// - The argument type is known to be valid for the target constructor
+/// - No keyword arguments are used, or they match the constructor's parameters
 ///
 /// ## References
 /// - [Python documentation: `decimal`](https://docs.python.org/3/library/decimal.html)
@@ -101,62 +119,178 @@ pub(crate) fn unnecessary_from_float(checker: &Checker, call: &ExprCall) {
         call.range(),
     );
 
-    let edit = Edit::range_replacement(
-        checker.locator().slice(&**value).to_string(),
-        call.func.range(),
-    );
+    // Validate that the method call has correct arguments and get the argument value
+    let Some(arg_value) = has_valid_method_arguments(call, method_name, constructor) else {
+        // Don't suggest a fix for invalid calls
+        return;
+    };
 
-    // Short-circuit case for special values, such as: `Decimal.from_float(float("inf"))` to `Decimal("inf")`.
-    'short_circuit: {
-        if !matches!(constructor, Constructor::Decimal) {
-            break 'short_circuit;
-        }
-        if !(method_name == MethodName::FromFloat) {
-            break 'short_circuit;
-        }
+    let constructor_name = checker.locator().slice(&**value).to_string();
 
-        let Some(value) = (match method_name {
-            MethodName::FromFloat => call.arguments.find_argument_value("f", 0),
-            MethodName::FromDecimal => call.arguments.find_argument_value("dec", 0),
-        }) else {
-            return;
-        };
-
-        let Expr::Call(
-            call @ ast::ExprCall {
-                func, arguments, ..
-            },
-        ) = value
-        else {
-            break 'short_circuit;
-        };
-
-        // Must have exactly one argument, which is a string literal.
-        if !arguments.keywords.is_empty() {
-            break 'short_circuit;
-        }
-        let [float] = arguments.args.as_ref() else {
-            break 'short_circuit;
-        };
-        if as_non_finite_float_string_literal(float).is_none() {
-            break 'short_circuit;
-        }
-
-        // Must be a call to the `float` builtin.
-        if !semantic.match_builtin_expr(func, "float") {
-            break 'short_circuit;
-        }
-
-        let replacement = checker.locator().slice(float).to_string();
-        diagnostic.set_fix(Fix::safe_edits(
-            edit,
-            [Edit::range_replacement(replacement, call.range())],
-        ));
-
+    // Special case for non-finite float literals: Decimal.from_float(float("inf")) -> Decimal("inf")
+    if let Some(replacement) = handle_non_finite_float_special_case(
+        call,
+        method_name,
+        constructor,
+        arg_value,
+        &constructor_name,
+        checker,
+    ) {
+        diagnostic.set_fix(Fix::safe_edit(replacement));
         return;
     }
 
-    diagnostic.set_fix(Fix::safe_edit(edit));
+    // Check if we should suppress the fix due to type validation concerns
+    let is_type_safe = is_valid_argument_type(arg_value, method_name, constructor, checker);
+    let has_keywords = !call.arguments.keywords.is_empty();
+
+    // Determine fix safety
+    let applicability = if is_type_safe && !has_keywords {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
+
+    // Build the replacement
+    let arg_text = checker.locator().slice(arg_value);
+    let replacement_text = format!("{constructor_name}({arg_text})");
+
+    let edit = Edit::range_replacement(replacement_text, call.range());
+
+    diagnostic.set_fix(Fix::applicable_edit(edit, applicability));
+}
+
+/// Check if the argument would be valid for the target constructor
+fn is_valid_argument_type(
+    arg_expr: &Expr,
+    method_name: MethodName,
+    constructor: Constructor,
+    checker: &Checker,
+) -> bool {
+    let semantic = checker.semantic();
+    let resolved_type = ResolvedPythonType::from(arg_expr);
+
+    let (is_int, is_float) = if let ResolvedPythonType::Unknown = resolved_type {
+        arg_expr
+            .as_name_expr()
+            .and_then(|name| semantic.only_binding(name).map(|id| semantic.binding(id)))
+            .map(|binding| {
+                (
+                    typing::is_int(binding, semantic),
+                    typing::is_float(binding, semantic),
+                )
+            })
+            .unwrap_or_default()
+    } else {
+        (false, false)
+    };
+
+    match (method_name, constructor) {
+        // Decimal.from_float accepts int, bool, float
+        (MethodName::FromFloat, Constructor::Decimal) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int || is_float,
+            _ => false,
+        },
+        // Fraction.from_float accepts int, bool, float
+        (MethodName::FromFloat, Constructor::Fraction) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool | NumberLike::Float,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int || is_float,
+            _ => false,
+        },
+        // Fraction.from_decimal accepts int, bool, Decimal
+        (MethodName::FromDecimal, Constructor::Fraction) => match resolved_type {
+            ResolvedPythonType::Atom(PythonType::Number(
+                NumberLike::Integer | NumberLike::Bool,
+            )) => true,
+            ResolvedPythonType::Unknown => is_int,
+            _ => {
+                // Check if it's a Decimal instance
+                arg_expr
+                    .as_call_expr()
+                    .and_then(|call| semantic.resolve_qualified_name(&call.func))
+                    .is_some_and(|qualified_name| {
+                        matches!(qualified_name.segments(), ["decimal", "Decimal"])
+                    })
+            }
+        },
+        _ => false,
+    }
+}
+
+/// Check if the call has valid arguments for the from_* method
+fn has_valid_method_arguments(
+    call: &ExprCall,
+    method_name: MethodName,
+    constructor: Constructor,
+) -> Option<&Expr> {
+    if call.arguments.len() != 1 {
+        return None;
+    }
+
+    match method_name {
+        MethodName::FromFloat => {
+            // Decimal.from_float is positional-only; Fraction.from_float allows keyword 'f'.
+            if constructor == Constructor::Decimal {
+                // Only allow positional argument for Decimal.from_float
+                call.arguments.find_positional(0)
+            } else {
+                // Fraction.from_float allows either positional or 'f' keyword
+                call.arguments.find_argument_value("f", 0)
+            }
+        }
+        MethodName::FromDecimal => {
+            // from_decimal(dec) - should have exactly one positional argument or 'dec' keyword
+            call.arguments.find_argument_value("dec", 0)
+        }
+    }
+}
+
+/// Handle the special case for non-finite float literals
+fn handle_non_finite_float_special_case(
+    call: &ExprCall,
+    method_name: MethodName,
+    constructor: Constructor,
+    arg_value: &Expr,
+    constructor_name: &str,
+    checker: &Checker,
+) -> Option<Edit> {
+    // Only applies to Decimal.from_float
+    if !matches!(
+        (method_name, constructor),
+        (MethodName::FromFloat, Constructor::Decimal)
+    ) {
+        return None;
+    }
+
+    let Expr::Call(ast::ExprCall {
+        func, arguments, ..
+    }) = arg_value
+    else {
+        return None;
+    };
+
+    // Must be a call to the `float` builtin.
+    if !checker.semantic().match_builtin_expr(func, "float") {
+        return None;
+    }
+
+    // Must have exactly one argument, which is a string literal.
+    if !arguments.keywords.is_empty() {
+        return None;
+    }
+    let [float_arg] = arguments.args.as_ref() else {
+        return None;
+    };
+    as_non_finite_float_string_literal(float_arg)?;
+
+    let replacement_arg = checker.locator().slice(float_arg).to_string();
+    let replacement_text = format!("{constructor_name}({replacement_arg})");
+    Some(Edit::range_replacement(replacement_text, call.range()))
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

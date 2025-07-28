@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use crate::DocumentSnapshot;
 use crate::document::{PositionEncoding, PositionExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
+use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::SignatureHelpRequest;
 use lsp_types::{
@@ -37,7 +37,6 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
         }
 
         let Some(file) = snapshot.file(db) else {
-            tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
 
@@ -72,7 +71,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                     .parameters
                     .into_iter()
                     .map(|param| {
-                        let label = if resolved_capabilities.signature_label_offset_support {
+                        let label = if resolved_capabilities.supports_signature_label_offset() {
                             // Find the parameter's offset in the signature label
                             if let Some(start) = sig.label.find(&param.label) {
                                 let encoding = snapshot.encoding();
@@ -115,11 +114,12 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                     })
                     .collect();
 
-                let active_parameter = if resolved_capabilities.signature_active_parameter_support {
-                    sig.active_parameter.and_then(|p| u32::try_from(p).ok())
-                } else {
-                    None
-                };
+                let active_parameter =
+                    if resolved_capabilities.supports_signature_active_parameter() {
+                        sig.active_parameter.and_then(|p| u32::try_from(p).ok())
+                    } else {
+                        None
+                    };
 
                 SignatureInformation {
                     label: sig.label,

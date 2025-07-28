@@ -13,8 +13,16 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ### Fully static
 
 ```py
-from typing_extensions import Literal, LiteralString, Never
+from typing_extensions import Literal, LiteralString, Protocol, Never
 from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+class Single(Enum):
+    VALUE = 1
 
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
@@ -24,6 +32,26 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 0]))
 static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
 static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
+
+static_assert(is_equivalent_to(Literal[Answer.YES], Literal[Answer.YES]))
+static_assert(is_equivalent_to(Literal[Answer.NO, Answer.YES], Answer))
+static_assert(is_equivalent_to(Literal[Answer.YES, Answer.NO], Answer))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Literal[Answer.NO]))
+static_assert(not is_equivalent_to(Literal[Answer.YES], Answer))
+
+static_assert(is_equivalent_to(Literal[Single.VALUE], Single))
+static_assert(is_equivalent_to(Single, Literal[Single.VALUE]))
+static_assert(is_equivalent_to(Literal[Single.VALUE], Literal[Single.VALUE]))
+
+static_assert(is_equivalent_to(tuple[Single] | int | str, str | int | tuple[Literal[Single.VALUE]]))
+
+class Protocol1(Protocol):
+    a: Single
+
+class Protocol2(Protocol):
+    a: Literal[Single.VALUE]
+
+static_assert(is_equivalent_to(Protocol1, Protocol2))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))
@@ -57,8 +85,9 @@ static_assert(not is_equivalent_to(type[object], type[Any]))
 ## Unions and intersections
 
 ```py
-from typing import Any
+from typing import Any, Literal
 from ty_extensions import Intersection, Not, Unknown, is_equivalent_to, static_assert
+from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
 static_assert(is_equivalent_to(str | int | Any, str | int | Unknown))
@@ -99,6 +128,11 @@ static_assert(is_equivalent_to(Intersection[P, Q], Intersection[Q, P]))
 static_assert(is_equivalent_to(Intersection[Q, Not[P]], Intersection[Not[P], Q]))
 static_assert(is_equivalent_to(Intersection[Q, R, Not[P]], Intersection[Not[P], R, Q]))
 static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not[S | P], R | Q]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
 ```
 
 ## Tuples

@@ -1538,19 +1538,9 @@ impl<'a> Generator<'a> {
 
     fn unparse_t_string_value(&mut self, value: &ast::TStringValue) {
         let mut first = true;
-        for t_string_part in value {
+        for t_string in value {
             self.p_delim(&mut first, " ");
-            match t_string_part {
-                ast::TStringPart::Literal(string_literal) => {
-                    self.unparse_string_literal(string_literal);
-                }
-                ast::TStringPart::FString(f_string) => {
-                    self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
-                }
-                ast::TStringPart::TString(t_string) => {
-                    self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
-                }
-            }
+            self.unparse_interpolated_string(&t_string.elements, t_string.flags.into());
         }
     }
 

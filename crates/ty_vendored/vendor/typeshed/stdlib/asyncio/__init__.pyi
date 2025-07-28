@@ -1,3 +1,5 @@
+"""The asyncio package, tracking PEP 3156."""
+
 # This condition is so big, it's clearer to keep to platform condition in two blocks
 # Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys

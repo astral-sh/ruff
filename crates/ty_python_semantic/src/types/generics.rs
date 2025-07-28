@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
@@ -11,9 +14,50 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, declaration_type,
+    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
+
+/// Returns an iterator of any generic context introduced by the given scope or any enclosing
+/// scope.
+fn enclosing_generic_contexts<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = GenericContext<'db>> {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                binding_type(db, index.expect_single_definition(class.node(module)))
+                    .into_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                binding_type(db, index.expect_single_definition(function.node(module)))
+                    .into_function_literal()?
+                    .signature(db)
+                    .iter()
+                    .last()
+                    .expect("function should have at least one overload")
+                    .generic_context
+            }
+            _ => None,
+        })
+}
+
+/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
+fn bound_legacy_typevars<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &'db SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = TypeVarInstance<'db>> {
+    enclosing_generic_contexts(db, module, index, scope)
+        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
+        .filter(|typevar| typevar.is_legacy(db))
+}
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -82,9 +126,11 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
+        definition: Definition<'db>,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
     ) -> Option<Self> {
+        // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
@@ -97,6 +143,16 @@ impl<'db> GenericContext<'db> {
         if let Some(ty) = return_type {
             ty.find_legacy_typevars(db, &mut variables);
         }
+
+        // Then remove any that were bound in enclosing scopes.
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let containing_scope = definition.file_scope(db);
+        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
+            variables.remove(&typevar);
+        }
+
         if variables.is_empty() {
             return None;
         }
@@ -171,6 +227,16 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
+    /// Returns a tuple type of the typevars introduced by this generic context.
+    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
+        TupleType::from_elements(
+            db,
+            self.variables(db)
+                .iter()
+                .map(|typevar| Type::TypeVar(*typevar)),
+        )
+    }
+
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         self.variables(db).is_subset(other.variables(db))
     }
@@ -194,7 +260,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = UnionType::from_elements(db, tuple.tuple(db).all_elements());
+        let element_type = tuple.tuple(db).homogeneous_element_type(db);
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 

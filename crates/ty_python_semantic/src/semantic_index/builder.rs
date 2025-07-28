@@ -10,7 +10,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
@@ -30,22 +30,25 @@ use crate::semantic_index::definition::{
     StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::place::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, PlaceExpr,
-    PlaceExprWithFlags, PlaceTableBuilder, Scope, ScopeId, ScopeKind, ScopedPlaceId,
-};
+use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
-use crate::semantic_index::use_def::{
-    EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
+use crate::semantic_index::scope::{
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef,
 };
-use crate::semantic_index::{ArcUseDefMap, SemanticIndex};
+use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
+use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
+use crate::semantic_index::use_def::{
+    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+};
+use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -89,6 +92,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    /// Whether we are currently visiting an `if TYPE_CHECKING` block.
+    in_type_checking_block: bool,
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
@@ -102,8 +107,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ast_ids: IndexVec<FileScopeId, AstIdsBuilder>,
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
+    scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -111,7 +115,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
-    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
+    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
@@ -130,6 +134,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
+            in_type_checking_block: false,
 
             scopes: IndexVec::new(),
             place_tables: IndexVec::new(),
@@ -137,16 +142,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scope_ids_by_scope: IndexVec::new(),
             use_def_maps: IndexVec::new(),
 
-            scopes_by_expression: FxHashMap::default(),
+            scopes_by_expression: ExpressionsScopeMapBuilder::new(),
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
-            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
-            eager_snapshots: FxHashMap::default(),
+            enclosing_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -249,6 +253,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             node_with_kind,
             children_start..children_start,
             reachability,
+            self.in_type_checking_block,
         );
         let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
@@ -273,25 +278,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
-    fn pop_scope(&mut self) -> FileScopeId {
-        self.try_node_context_stack_manager.exit_scope();
-
-        let ScopeInfo {
-            file_scope_id: popped_scope_id,
-            ..
-        } = self
-            .scope_stack
-            .pop()
-            .expect("Root scope should be present");
-
-        let children_end = self.scopes.next_index();
-        let popped_scope = &mut self.scopes[popped_scope_id];
-        popped_scope.extend_descendants(children_end);
-
-        if !popped_scope.is_eager() {
-            return popped_scope_id;
-        }
-
+    // Records snapshots of the place states visible from the current eager scope.
+    fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -309,47 +297,181 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
-            for nested_place in self.place_tables[popped_scope_id].places() {
+            for nested_place in self.place_tables[popped_scope_id].iter() {
                 // Skip this place if this enclosing scope doesn't contain any bindings for it.
                 // Note that even if this place is bound in the popped scope,
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
 
-                let Some(enclosing_place_id) =
-                    enclosing_place_table.place_id_by_expr(&nested_place.expr)
-                else {
+                let Some(enclosing_place_id) = enclosing_place_table.place_id(nested_place) else {
                     continue;
                 };
-                let enclosing_place = enclosing_place_table.place_expr(enclosing_place_id);
+                let enclosing_place = enclosing_place_table.place(enclosing_place_id);
 
                 // Snapshot the state of this place that are visible at this point in this
                 // enclosing scope.
-                let key = EagerSnapshotKey {
+                let key = EnclosingSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_place: enclosing_place_id,
                     nested_scope: popped_scope_id,
+                    nested_laziness: ScopeLaziness::Eager,
                 };
-                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
                     enclosing_place_id,
                     enclosing_scope_kind,
                     enclosing_place,
                 );
-                self.eager_snapshots.insert(key, eager_snapshot);
+                self.enclosing_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
             // eagerly, even if we would encounter another eager enclosing scope later on.
-            // Also, narrowing constraints outside a lazy scope are not applicable.
-            // TODO: If the place has never been rewritten, they are applicable.
             if !enclosing_scope_kind.is_eager() {
                 break;
             }
+        }
+    }
+
+    fn bound_scope(&self, enclosing_scope: FileScopeId, symbol: &Symbol) -> Option<FileScopeId> {
+        self.scope_stack
+            .iter()
+            .rev()
+            .skip_while(|scope| scope.file_scope_id != enclosing_scope)
+            .find_map(|scope_info| {
+                let scope_id = scope_info.file_scope_id;
+                let place_table = &self.place_tables[scope_id];
+                let place_id = place_table.symbol_id(symbol.name())?;
+                place_table.place(place_id).is_bound().then_some(scope_id)
+            })
+    }
+
+    // Records snapshots of the place states visible from the current lazy scope.
+    fn record_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        for enclosing_scope_info in self.scope_stack.iter().rev() {
+            let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
+            let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+
+            // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
+            for nested_symbol in self.place_tables[popped_scope_id].symbols() {
+                // For the same reason, symbols declared as nonlocal or global are not recorded.
+                // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
+                if self.scopes[enclosing_scope_id].visibility().is_public() {
+                    continue;
+                }
+
+                // Skip this place if this enclosing scope doesn't contain any bindings for it.
+                // Note that even if this place is bound in the popped scope,
+                // it may refer to the enclosing scope bindings
+                // so we also need to snapshot the bindings of the enclosing scope.
+                let Some(enclosed_symbol_id) =
+                    enclosing_place_table.symbol_id(nested_symbol.name())
+                else {
+                    continue;
+                };
+                let enclosing_place = enclosing_place_table.symbol(enclosed_symbol_id);
+                if !enclosing_place.is_bound() {
+                    // If the bound scope of a place can be modified from elsewhere, the snapshot will not be recorded.
+                    if self
+                        .bound_scope(enclosing_scope_id, nested_symbol)
+                        .is_none_or(|scope| self.scopes[scope].visibility().is_public())
+                    {
+                        continue;
+                    }
+                }
+
+                // Snapshot the state of this place that are visible at this point in this
+                // enclosing scope (this may later be invalidated and swept away).
+                let key = EnclosingSnapshotKey {
+                    enclosing_scope: enclosing_scope_id,
+                    enclosing_place: enclosed_symbol_id.into(),
+                    nested_scope: popped_scope_id,
+                    nested_laziness: ScopeLaziness::Lazy,
+                };
+                let lazy_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_outer_state(
+                    enclosed_symbol_id.into(),
+                    enclosing_scope_kind,
+                    enclosing_place.into(),
+                );
+                self.enclosing_snapshots.insert(key, lazy_snapshot);
+            }
+        }
+    }
+
+    /// Any lazy snapshots of places that have been reassigned or modified are no longer valid, so delete them.
+    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        self.enclosing_snapshots.retain(|key, _| {
+            let place_table = &self.place_tables[key.enclosing_scope];
+            key.nested_laziness.is_eager()
+                || key.enclosing_scope != popped_scope_id
+                || !key
+                    .enclosing_place
+                    .as_symbol()
+                    .is_some_and(|symbol_id| place_table.symbol(symbol_id).is_reassigned())
+        });
+    }
+
+    fn sweep_nonlocal_lazy_snapshots(&mut self) {
+        self.enclosing_snapshots.retain(|key, _| {
+            let place_table = &self.place_tables[key.enclosing_scope];
+
+            let is_bound_and_non_local = || -> bool {
+                let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
+                    return false;
+                };
+
+                let symbol = place_table.symbol(symbol_id);
+                self.scopes
+                    .iter_enumerated()
+                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
+                    .any(|(scope_id, _)| {
+                        let other_scope_place_table = &self.place_tables[scope_id];
+                        let Some(symbol_id) = other_scope_place_table.symbol_id(symbol.name())
+                        else {
+                            return false;
+                        };
+                        let symbol = other_scope_place_table.symbol(symbol_id);
+                        symbol.is_nonlocal() && symbol.is_bound()
+                    })
+            };
+
+            key.nested_laziness.is_eager() || !is_bound_and_non_local()
+        });
+    }
+
+    fn pop_scope(&mut self) -> FileScopeId {
+        self.try_node_context_stack_manager.exit_scope();
+
+        let ScopeInfo {
+            file_scope_id: popped_scope_id,
+            ..
+        } = self
+            .scope_stack
+            .pop()
+            .expect("Root scope should be present");
+
+        self.sweep_lazy_snapshots(popped_scope_id);
+
+        let children_end = self.scopes.next_index();
+
+        let popped_scope = &mut self.scopes[popped_scope_id];
+        popped_scope.extend_descendants(children_end);
+
+        if popped_scope.is_eager() {
+            self.record_eager_snapshots(popped_scope_id);
+        } else {
+            self.record_lazy_snapshots(popped_scope_id);
         }
 
         popped_scope_id
     }
 
-    fn current_place_table(&mut self) -> &mut PlaceTableBuilder {
+    fn current_place_table(&self) -> &PlaceTableBuilder {
+        let scope_id = self.current_scope();
+        &self.place_tables[scope_id]
+    }
+
+    fn current_place_table_mut(&mut self) -> &mut PlaceTableBuilder {
         let scope_id = self.current_scope();
         &mut self.place_tables[scope_id]
     }
@@ -388,34 +510,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
-    fn add_symbol(&mut self, name: Name) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_symbol(name);
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+        let (symbol_id, added) = self.current_place_table_mut().add_symbol(Symbol::new(name));
         if added {
-            self.current_use_def_map_mut().add_place(place_id);
+            self.current_use_def_map_mut().add_place(symbol_id.into());
         }
-        place_id
+        symbol_id
     }
 
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
-    fn add_place(&mut self, place_expr: PlaceExprWithFlags) -> ScopedPlaceId {
-        let (place_id, added) = self.current_place_table().add_place(place_expr);
+    fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+        let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
         }
         place_id
     }
 
+    #[track_caller]
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_bound(id);
+        self.current_place_table_mut().mark_bound(id);
     }
 
+    #[track_caller]
     fn mark_place_declared(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_declared(id);
+        self.current_place_table_mut().mark_declared(id);
     }
 
-    fn mark_place_used(&mut self, id: ScopedPlaceId) {
-        self.current_place_table().mark_place_used(id);
+    #[track_caller]
+    fn mark_symbol_used(&mut self, id: ScopedSymbolId) {
+        self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
     fn add_entry_for_definition_key(&mut self, key: DefinitionNodeKey) -> &mut Definitions<'db> {
@@ -445,23 +570,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
         let scope = self.current_scope();
         // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
-        if self.scopes[scope].kind() == ScopeKind::Class
-            && self.place_tables[scope].place_expr(place).is_name()
-        {
+        if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
         }
-        for associated_place in self.place_tables[scope].associated_place_ids(place) {
-            let is_place_name = self.place_tables[scope]
-                .place_expr(associated_place)
-                .is_name();
-            self.use_def_maps[scope].delete_binding(associated_place, is_place_name);
+        for associated_place in self.place_tables[scope]
+            .associated_place_ids(place)
+            .iter()
+            .copied()
+        {
+            self.use_def_maps[scope].delete_binding(associated_place.into());
         }
     }
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
-        let is_place_name = self.current_place_table().place_expr(place).is_name();
-        self.current_use_def_map_mut()
-            .delete_binding(place, is_place_name);
+        self.current_use_def_map_mut().delete_binding(place);
     }
 
     /// Push a new [`Definition`] onto the list of definitions
@@ -510,16 +632,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_declared(place);
         }
 
-        let is_place_name = self.current_place_table().place_expr(place).is_name();
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition, is_place_name);
+                use_def.record_declaration_and_binding(place, definition);
                 self.delete_associated_bindings(place);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                use_def.record_binding(place, definition, is_place_name);
+                use_def.record_binding(place, definition);
                 self.delete_associated_bindings(place);
             }
         }
@@ -689,7 +810,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             ast::Pattern::MatchClass(pattern) => {
                 let cls = self.add_standalone_expression(&pattern.cls);
-                PatternPredicateKind::Class(cls)
+
+                PatternPredicateKind::Class(
+                    cls,
+                    if pattern
+                        .arguments
+                        .patterns
+                        .iter()
+                        .all(ast::Pattern::is_irrefutable)
+                        && pattern
+                            .arguments
+                            .keywords
+                            .iter()
+                            .all(|kw| kw.pattern.is_irrefutable())
+                    {
+                        ClassPatternKind::Irrefutable
+                    } else {
+                        ClassPatternKind::Refutable
+                    },
+                )
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
@@ -708,14 +847,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: Expression<'db>,
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
-    ) -> PredicateOrLiteral<'db> {
+        previous_pattern: Option<PatternPredicate<'db>>,
+    ) -> (PredicateOrLiteral<'db>, PatternPredicate<'db>) {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
         // since its the pattern that introduces any constraints, not the body.) Ideally, that
         // standalone expression would wrap the match arm's pattern as a whole. But a standalone
         // expression can currently only wrap an ast::Expr, which patterns are not. So, we need to
-        // choose an Expr that can “stand in” for the pattern, which we can wrap in a standalone
+        // choose an Expr that can "stand in" for the pattern, which we can wrap in a standalone
         // expression.
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
@@ -730,13 +870,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             subject,
             kind,
             guard,
+            previous_pattern.map(Box::new),
         );
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         });
         self.record_narrowing_constraint(predicate);
-        predicate
+        (predicate, pattern_predicate)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -816,8 +957,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
-                self.mark_place_bound(symbol);
-                self.mark_place_declared(symbol);
+                self.mark_place_bound(symbol.into());
+                self.mark_place_declared(symbol.into());
                 if let Some(bounds) = bound {
                     self.visit_expr(bounds);
                 }
@@ -825,9 +966,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_expr(default);
                 }
                 match type_param {
-                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol, node),
-                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol, node),
-                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol, node),
+                    ast::TypeParam::TypeVar(node) => self.add_definition(symbol.into(), node),
+                    ast::TypeParam::ParamSpec(node) => self.add_definition(symbol.into(), node),
+                    ast::TypeParam::TypeVarTuple(node) => self.add_definition(symbol.into(), node),
                 };
             }
         }
@@ -914,20 +1055,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
             self.add_definition(
-                symbol,
+                symbol.into(),
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
-            self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
+            self.add_definition(
+                symbol.into(),
+                DefinitionNodeRef::VariadicKeywordParameter(kwarg),
+            );
         }
     }
 
     fn declare_parameter(&mut self, parameter: &'ast ast::ParameterWithDefault) {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
-        let definition = self.add_definition(symbol, parameter);
+        let definition = self.add_definition(symbol.into(), parameter);
 
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
@@ -1009,9 +1153,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
+        self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
+
+        for scope in &self.scopes {
+            if let Some(parent) = scope.parent() {
+                self.use_def_maps[parent]
+                    .reachability_constraints
+                    .mark_used(scope.reachability());
+            }
+        }
 
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
@@ -1035,14 +1188,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         ast_ids.shrink_to_fit();
-        self.scopes_by_expression.shrink_to_fit();
         self.definitions_by_node.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
-        self.eager_snapshots.shrink_to_fit();
-        self.globals_by_scope.shrink_to_fit();
+        self.enclosing_snapshots.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1050,14 +1201,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
-            globals_by_scope: self.globals_by_scope,
             ast_ids,
-            scopes_by_expression: self.scopes_by_expression,
+            scopes_by_expression: self.scopes_by_expression.build(),
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            eager_snapshots: self.eager_snapshots,
+            enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
         }
@@ -1142,12 +1292,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                self.mark_place_used(symbol);
+                self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut()
-                    .record_use(symbol, use_id, NodeKey::from_node(name));
+                self.current_use_def_map_mut().record_use(
+                    symbol.into(),
+                    use_id,
+                    NodeKey::from_node(name),
+                );
 
-                self.add_definition(symbol, function_def);
+                self.add_definition(symbol.into(), function_def);
             }
             ast::Stmt::ClassDef(class) => {
                 for decorator in &class.decorator_list {
@@ -1171,7 +1324,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
                 let symbol = self.add_symbol(class.name.id.clone());
-                self.add_definition(symbol, class);
+                self.add_definition(symbol.into(), class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
@@ -1181,7 +1334,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .map(|name| name.id.clone())
                         .unwrap_or("<unknown>".into()),
                 );
-                self.add_definition(symbol, type_alias);
+                self.add_definition(symbol.into(), type_alias);
                 self.visit_expr(&type_alias.name);
 
                 self.with_type_params(
@@ -1213,7 +1366,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     let symbol = self.add_symbol(symbol_name);
                     self.add_definition(
-                        symbol,
+                        symbol.into(),
                         ImportDefinitionNodeRef {
                             node,
                             alias_index,
@@ -1265,7 +1418,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             continue;
                         };
 
-                        let Some(referenced_module) = module.file() else {
+                        let Some(referenced_module) = module.file(self.db) else {
                             continue;
                         };
 
@@ -1285,10 +1438,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
-                            let node_ref = StarImportDefinitionNodeRef {
-                                node,
-                                place_id: symbol_id,
-                            };
+                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
                                 self.file,
@@ -1298,8 +1448,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                             let star_import_predicate = self.add_predicate(star_import.into());
 
-                            let pre_definition =
-                                self.current_use_def_map().single_place_snapshot(symbol_id);
+                            let pre_definition = self
+                                .current_use_def_map()
+                                .single_symbol_place_snapshot(symbol_id);
                             let pre_definition_reachability =
                                 self.current_use_def_map().reachability;
 
@@ -1316,7 +1467,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 );
                             self.current_use_def_map_mut().reachability = definition_reachability;
 
-                            self.push_additional_definition(symbol_id, node_ref);
+                            self.push_additional_definition(symbol_id.into(), node_ref);
 
                             self.current_use_def_map_mut()
                                 .record_and_negate_star_import_reachability_constraint(
@@ -1350,7 +1501,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let symbol = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
-                        symbol,
+                        symbol.into(),
                         ImportFromDefinitionNodeRef {
                             node,
                             alias_index,
@@ -1416,6 +1567,36 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
+                    if self.is_method_of_class().is_some() {
+                        // Record the right-hand side of the assignment as a standalone expression
+                        // if we're inside a method. This allows type inference to infer the type
+                        // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
+                        // where the type itself is not part of the annotation.
+                        self.add_standalone_expression(value);
+                    }
+                }
+
+                if let ast::Expr::Name(name) = &*node.target {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().symbol(symbol_id);
+                    // Check whether the variable has been declared global.
+                    if symbol.is_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedGlobal(name.id.as_str().into()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has been declared nonlocal.
+                    if symbol.is_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::AnnotatedNonlocal(
+                                name.id.as_str().into(),
+                            ),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
                 }
 
                 // See https://docs.python.org/3/library/ast.html#ast.AnnAssign
@@ -1474,6 +1655,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
+
+                let is_outer_block_in_type_checking = self.in_type_checking_block;
+
+                let if_block_in_type_checking = is_if_type_checking(&node.test);
+
+                // Track if we're in a chain that started with "not TYPE_CHECKING"
+                let mut is_in_not_type_checking_chain = is_if_not_type_checking(&node.test);
+
+                self.in_type_checking_block =
+                    if_block_in_type_checking || is_outer_block_in_type_checking;
+
                 self.visit_body(&node.body);
 
                 let mut post_clauses: Vec<FlowSnapshot> = vec![];
@@ -1492,6 +1684,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // if there's no `else` branch, we should add a no-op `else` branch
                     Some((None, Default::default()))
                 });
+
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
@@ -1514,12 +1707,34 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             self.record_reachability_constraint(last_predicate);
                     }
 
+                    // Determine if this clause is in type checking context
+                    let clause_in_type_checking = if let Some(elif_test) = clause_test {
+                        if is_if_type_checking(elif_test) {
+                            // This block has "TYPE_CHECKING" condition
+                            true
+                        } else if is_if_not_type_checking(elif_test) {
+                            // This block has "not TYPE_CHECKING" condition so we update the chain state for future blocks
+                            is_in_not_type_checking_chain = true;
+                            false
+                        } else {
+                            // This block has some other condition
+                            // It's in type checking only if we're in a "not TYPE_CHECKING" chain
+                            is_in_not_type_checking_chain
+                        }
+                    } else {
+                        is_in_not_type_checking_chain
+                    };
+
+                    self.in_type_checking_block = clause_in_type_checking;
+
                     self.visit_body(clause_body);
                 }
 
                 for post_clause_state in post_clauses {
                     self.flow_merge(post_clause_state);
                 }
+
+                self.in_type_checking_block = is_outer_block_in_type_checking;
             }
             ast::Stmt::While(ast::StmtWhile {
                 test,
@@ -1652,7 +1867,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
                 let mut post_case_snapshots = vec![];
-                let mut match_predicate;
+                let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
@@ -1662,11 +1877,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
-                    match_predicate = self.add_pattern_narrowing_constraint(
-                        subject_expr,
-                        &case.pattern,
-                        case.guard.as_deref(),
-                    );
+                    let (match_predicate, match_pattern_predicate) = self
+                        .add_pattern_narrowing_constraint(
+                            subject_expr,
+                            &case.pattern,
+                            case.guard.as_deref(),
+                            previous_pattern,
+                        );
+                    previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
                         self.record_reachability_constraint(match_predicate);
 
@@ -1786,7 +2004,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
-                                symbol,
+                                symbol.into(),
                                 DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                                     handler: except_handler,
                                     is_star: *is_star,
@@ -1800,7 +2018,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         self.visit_body(handler_body);
                         // The caught exception is cleared at the end of the except clause
                         if let Some(symbol) = symbol {
-                            self.delete_binding(symbol);
+                            self.delete_binding(symbol.into());
                         }
                         // Each `except` block is mutually exclusive with all other `except` blocks.
                         post_except_states.push(self.flow_snapshot());
@@ -1858,8 +2076,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 for name in names {
                     let symbol_id = self.add_symbol(name.id.clone());
-                    let symbol_table = self.current_place_table();
-                    let symbol = symbol_table.place_expr(symbol_id);
+                    let symbol = self.current_place_table().symbol(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
                     if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
@@ -1870,11 +2088,59 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             python_version: self.python_version,
                         });
                     }
-                    let scope_id = self.current_scope();
-                    self.globals_by_scope
-                        .entry(scope_id)
-                        .or_default()
-                        .insert(symbol_id);
+                    // Check whether the variable has also been declared nonlocal.
+                    if symbol.is_nonlocal() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    self.current_place_table_mut()
+                        .symbol_mut(symbol_id)
+                        .mark_global();
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Nonlocal(ast::StmtNonlocal {
+                range: _,
+                node_index: _,
+                names,
+            }) => {
+                for name in names {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol = self.current_place_table().symbol(symbol_id);
+                    // Check whether the variable has already been accessed in this scope.
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // Check whether the variable has also been declared global.
+                    if symbol.is_global() {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::NonlocalAndGlobal(name.to_string()),
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
+                    // The variable is required to exist in an enclosing scope, but that definition
+                    // might come later. For example, this is example legal, but we can't check
+                    // that here, because we haven't gotten to `x = 1`:
+                    // ```py
+                    // def f():
+                    //     def g():
+                    //         nonlocal x
+                    //     x = 1
+                    // ```
+                    self.current_place_table_mut()
+                        .symbol_mut(symbol_id)
+                        .mark_nonlocal();
                 }
                 walk_stmt(self, stmt);
             }
@@ -1886,9 +2152,26 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
                 for target in targets {
-                    if let Ok(target) = PlaceExpr::try_from(target) {
-                        let place_id = self.add_place(PlaceExprWithFlags::new(target));
-                        self.current_place_table().mark_place_used(place_id);
+                    if let Some(mut target) = PlaceExpr::try_from_expr(target) {
+                        if let PlaceExpr::Symbol(symbol) = &mut target {
+                            // `del x` behaves like an assignment in that it forces all references
+                            // to `x` in the current scope (including *prior* references) to refer
+                            // to the current scope's binding (unless `x` is declared `global` or
+                            // `nonlocal`). For example, this is an UnboundLocalError at runtime:
+                            //
+                            // ```py
+                            // x = 1
+                            // def foo():
+                            //     print(x)  # can't refer to global `x`
+                            //     if False:
+                            //         del x
+                            // foo()
+                            // ```
+                            symbol.mark_bound();
+                            symbol.mark_used();
+                        }
+
+                        let place_id = self.add_place(target);
                         self.delete_binding(place_id);
                     }
                 }
@@ -1947,7 +2230,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         self.scopes_by_expression
-            .insert(expr.into(), self.current_scope());
+            .record_expression(expr, self.current_scope());
 
         let node_key = NodeKey::from_node(expr);
 
@@ -1955,19 +2238,20 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Name(ast::ExprName { ctx, .. })
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
-                if let Ok(place_expr) = PlaceExpr::try_from(expr) {
-                    let mut place_expr = PlaceExprWithFlags::new(place_expr);
-                    if self.is_method_of_class().is_some()
-                        && place_expr.is_instance_attribute_candidate()
-                    {
-                        // We specifically mark attribute assignments to the first parameter of a method,
-                        // i.e. typically `self` or `cls`.
-                        let accessed_object_refers_to_first_parameter = self
-                            .current_first_parameter_name
-                            .is_some_and(|fst| place_expr.expr.root_name() == fst);
+                if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
+                    if self.is_method_of_class().is_some() {
+                        if let PlaceExpr::Member(member) = &mut place_expr {
+                            if member.is_instance_attribute_candidate() {
+                                // We specifically mark attribute assignments to the first parameter of a method,
+                                // i.e. typically `self` or `cls`.
+                                let accessed_object_refers_to_first_parameter = self
+                                    .current_first_parameter_name
+                                    .is_some_and(|first| member.symbol_name() == first);
 
-                        if accessed_object_refers_to_first_parameter && place_expr.is_member() {
-                            place_expr.mark_instance_attribute();
+                                if accessed_object_refers_to_first_parameter {
+                                    member.mark_instance_attribute();
+                                }
+                            }
                         }
                     }
 
@@ -1984,7 +2268,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        self.mark_place_used(place_id);
+                        if let ScopedPlaceId::Symbol(symbol_id) = place_id {
+                            self.mark_symbol_used(symbol_id);
+                        }
                         let use_id = self.current_ast_ids().record_use(expr);
                         self.current_use_def_map_mut()
                             .record_use(place_id, use_id, node_key);
@@ -2278,7 +2564,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
-                symbol,
+                symbol.into(),
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
                     identifier: name,
@@ -2299,7 +2585,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
-                symbol,
+                symbol.into(),
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
                     identifier: name,
@@ -2415,7 +2701,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        if self.db.is_file_open(self.file) {
+        if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
     }
@@ -2584,4 +2870,76 @@ fn dunder_all_extend_argument(value: &ast::Expr) -> Option<&ast::Expr> {
     let ast::ExprAttribute { value, attr, .. } = single_argument.as_attribute_expr()?;
 
     (attr == "__all__").then_some(value)
+}
+
+/// Builds an interval-map that matches expressions (by their node index) to their enclosing scopes.
+///
+/// The interval map is built in a two-step process because the expression ids are assigned in source order,
+/// but we visit the expressions in semantic order. Few expressions are registered out of order.
+///
+/// 1. build a point vector that maps node indices to their corresponding file scopes.
+/// 2. Sort the expressions by their starting id. Then condense the point vector into an interval map
+///    by collapsing adjacent node indices with the same scope
+///    into a single interval.
+struct ExpressionsScopeMapBuilder {
+    expression_and_scope: Vec<(NodeIndex, FileScopeId)>,
+}
+
+impl ExpressionsScopeMapBuilder {
+    fn new() -> Self {
+        Self {
+            expression_and_scope: vec![],
+        }
+    }
+
+    fn record_expression(&mut self, expression: &impl HasTrackedScope, scope: FileScopeId) {
+        self.expression_and_scope
+            .push((expression.node_index().load(), scope));
+    }
+
+    fn build(mut self) -> ExpressionsScopeMap {
+        self.expression_and_scope
+            .sort_unstable_by_key(|(index, _)| *index);
+
+        let mut iter = self.expression_and_scope.into_iter();
+        let Some(first) = iter.next() else {
+            return ExpressionsScopeMap::default();
+        };
+
+        let mut interval_map = Vec::new();
+
+        let mut current_scope = first.1;
+        let mut range = first.0..=first.0;
+
+        for (index, scope) in iter {
+            if scope == current_scope {
+                range = *range.start()..=index;
+                continue;
+            }
+
+            interval_map.push((range, current_scope));
+
+            current_scope = scope;
+            range = index..=index;
+        }
+
+        interval_map.push((range, current_scope));
+
+        ExpressionsScopeMap(interval_map.into_boxed_slice())
+    }
+}
+
+/// Returns if the expression is a `TYPE_CHECKING` expression.
+fn is_if_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+}
+
+/// Returns if the expression is a `not TYPE_CHECKING` expression.
+fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
+        && matches!(
+            &**operand,
+            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
+        )
+    )
 }

@@ -29,17 +29,17 @@ error[invalid-argument-type]: Argument to function `loads` is incorrect
   |            ^ Expected `str | bytes | bytearray`, found `Literal[5]`
   |
 info: Function defined here
-  --> stdlib/json/__init__.pyi:39:5
-   |
-37 |     **kwds: Any,
-38 | ) -> None: ...
-39 | def loads(
-   |     ^^^^^
-40 |     s: str | bytes | bytearray,
-   |     -------------------------- Parameter declared here
-41 |     *,
-42 |     cls: type[JSONDecoder] | None = None,
-   |
+   --> stdlib/json/__init__.pyi:218:5
+    |
+216 |     """
+217 |
+218 | def loads(
+    |     ^^^^^
+219 |     s: str | bytes | bytearray,
+    |     -------------------------- Parameter declared here
+220 |     *,
+221 |     cls: type[JSONDecoder] | None = None,
+    |
 info: rule `invalid-argument-type` is enabled by default
 
 ```

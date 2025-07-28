@@ -1,14 +1,16 @@
 use ruff_python_ast::{self as ast, Expr, ExprBooleanLiteral, ExprCall};
-use ruff_python_semantic::SemanticModel;
-use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_use_pathlib::helpers::is_keyword_only_argument_non_default;
-use crate::rules::flake8_use_pathlib::rules::Glob;
-use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathJoin,
-    OsPathSamefile, OsPathSplitext, OsRename, OsReplace, OsStat, OsSymlink, PyPath,
+use crate::rules::flake8_use_pathlib::helpers::{
+    is_file_descriptor, is_keyword_only_argument_non_default,
+};
+use crate::rules::flake8_use_pathlib::{
+    rules::Glob,
+    violations::{
+        BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
+        OsSymlink, PyPath,
+    },
 };
 
 pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
@@ -18,24 +20,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
     let range = call.func.range();
     match qualified_name.segments() {
-        // PTH101
-        ["os", "chmod"] => {
-            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.chmod)
-            // ```text
-            //           0     1          2               3
-            // os.chmod(path, mode, *, dir_fd=None, follow_symlinks=True)
-            // ```
-            if call
-                .arguments
-                .find_argument_value("path", 0)
-                .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
-                || is_keyword_only_argument_non_default(&call.arguments, "dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsChmod, range)
-        }
         // PTH102
         ["os", "makedirs"] => checker.report_diagnostic_if_enabled(OsMakedirs, range),
         // PTH103
@@ -51,42 +35,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             }
             checker.report_diagnostic_if_enabled(OsMkdir, range)
         }
-        // PTH104
-        ["os", "rename"] => {
-            // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
-            // set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rename)
-            // ```text
-            //           0    1       2                3
-            // os.rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
-                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsRename, range)
-        }
-        // PTH105
-        ["os", "replace"] => {
-            // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
-            // set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.replace)
-            // ```text
-            //              0    1       2                3
-            // os.replace(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "src_dir_fd")
-                || is_keyword_only_argument_non_default(&call.arguments, "dst_dir_fd")
-            {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsReplace, range)
-        }
-        // PTH109
-        ["os", "getcwd"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-        ["os", "getcwdb"] => checker.report_diagnostic_if_enabled(OsGetcwd, range),
-
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
@@ -128,8 +76,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             },
             range,
         ),
-        // PTH121
-        ["os", "path", "samefile"] => checker.report_diagnostic_if_enabled(OsPathSamefile, range),
         // PTH122
         ["os", "path", "splitext"] => checker.report_diagnostic_if_enabled(OsPathSplitext, range),
         // PTH211
@@ -236,37 +182,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
         _ => return,
     };
-}
-
-/// Returns `true` if the given expression looks like a file descriptor, i.e., if it is an integer.
-fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
-    if matches!(
-        expr,
-        Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(_),
-            ..
-        })
-    ) {
-        return true;
-    }
-
-    let Some(name) = get_name_expr(expr) else {
-        return false;
-    };
-
-    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
-        return false;
-    };
-
-    typing::is_int(binding, semantic)
-}
-
-fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
-    match expr {
-        Expr::Name(name) => Some(name),
-        Expr::Call(ExprCall { func, .. }) => get_name_expr(func),
-        _ => None,
-    }
 }
 
 /// Returns `true` if argument `name` is set to a non-default `None` value.

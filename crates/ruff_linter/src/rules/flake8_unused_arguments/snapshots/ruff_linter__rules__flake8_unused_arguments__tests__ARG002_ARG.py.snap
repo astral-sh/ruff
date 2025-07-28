@@ -66,3 +66,13 @@ ARG.py:216:24: ARG002 Unused method argument: `x`
     |                        ^ ARG002
 217 |         print("Hello, world!")
     |
+
+ARG.py:255:20: ARG002 Unused method argument: `y`
+    |
+253 | ###
+254 | class C:
+255 |     def f(self, x, y):
+    |                    ^ ARG002
+256 |         """Docstring."""
+257 |         msg = t"{x}..."
+    |

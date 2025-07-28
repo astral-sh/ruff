@@ -13,7 +13,7 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
@@ -34,7 +34,7 @@ pub struct CallableSignature<'db> {
 impl<'db> CallableSignature<'db> {
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
-            overloads: smallvec![signature],
+            overloads: smallvec_inline![signature],
         }
     }
 
@@ -331,7 +331,7 @@ impl<'db> Signature<'db> {
             }
         });
         let legacy_generic_context =
-            GenericContext::from_function_params(db, &parameters, return_ty);
+            GenericContext::from_function_params(db, definition, &parameters, return_ty);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!

@@ -275,18 +275,11 @@ impl<'a> Insertion<'a> {
     }
 }
 
-/// Find the end of the last docstring.
+/// Find the end of the docstring (first string statement).
 fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
-    let mut iter = body.iter();
-    let mut stmt = iter.next()?;
+    let stmt = body.first()?;
     if !is_docstring_stmt(stmt) {
         return None;
-    }
-    for next in iter {
-        if !is_docstring_stmt(next) {
-            break;
-        }
-        stmt = next;
     }
     Some(stmt.end())
 }
@@ -295,7 +288,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 fn match_semicolon(s: &str) -> Option<TextSize> {
     for (offset, c) in s.char_indices() {
         match c {
-            ' ' | '\t' => continue,
+            _ if is_python_whitespace(c) => continue,
             ';' => return Some(TextSize::try_from(offset).unwrap()),
             _ => break,
         }
@@ -367,7 +360,7 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::own_line("", TextSize::from(40), "\n")
+            Insertion::own_line("", TextSize::from(20), "\n")
         );
 
         let contents = r"
