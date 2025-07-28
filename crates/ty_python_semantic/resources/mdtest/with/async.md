@@ -17,5 +17,65 @@ class Manager:
 
 async def test():
     async with Manager() as f:
-        reveal_type(f)  # revealed: @Todo(async `with` statement)
+        reveal_type(f)  # revealed: Target
+```
+
+## `@asynccontextmanager`
+
+```py
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+class Session: ...
+
+@asynccontextmanager
+async def connect() -> AsyncGenerator[Session]:
+    yield Session()
+
+# TODO: this should be `() -> _AsyncGeneratorContextManager[Session, None]`
+reveal_type(connect)  # revealed: (...) -> _AsyncGeneratorContextManager[Unknown, None]
+
+async def main():
+    async with connect() as session:
+        # TODO: should be `Session`
+        reveal_type(session)  # revealed: Unknown
+```
+
+## `asyncio.timeout`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import asyncio
+
+async def long_running_task():
+    await asyncio.sleep(5)
+
+async def main():
+    async with asyncio.timeout(1):
+        await long_running_task()
+```
+
+## `asyncio.TaskGroup`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import asyncio
+
+async def long_running_task():
+    await asyncio.sleep(5)
+
+async def main():
+    async with asyncio.TaskGroup() as tg:
+        # TODO: should be `TaskGroup`
+        reveal_type(tg)  # revealed: Unknown
+
+        tg.create_task(long_running_task())
 ```

@@ -4790,6 +4790,29 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_call_dunder(db, "__await__", CallArguments::none())
+            .map_or(Type::unknown(), |result| {
+                let generator_ty = result.return_type(db);
+
+                if let Type::ProtocolInstance(instance) = generator_ty {
+                    if let Protocol::FromClass(class) = instance.inner {
+                        if class.is_known(db, KnownClass::Generator) {
+                            if let Some(specialization) =
+                                class.class_literal_specialized(db, None).1
+                            {
+                                if let [_, _, return_ty] = specialization.types(db) {
+                                    return *return_ty;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Type::unknown()
+            })
+    }
+
     /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///
