@@ -42,6 +42,7 @@ class TopologicalSorter(Generic[_T]):
         therefore no more nodes can be added using "add".
 
         Raise ValueError if nodes have already been passed out of the sorter.
+
         """
 
     def is_active(self) -> bool:

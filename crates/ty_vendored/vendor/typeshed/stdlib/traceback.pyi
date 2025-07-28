@@ -141,7 +141,8 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
     """
 
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary:
-    """Return a StackSummary object representing a list of
+    """
+    Return a StackSummary object representing a list of
     pre-processed entries from traceback.
 
     This is useful for alternate formatting of stack traces.  If
@@ -234,6 +235,7 @@ else:
 
         The message indicating which exception occurred is always the last
         string in the list.
+
         """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
@@ -598,7 +600,8 @@ class StackSummary(list[FrameSummary]):
 
     @classmethod
     def from_list(cls, a_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> StackSummary:
-        """Create a StackSummary object from a supplied list of
+        """
+        Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
     if sys.version_info >= (3, 11):

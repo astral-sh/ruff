@@ -197,6 +197,7 @@ class HTTPMessage(email.message.Message[str, str]):
         returned, without interpretation.  If the header does not occur, an
         empty list is returned.  If the header occurs multiple times, all
         occurrences are returned.  Case is not important in the header name.
+
         """
 
 @overload
@@ -250,6 +251,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         the *default* is not specified.
 
         If the headers are unknown, raises http.client.ResponseNotReady.
+
         """
 
     @overload
@@ -284,6 +286,7 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         Content-Length giving file size, and a Content-Type
         containing a guess at the file's type. See also the
         description of the mimetools module.
+
         """
 
     def geturl(self) -> str:
@@ -294,11 +297,13 @@ class HTTPResponse(io.BufferedIOBase, BinaryIO):  # type: ignore[misc]  # incomp
         some cases the caller needs to know which URL the client was
         redirected to. The geturl() method can be used to get at this
         redirected URL.
+
         """
 
     def getcode(self) -> int:
         """Return the HTTP status code that was sent with the response,
         or None if the URL is not an HTTP URL.
+
         """
 
     def begin(self) -> None: ...
@@ -348,7 +353,8 @@ class HTTPConnection:
     def set_debuglevel(self, level: int) -> None: ...
     if sys.version_info >= (3, 12):
         def get_proxy_response_headers(self) -> HTTPMessage | None:
-            """Returns a dictionary with the headers of the response
+            """
+            Returns a dictionary with the headers of the response
             received from the proxy server to the CONNECT request
             sent to set the tunnel.
 

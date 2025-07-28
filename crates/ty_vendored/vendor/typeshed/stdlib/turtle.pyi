@@ -311,6 +311,7 @@ class TurtleScreenBase:
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.mainloop()
+
         """
 
     def textinput(self, title: str, prompt: str) -> str | None:
@@ -324,6 +325,7 @@ class TurtleScreenBase:
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.textinput("NIM", "Name of first player:")
+
         """
 
     def numinput(
@@ -344,6 +346,7 @@ class TurtleScreenBase:
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.numinput("Poker", "Your stakes:", 1000, minval=10, maxval=10000)
+
         """
 
 class Terminator(Exception):
@@ -479,6 +482,7 @@ class TurtleScreen(TurtleScreenBase):
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.register_shape("triangle", ((5,-3),(0,5),(-5,-3)))
+
         """
 
     @overload
@@ -666,6 +670,7 @@ class TurtleScreen(TurtleScreenBase):
 
         Subsequently the turtle can be moved by repeatedly pressing
         the up-arrow key, consequently drawing a hexagon
+
         """
 
     def listen(self, xdummy: float | None = None, ydummy: float | None = None) -> None:
@@ -822,6 +827,7 @@ class TNavigator:
         >>> turtle.degrees(400.0)
         >>> turtle.heading()
         100
+
         """
 
     def radians(self) -> None:
@@ -1716,6 +1722,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
         >>> turtle.shapetransform(4, -1, 0, 2)
         >>> turtle.get_shapepoly()
         ((50, -20), (30, 20), (-50, 20), (-30, -20))
+
         """
     if sys.version_info < (3, 13):
         def settiltangle(self, angle: float) -> None:
@@ -2160,6 +2167,7 @@ class _Screen(TurtleScreen):
 
         Example (for a Screen instance named screen):
         >>> screen.exitonclick()
+
         """
 
 class Turtle(RawTurtle):
@@ -2187,19 +2195,8 @@ def write_docstringdict(filename: str = "turtle_docstringdict") -> None:
     into different languages.
     """
 
-# Note: it's somewhat unfortunate that we have to copy the function signatures.
-# It would be nice if we could partially reduce the redundancy by doing something
-# like the following:
-#
-#     _screen: Screen
-#     clear = _screen.clear
-#
-# However, it seems pytype does not support this type of syntax in pyi files.
-
 # Functions copied from TurtleScreenBase:
 
-# Note: mainloop() was always present in the global scope, but was added to
-# TurtleScreenBase in Python 3.0
 def mainloop() -> None:
     """Starts event loop - calling Tkinter's mainloop function.
 
@@ -2211,6 +2208,7 @@ def mainloop() -> None:
 
     Example:
     >>> mainloop()
+
     """
 
 def textinput(title: str, prompt: str) -> str | None:
@@ -2224,6 +2222,7 @@ def textinput(title: str, prompt: str) -> str | None:
 
     Example:
     >>> textinput("NIM", "Name of first player:")
+
     """
 
 def numinput(
@@ -2244,6 +2243,7 @@ def numinput(
 
     Example:
     >>> numinput("Poker", "Your stakes:", 1000, minval=10, maxval=10000)
+
     """
 
 # Functions copied from TurtleScreen:
@@ -2335,6 +2335,7 @@ def register_shape(name: str, shape: _PolygonCoords | Shape | None = None) -> No
 
     Example:
     >>> register_shape("triangle", ((5,-3),(0,5),(-5,-3)))
+
     """
 
 @overload
@@ -2537,6 +2538,7 @@ def onkey(fun: Callable[[], object], key: str) -> None:
 
     Subsequently the turtle can be moved by repeatedly pressing
     the up-arrow key, consequently drawing a hexagon
+
     """
 
 def listen(xdummy: float | None = None, ydummy: float | None = None) -> None:
@@ -2726,6 +2728,7 @@ def exitonclick() -> None:
 
     Example:
     >>> exitonclick()
+
     """
 
 def Screen() -> _Screen:
@@ -2756,6 +2759,7 @@ def degrees(fullcircle: float = 360.0) -> None:
     >>> degrees(400.0)
     >>> heading()
     100
+
     """
 
 def radians() -> None:
@@ -3611,6 +3615,7 @@ def get_shapepoly() -> _PolygonCoords | None:
     >>> shapetransform(4, -1, 0, 2)
     >>> get_shapepoly()
     ((50, -20), (30, 20), (-50, 20), (-30, -20))
+
     """
 
 if sys.version_info < (3, 13):

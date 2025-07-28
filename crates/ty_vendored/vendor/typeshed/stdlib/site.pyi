@@ -186,6 +186,7 @@ def setquit() -> None:  # undocumented
 
     These are objects which make the interpreter exit when called.
     The repr of each object contains a hint at how it works.
+
     """
 
 def venv(known_paths: set[str] | None) -> set[str] | None: ...  # undocumented
