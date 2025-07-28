@@ -80,9 +80,9 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
-    // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.readlink)
+    // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.makedirs)
     // ```text
-    //               0         1           2
+    //               0      1            2
     //  os.makedirs(name, mode=0o777, exist_ok=False)
     // ```
     // We should not offer autofixes if there are more arguments
