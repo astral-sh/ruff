@@ -155,13 +155,13 @@ reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@NamedTupleFallback
 
 # TODO: should be `Person` once we support `Self`
-reveal_type(Person._make(("Alice", 42)))  # revealed: Self@NamedTupleFallback
+reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
 
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
 # TODO: should be `Person` once we support `Self`
-reveal_type(person._replace(name="Bob"))  # revealed: Self@NamedTupleFallback
+reveal_type(person._replace(name="Bob"))  # revealed: Unknown
 ```
 
 ## `collections.namedtuple`
