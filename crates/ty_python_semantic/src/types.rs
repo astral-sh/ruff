@@ -7889,7 +7889,7 @@ impl<'db> CallableType<'db> {
             return Err(TypeRelationError::todo());
         }
         self.signatures(db)
-            .has_relation_to(db, other.signatures(db), relation)
+            .try_has_relation_to(db, other.signatures(db), relation)
     }
 
     /// Check whether this callable type is equivalent to another callable type.

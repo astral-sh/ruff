@@ -834,7 +834,7 @@ impl<'db> FunctionType<'db> {
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-        self_signature.is_subtype_of(db, other_signature)
+        self_signature.try_is_subtype_of(db, other_signature)
     }
 
     pub(crate) fn try_is_assignable_to(
@@ -849,7 +849,8 @@ impl<'db> FunctionType<'db> {
         if self.literal(db) != other.literal(db) {
             return Err(TypeRelationError::todo());
         }
-        self.signature(db).is_assignable_to(db, other.signature(db))
+        self.signature(db)
+            .try_is_assignable_to(db, other.signature(db))
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -907,8 +908,7 @@ fn is_instance_truthiness<'db>(
         if let Type::NominalInstance(instance) = ty {
             if instance
                 .class
-                .try_is_subclass_of(db, ClassType::NonGeneric(class))
-                .is_ok()
+                .is_subclass_of(db, ClassType::NonGeneric(class))
             {
                 return true;
             }

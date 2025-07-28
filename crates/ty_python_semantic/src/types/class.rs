@@ -469,7 +469,7 @@ impl<'db> ClassType<'db> {
                         }
                         (ClassType::Generic(base), ClassType::Generic(other)) => {
                             if base.origin(db) == other.origin(db) {
-                                base.specialization(db).has_relation_to(
+                                base.specialization(db).try_has_relation_to(
                                     db,
                                     other.specialization(db),
                                     relation,
@@ -542,10 +542,10 @@ impl<'db> ClassType<'db> {
 
         // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.try_is_subclass_of(db, other).is_ok();
+            return self.is_subclass_of(db, other);
         }
         if other.is_final(db) {
-            return other.try_is_subclass_of(db, self).is_ok();
+            return other.is_subclass_of(db, self);
         }
 
         // Two solid bases can only coexist in an MRO if one is a subclass of the other.
@@ -1412,10 +1412,7 @@ impl<'db> ClassLiteral<'db> {
             let Some(metaclass) = metaclass.to_class_type(db) else {
                 continue;
             };
-            if metaclass
-                .try_is_subclass_of(db, candidate.metaclass)
-                .is_ok()
-            {
+            if metaclass.is_subclass_of(db, candidate.metaclass) {
                 let (base_class_literal, _) = base_class.class_literal(db);
                 candidate = MetaclassCandidate {
                     metaclass,
@@ -1423,11 +1420,7 @@ impl<'db> ClassLiteral<'db> {
                 };
                 continue;
             }
-            if candidate
-                .metaclass
-                .try_is_subclass_of(db, metaclass)
-                .is_ok()
-            {
+            if candidate.metaclass.is_subclass_of(db, metaclass) {
                 continue;
             }
             let (base_class_literal, _) = base_class.class_literal(db);

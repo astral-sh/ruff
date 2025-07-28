@@ -103,27 +103,27 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn try_has_relation_to(
         &self,
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
     ) -> Result<(), TypeRelationError> {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
+            TypeRelation::Subtyping => self.try_is_subtype_of(db, other),
+            TypeRelation::Assignability => self.try_is_assignable_to(db, other),
         }
     }
 
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
-    pub(crate) fn is_subtype_of(
+    pub(crate) fn try_is_subtype_of(
         &self,
         db: &'db dyn Db,
         other: &Self,
     ) -> Result<(), TypeRelationError> {
-        Self::has_relation_to_impl(
+        Self::try_has_relation_to_impl(
             db,
             &self.overloads,
             &other.overloads,
@@ -134,12 +134,12 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
-    pub(crate) fn is_assignable_to(
+    pub(crate) fn try_is_assignable_to(
         &self,
         db: &'db dyn Db,
         other: &Self,
     ) -> Result<(), TypeRelationError> {
-        Self::has_relation_to_impl(
+        Self::try_has_relation_to_impl(
             db,
             &self.overloads,
             &other.overloads,
@@ -149,7 +149,7 @@ impl<'db> CallableSignature<'db> {
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
-    fn has_relation_to_impl(
+    fn try_has_relation_to_impl(
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
@@ -166,7 +166,7 @@ impl<'db> CallableSignature<'db> {
                 let results = self_signatures
                     .iter()
                     .map(|self_signature| {
-                        Self::has_relation_to_impl(
+                        Self::try_has_relation_to_impl(
                             db,
                             std::slice::from_ref(self_signature),
                             other_signatures,
@@ -187,7 +187,7 @@ impl<'db> CallableSignature<'db> {
                 let results = other_signatures
                     .iter()
                     .map(|other_signature| {
-                        Self::has_relation_to_impl(
+                        Self::try_has_relation_to_impl(
                             db,
                             self_signatures,
                             std::slice::from_ref(other_signature),
@@ -208,7 +208,7 @@ impl<'db> CallableSignature<'db> {
                 let results = other_signatures
                     .iter()
                     .map(|other_signature| {
-                        Self::has_relation_to_impl(
+                        Self::try_has_relation_to_impl(
                             db,
                             self_signatures,
                             std::slice::from_ref(other_signature),
@@ -240,7 +240,8 @@ impl<'db> CallableSignature<'db> {
                 if self == other {
                     return true;
                 }
-                self.is_subtype_of(db, other).is_ok() && other.is_subtype_of(db, self).is_ok()
+                self.try_is_subtype_of(db, other).is_ok()
+                    && other.try_is_subtype_of(db, self).is_ok()
             }
         }
     }
