@@ -287,8 +287,7 @@ fn handle_non_finite_float_special_case(
         return None;
     };
     let normalized = as_non_finite_float_string_literal(float_arg)?;
-    let replacement_arg = format!("\"{normalized}\"");
-    let replacement_text = format!("{constructor_name}({replacement_arg})");
+    let replacement_text = format!(r#"{constructor_name}("{normalized}")"#);
     Some(Edit::range_replacement(replacement_text, call.range()))
 }
 
