@@ -103,6 +103,10 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.try_is_subtype_of(db, other).is_ok()
+    }
+
     pub(crate) fn try_has_relation_to(
         &self,
         db: &'db dyn Db,
@@ -240,8 +244,7 @@ impl<'db> CallableSignature<'db> {
                 if self == other {
                     return true;
                 }
-                self.try_is_subtype_of(db, other).is_ok()
-                    && other.try_is_subtype_of(db, self).is_ok()
+                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
             }
         }
     }
