@@ -956,7 +956,10 @@ impl<'r> EscapedSourceCode<'r> {
             {
                 continue;
             }
-            if self.text.as_bytes()[range.start().to_usize() - 1] != b'\n' {
+            if !matches!(
+                self.text.as_bytes()[range.start().to_usize() - 1],
+                b'\n' | b'\r'
+            ) {
                 continue;
             }
             let start = range.start();
