@@ -409,7 +409,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     .0
                     .iter()
                     .zip(&other.0)
-                    .map(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                    .map(|(self_ty, other_ty)| self_ty.try_has_relation_to(db, *other_ty, relation))
                     .collect::<Vec<_>>();
 
                 if results.iter().all(Result::is_ok) {
@@ -427,7 +427,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if self_ty.has_relation_to(db, *other_ty, relation).is_err() {
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
                         return Err(TypeRelationError::todo());
                     }
                 }
@@ -435,7 +435,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next_back() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if self_ty.has_relation_to(db, *other_ty, relation).is_err() {
+                    if !self_ty.has_relation_to(db, *other_ty, relation) {
                         return Err(TypeRelationError::todo());
                     }
                 }
@@ -443,7 +443,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
                 let results = self_iter
-                    .map(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                    .map(|self_ty| self_ty.try_has_relation_to(db, other.variable, relation))
                     .collect::<Vec<_>>();
 
                 if results.iter().all(Result::is_ok) {
@@ -786,7 +786,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if self_ty.has_relation_to(db, other_ty, relation).is_err() {
+                    if !self_ty.has_relation_to(db, other_ty, relation) {
                         return Err(TypeRelationError::todo());
                     }
                 }
@@ -795,7 +795,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next_back() else {
                         return Err(TypeRelationError::todo());
                     };
-                    if self_ty.has_relation_to(db, other_ty, relation).is_err() {
+                    if !self_ty.has_relation_to(db, other_ty, relation) {
                         return Err(TypeRelationError::todo());
                     }
                 }
@@ -825,10 +825,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     )
                     .map(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
+                            self_ty.try_has_relation_to(db, other_ty, relation)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.try_has_relation_to(db, other.variable, relation)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -853,10 +853,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     .zip_longest(other_suffix.iter().rev())
                     .map(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
+                            self_ty.try_has_relation_to(db, *other_ty, relation)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.try_has_relation_to(db, other.variable, relation)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -871,7 +871,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                self.variable
+                    .try_has_relation_to(db, other.variable, relation)
             }
         }
     }

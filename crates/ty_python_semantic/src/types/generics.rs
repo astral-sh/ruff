@@ -554,15 +554,17 @@ impl<'db> Specialization<'db> {
                         }
                     }
                     TypeRelation::Assignability => {
-                        match self_type.is_assignable_to(db, *other_type) {
-                            Ok(()) => other_type.is_assignable_to(db, *self_type),
+                        match self_type.try_is_assignable_to(db, *other_type) {
+                            Ok(()) => other_type.try_is_assignable_to(db, *self_type),
                             Err(e) => Err(e),
                         }
                     }
                 },
-                TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
+                TypeVarVariance::Covariant => {
+                    self_type.try_has_relation_to(db, *other_type, relation)
+                }
                 TypeVarVariance::Contravariant => {
-                    other_type.has_relation_to(db, *self_type, relation)
+                    other_type.try_has_relation_to(db, *self_type, relation)
                 }
                 TypeVarVariance::Bivariant => Ok(()),
             };
@@ -731,7 +733,7 @@ impl<'db> SpecializationBuilder<'db> {
         // without specializing `T` to `None`.
         if !matches!(formal, Type::ProtocolInstance(_))
             && !actual.is_never()
-            && actual.is_subtype_of(self.db, formal).is_ok()
+            && actual.is_subtype_of(self.db, formal)
         {
             return Ok(());
         }
@@ -740,7 +742,7 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
                 match typevar.bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        if ty.is_assignable_to(self.db, bound).is_err() {
+                        if !ty.is_assignable_to(self.db, bound) {
                             return Err(SpecializationError::MismatchedBound {
                                 typevar,
                                 argument: ty,
@@ -750,7 +752,7 @@ impl<'db> SpecializationBuilder<'db> {
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         for constraint in constraints.iter(self.db) {
-                            if ty.is_assignable_to(self.db, *constraint).is_ok() {
+                            if ty.is_assignable_to(self.db, *constraint) {
                                 self.add_type_mapping(typevar, *constraint);
                                 return Ok(());
                             }

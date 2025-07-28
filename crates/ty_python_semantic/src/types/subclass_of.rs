@@ -176,7 +176,7 @@ impl<'db> SubclassOfType<'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to(db, other_class, relation)
+                self_class.try_has_relation_to(db, other_class, relation)
             }
         }
     }

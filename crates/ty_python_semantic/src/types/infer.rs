@@ -1985,7 +1985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if bound_ty.is_assignable_to(db, declared_ty).is_err() {
+        if !bound_ty.is_assignable_to(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
@@ -2090,10 +2090,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .place
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
-        let ty = if inferred_ty
-            .is_assignable_to(self.db(), ty.inner_type())
-            .is_ok()
-        {
+        let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
             if let Some(builder) = self.context.report_lint(&INVALID_DECLARATION, node) {
@@ -2143,9 +2140,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .and_then(|place| place.place.ignore_possibly_unbound())
                     {
                         let declared_type = declared_ty.inner_type();
-                        if declared_type
+                        if !declared_type
                             .is_assignable_to(self.db(), module_type_implicit_declaration)
-                            .is_err()
                         {
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_DECLARATION, node)
@@ -2162,10 +2158,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                if inferred_ty
-                    .is_assignable_to(self.db(), declared_ty.inner_type())
-                    .is_ok()
-                {
+                if inferred_ty.is_assignable_to(self.db(), declared_ty.inner_type()) {
                     (declared_ty, inferred_ty)
                 } else {
                     report_invalid_assignment(
@@ -2418,10 +2411,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownClass::GeneratorType
                 };
 
-                if inferred_return
+                if !inferred_return
                     .to_instance(self.db())
                     .is_assignable_to(self.db(), expected_ty)
-                    .is_err()
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
@@ -2447,12 +2439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(self.db()) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| {
-                    ty_range
-                        .ty
-                        .is_assignable_to(self.db(), expected_ty)
-                        .is_err()
-                })
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), expected_ty))
             {
                 report_invalid_return_type(
                     &self.context,
@@ -2464,9 +2451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicitly_return_none(self.db())
-                && Type::none(self.db())
-                    .is_assignable_to(self.db(), expected_ty)
-                    .is_err()
+                && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
@@ -2803,7 +2788,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
             let declared_and_inferred_ty = if let Some(default_ty) = default_ty {
-                if default_ty.is_assignable_to(self.db(), declared_ty).is_ok() {
+                if default_ty.is_assignable_to(self.db(), declared_ty) {
                     DeclaredAndInferredType::MightBeDifferent {
                         declared_ty: declared_ty.into(),
                         inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
@@ -3254,7 +3239,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             specialization_instance
                 .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
-                .is_ok()
                 .then_some(specialization_instance)
         }
 
@@ -3269,10 +3253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut builder = UnionBuilder::new(self.db());
             for element in tuple.tuple(self.db()).all_elements().copied() {
                 builder = builder.add(
-                    if element
-                        .is_assignable_to(self.db(), type_base_exception)
-                        .is_ok()
-                    {
+                    if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
                             "`Type::to_instance()` should always return `Some()` \
                                 if called on a type assignable to `type[BaseException]`",
@@ -3286,36 +3267,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
             builder.build()
-        } else if node_ty
-            .is_assignable_to(self.db(), type_base_exception)
-            .is_ok()
-        {
+        } else if node_ty.is_assignable_to(self.db(), type_base_exception) {
             node_ty.to_instance(self.db()).expect(
                 "`Type::to_instance()` should always return `Some()` \
                     if called on a type assignable to `type[BaseException]`",
             )
-        } else if node_ty
-            .is_assignable_to(
-                self.db(),
-                TupleType::homogeneous(self.db(), type_base_exception),
-            )
-            .is_ok()
-        {
+        } else if node_ty.is_assignable_to(
+            self.db(),
+            TupleType::homogeneous(self.db(), type_base_exception),
+        ) {
             extract_tuple_specialization(self.db(), node_ty)
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
-        } else if node_ty
-            .is_assignable_to(
+        } else if node_ty.is_assignable_to(
+            self.db(),
+            UnionType::from_elements(
                 self.db(),
-                UnionType::from_elements(
-                    self.db(),
-                    [
-                        type_base_exception,
-                        TupleType::homogeneous(self.db(), type_base_exception),
-                    ],
-                ),
-            )
-            .is_ok()
-        {
+                [
+                    type_base_exception,
+                    TupleType::homogeneous(self.db(), type_base_exception),
+                ],
+            ),
+        ) {
             KnownClass::BaseException.to_instance(self.db())
         } else {
             if let Some(node) = node {
@@ -3327,7 +3299,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if is_star {
             let class = if symbol_ty
                 .is_subtype_of(self.db(), KnownClass::Exception.to_instance(self.db()))
-                .is_ok()
             {
                 KnownClass::ExceptionGroup
             } else {
@@ -3673,7 +3644,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let ensure_assignable_to = |attr_ty| -> bool {
-            let assignable = value_ty.is_assignable_to(db, attr_ty).is_ok();
+            let assignable = value_ty.is_assignable_to(db, attr_ty);
             if !assignable && emit_diagnostics {
                 report_invalid_attribute_assignment(
                     &self.context,
@@ -4158,7 +4129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::ModuleLiteral(module) => {
                 if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
-                    let assignable = value_ty.is_assignable_to(db, attr_ty).is_ok();
+                    let assignable = value_ty.is_assignable_to(db, attr_ty);
                     if assignable {
                         true
                     } else {
@@ -4374,10 +4345,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_name_expr()
             .is_some_and(|name| &name.id == "TYPE_CHECKING")
         {
-            if KnownClass::Bool
+            if !KnownClass::Bool
                 .to_instance(self.db())
                 .is_assignable_to(self.db(), declared.inner_type())
-                .is_err()
             {
                 // annotation not assignable from `bool` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
@@ -4830,10 +4800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised);
 
-            if raised_type
-                .is_assignable_to(self.db(), can_be_raised)
-                .is_err()
-            {
+            if !raised_type.is_assignable_to(self.db(), can_be_raised) {
                 report_invalid_exception_raised(&self.context, raised, raised_type);
             }
         }
@@ -4841,10 +4808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(cause) = cause {
             let cause_type = self.infer_expression(cause);
 
-            if cause_type
-                .is_assignable_to(self.db(), can_be_exception_cause)
-                .is_err()
-            {
+            if !cause_type.is_assignable_to(self.db(), can_be_exception_cause) {
                 report_invalid_exception_cause(&self.context, cause, cause_type);
             }
         }
@@ -5994,7 +5958,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && KnownClass::Enum
                 .to_class_literal(self.db())
                 .to_class_type(self.db())
-                .is_none_or(|enum_class| class.is_subclass_of(self.db(), enum_class).is_err())
+                .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
@@ -6221,7 +6185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // this can only happen if the code is unreachable
                     // and therefore it is correct to set the result to `Never`.
                     let union = union.build();
-                    if union.is_assignable_to(db, ty).is_ok() {
+                    if union.is_assignable_to(db, ty) {
                         ty = union;
                     }
                 }
@@ -7051,8 +7015,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
 
                     if op == &ast::Operator::BitOr
-                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)).is_ok()
-                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)).is_ok())
+                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
                         && Program::get(db).python_version(db) < PythonVersion::PY310
                     {
                         diag.info(
@@ -7372,7 +7336,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // faster for the common case, and allow us to skip the (two) class member lookups.
                 let left_class = left_ty.to_meta_type(self.db());
                 let right_class = right_ty.to_meta_type(self.db());
-                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty).is_ok() {
+                if left_ty != right_ty && right_ty.is_subtype_of(self.db(), left_ty) {
                     let reflected_dunder = op.reflected_dunder();
                     let rhs_reflected = right_class.member(self.db(), reflected_dunder).place;
                     // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
@@ -8167,7 +8131,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-        if left != right && right.is_subtype_of(db, left).is_ok() {
+        if left != right && right.is_subtype_of(db, left) {
             call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
         } else {
             call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
@@ -8735,10 +8699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // even if the target version is Python 3.8 or lower,
                 // despite the fact that there will be no corresponding `__class_getitem__`
                 // method in these `sys.version_info` branches.
-                if value_ty
-                    .is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db()))
-                    .is_ok()
-                {
+                if value_ty.is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db())) {
                     let dunder_class_getitem_method =
                         value_ty.member(self.db(), "__class_getitem__").place;
 

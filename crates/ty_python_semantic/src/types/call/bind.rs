@@ -587,7 +587,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_subtype_of(db, *ty_b).is_ok(),
+                                    ty_a.is_subtype_of(db, *ty_b),
                                 ));
                             }
                         }
@@ -595,7 +595,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(
-                                    ty_a.is_assignable_to(db, *ty_b).is_ok(),
+                                    ty_a.is_assignable_to(db, *ty_b),
                                 ));
                             }
                         }
@@ -1491,7 +1491,6 @@ impl<'db> CallableBinding<'db> {
             }
             if top_materialized_argument_type
                 .is_assignable_to(db, TupleType::from_elements(db, parameter_types))
-                .is_ok()
             {
                 filter_remaining_overloads = true;
             }
@@ -2094,10 +2093,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
-            if argument_type
-                .is_assignable_to(self.db, expected_ty)
-                .is_err()
-            {
+            if !argument_type.is_assignable_to(self.db, expected_ty) {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
                 self.errors.push(BindingError::InvalidArgumentType {

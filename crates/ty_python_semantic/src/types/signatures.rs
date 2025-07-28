@@ -638,7 +638,7 @@ impl<'db> Signature<'db> {
         }
 
         let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
-            type1.unwrap_or(Type::unknown()).has_relation_to(
+            type1.unwrap_or(Type::unknown()).try_has_relation_to(
                 db,
                 type2.unwrap_or(Type::unknown()),
                 relation,

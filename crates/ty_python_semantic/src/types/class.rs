@@ -408,15 +408,19 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        self.try_is_subclass_of(db, other).is_ok()
+    }
+
+    pub(super) fn try_is_subclass_of(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
     ) -> Result<(), TypeRelationError> {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
+        self.try_has_relation_to(db, other, TypeRelation::Subtyping)
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -538,10 +542,10 @@ impl<'db> ClassType<'db> {
 
         // Optimisation: if either class is `@final`, we only need to do one `is_subclass_of` call.
         if self.is_final(db) {
-            return self.is_subclass_of(db, other).is_ok();
+            return self.try_is_subclass_of(db, other).is_ok();
         }
         if other.is_final(db) {
-            return other.is_subclass_of(db, self).is_ok();
+            return other.try_is_subclass_of(db, self).is_ok();
         }
 
         // Two solid bases can only coexist in an MRO if one is a subclass of the other.
@@ -777,14 +781,12 @@ impl<'db> ClassType<'db> {
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
                 signature.return_ty.is_some_and(|return_ty| {
-                    return_ty
-                        .is_assignable_to(
-                            db,
-                            self_ty
-                                .to_instance(db)
-                                .expect("ClassType should be instantiable"),
-                        )
-                        .is_err()
+                    !return_ty.is_assignable_to(
+                        db,
+                        self_ty
+                            .to_instance(db)
+                            .expect("ClassType should be instantiable"),
+                    )
                 })
             });
 
@@ -1410,7 +1412,10 @@ impl<'db> ClassLiteral<'db> {
             let Some(metaclass) = metaclass.to_class_type(db) else {
                 continue;
             };
-            if metaclass.is_subclass_of(db, candidate.metaclass).is_ok() {
+            if metaclass
+                .try_is_subclass_of(db, candidate.metaclass)
+                .is_ok()
+            {
                 let (base_class_literal, _) = base_class.class_literal(db);
                 candidate = MetaclassCandidate {
                     metaclass,
@@ -1418,7 +1423,11 @@ impl<'db> ClassLiteral<'db> {
                 };
                 continue;
             }
-            if candidate.metaclass.is_subclass_of(db, metaclass).is_ok() {
+            if candidate
+                .metaclass
+                .try_is_subclass_of(db, metaclass)
+                .is_ok()
+            {
                 continue;
             }
             let (base_class_literal, _) = base_class.class_literal(db);

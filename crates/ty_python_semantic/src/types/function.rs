@@ -805,19 +805,19 @@ impl<'db> FunctionType<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
     ) -> Result<(), TypeRelationError> {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
+            TypeRelation::Subtyping => self.try_is_subtype_of(db, other),
+            TypeRelation::Assignability => self.try_is_assignable_to(db, other),
         }
     }
 
-    pub(crate) fn is_subtype_of(
+    pub(crate) fn try_is_subtype_of(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -837,7 +837,7 @@ impl<'db> FunctionType<'db> {
         self_signature.is_subtype_of(db, other_signature)
     }
 
-    pub(crate) fn is_assignable_to(
+    pub(crate) fn try_is_assignable_to(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -907,7 +907,7 @@ fn is_instance_truthiness<'db>(
         if let Type::NominalInstance(instance) = ty {
             if instance
                 .class
-                .is_subclass_of(db, ClassType::NonGeneric(class))
+                .try_is_subclass_of(db, ClassType::NonGeneric(class))
                 .is_ok()
             {
                 return true;

@@ -109,13 +109,13 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.materialize(db, variance))
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
     ) -> Result<(), TypeRelationError> {
-        self.class.has_relation_to(db, other.class, relation)
+        self.class.try_has_relation_to(db, other.class, relation)
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
