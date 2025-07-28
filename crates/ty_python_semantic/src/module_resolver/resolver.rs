@@ -679,6 +679,20 @@ struct ResolvedFileModule {
     file: File,
 }
 
+/// Attempts to resolve a module name in a particular search path.
+///
+/// `search_path` should be the directory to start looking for the module.
+///
+/// `name` should be a complete non-empty module name, e.g, `foo` or
+/// `foo.bar.baz`.
+///
+/// Upon success, this returns the kind of the parent package (root, regular
+/// package or namespace package) along with the resolved details of the
+/// module: its kind (single-file module or package), the search path in
+/// which it was found (guaranteed to be equal to the one given) and the
+/// corresponding `File`.
+///
+/// Upon error, the kind of the parent package is returned.
 fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
@@ -788,6 +802,20 @@ fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) ->
     Some(file)
 }
 
+/// Attempt to resolve the parent package of a module.
+///
+/// `module_search_path` should be the directory to start looking for the
+/// parent package.
+///
+/// `components` should be the full module name of the parent package. This
+/// specifically should not include the basename of the module. So e.g.,
+/// for `foo.bar.baz`, `components` should be `[foo, bar]`. It follows that
+/// `components` may be empty (in which case, the parent package is the root).
+///
+/// Upon success, the path to the package and its "kind" (root, regular or
+/// namespace) is returned. Upon error, the kind of the package is still
+/// returned based on how many components were found and whether `__init__.py`
+/// is present.
 fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
@@ -806,7 +834,7 @@ where
     // `true` if resolving a sub-package. For example, `true` when resolving `bar` of `foo.bar`.
     let mut in_sub_package = false;
 
-    // For `foo.bar.baz`, test that `foo` and `baz` both contain a `__init__.py`.
+    // For `foo.bar.baz`, test that `foo` and `bar` both contain a `__init__.py`.
     for folder in components {
         package_path.push(folder);
 
