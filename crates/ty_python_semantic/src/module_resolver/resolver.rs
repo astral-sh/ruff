@@ -149,8 +149,9 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SearchPaths {
-    /// Search paths that have been statically determined purely from reading ty's configuration settings.
-    /// These shouldn't ever change unless the config settings themselves change.
+    /// Search paths that have been statically determined purely from reading
+    /// ty's configuration settings. These shouldn't ever change unless the
+    /// config settings themselves change.
     static_paths: Vec<SearchPath>,
 
     /// site-packages paths are not included in the above field:
@@ -238,13 +239,18 @@ impl SearchPaths {
             site_packages.push(SearchPath::site_packages(system, path.clone())?);
         }
 
-        // TODO vendor typeshed's third-party stubs as well as the stdlib and fallback to them as a final step
-
-        // Filter out module resolution paths that point to the same directory on disk (the same invariant maintained by [`sys.path` at runtime]).
-        // (Paths may, however, *overlap* -- e.g. you could have both `src/` and `src/foo`
-        // as module resolution paths simultaneously.)
+        // TODO vendor typeshed's third-party stubs as well as the stdlib and
+        // fallback to them as a final step?
         //
-        // This code doesn't use an `IndexSet` because the key is the system path and not the search root.
+        // See: <https://github.com/astral-sh/ruff/pull/19620#discussion_r2240609135>
+
+        // Filter out module resolution paths that point to the same directory
+        // on disk (the same invariant maintained by [`sys.path` at runtime]).
+        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
+        // and `src/foo` as module resolution paths simultaneously.)
+        //
+        // This code doesn't use an `IndexSet` because the key is the system
+        // path and not the search root.
         //
         // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
         let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
@@ -582,7 +588,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 Ok((package_kind, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
-                            "Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub."
+                            "Search path '{search_path} contains a module \
+                             named `{stub_name}` but a standalone module isn't a valid stub."
                         );
                     } else {
                         return Some(ResolvedName::FileModule(module));
@@ -606,7 +613,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 }
                 Err(PackageKind::Namespace) => {
                     tracing::trace!(
-                        "Stub-package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                        "Stub-package in `{search_path} doesn't contain module: \
+                         `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
                     // keep searching the next search path for a stub package with the same name.
@@ -636,7 +644,8 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                 }
                 PackageKind::Namespace => {
                     tracing::trace!(
-                        "Package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                        "Package in `{search_path} doesn't contain module: \
+                         `{name}` but it is a namespace package, keep going."
                     );
                 }
             },
@@ -657,7 +666,9 @@ enum ResolvedName {
 
     /// The module name resolved to a namespace package.
     ///
-    /// For example, `from opentelemetry import trace, metrics` where `opentelemetry` is a namespace package (and `trace` and `metrics` are sub packages).
+    /// For example, `from opentelemetry import trace, metrics` where
+    /// `opentelemetry` is a namespace package (and `trace` and `metrics` are
+    /// sub packages).
     NamespacePackage,
 }
 
@@ -709,19 +720,23 @@ fn resolve_name_in_search_path(
         ));
     }
 
-    // Last resort, check if a folder with the given name exists.
-    // If so, then this is a namespace package.
-    // We need to skip this check for typeshed because the `resolve_file_module` can also return `None`
-    // if the `__init__.py` exists but isn't available for the current Python version.
-    // Let's assume that the `xml` module is only available on Python 3.11+ and we're resolving for Python 3.10:
-    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though the file exists but the
-    //   module isn't available for the current Python version.
-    // * The check here would now return `true` because the `xml` directory exists, resulting
-    //   in a false positive for a namespace package.
+    // Last resort, check if a folder with the given name exists. If so,
+    // then this is a namespace package. We need to skip this check for
+    // typeshed because the `resolve_file_module` can also return `None` if the
+    // `__init__.py` exists but isn't available for the current Python version.
+    // Let's assume that the `xml` module is only available on Python 3.11+ and
+    // we're resolving for Python 3.10:
     //
-    // Since typeshed doesn't use any namespace packages today (May 2025), simply skip this
-    // check which also helps performance. If typeshed ever uses namespace packages, ensure that
-    // this check also takes the `VERSIONS` file into consideration.
+    // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+    //   the file exists but the module isn't available for the current Python
+    //   version.
+    // * The check here would now return `true` because the `xml` directory
+    //   exists, resulting in a false positive for a namespace package.
+    //
+    // Since typeshed doesn't use any namespace packages today (May 2025),
+    // simply skip this check which also helps performance. If typeshed
+    // ever uses namespace packages, ensure that this check also takes the
+    // `VERSIONS` file into consideration.
     if !search_path.is_standard_library() && package_path.is_directory(context) {
         if let Some(path) = package_path.to_system_path() {
             let system = context.db.system();
@@ -803,7 +818,8 @@ where
             // Pure modules hide namespace packages with the same name
             && resolve_file_module(&package_path, resolver_state).is_none()
         {
-            // A directory without an `__init__.py(i)` is a namespace package, continue with the next folder.
+            // A directory without an `__init__.py(i)` is a namespace package,
+            // continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
             // Package not found but it is part of a namespace package.
@@ -849,9 +865,11 @@ enum PackageKind {
     /// For example, `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
     Regular,
 
-    /// A sub-package in a namespace package. A namespace package is a package without an `__init__.py`.
+    /// A sub-package in a namespace package. A namespace package is a package
+    /// without an `__init__.py`.
     ///
-    /// For example, `bar` in `foo.bar` if the `foo` directory contains no `__init__.py`.
+    /// For example, `bar` in `foo.bar` if the `foo` directory contains no
+    /// `__init__.py`.
     Namespace,
 }
 
@@ -1488,8 +1506,8 @@ mod tests {
         db.memory_file_system().remove_file(&bar_path).unwrap();
         bar.sync(&mut db);
 
-        // Re-query the foo module. The foo module should still be cached because `bar.py` isn't relevant
-        // for resolving `foo`.
+        // Re-query the foo module. The foo module should still be cached
+        // because `bar.py` isn't relevant for resolving `foo`.
 
         let foo_module2 = resolve_module(&db, &foo_module_name);
         let foo_pieces2 = foo_module2.map(|foo_module2| {
@@ -2023,8 +2041,9 @@ not_a_directory
         db.write_file(src.join("main.py"), "print('Hy')")
             .context("Failed to write `main.py`")?;
 
-        // The symlink triggers the slow-path in the `OsSystem`'s `exists_path_case_sensitive`
-        // code because canonicalizing the path for `a/__init__.py` results in `a-package/__init__.py`
+        // The symlink triggers the slow-path in the `OsSystem`'s
+        // `exists_path_case_sensitive` code because canonicalizing the path
+        // for `a/__init__.py` results in `a-package/__init__.py`
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
@@ -2043,7 +2062,8 @@ not_a_directory
         let a_module_name = ModuleName::new_static("A").unwrap();
         assert_eq!(resolve_module(&db, &a_module_name), None);
 
-        // Now lookup the same module using the lowercase `a` and it should resolve to the file in the system site-packages
+        // Now lookup the same module using the lowercase `a` and it should
+        // resolve to the file in the system site-packages
         let a_module_name = ModuleName::new_static("a").unwrap();
         let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
         assert!(
