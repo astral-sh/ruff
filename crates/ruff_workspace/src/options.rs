@@ -5,6 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
@@ -1650,7 +1651,9 @@ impl<'de> Deserialize<'de> for Alias {
 }
 
 impl Flake8ImportConventionsOptions {
-    pub fn into_settings(self) -> flake8_import_conventions::settings::Settings {
+    pub fn try_into_settings(
+        self,
+    ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
@@ -1666,11 +1669,19 @@ impl Flake8ImportConventionsOptions {
             );
         }
 
-        flake8_import_conventions::settings::Settings {
-            aliases,
+        let normalized_aliases: FxHashMap<String, String> = aliases
+            .into_iter()
+            .map(|(module, alias)| {
+                let normalized_alias = alias.nfkc().collect::<String>();
+                (module, normalized_alias)
+            })
+            .collect();
+
+        Ok(flake8_import_conventions::settings::Settings {
+            aliases: normalized_aliases,
             banned_aliases: self.banned_aliases.unwrap_or_default(),
             banned_from: self.banned_from.unwrap_or_default(),
-        }
+        })
     }
 }
 

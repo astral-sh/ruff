@@ -3357,6 +3357,7 @@ dependencies = [
  "strum",
  "tempfile",
  "toml 0.9.2",
+ "unicode-normalization",
 ]
 
 [[package]]
