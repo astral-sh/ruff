@@ -21,8 +21,8 @@ use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
-pub use self::options::ClientOptions;
-pub(crate) use self::options::{AllOptions, DiagnosticMode};
+pub(crate) use self::options::AllOptions;
+pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::publish_settings_diagnostics;

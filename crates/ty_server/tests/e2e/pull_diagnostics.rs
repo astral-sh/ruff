@@ -1,6 +1,9 @@
 use anyhow::Result;
+use lsp_types::{
+    PreviousResultId, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+};
 use ruff_db::system::SystemPath;
-use ty_server::ClientOptions;
+use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
 
@@ -24,6 +27,153 @@ def foo() -> str:
     let diagnostics = server.document_diagnostic_request(foo)?;
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn workspace_diagnostic_caching() -> Result<()> {
+    // Redact result_id values since they are hash-based and non-deterministic
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
+    let _scoped = settings.bind_to_scope();
+
+    let workspace_root = SystemPath::new("src");
+
+    // File A: Will have an unchanged diagnostic
+    let file_a = SystemPath::new("src/unchanged.py");
+    let file_a_content = "\
+def foo() -> str:
+    return 42  # This error will remain the same
+";
+
+    // File B: Initially no error, will get a new error (added diagnostic)
+    let file_b = SystemPath::new("src/new_error.py");
+    let file_b_content_v1 = "\
+def foo() -> int:
+    return 42  # No error initially
+";
+    let file_b_content_v2 = "\
+def foo() -> str:
+    return 42  # Error appears
+";
+
+    // File C: Initially has error, will be fixed (removed diagnostic)
+    let file_c = SystemPath::new("src/fixed_error.py");
+    let file_c_content_v1 = "\
+def foo() -> str:
+    return 42  # Error initially
+";
+    let file_c_content_v2 = "\
+def foo() -> str:
+    return \"fixed\"  # Error removed
+";
+
+    // File D: Has error that changes content (changed diagnostic)
+    let file_d = SystemPath::new("src/changed_error.py");
+    let file_d_content_v1 = "\
+def foo() -> str:
+    return 42  # First error: expected str, got int
+";
+    let file_d_content_v2 = "\
+def foo() -> int:
+    return \"hello\"  # Different error: expected int, got str
+";
+
+    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )?
+        .with_global_options(global_options)
+        .with_file(file_a, file_a_content)?
+        .with_file(file_b, file_b_content_v1)?
+        .with_file(file_c, file_c_content_v1)?
+        .with_file(file_d, file_d_content_v1)?
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(file_a, &file_a_content, 1);
+
+    // First request with no previous result IDs
+    let first_response = server.workspace_diagnostic_request(None)?;
+    insta::assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
+
+    // Extract result IDs from the first response
+    let previous_result_ids = match first_response {
+        WorkspaceDiagnosticReportResult::Report(report) => {
+            report.items.into_iter().filter_map(|item| {
+                match item {
+                    WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+                        let result_id = full_report.full_document_diagnostic_report.result_id?;
+                        Some(PreviousResultId {
+                            uri: full_report.uri,
+                            value: result_id,
+                        })
+                    }
+                    WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
+                        // Shouldn't happen in the first request
+                        None
+                    }
+                }
+            })
+        }
+        WorkspaceDiagnosticReportResult::Partial(_) => {
+            panic!("The first response must be a full report");
+        }
+    }
+    .collect();
+
+    // Make changes to files B, C, and D (leave A unchanged)
+    // Need to open files before changing them
+    server.open_text_document(file_b, &file_b_content_v1, 1);
+    server.open_text_document(file_c, &file_c_content_v1, 1);
+    server.open_text_document(file_d, &file_d_content_v1, 1);
+
+    // File B: Add a new error
+    server.change_text_document(
+        file_b,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_b_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    // File C: Fix the error
+    server.change_text_document(
+        file_c,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_c_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    // File D: Change the error
+    server.change_text_document(
+        file_d,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_d_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    // Second request with previous result IDs
+    // Expected results:
+    // - File A: Unchanged report (diagnostic hasn't changed)
+    // - File B: Full report (new diagnostic appeared)
+    // - File C: Full report with empty diagnostics (diagnostic was removed)
+    // - File D: Full report (diagnostic content changed)
+    let second_response = server.workspace_diagnostic_request(Some(previous_result_ids))?;
+    insta::assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
 
     Ok(())
 }
