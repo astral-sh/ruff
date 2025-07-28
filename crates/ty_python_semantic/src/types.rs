@@ -4813,6 +4813,14 @@ impl<'db> Type<'db> {
             })
     }
 
+    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: Rename this method to `try_aenter` and add error handling
+        self.try_call_dunder(db, "__aenter__", CallArguments::none())
+            .map_or(Type::unknown(), |result| {
+                result.return_type(db).resolve_await(db)
+            })
+    }
+
     /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///

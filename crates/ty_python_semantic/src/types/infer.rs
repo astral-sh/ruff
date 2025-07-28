@@ -3200,12 +3200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         is_async: bool,
     ) -> Type<'db> {
         if is_async {
-            // TODO: proper error handling for `__aenter__`/`__aexit__` calls
-            return context_expression_type
-                .try_call_dunder(self.db(), "__aenter__", CallArguments::none())
-                .map_or(Type::unknown(), |bindings| {
-                    bindings.return_type(self.db()).resolve_await(self.db())
-                });
+            return context_expression_type.aenter(self.db());
         }
 
         context_expression_type

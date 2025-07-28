@@ -104,7 +104,7 @@ pub(crate) enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable,
     /// An context manager expression like the one in a `with` statement.
-    ContextManager,
+    ContextManager { is_async: bool },
     /// An expression that is being assigned to a target.
     Assign,
 }

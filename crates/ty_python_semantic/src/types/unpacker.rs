@@ -9,7 +9,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{CallArguments, Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -75,14 +75,20 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     );
                     err.fallback_element_type(self.db())
                 }),
-            UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(
-                    &self.context,
-                    value_type,
-                    value.as_any_node_ref(self.db(), self.module()),
-                );
-                err.fallback_enter_type(self.db())
-            }),
+            UnpackKind::ContextManager { is_async } => {
+                if is_async {
+                    value_type.aenter(self.db())
+                } else {
+                    value_type.try_enter(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(
+                            &self.context,
+                            value_type,
+                            value.as_any_node_ref(self.db(), self.module()),
+                        );
+                        err.fallback_enter_type(self.db())
+                    })
+                }
+            }
         };
 
         self.unpack_inner(

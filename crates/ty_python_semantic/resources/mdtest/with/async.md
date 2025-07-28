@@ -20,6 +20,20 @@ async def test():
         reveal_type(f)  # revealed: Target
 ```
 
+## Multiple targets
+
+```py
+class Manager:
+    async def __aenter__(self) -> tuple[int, str]:
+        return 42, "hello"
+
+    async def __aexit__(self, exc_type, exc_value, traceback): ...
+
+async def test():
+    async with Manager() as (x, y):
+        reveal_type(x)  # revealed: int
+```
+
 ## `@asynccontextmanager`
 
 ```py
