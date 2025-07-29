@@ -9,7 +9,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{CallArguments, Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;

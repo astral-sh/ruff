@@ -4790,35 +4790,48 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_call_dunder(db, "__await__", CallArguments::none())
-            .map_or(Type::unknown(), |result| {
-                let generator_ty = result.return_type(db);
-
-                if let Type::ProtocolInstance(instance) = generator_ty {
-                    if let Protocol::FromClass(class) = instance.inner {
-                        if class.is_known(db, KnownClass::Generator) {
-                            if let Some(specialization) =
-                                class.class_literal_specialized(db, None).1
-                            {
-                                if let [_, _, return_ty] = specialization.types(db) {
-                                    return *return_ty;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Type::unknown()
-            })
-    }
-
+    /// Similar to [`Self::try_enter`], but for async context managers.
     fn aenter(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Rename this method to `try_aenter` and add error handling
+        // TODO: Add proper error handling and rename this method to `try_aenter`.
         self.try_call_dunder(db, "__aenter__", CallArguments::none())
             .map_or(Type::unknown(), |result| {
                 result.return_type(db).resolve_await(db)
             })
+    }
+
+    /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
+    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: Add proper error handling and rename this method to `try_await`.
+        self.try_call_dunder(db, "__await__", CallArguments::none())
+            .map_or(Type::unknown(), |result| {
+                result
+                    .return_type(db)
+                    .generator_return_type(db)
+                    .unwrap_or_else(Type::unknown)
+            })
+    }
+
+    /// Get the return type of a `yield from …` expression where `self` is the type of the generator.
+    ///
+    /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
+    /// protocol.
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
+        // match on the protocol instance to get the `ReturnType` type parameter.
+
+        if let Type::ProtocolInstance(instance) = self {
+            if let Protocol::FromClass(class) = instance.inner {
+                if class.is_known(db, KnownClass::Generator) {
+                    if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                        if let [_, _, return_ty] = specialization.types(db) {
+                            return Some(*return_ty);
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)

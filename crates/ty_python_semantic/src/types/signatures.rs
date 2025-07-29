@@ -320,14 +320,14 @@ impl<'db> Signature<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
-        is_async_generator: bool,
+        is_generator: bool,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
 
-            if function_node.is_async && !is_async_generator {
+            if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
             } else {

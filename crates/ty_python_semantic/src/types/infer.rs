@@ -6092,8 +6092,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_element_type(self.db())
             });
 
-        // TODO get type from `ReturnType` of generator
-        todo_type!("Generic `typing.Generator` type")
+        iterable_type
+            .generator_return_type(self.db())
+            .unwrap_or_else(Type::unknown)
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {

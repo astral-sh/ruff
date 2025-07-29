@@ -32,6 +32,7 @@ class Manager:
 async def test():
     async with Manager() as (x, y):
         reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: str
 ```
 
 ## `@asynccontextmanager`
