@@ -124,8 +124,6 @@ fn is_sequential(indices: &[usize]) -> bool {
     indices.iter().enumerate().all(|(idx, value)| idx == *value)
 }
 
-// An opening curly brace, followed by any integer, followed by any text,
-// followed by a closing brace.
 static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"(?x)
