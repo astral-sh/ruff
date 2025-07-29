@@ -427,19 +427,6 @@ impl<'db> PropertyInstanceType<'db> {
         )
     }
 
-    fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        if let Some(ty) = self.getter(db) {
-            ty.find_legacy_typevars(db, typevars);
-        }
-        if let Some(ty) = self.setter(db) {
-            ty.find_legacy_typevars(db, typevars);
-        }
-    }
-
     fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self::new(
             db,
@@ -5563,110 +5550,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build
-    /// up a generic context from any legacy `TypeVar`s that appear in a function parameter list or
-    /// `Generic` specialization.
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self {
-            Type::TypeVar(typevar) => {
-                if typevar.is_legacy(db) {
-                    typevars.insert(typevar);
-                }
-            }
-
-            Type::FunctionLiteral(function) => function.find_legacy_typevars(db, typevars),
-
-            Type::BoundMethod(method) => {
-                method.self_instance(db).find_legacy_typevars(db, typevars);
-                method.function(db).find_legacy_typevars(db, typevars);
-            }
-
-            Type::MethodWrapper(
-                MethodWrapperKind::FunctionTypeDunderGet(function)
-                | MethodWrapperKind::FunctionTypeDunderCall(function),
-            ) => {
-                function.find_legacy_typevars(db, typevars);
-            }
-
-            Type::MethodWrapper(
-                MethodWrapperKind::PropertyDunderGet(property)
-                | MethodWrapperKind::PropertyDunderSet(property),
-            ) => {
-                property.find_legacy_typevars(db, typevars);
-            }
-
-            Type::Callable(callable) => {
-                callable.find_legacy_typevars(db, typevars);
-            }
-
-            Type::PropertyInstance(property) => {
-                property.find_legacy_typevars(db, typevars);
-            }
-
-            Type::Union(union) => {
-                for element in union.iter(db) {
-                    element.find_legacy_typevars(db, typevars);
-                }
-            }
-            Type::Intersection(intersection) => {
-                for positive in intersection.positive(db) {
-                    positive.find_legacy_typevars(db, typevars);
-                }
-                for negative in intersection.negative(db) {
-                    negative.find_legacy_typevars(db, typevars);
-                }
-            }
-
-            Type::Tuple(tuple) => {
-                tuple.find_legacy_typevars(db, typevars);
-            }
-
-            Type::GenericAlias(alias) => {
-                alias.find_legacy_typevars(db, typevars);
-            }
-
-            Type::NominalInstance(instance) => {
-                instance.find_legacy_typevars(db, typevars);
-            }
-
-            Type::ProtocolInstance(instance) => {
-                instance.find_legacy_typevars(db, typevars);
-            }
-
-            Type::SubclassOf(subclass_of) => {
-                subclass_of.find_legacy_typevars(db, typevars);
-            }
-
-            Type::TypeIs(type_is) => {
-                type_is.return_type(db).find_legacy_typevars(db, typevars);
-            }
-
-            Type::Dynamic(_)
-            | Type::Never
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_) => {}
-        }
-    }
-
     /// Return the string representation of this type when converted to string as it would be
     /// provided by the `__str__` method.
     ///
@@ -7648,14 +7531,6 @@ impl<'db> CallableType<'db> {
             self.signatures(db).apply_type_mapping(db, type_mapping),
             self.is_function_like(db),
         )
-    }
-
-    fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.signatures(db).find_legacy_typevars(db, typevars);
     }
 
     /// Check whether this callable type has the given relation to another callable type.

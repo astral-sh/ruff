@@ -176,8 +176,16 @@ impl<'db> GenericContext<'db> {
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
+        let mut find_legacy_typevars = |db, ty| {
+            if let Type::TypeVar(typevar) = ty {
+                if typevar.is_legacy(db) {
+                    variables.insert(typevar);
+                }
+            }
+            Ok(())
+        };
         for base in bases {
-            base.find_legacy_typevars(db, &mut variables);
+            visit_type(db, base, &mut find_legacy_typevars);
         }
         if variables.is_empty() {
             return None;
@@ -604,16 +612,6 @@ impl<'db> Specialization<'db> {
         }
 
         true
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for ty in self.types(db) {
-            ty.find_legacy_typevars(db, typevars);
-        }
     }
 }
 

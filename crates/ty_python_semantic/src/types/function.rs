@@ -77,10 +77,10 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::{TypeVisitor, TypeVisitorResult, any_over_type};
 use crate::types::{
     BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, walk_type_mapping,
+    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, UnionBuilder,
+    walk_type_mapping,
 };
-use crate::{Db, FxOrderSet, ModuleName, resolve_module};
+use crate::{Db, ModuleName, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -854,17 +854,6 @@ impl<'db> FunctionType<'db> {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
         self_signature.is_equivalent_to(db, other_signature)
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        let signatures = self.signature(db);
-        for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, typevars);
-        }
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {

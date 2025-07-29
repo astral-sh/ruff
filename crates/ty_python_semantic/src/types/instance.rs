@@ -4,14 +4,14 @@ use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
+use crate::Db;
 use crate::place::PlaceAndQualifiers;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
-use crate::{Db, FxOrderSet};
+use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -148,14 +148,6 @@ impl<'db> NominalInstanceType<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
         Self::from_class(self.class.apply_type_mapping(db, type_mapping))
-    }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.class.find_legacy_typevars(db, typevars);
     }
 }
 
@@ -332,21 +324,6 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self.inner {
-            Protocol::FromClass(class) => {
-                class.find_legacy_typevars(db, typevars);
-            }
-            Protocol::Synthesized(synthesized) => {
-                synthesized.find_legacy_typevars(db, typevars);
-            }
-        }
-    }
-
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
@@ -378,9 +355,9 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
+    use crate::Db;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance};
-    use crate::{Db, FxOrderSet};
+    use crate::types::{TypeMapping, TypeTransformer, TypeVarVariance};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
     ///
@@ -415,14 +392,6 @@ mod synthesized_protocol {
             type_mapping: &TypeMapping<'a, 'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
-        }
-
-        pub(super) fn find_legacy_typevars(
-            self,
-            db: &'db dyn Db,
-            typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-        ) {
-            self.0.find_legacy_typevars(db, typevars);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

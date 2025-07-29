@@ -7,12 +7,12 @@ use ruff_python_ast::name::Name;
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
 use crate::{
-    Db, FxOrderSet,
+    Db,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::use_def_map,
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
         visitor::{TypeVisitor, TypeVisitorResult},
@@ -207,16 +207,6 @@ impl<'db> ProtocolInterface<'db> {
                 .collect::<BTreeMap<_, _>>(),
         )
     }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for data in self.inner(db).values() {
-            data.find_legacy_typevars(db, typevars);
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -242,14 +232,6 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self.kind.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.kind.find_legacy_typevars(db, typevars);
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -293,18 +275,6 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Other(ty) => {
                 ProtocolMemberKind::Other(ty.apply_type_mapping(db, type_mapping))
             }
-        }
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self {
-            ProtocolMemberKind::Method(callable) => callable.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Property(property) => property.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Other(ty) => ty.find_legacy_typevars(db, typevars),
         }
     }
 
