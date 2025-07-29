@@ -1690,7 +1690,7 @@ impl<'db> Type<'db> {
                     .try_has_relation_to(db, other, relation)
                 {
                     TypeRelationResult::Pass => TypeRelationResult::Pass,
-                    TypeRelationResult::Fail(mut e1) => {
+                    TypeRelationResult::Fail(e1) => {
                         if relation.is_assignability() {
                             match other.try_has_relation_to(
                                 db,
@@ -1699,8 +1699,7 @@ impl<'db> Type<'db> {
                             ) {
                                 TypeRelationResult::Pass => TypeRelationResult::Pass,
                                 TypeRelationResult::Fail(e2) => {
-                                    e1.add(TypeRelationResult::Fail(e2));
-                                    TypeRelationResult::Fail(e1)
+                                    TypeRelationResult::Fail(e1.add(e2))
                                 }
                             }
                         } else {
@@ -7526,15 +7525,18 @@ impl From<bool> for TypeRelationResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct TypeRelationError(pub(crate) Vec<TypeRelationErrorKind>);
+pub(crate) enum TypeRelationError {
+    Single(TypeRelationErrorKind),
+    Multiple(Vec<TypeRelationErrorKind>),
+}
 
 impl TypeRelationError {
     pub(crate) fn single(kind: TypeRelationErrorKind) -> Self {
-        Self(vec![kind])
+        Self::Single(kind)
     }
 
     pub(crate) fn todo() -> Self {
-        Self(vec![TypeRelationErrorKind::Todo])
+        Self::Single(TypeRelationErrorKind::Todo)
     }
 
     pub(crate) fn from_results(
@@ -7543,15 +7545,31 @@ impl TypeRelationError {
         let mut errors = Vec::new();
         for result in results {
             if let TypeRelationResult::Fail(fail) = result {
-                errors.extend(fail.0);
+                errors.extend(fail);
             }
         }
-        TypeRelationError(errors)
+        TypeRelationError::Multiple(errors)
     }
 
-    pub(crate) fn add(&mut self, other: TypeRelationResult) {
-        if let TypeRelationResult::Fail(fail) = other {
-            self.0.extend(fail.0);
+    pub(crate) fn add(self, other: TypeRelationError) -> Self {
+        match (self, other) {
+            (TypeRelationError::Single(kind), TypeRelationError::Single(fail_kind)) => {
+                TypeRelationError::Multiple(vec![kind, fail_kind])
+            }
+            (TypeRelationError::Single(kind), TypeRelationError::Multiple(mut fail_kinds))
+            | (TypeRelationError::Multiple(mut fail_kinds), TypeRelationError::Single(kind)) => {
+                let mut errors = Vec::with_capacity(1 + fail_kinds.len());
+                errors.push(kind);
+                errors.append(&mut fail_kinds);
+                TypeRelationError::Multiple(errors)
+            }
+            (
+                TypeRelationError::Multiple(mut errors),
+                TypeRelationError::Multiple(mut fail_kinds),
+            ) => {
+                errors.append(&mut fail_kinds);
+                TypeRelationError::Multiple(errors)
+            }
         }
     }
 }
@@ -7560,7 +7578,10 @@ impl Iterator for TypeRelationError {
     type Item = TypeRelationErrorKind;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.pop()
+        match self {
+            TypeRelationError::Single(kind) => Some(*kind),
+            TypeRelationError::Multiple(errors) => errors.pop(),
+        }
     }
 }
 
