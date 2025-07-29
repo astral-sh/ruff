@@ -29,9 +29,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         _client: &Client,
         _params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
-        let index = snapshot.index();
-
-        if !index.global_settings().diagnostic_mode().is_workspace() {
+        if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             // VS Code sends us the workspace diagnostic request every 2 seconds, so these logs can
             // be quite verbose.
             tracing::trace!("Workspace diagnostics is disabled; returning empty report");
@@ -41,6 +39,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         }
 
         let mut items = Vec::new();
+        let index = snapshot.index();
 
         for db in snapshot.projects() {
             let diagnostics = db.check();

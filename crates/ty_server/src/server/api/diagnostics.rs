@@ -125,12 +125,7 @@ pub(crate) fn publish_settings_diagnostics(
     // Note we DO NOT respect the fact that clients support pulls because these are
     // files they *specifically* won't pull diagnostics from us for, because we don't
     // claim to be an LSP for them.
-    let has_workspace_diagnostics = session
-        .workspaces()
-        .for_path(&path)
-        .map(|workspace| workspace.settings().diagnostic_mode().is_workspace())
-        .unwrap_or(false);
-    if has_workspace_diagnostics {
+    if session.global_settings().diagnostic_mode().is_workspace() {
         return;
     }
 

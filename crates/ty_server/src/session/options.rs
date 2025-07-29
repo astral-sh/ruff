@@ -1,94 +1,80 @@
 use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use ty_project::CheckMode;
+use serde_json::Value;
+
 use ty_project::metadata::Options;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
 use crate::logging::LogLevel;
-use crate::session::ClientSettings;
 
-pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
+use super::settings::{GlobalSettings, WorkspaceSettings};
 
+/// Static initialization options that are set once at server startup that never change.
+///
+/// These are equivalent to command-line arguments and configure fundamental server behavior. Any
+/// changes to these options require a server restart to take effect.
 #[derive(Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GlobalOptions {
-    #[serde(flatten)]
-    client: ClientOptions,
+pub(crate) struct InitializationOptions {
+    /// The log level for the language server.
+    pub(crate) log_level: Option<LogLevel>,
 
-    // These settings are only needed for tracing, and are only read from the global configuration.
-    // These will not be in the resolved settings.
-    #[serde(flatten)]
-    pub(crate) tracing: TracingOptions,
+    /// Path to the log file, defaults to stderr if not set.
+    ///
+    /// Tildes (`~`) and environment variables (e.g., `$HOME`) are expanded.
+    pub(crate) log_file: Option<SystemPathBuf>,
 }
 
-impl GlobalOptions {
-    pub(crate) fn into_settings(self) -> ClientSettings {
-        self.client.into_settings()
+impl InitializationOptions {
+    /// Create the initialization options from the given JSON value that corresponds to the
+    /// initialization options sent by the client.
+    pub(crate) fn from_value(options: Option<Value>) -> InitializationOptions {
+        let options =
+            options.unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default()));
+        serde_json::from_value(options).unwrap_or_else(|err| {
+            tracing::error!(
+                "Failed to deserialize initialization options: {err}. \
+                    Falling back to default initialization options."
+            );
+            InitializationOptions::default()
+        })
     }
-
-    pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
-        self.client.diagnostic_mode.unwrap_or_default()
-    }
 }
 
-/// This is a direct representation of the workspace settings schema, which inherits the schema of
-/// [`ClientOptions`] and adds extra fields to describe the workspace it applies to.
-#[derive(Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct WorkspaceOptions {
-    #[serde(flatten)]
-    options: ClientOptions,
-    workspace: Url,
-}
-
-/// This is a direct representation of the settings schema sent by the client.
+/// Options that configure the behavior of the language server.
+///
+/// This is the direct representation of the options that the client sends to the server when
+/// asking for workspace configuration. These options are dynamic and can change during the runtime
+/// of the server via the `workspace/didChangeConfiguration` notification.
+///
+/// Usually, these options are at per-workspace level, but these can also include options that
+/// needs to be applied globally such as the diagnostic mode. It's included here because they can
+/// be changed dynamically by the client.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub struct ClientOptions {
-    /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
-    /// server.
-    python: Option<Python>,
     /// Diagnostic mode for the language server.
+    ///
+    /// This applies to all of the workspaces that are managed by the language server.
     diagnostic_mode: Option<DiagnosticMode>,
 
+    /// Whether to disable language services like code completions, hover, etc.
+    ///
+    /// This is applied for individual workspaces.
+    disable_language_services: Option<bool>,
+
+    /// Information about the currently active Python environment in the VS Code Python extension.
+    ///
+    /// This is relevant only for VS Code and is populated by the ty VS Code extension.
     python_extension: Option<PythonExtension>,
-}
-
-/// Diagnostic mode for the language server.
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-pub(crate) enum DiagnosticMode {
-    /// Check only currently open files.
-    #[default]
-    OpenFilesOnly,
-    /// Check all files in the workspace.
-    Workspace,
-}
-
-impl DiagnosticMode {
-    pub(crate) fn is_workspace(self) -> bool {
-        matches!(self, DiagnosticMode::Workspace)
-    }
-
-    pub(crate) fn into_check_mode(self) -> CheckMode {
-        match self {
-            DiagnosticMode::OpenFilesOnly => CheckMode::OpenFiles,
-            DiagnosticMode::Workspace => CheckMode::AllFiles,
-        }
-    }
 }
 
 impl ClientOptions {
     /// Returns the client settings that are relevant to the language server.
-    pub(crate) fn into_settings(self) -> ClientSettings {
+    pub(crate) fn into_settings(self) -> (GlobalSettings, WorkspaceSettings) {
         let overrides = self.python_extension.and_then(|extension| {
             let active_environment = extension.active_environment?;
 
@@ -130,38 +116,48 @@ impl ClientOptions {
             Some(overrides)
         });
 
-        ClientSettings {
-            disable_language_services: self
-                .python
-                .and_then(|python| python.ty)
-                .and_then(|ty| ty.disable_language_services)
-                .unwrap_or_default(),
-            diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
-            overrides,
-        }
+        (
+            GlobalSettings {
+                diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
+            },
+            WorkspaceSettings {
+                disable_language_services: self.disable_language_services.unwrap_or_default(),
+                overrides,
+            },
+        )
     }
 }
 
-// TODO(dhruvmanila): We need to mirror the "python.*" namespace on the server side but ideally it
-// would be useful to instead use `workspace/configuration` instead. This would be then used to get
-// all settings and not just the ones in "python.*".
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+/// Diagnostic mode for the language server.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Python {
-    ty: Option<Ty>,
+pub(crate) enum DiagnosticMode {
+    /// Check only currently open files.
+    #[default]
+    OpenFilesOnly,
+    /// Check all files in the workspace.
+    Workspace,
+}
+
+impl DiagnosticMode {
+    /// Returns `true` if the diagnostic mode is set to check all files in the workspace.
+    pub(crate) const fn is_workspace(self) -> bool {
+        matches!(self, DiagnosticMode::Workspace)
+    }
+
+    /// Returns `true` if the diagnostic mode is set to check only currently open files.
+    pub(crate) const fn is_open_files_only(self) -> bool {
+        matches!(self, DiagnosticMode::OpenFilesOnly)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct PythonExtension {
     active_environment: Option<ActiveEnvironment>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
@@ -170,7 +166,6 @@ pub(crate) struct ActiveEnvironment {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
@@ -182,7 +177,6 @@ pub(crate) struct EnvironmentVersion {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     pub(crate) folder_uri: Url,
@@ -194,100 +188,9 @@ pub(crate) struct PythonEnvironment {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[allow(dead_code)]
     pub(crate) uri: Url,
     pub(crate) sys_prefix: SystemPathBuf,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-struct Ty {
-    disable_language_services: Option<bool>,
-}
-
-/// This is a direct representation of the settings schema sent by the client.
-/// Settings needed to initialize tracing. These will only be read from the global configuration.
-#[derive(Debug, Deserialize, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct TracingOptions {
-    pub(crate) log_level: Option<LogLevel>,
-
-    /// Path to the log file - tildes and environment variables are supported.
-    pub(crate) log_file: Option<SystemPathBuf>,
-}
-
-/// This is the exact schema for initialization options sent in by the client during
-/// initialization.
-#[derive(Debug, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-#[serde(untagged)]
-enum InitializationOptions {
-    #[serde(rename_all = "camelCase")]
-    HasWorkspaces {
-        #[serde(rename = "globalSettings")]
-        global: GlobalOptions,
-        #[serde(rename = "settings")]
-        workspace: Vec<WorkspaceOptions>,
-    },
-    GlobalOnly {
-        #[serde(default)]
-        settings: GlobalOptions,
-    },
-}
-
-impl Default for InitializationOptions {
-    fn default() -> Self {
-        Self::GlobalOnly {
-            settings: GlobalOptions::default(),
-        }
-    }
-}
-
-/// Built from the initialization options provided by the client.
-#[derive(Debug)]
-pub(crate) struct AllOptions {
-    pub(crate) global: GlobalOptions,
-    /// If this is `None`, the client only passed in global settings.
-    pub(crate) workspace: Option<WorkspaceOptionsMap>,
-}
-
-impl AllOptions {
-    /// Initializes the controller from the serialized initialization options. This fails if
-    /// `options` are not valid initialization options.
-    pub(crate) fn from_value(options: serde_json::Value) -> Self {
-        Self::from_init_options(
-            serde_json::from_value(options)
-                .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
-                })
-                .unwrap_or_default(),
-        )
-    }
-
-    fn from_init_options(options: InitializationOptions) -> Self {
-        let (global_options, workspace_options) = match options {
-            InitializationOptions::GlobalOnly { settings: options } => (options, None),
-            InitializationOptions::HasWorkspaces {
-                global: global_options,
-                workspace: workspace_options,
-            } => (global_options, Some(workspace_options)),
-        };
-
-        Self {
-            global: global_options,
-            workspace: workspace_options.map(|workspace_options| {
-                workspace_options
-                    .into_iter()
-                    .map(|workspace_options| {
-                        (workspace_options.workspace, workspace_options.options)
-                    })
-                    .collect()
-            }),
-        }
-    }
 }

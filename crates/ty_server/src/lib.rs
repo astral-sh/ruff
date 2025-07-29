@@ -10,6 +10,7 @@ pub use crate::session::ClientOptions;
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::{DocumentQuery, Session};
 
+mod capabilities;
 mod document;
 mod logging;
 mod server;

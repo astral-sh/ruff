@@ -107,6 +107,11 @@ impl ProjectDatabase {
         self.project().check_file(self, file)
     }
 
+    /// Returns the check mode for the project.
+    pub fn check_mode(&self) -> CheckMode {
+        self.project().check_mode(self)
+    }
+
     /// Set the check mode for the project.
     pub fn set_check_mode(&mut self, mode: CheckMode) {
         tracing::debug!("Updating project to check {mode}");

@@ -1,4 +1,4 @@
-use lsp_types::{ClientCapabilities, MarkupKind};
+use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind};
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -16,6 +16,8 @@ bitflags::bitflags! {
         const MULTILINE_SEMANTIC_TOKENS = 1 << 7;
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
+        const FILE_WATCHER_SUPPORT = 1 << 10;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 11;
     }
 }
 
@@ -70,7 +72,17 @@ impl ResolvedClientCapabilities {
         self.contains(Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
     }
 
-    pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
+    /// Returns `true` if the client supports file watcher capabilities.
+    pub(crate) const fn supports_file_watcher(self) -> bool {
+        self.contains(Self::FILE_WATCHER_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports dyanmic registration for diagnostic capabilities.
+    pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
+        self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
+    pub(crate) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
         let workspace = client_capabilities.workspace.as_ref();
@@ -90,8 +102,22 @@ impl ResolvedClientCapabilities {
             flags |= Self::INLAY_HINT_REFRESH;
         }
 
+        if workspace
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::FILE_WATCHER_SUPPORT;
+        }
+
         if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
             flags |= Self::PULL_DIAGNOSTICS;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.diagnostic.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
         }
 
         if text_document
@@ -174,5 +200,15 @@ impl ResolvedClientCapabilities {
         }
 
         flags
+    }
+}
+
+/// Creates the default [`DiagnosticOptions`] for the server.
+pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> DiagnosticOptions {
+    DiagnosticOptions {
+        identifier: Some(crate::DIAGNOSTIC_NAME.to_string()),
+        inter_file_dependencies: true,
+        workspace_diagnostics,
+        ..Default::default()
     }
 }
