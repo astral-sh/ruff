@@ -1698,7 +1698,9 @@ impl<'db> Type<'db> {
                                 relation,
                             ) {
                                 TypeRelationResult::Pass => TypeRelationResult::Pass,
-                                TypeRelationResult::Fail(_) => TypeRelationResult::Fail(e1),
+                                TypeRelationResult::Fail(e2) => {
+                                    TypeRelationResult::Fail(e1.add(e2))
+                                }
                             }
                         } else {
                             TypeRelationResult::Fail(e1)
@@ -7555,6 +7557,28 @@ impl TypeRelationError {
             TypeRelationError::Single(errors.pop().unwrap())
         } else {
             TypeRelationError::Multiple(errors)
+        }
+    }
+
+    pub(crate) fn add(self, other: TypeRelationError) -> Self {
+        match (self, other) {
+            (TypeRelationError::Single(kind), TypeRelationError::Single(fail_kind)) => {
+                TypeRelationError::Multiple(vec![kind, fail_kind])
+            }
+            (TypeRelationError::Single(kind), TypeRelationError::Multiple(mut fail_kinds))
+            | (TypeRelationError::Multiple(mut fail_kinds), TypeRelationError::Single(kind)) => {
+                let mut errors = Vec::with_capacity(1 + fail_kinds.len());
+                errors.push(kind);
+                errors.append(&mut fail_kinds);
+                TypeRelationError::Multiple(errors)
+            }
+            (
+                TypeRelationError::Multiple(mut errors),
+                TypeRelationError::Multiple(mut fail_kinds),
+            ) => {
+                errors.append(&mut fail_kinds);
+                TypeRelationError::Multiple(errors)
+            }
         }
     }
 }
