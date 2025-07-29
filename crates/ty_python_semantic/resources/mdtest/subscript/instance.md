@@ -14,7 +14,7 @@ a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscri
 class NotSubscriptable:
     __getitem__ = None
 
-# error: "Method `__getitem__` of type `Unknown | None` is not callable on object of type `NotSubscriptable`"
+# error: "Method `__getitem__` of type `Unknown | None` is possibly not callable on object of type `NotSubscriptable`"
 a = NotSubscriptable()[0]
 ```
 
@@ -51,7 +51,7 @@ class Identity:
         return index
 
 a = Identity()
-# error: [call-non-callable] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` is not callable on object of type `Identity`"
+# error: [call-non-callable] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with argument of type `Literal["a"]` on object of type `Identity`"
 a["a"]
 ```
 
@@ -82,7 +82,7 @@ class NoSetitem:
     __setitem__ = None
 
 a = NoSetitem()
-a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` is not callable on object of type `NoSetitem`"
+a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` is possibly not callable on object of type `NoSetitem`"
 ```
 
 ## Valid `__setitem__` method
@@ -104,6 +104,6 @@ class Identity:
         pass
 
 a = Identity()
-# error: [call-non-callable] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` is not callable on object of type `Identity`"
+# error: [call-non-callable] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with arguments of type `Literal["a"]` and `Literal[0]` on object of type `Identity`"
 a["a"] = 0
 ```
