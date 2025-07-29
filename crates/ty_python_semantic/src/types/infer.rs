@@ -10811,7 +10811,7 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 /// Map based on a `Vec`. It doesn't enforce
 /// uniqueness on insertion. Instead, it relies on the caller
 /// that elements are unique. For example, the way we visit definitions
-/// in the `TypeInference` builder make already implicitly guarantees that each definition
+/// in the `TypeInference` builder already implicitly guarantees that each definition
 /// is only visited once.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VecMap<K, V>(Vec<(K, V)>);
