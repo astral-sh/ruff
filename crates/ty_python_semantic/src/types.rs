@@ -59,6 +59,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -390,17 +391,18 @@ pub struct PropertyInstanceType<'db> {
     setter: Option<Type<'db>>,
 }
 
-fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_property_instance_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     property: PropertyInstanceType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     if let Some(getter) = property.getter(db) {
-        visitor.visit_type(db, getter);
+        visitor.visit_type(db, getter)?;
     }
     if let Some(setter) = property.setter(db) {
-        visitor.visit_type(db, setter);
+        visitor.visit_type(db, setter)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -5889,20 +5891,21 @@ pub enum TypeMapping<'a, 'db> {
     PromoteLiterals,
 }
 
-fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_mapping<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     mapping: &TypeMapping<'_, 'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match mapping {
         TypeMapping::Specialization(specialization) => {
-            walk_specialization(db, *specialization, visitor);
+            walk_specialization(db, *specialization, visitor)?;
         }
         TypeMapping::PartialSpecialization(specialization) => {
-            walk_partial_specialization(db, specialization, visitor);
+            walk_partial_specialization(db, specialization, visitor)?;
         }
         TypeMapping::PromoteLiterals => {}
     }
+    Ok(())
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -5975,29 +5978,30 @@ pub enum KnownInstanceType<'db> {
     Field(FieldInstance<'db>),
 }
 
-fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_known_instance_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     known_instance: KnownInstanceType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(db, context, visitor);
+            walk_generic_context(db, context, visitor)?;
         }
         KnownInstanceType::TypeVar(typevar) => {
-            visitor.visit_type_var_type(db, typevar);
+            visitor.visit_type_var_type(db, typevar)?;
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
-            visitor.visit_type_alias_type(db, type_alias);
+            visitor.visit_type_alias_type(db, type_alias)?;
         }
         KnownInstanceType::Deprecated(_) => {
             // Nothing to visit
         }
         KnownInstanceType::Field(field) => {
-            visitor.visit_type(db, field.default_type(db));
+            visitor.visit_type(db, field.default_type(db))?;
         }
     }
+    Ok(())
 }
 
 impl<'db> KnownInstanceType<'db> {
@@ -6475,17 +6479,18 @@ pub struct TypeVarInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TypeVarInstance<'_> {}
 
-fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_var_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_var: TypeVarInstance<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     if let Some(bounds) = type_var.bound_or_constraints(db) {
-        walk_type_var_bounds(db, bounds, visitor);
+        walk_type_var_bounds(db, bounds, visitor)?;
     }
     if let Some(default_type) = type_var.default_ty(db) {
-        visitor.visit_type(db, default_type);
+        visitor.visit_type(db, default_type)?;
     }
+    Ok(())
 }
 
 impl<'db> TypeVarInstance<'db> {
@@ -6568,17 +6573,18 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(UnionType<'db>),
 }
 
-fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_var_bounds<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match bounds {
-        TypeVarBoundOrConstraints::UpperBound(bound) => visitor.visit_type(db, bound),
+        TypeVarBoundOrConstraints::UpperBound(bound) => visitor.visit_type(db, bound)?,
         TypeVarBoundOrConstraints::Constraints(constraints) => {
-            visitor.visit_union_type(db, constraints);
+            visitor.visit_union_type(db, constraints)?;
         }
     }
+    Ok(())
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
@@ -7485,13 +7491,14 @@ pub struct BoundMethodType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundMethodType<'_> {}
 
-fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_bound_method_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     method: BoundMethodType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_function_type(db, method.function(db));
-    visitor.visit_type(db, method.self_instance(db));
+) -> TypeVisitorResult {
+    visitor.visit_function_type(db, method.function(db))?;
+    visitor.visit_type(db, method.self_instance(db))?;
+    Ok(())
 }
 
 impl<'db> BoundMethodType<'db> {
@@ -7559,14 +7566,15 @@ pub struct CallableType<'db> {
     is_function_like: bool,
 }
 
-pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_callable_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     ty: CallableType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for signature in &ty.signatures(db).overloads {
-        walk_signature(db, signature, visitor);
+        walk_signature(db, signature, visitor)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -7697,28 +7705,29 @@ pub enum MethodWrapperKind<'db> {
     StrStartswith(StringLiteralType<'db>),
 }
 
-pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_method_wrapper_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     method_wrapper: MethodWrapperKind<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match method_wrapper {
         MethodWrapperKind::FunctionTypeDunderGet(function) => {
-            visitor.visit_function_type(db, function);
+            visitor.visit_function_type(db, function)?;
         }
         MethodWrapperKind::FunctionTypeDunderCall(function) => {
-            visitor.visit_function_type(db, function);
+            visitor.visit_function_type(db, function)?;
         }
         MethodWrapperKind::PropertyDunderGet(property) => {
-            visitor.visit_property_instance_type(db, property);
+            visitor.visit_property_instance_type(db, property)?;
         }
         MethodWrapperKind::PropertyDunderSet(property) => {
-            visitor.visit_property_instance_type(db, property);
+            visitor.visit_property_instance_type(db, property)?;
         }
         MethodWrapperKind::StrStartswith(string_literal) => {
-            visitor.visit_type(db, Type::StringLiteral(string_literal));
+            visitor.visit_type(db, Type::StringLiteral(string_literal))?;
         }
     }
+    Ok(())
 }
 
 impl<'db> MethodWrapperKind<'db> {
@@ -7918,12 +7927,13 @@ pub struct PEP695TypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
-fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_pep_695_type_alias<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: PEP695TypeAliasType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, type_alias.value_type(db));
+) -> TypeVisitorResult {
+    visitor.visit_type(db, type_alias.value_type(db))?;
+    Ok(())
 }
 
 #[salsa::tracked]
@@ -7965,12 +7975,13 @@ pub struct BareTypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BareTypeAliasType<'_> {}
 
-fn walk_bare_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_bare_type_alias<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: BareTypeAliasType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, type_alias.value(db));
+) -> TypeVisitorResult {
+    visitor.visit_type(db, type_alias.value(db))?;
+    Ok(())
 }
 
 impl<'db> BareTypeAliasType<'db> {
@@ -7992,19 +8003,20 @@ pub enum TypeAliasType<'db> {
     Bare(BareTypeAliasType<'db>),
 }
 
-fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_alias_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     type_alias: TypeAliasType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match type_alias {
         TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(db, type_alias, visitor);
+            walk_pep_695_type_alias(db, type_alias, visitor)?;
         }
         TypeAliasType::Bare(type_alias) => {
-            walk_bare_type_alias(db, type_alias, visitor);
+            walk_bare_type_alias(db, type_alias, visitor)?;
         }
     }
+    Ok(())
 }
 
 impl<'db> TypeAliasType<'db> {
@@ -8059,14 +8071,15 @@ pub struct UnionType<'db> {
     pub elements: Box<[Type<'db>]>,
 }
 
-pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(crate) fn walk_union<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     union: UnionType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for element in union.elements(db) {
-        visitor.visit_type(db, *element);
+        visitor.visit_type(db, *element)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -8296,17 +8309,18 @@ pub struct IntersectionType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
 
-pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_intersection_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for element in intersection.positive(db) {
-        visitor.visit_type(db, *element);
+        visitor.visit_type(db, *element)?;
     }
     for element in intersection.negative(db) {
-        visitor.visit_type(db, *element);
+        visitor.visit_type(db, *element)?;
     }
+    Ok(())
 }
 
 impl<'db> IntersectionType<'db> {
@@ -8696,13 +8710,14 @@ pub struct BoundSuperType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundSuperType<'_> {}
 
-fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_bound_super_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bound_super: BoundSuperType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, bound_super.pivot_class(db).into());
-    visitor.visit_type(db, bound_super.owner(db).into_type());
+) -> TypeVisitorResult {
+    visitor.visit_type(db, bound_super.pivot_class(db).into())?;
+    visitor.visit_type(db, bound_super.owner(db).into_type())?;
+    Ok(())
 }
 
 impl<'db> BoundSuperType<'db> {
@@ -8887,12 +8902,13 @@ pub struct TypeIsType<'db> {
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
 }
 
-fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_typeis_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     typeis_type: TypeIsType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, typeis_type.return_type(db));
+) -> TypeVisitorResult {
+    visitor.visit_type(db, typeis_type.return_type(db))?;
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.

@@ -15,6 +15,7 @@ use crate::{
         Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
+        visitor::{TypeVisitor, TypeVisitorResult},
     },
 };
 
@@ -77,14 +78,15 @@ pub(super) struct ProtocolInterface<'db> {
 
 impl get_size2::GetSize for ProtocolInterface<'_> {}
 
-pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_protocol_interface<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     interface: ProtocolInterface<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for member in interface.members(db) {
-        walk_protocol_member(db, &member, visitor);
+        walk_protocol_member(db, &member, visitor)?;
     }
+    Ok(())
 }
 
 impl<'db> ProtocolInterface<'db> {
@@ -329,18 +331,19 @@ pub(super) struct ProtocolMember<'a, 'db> {
     qualifiers: TypeQualifiers,
 }
 
-fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_protocol_member<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match member.kind {
-        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
+        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method)?,
         ProtocolMemberKind::Property(property) => {
-            visitor.visit_property_instance_type(db, property);
+            visitor.visit_property_instance_type(db, property)?;
         }
-        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
+        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty)?,
     }
+    Ok(())
 }
 
 impl<'a, 'db> ProtocolMember<'a, 'db> {

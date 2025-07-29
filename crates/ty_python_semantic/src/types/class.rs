@@ -20,6 +20,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
@@ -180,12 +181,13 @@ pub struct GenericAlias<'db> {
     pub(crate) specialization: Specialization<'db>,
 }
 
-pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_generic_alias<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     alias: GenericAlias<'db>,
     visitor: &mut V,
-) {
-    walk_specialization(db, alias.specialization(db), visitor);
+) -> TypeVisitorResult {
+    walk_specialization(db, alias.specialization(db), visitor)?;
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.

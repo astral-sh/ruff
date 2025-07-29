@@ -12,6 +12,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
@@ -74,14 +75,15 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
-pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     context: GenericContext<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for typevar in context.variables(db) {
-        visitor.visit_type_var_type(db, *typevar);
+        visitor.visit_type_var_type(db, *typevar)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -359,18 +361,19 @@ pub struct Specialization<'db> {
     tuple_inner: Option<TupleType<'db>>,
 }
 
-pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
     visitor: &mut V,
-) {
-    walk_generic_context(db, specialization.generic_context(db), visitor);
+) -> TypeVisitorResult {
+    walk_generic_context(db, specialization.generic_context(db), visitor)?;
     for ty in specialization.types(db) {
-        visitor.visit_type(db, *ty);
+        visitor.visit_type(db, *ty)?;
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        visitor.visit_tuple_type(db, tuple)?;
     }
+    Ok(())
 }
 
 impl<'db> Specialization<'db> {
@@ -616,15 +619,16 @@ pub struct PartialSpecialization<'a, 'db> {
     types: Cow<'a, [Type<'db>]>,
 }
 
-pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_partial_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: &PartialSpecialization<'_, 'db>,
     visitor: &mut V,
-) {
-    walk_generic_context(db, specialization.generic_context, visitor);
+) -> TypeVisitorResult {
+    walk_generic_context(db, specialization.generic_context, visitor)?;
     for ty in &*specialization.types {
-        visitor.visit_type(db, *ty);
+        visitor.visit_type(db, *ty)?;
     }
+    Ok(())
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {

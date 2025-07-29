@@ -9,6 +9,7 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
 use crate::{Db, FxOrderSet};
 
@@ -77,12 +78,13 @@ pub struct NominalInstanceType<'db> {
     _phantom: PhantomData<()>,
 }
 
-pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_nominal_instance_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     nominal: NominalInstanceType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, nominal.class.into());
+) -> TypeVisitorResult {
+    visitor.visit_type(db, nominal.class.into())?;
+    Ok(())
 }
 
 impl<'db> NominalInstanceType<'db> {
@@ -177,12 +179,13 @@ pub struct ProtocolInstanceType<'db> {
     _phantom: PhantomData<()>,
 }
 
-pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_protocol_instance_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     protocol: ProtocolInstanceType<'db>,
     visitor: &mut V,
-) {
-    walk_protocol_interface(db, protocol.inner.interface(db), visitor);
+) -> TypeVisitorResult {
+    walk_protocol_interface(db, protocol.inner.interface(db), visitor)?;
+    Ok(())
 }
 
 impl<'db> ProtocolInstanceType<'db> {

@@ -24,6 +24,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -104,14 +105,15 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
-pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_tuple_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for element in tuple.tuple(db).all_elements() {
-        visitor.visit_type(db, *element);
+        visitor.visit_type(db, *element)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.

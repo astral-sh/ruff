@@ -1,6 +1,7 @@
 use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarInstance,
@@ -16,12 +17,13 @@ pub struct SubclassOfType<'db> {
     subclass_of: SubclassOfInner<'db>,
 }
 
-pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_subclass_of_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     subclass_of: SubclassOfType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, Type::from(subclass_of.subclass_of));
+) -> TypeVisitorResult {
+    visitor.visit_type(db, Type::from(subclass_of.subclass_of))?;
+    Ok(())
 }
 
 impl<'db> SubclassOfType<'db> {
