@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.7
+
+This is a follow-up release to 0.12.6. Because of an issue in the package metadata, 0.12.6 failed to publish fully to PyPI and has been yanked. The contents of 0.12.7 are identical, except for the updated metadata.
+
 ## 0.12.6
 
 ### Preview features
