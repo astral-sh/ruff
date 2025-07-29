@@ -145,3 +145,22 @@ PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
 37 36 | 
 38 37 |     def __init__():
 39 38 |         pass
+
+PYI013.py:44:5: PYI013 [*] Non-empty class body must not contain `...`
+   |
+42 | class NonEmptyChildWithInlineComment:
+43 |     value: int
+44 |     ... # preserve me
+   |     ^^^ PYI013
+   |
+   = help: Remove unnecessary `...`
+
+ℹ Safe fix
+41 41 | 
+42 42 | class NonEmptyChildWithInlineComment:
+43 43 |     value: int
+44    |-    ... # preserve me
+   44 |+    # preserve me
+45 45 | 
+46 46 | 
+47 47 | class EmptyClass:
