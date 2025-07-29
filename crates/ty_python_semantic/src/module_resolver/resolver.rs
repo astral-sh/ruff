@@ -1,3 +1,13 @@
+/*!
+This module principally provides two routines for resolving a particular module
+name to a `Module`: [`resolve_module`] and [`resolve_real_module`]. You'll
+usually want the former, unless you're certain you want to forbid stubs, in
+which case, use the latter.
+
+For implementors, see `import-resolution-diagram.svg` for a flow diagram that
+specifies ty's implementation of Python's import resolution algorithm.
+*/
+
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
