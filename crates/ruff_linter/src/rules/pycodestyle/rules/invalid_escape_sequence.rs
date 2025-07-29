@@ -271,7 +271,7 @@ fn analyze_escape_chars_in_interpolated_string(
 /// we manually add backslashes to each invalid escape character found.
 ///
 /// Escapes in format specs are handled separately because they are not
-/// effected by whether or not the string is raw.
+/// affected by whether or not the string is raw.
 fn check(
     checker: &Checker,
     locator: &Locator,
