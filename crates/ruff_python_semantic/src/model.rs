@@ -1017,6 +1017,7 @@ impl<'a> SemanticModel<'a> {
                             self.module.qualified_name()?,
                             qualified_name.segments(),
                             tail,
+                            self.module.kind.is_package(),
                         )?
                     } else {
                         qualified_name
