@@ -559,6 +559,22 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+## Subclasses of `enum.Flag`
+
+```py
+from enum import Flag, auto
+
+class KeyModifier(Flag):
+    SHIFT = auto()
+    CTRL = auto()
+    ALT = auto()
+
+reveal_type(KeyModifier.SHIFT)  # revealed: Literal[KeyModifier.SHIFT]
+
+# TODO: this should be `KeyModifier`
+reveal_type(KeyModifier.SHIFT | KeyModifier.CTRL)  # revealed: Literal[KeyModifier.CTRL]
+```
+
 ## Custom enum types
 
 Enum classes can also be defined using a subclass of `enum.Enum` or any class that uses
