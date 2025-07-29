@@ -26,13 +26,27 @@ mod tests {
     #[test_case(Rule::CreateSubprocessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::RunProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
     #[test_case(Rule::WaitForProcessInAsyncFunction, Path::new("ASYNC22x.py"))]
-    #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
     #[test_case(Rule::BlockingSleepInAsyncFunction, Path::new("ASYNC251.py"))]
+    #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_async").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::BlockingOpenCallInAsyncFunction, Path::new("ASYNC230.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_async").join(path).as_path(),
+            &LinterSettings {
+                preview: crate::settings::types::PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

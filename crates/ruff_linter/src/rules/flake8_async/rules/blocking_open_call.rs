@@ -5,6 +5,8 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_pathlib_read_write_async_check_enabled;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks that async functions do not open files with blocking methods like `open`.
@@ -50,7 +52,7 @@ pub(crate) fn blocking_open_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     if is_open_call(&call.func, checker.semantic())
-        || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic())
+        || is_open_call_from_pathlib(call.func.as_ref(), checker.semantic(), checker.settings())
     {
         checker.report_diagnostic(BlockingOpenCallInAsyncFunction, call.func.range());
     }
@@ -69,16 +71,21 @@ fn is_open_call(func: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// Returns `true` if an expression resolves to a call to `pathlib.Path.open`.
-fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
+fn is_open_call_from_pathlib(
+    func: &Expr,
+    semantic: &SemanticModel,
+    settings: &LinterSettings,
+) -> bool {
     let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func else {
         return false;
     };
 
-    if attr.as_str() != "open"
-        && attr.as_str() != "read_text"
-        && attr.as_str() != "read_bytes"
-        && attr.as_str() != "write_text"
-        && attr.as_str() != "write_bytes"
+    if !matches!(attr.as_str(), "open")
+        && (!is_pathlib_read_write_async_check_enabled(settings)
+            || !matches!(
+                attr.as_str(),
+                "read_text" | "read_bytes" | "write_text" | "write_bytes"
+            ))
     {
         return false;
     }
