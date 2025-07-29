@@ -8,12 +8,10 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::Violation;
-use crate::checkers::ast::DiagnosticReporter;
 use crate::checkers::ast::{Checker, LintContext};
 use crate::preview::is_unicode_to_unicode_confusables_enabled;
 use crate::rules::ruff::rules::Context;
 use crate::rules::ruff::rules::confusables::confusable;
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for ambiguous Unicode characters in strings.
@@ -181,7 +179,7 @@ pub(crate) fn ambiguous_unicode_character_comment(
     range: TextRange,
 ) {
     let text = locator.slice(range);
-    ambiguous_unicode_character(text, range, context.settings(), Context::Comment, context);
+    ambiguous_unicode_character(text, range, Context::Comment, context);
 }
 
 /// RUF001, RUF002
@@ -205,9 +203,8 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
                 ambiguous_unicode_character(
                     text,
                     string_literal.range(),
-                    checker.settings(),
                     context,
-                    checker,
+                    checker.context(),
                 );
             }
             ast::StringLikePart::Bytes(_) => {}
@@ -215,25 +212,18 @@ pub(crate) fn ambiguous_unicode_character_string(checker: &Checker, string_like:
             | ast::StringLikePart::TString(TString { elements, .. }) => {
                 for literal in elements.literals() {
                     let text = checker.locator().slice(literal);
-                    ambiguous_unicode_character(
-                        text,
-                        literal.range(),
-                        checker.settings(),
-                        context,
-                        checker,
-                    );
+                    ambiguous_unicode_character(text, literal.range(), context, checker.context());
                 }
             }
         }
     }
 }
 
-fn ambiguous_unicode_character<'a>(
+fn ambiguous_unicode_character(
     text: &str,
     range: TextRange,
-    settings: &LinterSettings,
     context: Context,
-    reporter: &impl DiagnosticReporter<'a>,
+    lint_context: &LintContext,
 ) {
     // Most of the time, we don't need to check for ambiguous unicode characters at all.
     if text.is_ascii() {
@@ -249,7 +239,7 @@ fn ambiguous_unicode_character<'a>(
             if !word_candidates.is_empty() {
                 if word_flags.is_candidate_word() {
                     for candidate in word_candidates.drain(..) {
-                        candidate.into_diagnostic(context, reporter, settings);
+                        candidate.into_diagnostic(context, lint_context);
                     }
                 }
                 word_candidates.clear();
@@ -260,21 +250,23 @@ fn ambiguous_unicode_character<'a>(
             // case, it's always included as a diagnostic.
             if !current_char.is_ascii() {
                 if let Some(representant) = confusable(current_char as u32).filter(|representant| {
-                    is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+                    is_unicode_to_unicode_confusables_enabled(lint_context.settings())
+                        || representant.is_ascii()
                 }) {
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
                         representant,
                     );
-                    candidate.into_diagnostic(context, reporter, settings);
+                    candidate.into_diagnostic(context, lint_context);
                 }
             }
         } else if current_char.is_ascii() {
             // The current word contains at least one ASCII character.
             word_flags |= WordFlags::ASCII;
         } else if let Some(representant) = confusable(current_char as u32).filter(|representant| {
-            is_unicode_to_unicode_confusables_enabled(settings) || representant.is_ascii()
+            is_unicode_to_unicode_confusables_enabled(lint_context.settings())
+                || representant.is_ascii()
         }) {
             // The current word contains an ambiguous unicode character.
             word_candidates.push(Candidate::new(
@@ -292,7 +284,7 @@ fn ambiguous_unicode_character<'a>(
     if !word_candidates.is_empty() {
         if word_flags.is_candidate_word() {
             for candidate in word_candidates.drain(..) {
-                candidate.into_diagnostic(context, reporter, settings);
+                candidate.into_diagnostic(context, lint_context);
             }
         }
         word_candidates.clear();
@@ -342,30 +334,29 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic<'a>(
-        self,
-        context: Context,
-        reporter: &impl DiagnosticReporter<'a>,
-        settings: &LinterSettings,
-    ) {
-        if !settings.allowed_confusables.contains(&self.confusable) {
+    fn into_diagnostic(self, context: Context, lint_context: &LintContext) {
+        if !lint_context
+            .settings()
+            .allowed_confusables
+            .contains(&self.confusable)
+        {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             match context {
-                Context::String => reporter.report_diagnostic_if_enabled(
+                Context::String => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterString {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Docstring => reporter.report_diagnostic_if_enabled(
+                Context::Docstring => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterDocstring {
                         confusable: self.confusable,
                         representant: self.representant,
                     },
                     char_range,
                 ),
-                Context::Comment => reporter.report_diagnostic_if_enabled(
+                Context::Comment => lint_context.report_diagnostic_if_enabled(
                     AmbiguousUnicodeCharacterComment {
                         confusable: self.confusable,
                         representant: self.representant,

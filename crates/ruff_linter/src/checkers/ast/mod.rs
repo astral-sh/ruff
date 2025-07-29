@@ -590,6 +590,16 @@ impl<'a> Checker<'a> {
             member,
         })
     }
+
+    /// Return the [`LintContext`] for the current analysis.
+    ///
+    /// Note that you should always prefer calling methods like `settings`, `report_diagnostic`, or
+    /// `is_rule_enabled` directly on [`Checker`] when possible. This method exists only for the
+    /// rare cases where rules or helper functions need to be accessed by both a `Checker` and a
+    /// `LintContext` in different analysis phases.
+    pub(crate) const fn context(&self) -> &'a LintContext<'a> {
+        self.context
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -3324,38 +3334,5 @@ impl Drop for DiagnosticGuard<'_, '_> {
         if let Some(diagnostic) = self.diagnostic.take() {
             self.context.diagnostics.borrow_mut().push(diagnostic);
         }
-    }
-}
-
-pub(crate) trait DiagnosticReporter<'a> {
-    /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
-    /// enabled.
-    ///
-    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
-    /// before it is added to the collection in the context on `Drop`.
-    fn report_diagnostic_if_enabled<'chk, T: Violation>(
-        &'chk self,
-        kind: T,
-        range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>>;
-}
-
-impl<'a> DiagnosticReporter<'a> for Checker<'a> {
-    fn report_diagnostic_if_enabled<'chk, T: Violation>(
-        &'chk self,
-        kind: T,
-        range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.report_diagnostic_if_enabled(kind, range)
-    }
-}
-
-impl<'a> DiagnosticReporter<'a> for LintContext<'a> {
-    fn report_diagnostic_if_enabled<'chk, T: Violation>(
-        &'chk self,
-        kind: T,
-        range: TextRange,
-    ) -> Option<DiagnosticGuard<'chk, 'a>> {
-        self.report_diagnostic_if_enabled(kind, range)
     }
 }
