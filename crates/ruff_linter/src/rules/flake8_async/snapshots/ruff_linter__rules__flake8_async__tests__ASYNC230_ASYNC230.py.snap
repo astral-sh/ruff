@@ -126,4 +126,15 @@ ASYNC230.py:75:9: ASYNC230 Async functions should not open files with blocking m
 74 | async def func() -> None:
 75 |     p = Path("foo").write_bytes(b"content")  # ASYNC230
    |         ^^^^^^^^^^^^^^^^^^^^^^^ ASYNC230
+76 |
+77 | async def func() -> None:
+   |
+
+ASYNC230.py:78:9: ASYNC230 Async functions should not open files with blocking methods like `open`
+   |
+77 | async def func() -> None:
+78 |     p = Path("foo").touch()  # ASYNC230
+   |         ^^^^^^^^^^^^^^^^^ ASYNC230
+79 |
+80 | # Non-violation cases for pathlib:
    |

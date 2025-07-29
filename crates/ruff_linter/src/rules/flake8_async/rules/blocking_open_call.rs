@@ -84,7 +84,7 @@ fn is_open_call_from_pathlib(
         && (!is_pathlib_read_write_async_check_enabled(settings)
             || !matches!(
                 attr.as_str(),
-                "read_text" | "read_bytes" | "write_text" | "write_bytes"
+                "read_text" | "read_bytes" | "write_text" | "write_bytes" | "touch"
             ))
     {
         return false;
