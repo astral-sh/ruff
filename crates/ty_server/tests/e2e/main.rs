@@ -658,7 +658,11 @@ impl TestServer {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
-            work_done_progress_params: WorkDoneProgressParams::default(),
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: Some(lsp_types::NumberOrString::String(
+                    "test-progress-token".to_string(),
+                )),
+            },
             partial_result_params: PartialResultParams::default(),
         };
 

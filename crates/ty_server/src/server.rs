@@ -18,13 +18,16 @@ use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
+mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use api::publish_settings_diagnostics;
-pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
+pub(crate) use main_loop::{
+    Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
+};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
@@ -55,6 +58,7 @@ impl Server {
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
 
+        tracing::info!("Initializing ty language server with options: {global_options:#?}");
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities =
@@ -198,7 +202,9 @@ impl Server {
                 inter_file_dependencies: true,
                 // TODO: Dynamically register for workspace diagnostics.
                 workspace_diagnostics: diagnostic_mode.is_workspace(),
-                ..Default::default()
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(diagnostic_mode.is_workspace()),
+                },
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
