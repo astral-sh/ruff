@@ -145,9 +145,6 @@ pub(crate) struct TestServer {
 
     /// Workspace configurations for `workspace/configuration` requests
     workspace_configurations: HashMap<Url, ClientOptions>,
-
-    /// Capabilities registered by the server
-    registered_capabilities: Vec<String>,
 }
 
 impl TestServer {
@@ -202,7 +199,6 @@ impl TestServer {
             requests: VecDeque::new(),
             initialize_response: None,
             workspace_configurations,
-            registered_capabilities: Vec::new(),
         }
         .initialize(workspace_folders, capabilities)
     }
@@ -655,7 +651,6 @@ impl fmt::Debug for TestServer {
             .field("server_requests", &self.requests)
             .field("initialize_response", &self.initialize_response)
             .field("workspace_configurations", &self.workspace_configurations)
-            .field("registered_capabilities", &self.registered_capabilities)
             .finish_non_exhaustive()
     }
 }
@@ -780,6 +775,17 @@ impl TestServerBuilder {
         } else {
             None
         };
+        self
+    }
+
+    /// Enable or disable dynamic registration of diagnostics capability
+    pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_with(Default::default)
+            .diagnostic
+            .get_or_insert_with(Default::default)
+            .dynamic_registration = Some(enabled);
         self
     }
 

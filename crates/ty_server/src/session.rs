@@ -23,8 +23,8 @@ use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::index::DocumentQuery;
-pub use self::options::ClientOptions;
 pub(crate) use self::options::InitializationOptions;
+pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::WorkspaceSettings;
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};

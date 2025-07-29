@@ -126,12 +126,18 @@ impl ClientOptions {
             },
         )
     }
+
+    #[must_use]
+    pub fn with_diagnostic_mode(mut self, diagnostic_mode: DiagnosticMode) -> Self {
+        self.diagnostic_mode = Some(diagnostic_mode);
+        self
+    }
 }
 
 /// Diagnostic mode for the language server.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum DiagnosticMode {
+pub enum DiagnosticMode {
     /// Check only currently open files.
     #[default]
     OpenFilesOnly,

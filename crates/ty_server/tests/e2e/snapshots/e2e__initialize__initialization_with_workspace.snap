@@ -64,7 +64,7 @@ expression: initialization_result
     "diagnosticProvider": {
       "identifier": "ty",
       "interFileDependencies": true,
-      "workspaceDiagnostics": false
+      "workspaceDiagnostics": true
     }
   },
   "serverInfo": {

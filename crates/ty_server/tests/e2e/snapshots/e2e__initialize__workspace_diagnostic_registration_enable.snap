@@ -1,0 +1,14 @@
+---
+source: crates/ty_server/tests/e2e/initialize.rs
+expression: registration
+---
+{
+  "id": "ty/textDocument/diagnostic",
+  "method": "textDocument/diagnostic",
+  "registerOptions": {
+    "documentSelector": null,
+    "identifier": "ty",
+    "interFileDependencies": true,
+    "workspaceDiagnostics": true
+  }
+}
