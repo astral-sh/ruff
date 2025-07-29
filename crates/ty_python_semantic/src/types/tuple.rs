@@ -528,7 +528,7 @@ impl<T> VariableLengthTuple<T> {
         self.prefix_elements().chain(self.suffix_elements())
     }
 
-    pub(super) fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
+    fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
         (self.prefix_elements())
             .chain(std::iter::once(&self.variable))
             .chain(self.suffix_elements())
