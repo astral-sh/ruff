@@ -1390,58 +1390,59 @@ impl<'db> Type<'db> {
             (_, Type::Never) => TypeRelationResult::todo_fail(),
 
             (Type::Union(union), _) => {
-                let results = union
-                    .elements(db)
-                    .iter()
-                    .map(|&elem_ty| elem_ty.try_has_relation_to(db, target, relation))
-                    .collect::<Vec<_>>();
-
-                TypeRelationResult::all_pass(results)
+                for elem_ty in union.elements(db) {
+                    let res = elem_ty.try_has_relation_to(db, target, relation);
+                    if res.is_fail() {
+                        return res;
+                    }
+                }
+                TypeRelationResult::Pass
             }
 
             (_, Type::Union(union)) => {
-                let results = union
-                    .elements(db)
-                    .iter()
-                    .map(|&elem_ty| self.try_has_relation_to(db, elem_ty, relation))
-                    .collect::<Vec<_>>();
-
-                TypeRelationResult::any_pass(results)
+                let mut results = Vec::new();
+                for &elem_ty in union.elements(db) {
+                    let res = self.try_has_relation_to(db, elem_ty, relation);
+                    if res.is_pass() {
+                        return res;
+                    }
+                    results.push(res);
+                }
+                TypeRelationResult::Fail(TypeRelationError::from_results(results))
             }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
             (_, Type::Intersection(intersection)) => {
-                let results = intersection
-                    .positive(db)
-                    .iter()
-                    .map(|&pos_ty| self.try_has_relation_to(db, pos_ty, relation))
-                    .collect::<Vec<_>>();
-
-                if results.iter().all(TypeRelationResult::is_pass) {
-                    if intersection
-                        .negative(db)
-                        .iter()
-                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
-                    {
-                        TypeRelationResult::Pass
-                    } else {
-                        TypeRelationResult::todo_fail()
+                for &pos_ty in intersection.positive(db) {
+                    let res = self.try_has_relation_to(db, pos_ty, relation);
+                    if res.is_fail() {
+                        return res;
                     }
+                }
+
+                if intersection
+                    .negative(db)
+                    .iter()
+                    .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
+                {
+                    TypeRelationResult::Pass
                 } else {
-                    TypeRelationResult::Fail(TypeRelationError::from_results(results))
+                    TypeRelationResult::todo_fail()
                 }
             }
 
             (Type::Intersection(intersection), _) => {
-                let results = intersection
-                    .positive(db)
-                    .iter()
-                    .map(|&elem_ty| elem_ty.try_has_relation_to(db, target, relation))
-                    .collect::<Vec<_>>();
-
-                TypeRelationResult::any_pass(results)
+                let mut results = Vec::new();
+                for &elem_ty in intersection.positive(db) {
+                    let res = elem_ty.try_has_relation_to(db, target, relation);
+                    if res.is_pass() {
+                        return res;
+                    }
+                    results.push(res);
+                }
+                TypeRelationResult::Fail(TypeRelationError::from_results(results))
             }
 
             // Other than the special cases checked above, no other types are a subtype of a
@@ -7502,6 +7503,10 @@ pub(crate) enum TypeRelationResult {
 impl TypeRelationResult {
     fn is_pass(&self) -> bool {
         matches!(self, TypeRelationResult::Pass)
+    }
+
+    fn is_fail(&self) -> bool {
+        matches!(self, TypeRelationResult::Fail(_))
     }
 
     fn todo_fail() -> Self {
