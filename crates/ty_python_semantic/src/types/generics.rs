@@ -12,7 +12,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
-use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult, visit_type};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
@@ -134,16 +134,24 @@ impl<'db> GenericContext<'db> {
     ) -> Option<Self> {
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
+        let mut find_legacy_typevars = |db, ty| {
+            if let Type::TypeVar(typevar) = ty {
+                if typevar.is_legacy(db) {
+                    variables.insert(typevar);
+                }
+            }
+            Ok(())
+        };
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                visit_type(db, ty, &mut find_legacy_typevars);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                visit_type(db, ty, &mut find_legacy_typevars);
             }
         }
         if let Some(ty) = return_type {
-            ty.find_legacy_typevars(db, &mut variables);
+            visit_type(db, ty, &mut find_legacy_typevars);
         }
 
         // Then remove any that were bound in enclosing scopes.
