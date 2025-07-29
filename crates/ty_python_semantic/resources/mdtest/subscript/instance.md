@@ -66,7 +66,7 @@ a = NoGetitem()
 a[0] = 0
 ```
 
-## Subscript store with no setitem
+## Subscript store with no `__setitem__`
 
 ```py
 class NoSetitem: ...
