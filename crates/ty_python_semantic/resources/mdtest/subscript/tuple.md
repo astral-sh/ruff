@@ -73,6 +73,28 @@ def g(m: MixedSubclass, i: int):
     # but achieving that with only synthesized overloads wouldn't be possible
     reveal_type(m[-6])  # revealed: Exception | str | int | bytes | range
     reveal_type(m[-10])  # revealed: Exception | str | int | bytes | range
+
+class MixedSubclass2(tuple[int, str, *tuple[bytes, ...], range]): ...
+
+# revealed: Overload[(self, index: Literal[-2], /) -> bytes | str, (self, index: Literal[1], /) -> str, (self, index: Literal[2], /) -> bytes | range, (self, index: Literal[-1], /) -> range, (self, index: Literal[0], /) -> int, (self, index: Literal[-3], /) -> bytes | str | int, (self, index: SupportsIndex, /) -> int | str | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[int | str | bytes | range, ...]]
+reveal_type(MixedSubclass2.__getitem__)
+
+def g(m: MixedSubclass2, i: int):
+    reveal_type(m[0])  # revealed: int
+    reveal_type(m[1])  # revealed: str
+    reveal_type(m[2])  # revealed: bytes | range
+
+    # Ideally this would just be `bytes | range`,
+    # but that's not possible to achieve with synthesized overloads
+    reveal_type(m[3])  # revealed: int | str | bytes | range
+
+    reveal_type(m[-1])  # revealed: range
+    reveal_type(m[-2])  # revealed: bytes | str
+    reveal_type(m[-3])  # revealed: bytes | str | int
+
+    # Ideally this would just be `int | str | bytes`,
+    # but that's not possible to achieve with synthesized overloads
+    reveal_type(m[-4])  # revealed: int | str | bytes | range
 ```
 
 ## Slices
