@@ -18,10 +18,16 @@ use crate::{
 
 /// The result returned from the [`TypeVisitor`] trait methods. You can abort the visitor by
 /// returning `Err(AbortTypeVisitor)`.
-pub(crate) type TypeVisitorResult = Result<(), AbortTypeVisitor>;
+pub(crate) type TypeVisitorResult = Result<(), TypeVisitorControlFlow>;
 
-/// Indicates that you wish to abort visiting a type.
-pub(crate) struct AbortTypeVisitor;
+/// Controls the behavior of a [`TypeVisitor`], allowing you to skip parts of the type or abort the
+/// visiting early.
+pub(crate) enum TypeVisitorControlFlow {
+    /// Abort the entire visitor
+    Abort,
+    /// Do not recurse into the current type, but otherwise continue visiting
+    Prune,
+}
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -309,15 +315,18 @@ where
         V: TypeVisitor<'db>,
     {
         fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) -> TypeVisitorResult {
-            self.wrapped.visit_type(db, ty)?;
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {}
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    if self.seen_types.insert(non_atomic_type) {
-                        // If we haven't already seen this type, we should recurse into it.
-                        walk_non_atomic_type(db, non_atomic_type, self)?;
+            match self.wrapped.visit_type(db, ty) {
+                err @ Err(TypeVisitorControlFlow::Abort) => return err,
+                Err(TypeVisitorControlFlow::Prune) => {}
+                Ok(()) => match TypeKind::from(ty) {
+                    TypeKind::Atomic => {}
+                    TypeKind::NonAtomic(non_atomic_type) => {
+                        if self.seen_types.insert(non_atomic_type) {
+                            // If we haven't already seen this type, we should recurse into it.
+                            walk_non_atomic_type(db, non_atomic_type, self)?;
+                        }
                     }
-                }
+                },
             }
             Ok(())
         }
@@ -339,11 +348,11 @@ pub(super) fn any_over_type<'db>(
     let mut found_matching_type = false;
     visit_type(db, ty, |_, ty| {
         if found_matching_type {
-            return Err(AbortTypeVisitor);
+            return Err(TypeVisitorControlFlow::Abort);
         }
         found_matching_type |= query(ty);
         if found_matching_type {
-            return Err(AbortTypeVisitor);
+            return Err(TypeVisitorControlFlow::Abort);
         }
         Ok(())
     });
