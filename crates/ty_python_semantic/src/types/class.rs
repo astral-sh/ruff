@@ -23,8 +23,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeRelationResult, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    declaration_type, infer_definition_types,
+    TypeRelationError, TypeRelationResult, TypeTransformer, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -435,43 +435,45 @@ impl<'db> ClassType<'db> {
             return TypeRelationResult::Pass;
         }
 
-        let results = self
-            .iter_mro(db)
-            .map(|base| {
-                match base {
-                    ClassBase::Dynamic(_) => match relation {
-                        TypeRelation::Subtyping => other.is_object(db).into(),
-                        TypeRelation::Assignability => (!other.is_final(db)).into(),
-                    },
+        let mut results = Vec::new();
+        for base in self.iter_mro(db) {
+            let res = match base {
+                ClassBase::Dynamic(_) => match relation {
+                    TypeRelation::Subtyping => other.is_object(db).into(),
+                    TypeRelation::Assignability => (!other.is_final(db)).into(),
+                },
 
-                    // Protocol and Generic are not represented by a ClassType.
-                    ClassBase::Protocol | ClassBase::Generic => TypeRelationResult::todo_fail(),
+                // Protocol and Generic are not represented by a ClassType.
+                ClassBase::Protocol | ClassBase::Generic => TypeRelationResult::todo_fail(),
 
-                    ClassBase::Class(base) => match (base, other) {
-                        (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
-                            (base == other).into()
-                        }
-                        (ClassType::Generic(base), ClassType::Generic(other)) => {
-                            if base.origin(db) == other.origin(db) {
-                                base.specialization(db).try_has_relation_to(
-                                    db,
-                                    other.specialization(db),
-                                    relation,
-                                )
-                            } else {
-                                TypeRelationResult::todo_fail()
-                            }
-                        }
-                        (ClassType::Generic(_), ClassType::NonGeneric(_))
-                        | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
+                ClassBase::Class(base) => match (base, other) {
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        (base == other).into()
+                    }
+                    (ClassType::Generic(base), ClassType::Generic(other)) => {
+                        if base.origin(db) == other.origin(db) {
+                            base.specialization(db).try_has_relation_to(
+                                db,
+                                other.specialization(db),
+                                relation,
+                            )
+                        } else {
                             TypeRelationResult::todo_fail()
                         }
-                    },
-                }
-            })
-            .collect::<Vec<_>>();
+                    }
+                    (ClassType::Generic(_), ClassType::NonGeneric(_))
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
+                        TypeRelationResult::todo_fail()
+                    }
+                },
+            };
+            if res.is_pass() {
+                return res;
+            }
+            results.push(res);
+        }
 
-        TypeRelationResult::any_pass(results)
+        TypeRelationResult::Fail(TypeRelationError::from_results(results))
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
