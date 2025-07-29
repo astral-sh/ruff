@@ -405,14 +405,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 if self.0.len() != other.0.len() {
                     return TypeRelationResult::todo_fail();
                 }
-                let results = self
-                    .0
-                    .iter()
-                    .zip(&other.0)
-                    .map(|(self_ty, other_ty)| self_ty.try_has_relation_to(db, *other_ty, relation))
-                    .collect::<Vec<_>>();
-
-                TypeRelationResult::all_pass(results)
+                for (self_ty, other_ty) in self.0.iter().zip(&other.0) {
+                    let res = self_ty.try_has_relation_to(db, *other_ty, relation);
+                    if res.is_fail() {
+                        return res;
+                    }
+                }
+                TypeRelationResult::Pass
             }
 
             Tuple::Variable(other) => {
@@ -442,11 +441,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                let results = self_iter
-                    .map(|self_ty| self_ty.try_has_relation_to(db, other.variable, relation))
-                    .collect::<Vec<_>>();
-
-                TypeRelationResult::all_pass(results)
+                for self_ty in self_iter {
+                    let res = self_ty.try_has_relation_to(db, other.variable, relation);
+                    if res.is_fail() {
+                        return res;
+                    }
+                }
+                TypeRelationResult::Pass
             }
         }
     }

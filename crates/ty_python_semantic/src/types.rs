@@ -1360,13 +1360,14 @@ impl<'db> Type<'db> {
                         bound.try_has_relation_to(db, target, relation)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        let results = constraints
-                            .elements(db)
-                            .iter()
-                            .map(|constraint| constraint.try_has_relation_to(db, target, relation))
-                            .collect::<Vec<_>>();
+                        for constraint in constraints.elements(db) {
+                            let res = constraint.try_has_relation_to(db, target, relation);
+                            if res.is_fail() {
+                                return res;
+                            }
+                        }
 
-                        TypeRelationResult::all_pass(results)
+                        TypeRelationResult::Pass
                     }
                 }
             }
@@ -7511,26 +7512,6 @@ impl TypeRelationResult {
 
     fn todo_fail() -> Self {
         Self::Fail(TypeRelationError::todo())
-    }
-
-    pub(crate) fn all_pass(
-        results: impl IntoIterator<Item = TypeRelationResult>,
-    ) -> TypeRelationResult {
-        if results.into_iter().all(|result| result.is_pass()) {
-            TypeRelationResult::Pass
-        } else {
-            TypeRelationResult::Fail(TypeRelationError::todo())
-        }
-    }
-
-    pub(crate) fn any_pass(
-        results: impl IntoIterator<Item = TypeRelationResult>,
-    ) -> TypeRelationResult {
-        if results.into_iter().any(|result| result.is_pass()) {
-            TypeRelationResult::Pass
-        } else {
-            TypeRelationResult::Fail(TypeRelationError::todo())
-        }
     }
 }
 
