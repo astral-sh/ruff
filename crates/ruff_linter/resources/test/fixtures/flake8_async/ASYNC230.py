@@ -66,7 +66,6 @@ async def func() -> None:
 async def func() -> None:
     p = Path("foo").read_bytes()  # ASYNC230
 
-
 async def func() -> None:
     p = Path("foo").write_text("content")  # ASYNC230
 
