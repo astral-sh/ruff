@@ -74,7 +74,12 @@ fn is_open_call_from_pathlib(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    if attr.as_str() != "open" {
+    if attr.as_str() != "open"
+        && attr.as_str() != "read_text"
+        && attr.as_str() != "read_bytes"
+        && attr.as_str() != "write_text"
+        && attr.as_str() != "write_bytes"
+    {
         return false;
     }
 

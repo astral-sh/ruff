@@ -22,6 +22,7 @@ async def foo():
 def foo_sync():
     open("")
 
+
 # Violation cases:
 
 
@@ -57,6 +58,22 @@ async def func() -> None:
     (p1, p2) = (Path("foo"), Path("bar"))
 
     p1.open()  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").read_text()  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").read_bytes()  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").write_text("content")  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").write_bytes(b"content")  # ASYNC230
 
 
 # Non-violation cases for pathlib:
