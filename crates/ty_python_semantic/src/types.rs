@@ -1698,9 +1698,7 @@ impl<'db> Type<'db> {
                                 relation,
                             ) {
                                 TypeRelationResult::Pass => TypeRelationResult::Pass,
-                                TypeRelationResult::Fail(e2) => {
-                                    TypeRelationResult::Fail(e1.add(e2))
-                                }
+                                TypeRelationResult::Fail(_) => TypeRelationResult::Fail(e1),
                             }
                         } else {
                             TypeRelationResult::Fail(e1)
@@ -7545,31 +7543,18 @@ impl TypeRelationError {
         let mut errors = Vec::new();
         for result in results {
             if let TypeRelationResult::Fail(fail) = result {
-                errors.extend(fail);
+                match fail {
+                    TypeRelationError::Single(kind) => errors.push(kind),
+                    TypeRelationError::Multiple(multiple_errors) => {
+                        errors.extend(multiple_errors);
+                    }
+                }
             }
         }
-        TypeRelationError::Multiple(errors)
-    }
-
-    pub(crate) fn add(self, other: TypeRelationError) -> Self {
-        match (self, other) {
-            (TypeRelationError::Single(kind), TypeRelationError::Single(fail_kind)) => {
-                TypeRelationError::Multiple(vec![kind, fail_kind])
-            }
-            (TypeRelationError::Single(kind), TypeRelationError::Multiple(mut fail_kinds))
-            | (TypeRelationError::Multiple(mut fail_kinds), TypeRelationError::Single(kind)) => {
-                let mut errors = Vec::with_capacity(1 + fail_kinds.len());
-                errors.push(kind);
-                errors.append(&mut fail_kinds);
-                TypeRelationError::Multiple(errors)
-            }
-            (
-                TypeRelationError::Multiple(mut errors),
-                TypeRelationError::Multiple(mut fail_kinds),
-            ) => {
-                errors.append(&mut fail_kinds);
-                TypeRelationError::Multiple(errors)
-            }
+        if errors.len() == 1 {
+            TypeRelationError::Single(errors.pop().unwrap())
+        } else {
+            TypeRelationError::Multiple(errors)
         }
     }
 }
