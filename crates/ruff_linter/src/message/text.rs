@@ -13,7 +13,6 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
@@ -281,7 +280,6 @@ fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange)
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
 
     // Updates the range given by the caller whenever a single byte (at
     // `index` in `source`) is replaced with `len` bytes.
@@ -310,19 +308,7 @@ fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange)
     };
 
     for (index, c) in source.char_indices() {
-        let old_width = line_width.get();
-        line_width = line_width.add_char(c);
-
-        if matches!(c, '\t') {
-            let tab_width = u32::try_from(line_width.get() - old_width)
-                .expect("small width because of tab size");
-            result.push_str(&source[last_end..index]);
-            for _ in 0..tab_width {
-                result.push(' ');
-            }
-            last_end = index + 1;
-            update_range(index, tab_width);
-        } else if let Some(printable) = unprintable_replacement(c) {
+        if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
             result.push(printable);
             last_end = index + 1;
