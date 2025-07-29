@@ -23,15 +23,6 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
         _client: &Client,
         params: WorkspaceSymbolParams,
     ) -> crate::server::Result<Option<WorkspaceSymbolResponse>> {
-        // Check if language services are disabled
-        if snapshot
-            .index()
-            .global_settings()
-            .is_language_services_disabled()
-        {
-            return Ok(None);
-        }
-
         let query = &params.query;
         let mut all_symbols = Vec::new();
 

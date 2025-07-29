@@ -32,7 +32,10 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         _client: &Client,
         params: DocumentSymbolParams,
     ) -> crate::server::Result<Option<lsp_types::DocumentSymbolResponse>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
