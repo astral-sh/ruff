@@ -2,6 +2,11 @@
 
 ## Indexing
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 t = (1, "a", "b")
 
@@ -18,6 +23,56 @@ reveal_type(a)  # revealed: Unknown
 
 b = t[-4]  # error: [index-out-of-bounds]
 reveal_type(b)  # revealed: Unknown
+```
+
+Precise types for index operations are also inferred for tuple subclasses:
+
+```py
+class HeterogeneousSubclass(tuple[int, str, int, bytes]): ...
+
+# revealed: Overload[(self, index: Literal[-1, 3], /) -> bytes, (self, index: Literal[-4, -2, 0, 2], /) -> int, (self, index: Literal[-3, 1], /) -> str, (self, index: SupportsIndex, /) -> int | str | bytes, (self, index: slice[Any, Any, Any], /) -> tuple[int | str | bytes, ...]]
+reveal_type(HeterogeneousSubclass.__getitem__)
+
+def f(h: HeterogeneousSubclass, i: int):
+    reveal_type(h[0])  # revealed: int
+    reveal_type(h[1])  # revealed: str
+    reveal_type(h[2])  # revealed: int
+    reveal_type(h[3])  # revealed: bytes
+    reveal_type(h[-1])  # revealed: bytes
+    reveal_type(h[-2])  # revealed: int
+    reveal_type(h[-3])  # revealed: str
+    reveal_type(h[-4])  # revealed: int
+    reveal_type(h[i])  # revealed: int | str | bytes
+
+class MixedSubclass(tuple[Exception, *tuple[str, ...], int, bytes, int, range]): ...
+
+# revealed: Overload[(self, index: Literal[-3], /) -> bytes, (self, index: Literal[-5], /) -> str | Exception, (self, index: Literal[4], /) -> str | int | bytes | range, (self, index: Literal[2, 3], /) -> str | int | bytes, (self, index: Literal[-1], /) -> range, (self, index: Literal[1], /) -> str | int, (self, index: Literal[-4, -2], /) -> int, (self, index: Literal[0], /) -> Exception, (self, index: SupportsIndex, /) -> Exception | str | int | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[Exception | str | int | bytes | range, ...]]
+reveal_type(MixedSubclass.__getitem__)
+
+def g(m: MixedSubclass, i: int):
+    reveal_type(m[0])  # revealed: Exception
+    reveal_type(m[1])  # revealed: str | int
+    reveal_type(m[2])  # revealed: str | int | bytes
+    reveal_type(m[3])  # revealed: str | int | bytes
+    reveal_type(m[4])  # revealed: str | int | bytes | range
+
+    reveal_type(m[-1])  # revealed: range
+    reveal_type(m[-2])  # revealed: int
+    reveal_type(m[-3])  # revealed: bytes
+    reveal_type(m[-4])  # revealed: int
+    reveal_type(m[-5])  # revealed: str | Exception
+
+    reveal_type(m[i])  # revealed: Exception | str | int | bytes | range
+
+    # Ideally we would not include `Exception` in the unions for these,
+    # but it's not possible to do this using only synthesized overloads.
+    reveal_type(m[5])  # revealed: Exception | str | int | bytes | range
+    reveal_type(m[10])  # revealed: Exception | str | int | bytes | range
+
+    # Similarly, ideally these would just be `str` | Exception`,
+    # but achieving that with only synthesized overloads wouldn't be possible
+    reveal_type(m[-6])  # revealed: Exception | str | int | bytes | range
+    reveal_type(m[-10])  # revealed: Exception | str | int | bytes | range
 ```
 
 ## Slices
