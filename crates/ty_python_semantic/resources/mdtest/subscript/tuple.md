@@ -97,6 +97,18 @@ def g(m: MixedSubclass2, i: int):
     reveal_type(m[-4])  # revealed: int | str | bytes | range
 ```
 
+The stdlib API `os.stat` is a commonly used API that returns an instance of a tuple subclass
+(`os.stat_result`), and therefore provides a good integration test for tuple subclasses.
+
+```py
+import os
+import stat
+
+reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
+# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
+reveal_type(os.stat_result.__getitem__)
+```
+
 ## Slices
 
 ```py
