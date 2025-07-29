@@ -83,7 +83,7 @@ impl ResolvedClientCapabilities {
         self.contains(Self::FILE_WATCHER_SUPPORT)
     }
 
-    /// Returns `true` if the client supports dyanmic registration for diagnostic capabilities.
+    /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }

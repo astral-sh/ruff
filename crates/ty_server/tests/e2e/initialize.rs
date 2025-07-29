@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::request::RegisterCapability;
+use lsp_types::{DiagnosticServerCapabilities, request::RegisterCapability};
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode};
 
@@ -67,7 +67,7 @@ fn workspace_diagnostic_registration_disable() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
 
     // The `Drop` implementation would assert that the no requests were sent by the server.
-    TestServerBuilder::new()?
+    let server = TestServerBuilder::new()?
         .with_workspace(
             workspace_root,
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
@@ -75,6 +75,23 @@ fn workspace_diagnostic_registration_disable() -> Result<()> {
         .enable_diagnostic_dynamic_registration(true)
         .build()?
         .wait_until_workspaces_are_initialized()?;
+
+    let diagnostic_capabilities = server
+        .initialization_result()
+        .unwrap()
+        .capabilities
+        .diagnostic_provider
+        .as_ref()
+        .unwrap();
+
+    let DiagnosticServerCapabilities::Options(options) = diagnostic_capabilities else {
+        panic!("Expected diagnostic capabilities to be options, got: {diagnostic_capabilities:#?}");
+    };
+
+    assert!(
+        !options.workspace_diagnostics,
+        "Expected workspace diagnostics to be disabled"
+    );
 
     Ok(())
 }
