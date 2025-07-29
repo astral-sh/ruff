@@ -96,7 +96,7 @@ a = Identity()
 a[0] = 0
 ```
 
-## Invalid index
+## `__setitem__` with invalid index argument
 
 ```py
 class Identity:
