@@ -32,6 +32,7 @@ pub(crate) use needless_else::*;
 pub(crate) use never_union::*;
 pub(crate) use non_octal_permissions::*;
 pub(crate) use none_not_at_end_of_union::*;
+pub(crate) use large_number_without_underscore_separators::*;
 pub(crate) use parenthesize_chained_operators::*;
 pub(crate) use post_init_default::*;
 pub(crate) use pytest_raises_ambiguous_pattern::*;
@@ -62,6 +63,7 @@ pub(crate) use zip_instead_of_pairwise::*;
 
 mod access_annotations_from_class_dict;
 mod ambiguous_unicode_character;
+mod large_number_without_underscore_separators;
 mod assert_with_print_message;
 mod assignment_in_assert;
 mod asyncio_dangling_task;
