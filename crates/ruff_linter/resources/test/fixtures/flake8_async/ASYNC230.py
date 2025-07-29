@@ -22,7 +22,6 @@ async def foo():
 def foo_sync():
     open("")
 
-
 # Violation cases:
 
 
