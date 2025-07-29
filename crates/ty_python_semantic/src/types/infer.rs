@@ -10810,7 +10810,7 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 
 /// Map based on a `Vec`. It doesn't enforce
 /// uniqueness on insertion. Instead, it relies on the caller
-/// that elements are uniuqe. For example, the way we visit definitions
+/// that elements are unique. For example, the way we visit definitions
 /// in the `TypeInference` builder make already implicitly guarantees that each definition
 /// is only visited once.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
