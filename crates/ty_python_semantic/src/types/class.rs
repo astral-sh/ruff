@@ -651,54 +651,23 @@ impl<'db> ClassType<'db> {
                                 }
                             }
 
-                            // E.g. for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
+                            // E.g. for `tuple[str, *tuple[float, ...], bytes, range]`, we will generate the following overloads:
                             //
                             //    __getitem__(self, index: Literal[0], /) -> str
-                            //    __getitem__(self, index: Literal[-1], /) -> bytes
+                            //    __getitem__(self, index: Literal[1], /) -> float | bytes
+                            //    __getitem__(self, index: Literal[2], /) -> float | bytes | range
+                            //    __getitem__(self, index: Literal[-1], /) -> range
+                            //    __getitem__(self, index: Literal[-2], /) -> bytes
+                            //    __getitem__(self, index: Literal[-3], /) -> float | str
                             //
                             TupleSpec::Variable(variable_length_tuple) => {
                                 for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
                                     if let Ok(index) = i64::try_from(index) {
                                         element_type_to_indices.entry(*ty).or_default().push(index);
                                     }
-                                }
 
-                                for index in 0..variable_length_tuple.suffix.len() {
-                                    if let Ok(i) =
-                                        i64::try_from(variable_length_tuple.prefix.len() + index)
-                                    {
-                                        let overload_return = UnionType::from_elements(
-                                            db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .suffix
-                                                    .iter()
-                                                    .take(index + 1)
-                                                    .copied(),
-                                            ),
-                                        );
-                                        element_type_to_indices
-                                            .entry(overload_return)
-                                            .or_default()
-                                            .push(i);
-                                    }
-                                }
-
-                                for (index, ty) in
-                                    variable_length_tuple.suffix.iter().rev().enumerate()
-                                {
-                                    if let Some(index) =
-                                        index.checked_add(1).and_then(|i| i64::try_from(i).ok())
-                                    {
-                                        element_type_to_indices
-                                            .entry(*ty)
-                                            .or_default()
-                                            .push(0 - index);
-                                    }
-                                }
-
-                                for index in 0..variable_length_tuple.prefix.len() {
                                     let one_based_index = index + 1;
+
                                     if let Ok(i) = i64::try_from(
                                         variable_length_tuple.suffix.len() + one_based_index,
                                     ) {
@@ -717,6 +686,38 @@ impl<'db> ClassType<'db> {
                                             .entry(overload_return)
                                             .or_default()
                                             .push(0 - i);
+                                    }
+                                }
+
+                                for (index, ty) in
+                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                {
+                                    if let Some(index) =
+                                        index.checked_add(1).and_then(|i| i64::try_from(i).ok())
+                                    {
+                                        element_type_to_indices
+                                            .entry(*ty)
+                                            .or_default()
+                                            .push(0 - index);
+                                    }
+
+                                    if let Ok(i) =
+                                        i64::try_from(variable_length_tuple.prefix.len() + index)
+                                    {
+                                        let overload_return = UnionType::from_elements(
+                                            db,
+                                            std::iter::once(variable_length_tuple.variable).chain(
+                                                variable_length_tuple
+                                                    .suffix
+                                                    .iter()
+                                                    .take(index + 1)
+                                                    .copied(),
+                                            ),
+                                        );
+                                        element_type_to_indices
+                                            .entry(overload_return)
+                                            .or_default()
+                                            .push(i);
                                     }
                                 }
                             }

@@ -46,7 +46,7 @@ def f(h: HeterogeneousSubclass, i: int):
 
 class MixedSubclass(tuple[Exception, *tuple[str, ...], int, bytes, int, range]): ...
 
-# revealed: Overload[(self, index: Literal[-3], /) -> bytes, (self, index: Literal[-5], /) -> str | Exception, (self, index: Literal[4], /) -> str | int | bytes | range, (self, index: Literal[2, 3], /) -> str | int | bytes, (self, index: Literal[-1], /) -> range, (self, index: Literal[1], /) -> str | int, (self, index: Literal[-4, -2], /) -> int, (self, index: Literal[0], /) -> Exception, (self, index: SupportsIndex, /) -> Exception | str | int | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[Exception | str | int | bytes | range, ...]]
+# revealed: Overload[(self, index: Literal[-3], /) -> bytes, (self, index: Literal[4], /) -> str | int | bytes | range, (self, index: Literal[2, 3], /) -> str | int | bytes, (self, index: Literal[-1], /) -> range, (self, index: Literal[1], /) -> str | int, (self, index: Literal[-5], /) -> str | Exception, (self, index: Literal[-4, -2], /) -> int, (self, index: Literal[0], /) -> Exception, (self, index: SupportsIndex, /) -> Exception | str | int | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[Exception | str | int | bytes | range, ...]]
 reveal_type(MixedSubclass.__getitem__)
 
 def g(m: MixedSubclass, i: int):
