@@ -55,7 +55,7 @@ a = Identity()
 a["a"]
 ```
 
-## Setitem with no getitem
+## `__setitem__` with no `__getitem__`
 
 ```py
 class NoGetitem:
