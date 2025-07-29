@@ -3326,3 +3326,36 @@ impl Drop for DiagnosticGuard<'_, '_> {
         }
     }
 }
+
+pub(crate) trait DiagnosticReporter<'a> {
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic if the corresponding rule is
+    /// enabled.
+    ///
+    /// The guard derefs to a [`Diagnostic`], so it can be used to further modify the diagnostic
+    /// before it is added to the collection in the context on `Drop`.
+    fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>>;
+}
+
+impl<'a> DiagnosticReporter<'a> for Checker<'a> {
+    fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.report_diagnostic_if_enabled(kind, range)
+    }
+}
+
+impl<'a> DiagnosticReporter<'a> for LintContext<'a> {
+    fn report_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.report_diagnostic_if_enabled(kind, range)
+    }
+}
