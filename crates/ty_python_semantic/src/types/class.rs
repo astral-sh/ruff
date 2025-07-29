@@ -1672,7 +1672,6 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                // For the `__replace__` signature, force to kw only
                 let mut parameter = if kw_only_field_seen || name == "__replace__" {
                     Parameter::keyword_only(field_name)
                 } else {
