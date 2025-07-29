@@ -75,7 +75,7 @@ a = NoSetitem()
 a[0] = 0  # error: "Cannot assign to object of type `NoSetitem` with no `__setitem__` method"
 ```
 
-## Setitem not callable
+## `__setitem__` not callable
 
 ```py
 class NoSetitem:
