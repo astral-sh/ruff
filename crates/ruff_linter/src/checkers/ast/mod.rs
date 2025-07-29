@@ -3216,6 +3216,11 @@ impl<'a> LintContext<'a> {
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &Diagnostic> {
         self.diagnostics.get_mut().iter()
     }
+
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &LinterSettings {
+        self.settings
+    }
 }
 
 /// An abstraction for mutating a diagnostic.

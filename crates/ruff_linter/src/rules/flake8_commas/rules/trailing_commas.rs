@@ -251,7 +251,6 @@ pub(crate) fn trailing_commas(
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     let mut fstrings = 0u32;
     let simple_tokens = tokens.iter().filter_map(|token| {
@@ -299,7 +298,7 @@ pub(crate) fn trailing_commas(
         }
 
         // Update the comma context stack.
-        let context = update_context(token, prev, prev_prev, &mut stack, settings);
+        let context = update_context(token, prev, prev_prev, &mut stack, lint_context.settings());
 
         check_token(token, prev, prev_prev, context, locator, lint_context);
 

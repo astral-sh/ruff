@@ -178,11 +178,10 @@ pub(crate) fn ambiguous_unicode_character_comment(
     context: &LintContext,
     locator: &Locator,
     range: TextRange,
-    settings: &LinterSettings,
 ) {
     let text = locator.slice(range);
-    for candidate in ambiguous_unicode_character(text, range, settings) {
-        candidate.into_diagnostic(Context::Comment, settings, context);
+    for candidate in ambiguous_unicode_character(text, range, context.settings()) {
+        candidate.into_diagnostic(Context::Comment, context);
     }
 }
 
@@ -342,13 +341,12 @@ impl Candidate {
         }
     }
 
-    fn into_diagnostic(
-        self,
-        context: Context,
-        settings: &LinterSettings,
-        lint_context: &LintContext,
-    ) {
-        if !settings.allowed_confusables.contains(&self.confusable) {
+    fn into_diagnostic(self, context: Context, lint_context: &LintContext) {
+        if !lint_context
+            .settings()
+            .allowed_confusables
+            .contains(&self.confusable)
+        {
             let char_range = TextRange::at(self.offset, self.confusable.text_len());
             match context {
                 Context::String => lint_context.report_diagnostic_if_enabled(

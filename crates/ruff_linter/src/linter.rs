@@ -188,7 +188,6 @@ pub fn check_path(
             locator,
             indexer,
             stylist,
-            settings,
             source_type,
             source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
             &mut context,
