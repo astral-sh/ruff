@@ -139,25 +139,26 @@ static FORMAT_SPECIFIER: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-/// Replace the single brace with a formatted brace.
-fn replace_single_brace(text: &str) -> String {
-    FORMAT_SPECIFIER
-        .replace_all(text, "$prefix{$fmt}")
-        .to_string()
-}
-
 /// Remove the explicit positional indices from a format string.
 fn remove_specifiers<'a>(value: &mut Expression<'a>, arena: &'a typed_arena::Arena<String>) {
     match value {
         Expression::SimpleString(expr) => {
-            expr.value = arena.alloc(replace_single_brace(expr.value));
+            expr.value = arena.alloc({
+                FORMAT_SPECIFIER
+                    .replace_all(expr.value, "$prefix{$fmt}")
+                    .to_string()
+            });
         }
         Expression::ConcatenatedString(expr) => {
             let mut stack = vec![&mut expr.left, &mut expr.right];
             while let Some(string) = stack.pop() {
                 match string.as_mut() {
                     libcst_native::String::Simple(string) => {
-                        string.value = arena.alloc(replace_single_brace(string.value));
+                        string.value = arena.alloc({
+                            FORMAT_SPECIFIER
+                                .replace_all(string.value, "$prefix{$fmt}")
+                                .to_string()
+                        });
                     }
                     libcst_native::String::Concatenated(string) => {
                         stack.push(&mut string.left);
