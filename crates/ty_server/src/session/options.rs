@@ -18,6 +18,7 @@ use super::settings::{GlobalSettings, WorkspaceSettings};
 /// changes to these options require a server restart to take effect.
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub(crate) struct InitializationOptions {
     /// The log level for the language server.
     pub(crate) log_level: Option<LogLevel>,
@@ -31,16 +32,15 @@ pub(crate) struct InitializationOptions {
 impl InitializationOptions {
     /// Create the initialization options from the given JSON value that corresponds to the
     /// initialization options sent by the client.
-    pub(crate) fn from_value(options: Option<Value>) -> InitializationOptions {
+    pub(crate) fn from_value(
+        options: Option<Value>,
+    ) -> (InitializationOptions, Option<serde_json::Error>) {
         let options =
             options.unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default()));
-        serde_json::from_value(options).unwrap_or_else(|err| {
-            tracing::error!(
-                "Failed to deserialize initialization options: {err}. \
-                    Falling back to default initialization options."
-            );
-            InitializationOptions::default()
-        })
+        match serde_json::from_value(options) {
+            Ok(options) => (options, None),
+            Err(err) => (InitializationOptions::default(), Some(err)),
+        }
     }
 }
 

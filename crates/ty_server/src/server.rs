@@ -53,13 +53,30 @@ impl Server {
             ..
         } = serde_json::from_value(init_value)?;
 
-        let initialization_options = InitializationOptions::from_value(initialization_options);
+        let (initialization_options, deserialization_error) =
+            InitializationOptions::from_value(initialization_options);
+
+        if initialize_logging {
+            crate::logging::init_logging(
+                initialization_options.log_level.unwrap_or_default(),
+                initialization_options.log_file.as_deref(),
+            );
+        }
+
+        if let Some(error) = deserialization_error {
+            tracing::error!(
+                "Failed to deserialize initialization options: {error}. \
+                Using default initialization options."
+            );
+        }
+
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities =
             Self::server_capabilities(position_encoding, resolved_client_capabilities);
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
+        tracing::debug!("Version: {version}");
 
         connection.initialize_finish(
             id,
@@ -76,15 +93,6 @@ impl Server {
         // some responses before blocking.
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
-
-        if initialize_logging {
-            crate::logging::init_logging(
-                initialization_options.log_level.unwrap_or_default(),
-                initialization_options.log_file.as_deref(),
-            );
-        }
-
-        tracing::debug!("Version: {version}");
 
         // Get workspace URLs without settings - settings will come from workspace/configuration
         let workspace_urls = workspace_folders
@@ -176,17 +184,21 @@ impl Server {
         position_encoding: PositionEncoding,
         resolved_client_capabilities: ResolvedClientCapabilities,
     ) -> ServerCapabilities {
+        let diagnostic_provider =
+            if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
+                // If the client supports dynamic registration, we will register the diagnostic
+                // capabilities dynamically based on the `ty.diagnosticMode` setting.
+                None
+            } else {
+                // Otherwise, we always advertise support for workspace diagnostics.
+                Some(DiagnosticServerCapabilities::Options(
+                    server_diagnostic_options(true),
+                ))
+            };
+
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
-            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
-                // If the client doesn't support dynamic registration for diagnostic capabilities,
-                // we'll advertise that the server always support workspace diagnostics. Otherwise,
-                // the server will dynamically register / unregister workspace diagnostics as per
-                // the `ty.diagnosticMode` setting.
-                server_diagnostic_options(
-                    !resolved_client_capabilities.supports_diagnostic_dynamic_registration(),
-                ),
-            )),
+            diagnostic_provider,
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
                     open_close: Some(true),

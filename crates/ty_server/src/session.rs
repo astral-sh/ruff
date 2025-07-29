@@ -9,10 +9,12 @@ use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::Message;
 use lsp_types::notification::{Exit, Notification};
-use lsp_types::request::{DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown};
+use lsp_types::request::{
+    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
+};
 use lsp_types::{
     DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
-    TextDocumentContentChangeEvent, Url,
+    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
 use ruff_db::Db;
 use ruff_db::files::File;
@@ -88,6 +90,9 @@ pub(crate) struct Session {
     /// Has the client requested the server to shutdown.
     shutdown_requested: bool,
 
+    /// Whether the server has dynamically registered the diagnostic capability with the client.
+    diagnostic_capability_registered: bool,
+
     deferred_messages: VecDeque<Message>,
 }
 
@@ -138,6 +143,7 @@ impl Session {
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
+            diagnostic_capability_registered: false,
         })
     }
 
@@ -442,8 +448,8 @@ impl Session {
                     project.db.set_check_mode(CheckMode::AllFiles);
                 }
             }
-            self.register_workspace_diagnostics(client);
         }
+        self.register_diagnostic_capability(client, global_settings.diagnostic_mode());
         self.global_settings = Arc::new(global_settings);
 
         assert!(
@@ -460,11 +466,13 @@ impl Session {
         }
     }
 
-    /// Sends a registration notification to the client to enable workspace diagnostics.
-    fn register_workspace_diagnostics(&mut self, client: &Client) {
-        // TODO: Use this ID to unregister if the value of `ty.diagnosticMode` changes. This would
-        // be handled when the server supports `workspace/didChangeConfiguration` notification.
-        static WORKSPACE_DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+    /// Sends a registration notification to the client to enable / disable workspace diagnostics
+    /// as per the `diagnostic_mode`.
+    ///
+    /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
+    /// capabilities.
+    fn register_diagnostic_capability(&mut self, client: &Client, diagnostic_mode: DiagnosticMode) {
+        static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
 
         if !self
             .resolved_client_capabilities
@@ -473,13 +481,30 @@ impl Session {
             return;
         }
 
+        if self.diagnostic_capability_registered {
+            client.send_request::<UnregisterCapability>(
+                self,
+                UnregistrationParams {
+                    unregisterations: vec![Unregistration {
+                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                        method: DocumentDiagnosticRequest::METHOD.into(),
+                    }],
+                },
+                |_: &Client, ()| {
+                    tracing::info!("Unregistered diagnostic capability");
+                },
+            );
+        }
+
         let registration = Registration {
-            id: WORKSPACE_DIAGNOSTIC_REGISTRATION_ID.into(),
+            id: DIAGNOSTIC_REGISTRATION_ID.into(),
             method: DocumentDiagnosticRequest::METHOD.into(),
             register_options: Some(
                 serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
                     DiagnosticRegistrationOptions {
-                        diagnostic_options: server_diagnostic_options(true),
+                        diagnostic_options: server_diagnostic_options(
+                            diagnostic_mode.is_workspace(),
+                        ),
                         ..Default::default()
                     },
                 ))
@@ -492,10 +517,14 @@ impl Session {
             RegistrationParams {
                 registrations: vec![registration],
             },
-            |_: &Client, ()| {
-                tracing::debug!("Registered workspace diagnostics");
+            move |_: &Client, ()| {
+                tracing::info!(
+                    "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
+                );
             },
         );
+
+        self.diagnostic_capability_registered = true;
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
