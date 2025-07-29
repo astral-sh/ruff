@@ -7,14 +7,15 @@ use ruff_python_ast::name::Name;
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
 use crate::{
-    Db, FxOrderSet,
+    Db,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::use_def_map,
     types::{
         CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
+        visitor::{TypeVisitor, TypeVisitorResult},
     },
 };
 
@@ -77,14 +78,15 @@ pub(super) struct ProtocolInterface<'db> {
 
 impl get_size2::GetSize for ProtocolInterface<'_> {}
 
-pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_protocol_interface<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     interface: ProtocolInterface<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for member in interface.members(db) {
-        walk_protocol_member(db, &member, visitor);
+        walk_protocol_member(db, &member, visitor)?;
     }
+    Ok(())
 }
 
 impl<'db> ProtocolInterface<'db> {
@@ -205,16 +207,6 @@ impl<'db> ProtocolInterface<'db> {
                 .collect::<BTreeMap<_, _>>(),
         )
     }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for data in self.inner(db).values() {
-            data.find_legacy_typevars(db, typevars);
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -240,14 +232,6 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self.kind.apply_type_mapping(db, type_mapping),
             qualifiers: self.qualifiers,
         }
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.kind.find_legacy_typevars(db, typevars);
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -294,18 +278,6 @@ impl<'db> ProtocolMemberKind<'db> {
         }
     }
 
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self {
-            ProtocolMemberKind::Method(callable) => callable.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Property(property) => property.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Other(ty) => ty.find_legacy_typevars(db, typevars),
-        }
-    }
-
     fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
@@ -329,18 +301,19 @@ pub(super) struct ProtocolMember<'a, 'db> {
     qualifiers: TypeQualifiers,
 }
 
-fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_protocol_member<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     match member.kind {
-        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
+        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method)?,
         ProtocolMemberKind::Property(property) => {
-            visitor.visit_property_instance_type(db, property);
+            visitor.visit_property_instance_type(db, property)?;
         }
-        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
+        ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty)?,
     }
+    Ok(())
 }
 
 impl<'a, 'db> ProtocolMember<'a, 'db> {

@@ -12,6 +12,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::visitor::{TypeVisitor, TypeVisitorControlFlow, TypeVisitorResult, visit_type};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
@@ -59,6 +60,23 @@ fn bound_legacy_typevars<'db>(
         .filter(|typevar| typevar.is_legacy(db))
 }
 
+struct FindLegacyTypeVars<'a, 'db>(&'a mut FxOrderSet<TypeVarInstance<'db>>);
+
+impl<'db> TypeVisitor<'db> for FindLegacyTypeVars<'_, 'db> {
+    fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) -> TypeVisitorResult {
+        match ty {
+            Type::TypeVar(typevar) => {
+                if typevar.is_legacy(db) {
+                    self.0.insert(typevar);
+                }
+                Err(TypeVisitorControlFlow::Prune)
+            }
+            Type::KnownInstance(_) => Err(TypeVisitorControlFlow::Prune),
+            _ => Ok(()),
+        }
+    }
+}
+
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
 /// TODO: Handle nested generic contexts better, with actual parent links to the lexically
@@ -74,14 +92,15 @@ pub struct GenericContext<'db> {
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
-pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     context: GenericContext<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for typevar in context.variables(db) {
-        visitor.visit_type_var_type(db, *typevar);
+        visitor.visit_type_var_type(db, *typevar)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -134,14 +153,14 @@ impl<'db> GenericContext<'db> {
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                visit_type(db, ty, FindLegacyTypeVars(&mut variables));
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                visit_type(db, ty, FindLegacyTypeVars(&mut variables));
             }
         }
         if let Some(ty) = return_type {
-            ty.find_legacy_typevars(db, &mut variables);
+            visit_type(db, ty, FindLegacyTypeVars(&mut variables));
         }
 
         // Then remove any that were bound in enclosing scopes.
@@ -167,7 +186,7 @@ impl<'db> GenericContext<'db> {
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, &mut variables);
+            visit_type(db, base, FindLegacyTypeVars(&mut variables));
         }
         if variables.is_empty() {
             return None;
@@ -359,18 +378,19 @@ pub struct Specialization<'db> {
     tuple_inner: Option<TupleType<'db>>,
 }
 
-pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
     visitor: &mut V,
-) {
-    walk_generic_context(db, specialization.generic_context(db), visitor);
+) -> TypeVisitorResult {
+    walk_generic_context(db, specialization.generic_context(db), visitor)?;
     for ty in specialization.types(db) {
-        visitor.visit_type(db, *ty);
+        visitor.visit_type(db, *ty)?;
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        visitor.visit_tuple_type(db, tuple)?;
     }
+    Ok(())
 }
 
 impl<'db> Specialization<'db> {
@@ -594,16 +614,6 @@ impl<'db> Specialization<'db> {
 
         true
     }
-
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for ty in self.types(db) {
-            ty.find_legacy_typevars(db, typevars);
-        }
-    }
 }
 
 /// A mapping between type variables and types.
@@ -616,15 +626,16 @@ pub struct PartialSpecialization<'a, 'db> {
     types: Cow<'a, [Type<'db>]>,
 }
 
-pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_partial_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: &PartialSpecialization<'_, 'db>,
     visitor: &mut V,
-) {
-    walk_generic_context(db, specialization.generic_context, visitor);
+) -> TypeVisitorResult {
+    walk_generic_context(db, specialization.generic_context, visitor)?;
     for ty in &*specialization.types {
-        visitor.visit_type(db, *ty);
+        visitor.visit_type(db, *ty)?;
     }
+    Ok(())
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {

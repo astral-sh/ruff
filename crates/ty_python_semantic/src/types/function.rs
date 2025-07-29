@@ -74,13 +74,13 @@ use crate::types::diagnostic::{
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult, any_over_type};
 use crate::types::{
     BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, walk_type_mapping,
+    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, UnionBuilder,
+    walk_type_mapping,
 };
-use crate::{Db, FxOrderSet, ModuleName, resolve_module};
+use crate::{Db, ModuleName, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -429,14 +429,15 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
-fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_function_literal<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionLiteral<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     if let Some(context) = function.inherited_generic_context(db) {
-        walk_generic_context(db, context, visitor);
+        walk_generic_context(db, context, visitor)?;
     }
+    Ok(())
 }
 
 #[salsa::tracked]
@@ -596,15 +597,16 @@ pub struct FunctionType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FunctionType<'_> {}
 
-pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_function_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
     visitor: &mut V,
-) {
-    walk_function_literal(db, function.literal(db), visitor);
+) -> TypeVisitorResult {
+    walk_function_literal(db, function.literal(db), visitor)?;
     for mapping in function.type_mappings(db) {
-        walk_type_mapping(db, mapping, visitor);
+        walk_type_mapping(db, mapping, visitor)?;
     }
+    Ok(())
 }
 
 #[salsa::tracked]
@@ -852,17 +854,6 @@ impl<'db> FunctionType<'db> {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
         self_signature.is_equivalent_to(db, other_signature)
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        let signatures = self.signature(db);
-        for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, typevars);
-        }
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {

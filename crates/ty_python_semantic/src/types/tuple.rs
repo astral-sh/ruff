@@ -22,14 +22,15 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::Db;
 use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
-    UnionBuilder, UnionType, cyclic::PairVisitor,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance, UnionBuilder, UnionType,
+    cyclic::PairVisitor,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::{Db, FxOrderSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -104,14 +105,15 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
-pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_tuple_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     for element in tuple.tuple(db).all_elements() {
-        visitor.visit_type(db, *element);
+        visitor.visit_type(db, *element)?;
     }
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -219,14 +221,6 @@ impl<'db> TupleType<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Option<Self> {
         TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.tuple(db).find_legacy_typevars(db, typevars);
     }
 
     pub(crate) fn has_relation_to(
@@ -382,16 +376,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 .iter()
                 .map(|ty| ty.apply_type_mapping(db, type_mapping)),
         )
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for ty in &self.0 {
-            ty.find_legacy_typevars(db, typevars);
-        }
     }
 
     fn has_relation_to(
@@ -720,20 +704,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 .iter()
                 .map(|ty| ty.apply_type_mapping(db, type_mapping)),
         )
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for ty in &self.prefix {
-            ty.find_legacy_typevars(db, typevars);
-        }
-        self.variable.find_legacy_typevars(db, typevars);
-        for ty in &self.suffix {
-            ty.find_legacy_typevars(db, typevars);
-        }
     }
 
     fn has_relation_to(
@@ -1066,17 +1036,6 @@ impl<'db> Tuple<Type<'db>> {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.apply_type_mapping(db, type_mapping)),
             Tuple::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),
-        }
-    }
-
-    fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self {
-            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, typevars),
-            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, typevars),
         }
     }
 

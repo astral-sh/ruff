@@ -1,11 +1,12 @@
 use ruff_python_ast::name::Name;
 
+use crate::Db;
 use crate::place::PlaceAndQualifiers;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarInstance,
 };
-use crate::{Db, FxOrderSet};
 
 use super::{TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance};
 
@@ -16,12 +17,13 @@ pub struct SubclassOfType<'db> {
     subclass_of: SubclassOfInner<'db>,
 }
 
-pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_subclass_of_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     subclass_of: SubclassOfType<'db>,
     visitor: &mut V,
-) {
-    visitor.visit_type(db, Type::from(subclass_of.subclass_of));
+) -> TypeVisitorResult {
+    visitor.visit_type(db, Type::from(subclass_of.subclass_of))?;
+    Ok(())
 }
 
 impl<'db> SubclassOfType<'db> {
@@ -117,19 +119,6 @@ impl<'db> SubclassOfType<'db> {
                 subclass_of: SubclassOfInner::Class(class.apply_type_mapping(db, type_mapping)),
             },
             SubclassOfInner::Dynamic(_) => self,
-        }
-    }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self.subclass_of {
-            SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars(db, typevars);
-            }
-            SubclassOfInner::Dynamic(_) => {}
         }
     }
 

@@ -16,10 +16,11 @@ use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
+use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
-use crate::{Db, FxOrderSet};
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
+use crate::types::{TypeMapping, TypeRelation, todo_type};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
@@ -83,16 +84,6 @@ impl<'db> CallableSignature<'db> {
                 .iter()
                 .map(|signature| signature.apply_type_mapping(db, type_mapping)),
         )
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for signature in &self.overloads {
-            signature.find_legacy_typevars(db, typevars);
-        }
     }
 
     pub(crate) fn bind_self(&self) -> Self {
@@ -241,27 +232,28 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Option<Type<'db>>,
 }
 
-pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_signature<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
     visitor: &mut V,
-) {
+) -> TypeVisitorResult {
     if let Some(generic_context) = &signature.generic_context {
-        walk_generic_context(db, *generic_context, visitor);
+        walk_generic_context(db, *generic_context, visitor)?;
     }
     if let Some(inherited_generic_context) = &signature.inherited_generic_context {
-        walk_generic_context(db, *inherited_generic_context, visitor);
+        walk_generic_context(db, *inherited_generic_context, visitor)?;
     }
     // By default we usually don't visit the type of the default value,
     // as it isn't relevant to most things
     for parameter in &signature.parameters {
         if let Some(ty) = parameter.annotated_type() {
-            visitor.visit_type(db, ty);
+            visitor.visit_type(db, ty)?;
         }
     }
     if let Some(return_ty) = &signature.return_ty {
-        visitor.visit_type(db, *return_ty);
+        visitor.visit_type(db, *return_ty)?;
     }
+    Ok(())
 }
 
 impl<'db> Signature<'db> {
@@ -410,24 +402,6 @@ impl<'db> Signature<'db> {
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-        }
-    }
-
-    pub(crate) fn find_legacy_typevars(
-        &self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        for param in &self.parameters {
-            if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, typevars);
-            }
-            if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, typevars);
-            }
-        }
-        if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, typevars);
         }
     }
 

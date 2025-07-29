@@ -20,6 +20,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleType;
+use crate::types::visitor::{TypeVisitor, TypeVisitorResult};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
@@ -27,7 +28,7 @@ use crate::types::{
     infer_definition_types,
 };
 use crate::{
-    Db, FxOrderSet, KnownModule, Program,
+    Db, KnownModule, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,
@@ -180,12 +181,13 @@ pub struct GenericAlias<'db> {
     pub(crate) specialization: Specialization<'db>,
 }
 
-pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_generic_alias<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     alias: GenericAlias<'db>,
     visitor: &mut V,
-) {
-    walk_specialization(db, alias.specialization(db), visitor);
+) -> TypeVisitorResult {
+    walk_specialization(db, alias.specialization(db), visitor)?;
+    Ok(())
 }
 
 // The Salsa heap is tracked separately.
@@ -226,16 +228,6 @@ impl<'db> GenericAlias<'db> {
             self.origin(db),
             self.specialization(db).apply_type_mapping(db, type_mapping),
         )
-    }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        // A tuple's specialization will include all of its element types, so we don't need to also
-        // look in `self.tuple`.
-        self.specialization(db).find_legacy_typevars(db, typevars);
     }
 }
 
@@ -362,17 +354,6 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
-        }
-    }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        match self {
-            Self::NonGeneric(_) => {}
-            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
         }
     }
 
