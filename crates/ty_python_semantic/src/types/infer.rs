@@ -336,23 +336,27 @@ fn single_expression_cycle_initial<'db>(
 ///    the problem that I cannot have two salsa::tracked functions calling each other and both
 ///    returning &ExpressionInference. It did not help with the cycle because before we get the
 ///    type we need to abort if it's not definitely_bound.
-/// 3. infer_expression_if_bound: returns Type::Never if the expression is not definitely_bound.
+/// 3. infer_expression_if_definitely_bound: returns Type::Unknown if the expression is not definitely_bound.
 ///    it worked but it did not reduce the number of cycles as much as other way.
 ///    This works for the analyze_cycles_gridout test case but causes panic for others
 #[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn infer_expression_if_bound<'db>(
+pub(crate) fn infer_expression_if_definitely_bound<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Type<'db> {
     let file = expression.file(db);
     let module = parsed_module(db, file).load(db);
+    eprintln!("inferring types");
     let inference = infer_expression_types(db, expression);
+    eprintln!("type inferred");
+    let node = expression.node_ref(db, &module);
+    let b = inference.definitely_bound();
+    eprintln!("{node:?} is definitely bound: {b}");
 
-    if inference.definitely_bound() {
-        let node = expression.node_ref(db, &module);
+    if b {
         inference.expression_type(node)
     } else {
-        Type::Never
+        Type::unknown()
     }
 }
 
@@ -680,7 +684,7 @@ impl<'db> ExpressionInference<'db> {
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_fallback: true,
-                all_definitely_bound: true,
+                all_definitely_bound: false,
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -6396,6 +6400,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// NOTE: first way, if any of places are not definitely bound then set the value
     /// Calls infer_place_load and records if the expression is definitely bound.
     fn record_place_load(
         &mut self,
@@ -8927,6 +8932,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
 
+        let all_definitely_bound = match self.region {
+            InferenceRegion::Expression(expression) => {
+                let mut visitor = BoundSymbolsVisitor {
+                    builder: &self,
+                    all_definitely_bound: false,
+                };
+                let node = expression.node_ref(self.db(), self.module());
+                visitor.visit_expr(node);
+                let b = visitor.all_definitely_bound;
+                eprintln!("{node:?}\n is bound: {b}");
+                b
+            }
+            _ => false,
+        };
+
         let Self {
             context,
             mut expressions,
@@ -8935,7 +8955,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
-            all_definitely_bound,
+
+            // ignored
+            all_definitely_bound: _,
 
             // builder only state
             deferred_state: _,
@@ -10760,6 +10782,52 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 }
 
+/// NOTE: Another way, what if we visit all the exprs and check if it's bound.
+/// Visitor to check if all symbols within an expression are definitely bound.
+struct BoundSymbolsVisitor<'a, 'db, 'ast> {
+    builder: &'a TypeInferenceBuilder<'db, 'ast>,
+    all_definitely_bound: bool,
+}
+
+impl<'a, 'db, 'ast> Visitor<'ast> for BoundSymbolsVisitor<'a, 'db, 'ast> {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        // Short-circuit the traversal if we've already found an unbound symbol.
+        if !self.all_definitely_bound {
+            return;
+        }
+
+        match expr {
+            ast::Expr::Attribute(attr) if attr.ctx == ast::ExprContext::Load => {}
+            ast::Expr::Name(name) if name.ctx == ast::ExprContext::Load => {}
+            _ => return walk_expr(self, expr),
+        };
+
+        let place_expr = match PlaceExpr::try_from_expr(expr) {
+            Some(place_expr) => place_expr,
+            None => {
+                debug_assert!(
+                    false,
+                    "ast::Expr::Name, ast::Expr::Attribute should be a valid PlaceExpr"
+                );
+                return walk_expr(self, expr);
+            }
+        };
+
+        let place = self
+            .builder
+            .infer_place_load(PlaceExprRef::from(&place_expr), ast::ExprRef::from(expr))
+            .0
+            .place;
+
+        if !matches!(place, Place::Type(_, Boundness::Bound)) {
+            self.all_definitely_bound = false;
+            return;
+        }
+
+        walk_expr(self, expr);
+    }
+}
+
 /// The deferred state of a specific expression in an inference region.
 #[derive(Default, Debug, Clone, Copy)]
 enum DeferredExpressionState {
@@ -11226,6 +11294,46 @@ mod tests {
                 .collect::<Vec<_>>()
         });
         assert_eq!(cycles.len(), 2414);
+    }
+
+    #[test]
+    fn cyclic_dependant_attributes() {
+        let mut db = setup_db();
+        let filename = "src/cyclic.py";
+        db.write_dedented(
+            filename,
+            r#"
+            from typing import Literal
+
+            class Toggle:
+                def __init__(self: "Toggle"):
+                    if self.x:
+                        self.x: Literal[False] = False
+            "#,
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, filename, &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle {
+                        database_key,
+                        iteration_count,
+                        fell_back: _,
+                    } = event.kind
+                    {
+                        Some(format!("{database_key:?}, {iteration_count:?}"))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(cycles.len(), 0);
     }
 
     #[test]
