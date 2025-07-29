@@ -249,6 +249,11 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         .iter()
         .find(|binding| for_stmt.target.range() == binding.range)
         .unwrap();
+    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+    // then it is intended to be used elsewhere outside the for loop.
+    if target_binding.is_global() || target_binding.is_nonlocal() {
+        return;
+    }
     // If any references to the loop target variable are after the loop,
     // then converting it into a comprehension would cause a NameError
     if target_binding

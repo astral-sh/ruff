@@ -433,17 +433,31 @@ the typevars of the enclosing generic class, and introduce new (distinct) typeva
 scope for the method.
 
 ```py
+from ty_extensions import generic_context
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
 
 class C(Generic[T]):
-    def method(self, u: U) -> U:
+    def method(self, u: int) -> int:
         return u
 
+    def generic_method(self, t: T, u: U) -> U:
+        return u
+
+reveal_type(generic_context(C))  # revealed: tuple[T]
+reveal_type(generic_context(C.method))  # revealed: None
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(C[int]))  # revealed: None
+reveal_type(generic_context(C[int].method))  # revealed: None
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U]
+
 c: C[int] = C[int]()
-reveal_type(c.method("string"))  # revealed: Literal["string"]
+reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
+reveal_type(generic_context(c))  # revealed: None
+reveal_type(generic_context(c.method))  # revealed: None
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[U]
 ```
 
 ## Specializations propagate

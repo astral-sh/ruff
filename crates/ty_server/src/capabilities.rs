@@ -16,8 +16,9 @@ bitflags::bitflags! {
         const MULTILINE_SEMANTIC_TOKENS = 1 << 7;
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
-        const FILE_WATCHER_SUPPORT = 1 << 10;
-        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 11;
+        const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
+        const FILE_WATCHER_SUPPORT = 1 << 11;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 12;
     }
 }
 
@@ -72,6 +73,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
     }
 
+    /// Returns `true` if the client supports hierarchical document symbols.
+    pub(crate) const fn supports_hierarchical_document_symbols(self) -> bool {
+        self.contains(Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
+    }
+
     /// Returns `true` if the client supports file watcher capabilities.
     pub(crate) const fn supports_file_watcher(self) -> bool {
         self.contains(Self::FILE_WATCHER_SUPPORT)
@@ -82,7 +88,7 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }
 
-    pub(crate) fn new(client_capabilities: &ClientCapabilities) -> Self {
+    pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
         let workspace = client_capabilities.workspace.as_ref();
@@ -197,6 +203,18 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                text_document
+                    .document_symbol
+                    .as_ref()?
+                    .hierarchical_document_symbol_support
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
         flags

@@ -2,10 +2,11 @@
 
 from _typeshed import StrPath
 from collections.abc import Callable
-from typing import Any, BinaryIO, Protocol, overload
+from typing import Any, BinaryIO, Protocol, overload, type_check_only
 
 __all__ = ["what"]
 
+@type_check_only
 class _ReadableBinary(Protocol):
     def tell(self) -> int: ...
     def read(self, size: int, /) -> bytes: ...

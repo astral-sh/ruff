@@ -118,7 +118,7 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(context, tokens, locator, indexer);
+        flake8_commas::rules::trailing_commas(context, tokens, locator, indexer, settings);
     }
 
     if context.is_rule_enabled(Rule::ExtraneousParentheses) {

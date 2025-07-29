@@ -69,6 +69,7 @@ if sys.version_info >= (3, 11):
         on entry to the with-statement and restore the previous default context when
         exiting the with-statement. If no context is specified, a copy of the current
         default context is used.
+
         """
 
 else:
@@ -77,6 +78,7 @@ else:
         on entry to the with-statement and restore the previous default context when
         exiting the with-statement. If no context is specified, a copy of the current
         default context is used.
+
         """
 
 if sys.version_info >= (3, 14):
@@ -84,6 +86,7 @@ if sys.version_info >= (3, 14):
         """Return a context object initialized to the proper values for one of the
         IEEE interchange formats.  The argument must be a multiple of 32 and less
         than IEEE_CONTEXT_MAX_BITS.
+
         """
 
 DefaultContext: Context

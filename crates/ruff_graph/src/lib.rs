@@ -42,13 +42,11 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            let Some(resolved) = Resolver::new(db).resolve(import) else {
-                continue;
-            };
-            let Some(path) = resolved.as_system_path() else {
-                continue;
-            };
-            resolved_imports.insert(path.to_path_buf());
+            for resolved in Resolver::new(db).resolve(import) {
+                if let Some(path) = resolved.as_system_path() {
+                    resolved_imports.insert(path.to_path_buf());
+                }
+            }
         }
 
         Ok(resolved_imports)

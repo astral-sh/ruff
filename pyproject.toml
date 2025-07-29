@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.9,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -9,7 +9,8 @@ description = "An extremely fast Python linter and code formatter, written in Ru
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
     "automation",
     "flake8",
@@ -22,7 +23,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: MIT License",  # for compatibility with tooling such as pip-licenses
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.7",

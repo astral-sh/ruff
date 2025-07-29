@@ -33,7 +33,8 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -1277,6 +1278,15 @@ impl<'db> Type<'db> {
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
+
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // This allows field definitions like `name: str = field(default="")` in dataclasses
+            // to pass the assignability check of the inferred type to the declared type.
+            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+                if relation.is_assignability() =>
+            {
+                field.default_type(db).has_relation_to(db, right, relation)
+            }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -5108,6 +5118,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::Field(__call__) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Field],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Protocol
@@ -5956,6 +5970,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
+
+    /// A single instance of `dataclasses.Field`
+    Field(FieldInstance<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -5977,6 +5994,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::Deprecated(_) => {
             // Nothing to visit
         }
+        KnownInstanceType::Field(field) => {
+            visitor.visit_type(db, field.default_type(db));
+        }
     }
 }
 
@@ -5997,6 +6017,7 @@ impl<'db> KnownInstanceType<'db> {
                 // Nothing to normalize
                 Self::Deprecated(deprecated)
             }
+            Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
         }
     }
 
@@ -6006,6 +6027,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
+            Self::Field(_) => KnownClass::Field,
         }
     }
 
@@ -6051,6 +6073,11 @@ impl<'db> KnownInstanceType<'db> {
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
+                    KnownInstanceType::Field(field) => {
+                        f.write_str("dataclasses.Field[")?;
+                        field.default_type(self.db).display(self.db).fmt(f)?;
+                        f.write_str("]")
+                    }
                 }
             }
         }
@@ -6260,6 +6287,8 @@ enum InvalidTypeExpression<'db> {
     Generic,
     /// Same for `@deprecated`
     Deprecated,
+    /// Same for `dataclasses.Field`
+    Field,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6303,6 +6332,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Deprecated => {
                         f.write_str("`warnings.deprecated` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Field => {
+                        f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
@@ -6369,6 +6401,36 @@ pub struct DeprecatedInstance<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
+
+/// Contains information about instances of `dataclasses.Field`, typically created using
+/// `dataclasses.field()`.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct FieldInstance<'db> {
+    /// The type of the default value for this field. This is derived from the `default` or
+    /// `default_factory` arguments to `dataclasses.field()`.
+    pub default_type: Type<'db>,
+
+    /// Whether this field is part of the `__init__` signature, or not.
+    pub init: bool,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FieldInstance<'_> {}
+
+impl<'db> FieldInstance<'db> {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
+        FieldInstance::new(
+            db,
+            self.default_type(db).normalized_impl(db, visitor),
+            self.init(db),
+        )
+    }
+}
 
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -8313,21 +8375,27 @@ impl<'db> IntersectionType<'db> {
         sorted_self == other.normalized(db)
     }
 
+    /// Returns an iterator over the positive elements of the intersection. If
+    /// there are no positive elements, returns a single `object` type.
+    fn positive_elements_or_object(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        if self.positive(db).is_empty() {
+            Either::Left(std::iter::once(Type::object(db)))
+        } else {
+            Either::Right(self.positive(db).iter().copied())
+        }
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions");
-        }
-
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
-        for ty in self.positive(db) {
-            let ty_member = transform_fn(ty);
+        for ty in self.positive_elements_or_object(db) {
+            let ty_member = transform_fn(&ty);
             match ty_member {
                 Place::Unbound => {}
                 Place::Type(ty_member, member_boundness) => {
@@ -8360,21 +8428,16 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions")
-                .into();
-        }
-
         let mut builder = IntersectionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut any_unbound = false;
         let mut any_possibly_unbound = false;
-        for ty in self.positive(db) {
+        for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
-            } = transform_fn(ty);
+            } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
                 Place::Unbound => {
@@ -8840,7 +8903,7 @@ impl<'db> TypeIsType<'db> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);
 
-        Some(format!("{}", table.place_expr(place)))
+        Some(format!("{}", table.place(place)))
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

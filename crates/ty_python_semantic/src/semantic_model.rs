@@ -7,7 +7,7 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
-use crate::semantic_index::place::FileScopeId;
+use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};

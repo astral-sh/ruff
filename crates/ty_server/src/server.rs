@@ -8,9 +8,10 @@ use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DeclarationCapability, DiagnosticServerCapabilities,
     HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
-    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    MessageType, SelectionRangeProviderCapability, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
@@ -228,6 +229,9 @@ impl Server {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()
             }),
+            selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+            document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+            workspace_symbol_provider: Some(lsp_types::OneOf::Left(true)),
             ..Default::default()
         }
     }

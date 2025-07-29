@@ -165,7 +165,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
-                | KnownInstanceType::Deprecated(_) => None,
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {
