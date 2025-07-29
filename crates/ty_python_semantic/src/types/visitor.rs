@@ -159,6 +159,15 @@ pub(crate) trait TypeVisitor<'db> {
     }
 }
 
+impl<'db, F> TypeVisitor<'db> for F
+where
+    F: FnMut(&'db dyn Db, Type<'db>) -> TypeVisitorResult,
+{
+    fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) -> TypeVisitorResult {
+        self(db, ty)
+    }
+}
+
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 enum NonAtomicType<'db> {
@@ -283,16 +292,19 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
 /// without having to track which types have already been seen. We guarantee that your
 /// [`visit_type`][TypeVisitor::visit_type] trait method will only be called once for each distinct
 /// non-atomic type that is encountered.
-pub(super) fn visit_type<'a, 'db, V>(db: &'db dyn Db, wrapped: &'a mut V, ty: Type<'db>)
+///
+/// Note that [`TypeVisitor`] is implemented for any closure with the correct signature, meaning
+/// that you often don't need to crate a named type for your visitor.
+pub(super) fn visit_type<'db, V>(db: &'db dyn Db, ty: Type<'db>, wrapped: V)
 where
     V: TypeVisitor<'db>,
 {
-    struct RecursionGuard<'a, 'db, V> {
-        wrapped: &'a mut V,
+    struct RecursionGuard<'db, V> {
+        wrapped: V,
         seen_types: FxIndexSet<NonAtomicType<'db>>,
     }
 
-    impl<'db, V> TypeVisitor<'db> for RecursionGuard<'_, 'db, V>
+    impl<'db, V> TypeVisitor<'db> for RecursionGuard<'db, V>
     where
         V: TypeVisitor<'db>,
     {
@@ -324,28 +336,16 @@ pub(super) fn any_over_type<'db>(
     ty: Type<'db>,
     query: &'db dyn Fn(Type<'db>) -> bool,
 ) -> bool {
-    struct AnyOverTypeVisitor<'db, 'a> {
-        query: &'a dyn Fn(Type<'db>) -> bool,
-        found_matching_type: bool,
-    }
-
-    impl<'db> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_> {
-        fn visit_type(&mut self, _db: &'db dyn Db, ty: Type<'db>) -> TypeVisitorResult {
-            if self.found_matching_type {
-                return Err(AbortTypeVisitor);
-            }
-            self.found_matching_type |= (self.query)(ty);
-            if self.found_matching_type {
-                return Err(AbortTypeVisitor);
-            }
-            Ok(())
+    let mut found_matching_type = false;
+    visit_type(db, ty, |_, ty| {
+        if found_matching_type {
+            return Err(AbortTypeVisitor);
         }
-    }
-
-    let mut visitor = AnyOverTypeVisitor {
-        query,
-        found_matching_type: false,
-    };
-    visit_type(db, &mut visitor, ty);
-    visitor.found_matching_type
+        found_matching_type |= query(ty);
+        if found_matching_type {
+            return Err(AbortTypeVisitor);
+        }
+        Ok(())
+    });
+    found_matching_type
 }
