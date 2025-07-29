@@ -43,7 +43,7 @@ def _(flag: bool):
     reveal_type(Identity()[0])  # revealed: int | str
 ```
 
-## Getitem with invalid index
+## `__getitem__` with invalid index argument
 
 ```py
 class Identity:
