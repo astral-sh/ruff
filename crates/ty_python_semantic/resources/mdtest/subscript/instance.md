@@ -85,7 +85,7 @@ a = NoSetitem()
 a[0] = 0  # error: "Method `__setitem__` of type `Unknown | None` is not callable on object of type `NoSetitem`"
 ```
 
-## Valid setitem
+## Valid `__setitem__` method
 
 ```py
 class Identity:
