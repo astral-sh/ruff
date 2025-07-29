@@ -383,7 +383,9 @@ impl<'db> Signature<'db> {
             inherited_generic_context: self
                 .inherited_generic_context
                 .map(|ctx| ctx.normalized_impl(db, visitor)),
-            definition: self.definition,
+            // Discard the definition when normalizing, so that two equivalent signatures
+            // with different `Definition`s share the same Salsa ID when normalized
+            definition: None,
             parameters: self
                 .parameters
                 .iter()
