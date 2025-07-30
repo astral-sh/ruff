@@ -20,6 +20,20 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
     })
 }
 
+/// Check if the given segments represent a pathlib Path subclass or `PackagePath`.
+pub(crate) fn is_pure_path_subclass(segments: &[&str]) -> bool {
+    let is_pathlib = matches!(
+        segments,
+        [
+            "pathlib",
+            "Path" | "PurePath" | "PosixPath" | "PurePosixPath" | "WindowsPath" | "PureWindowsPath"
+        ]
+    );
+    let is_packagepath = matches!(segments, ["importlib", "metadata", "PackagePath"]);
+
+    is_pathlib || is_packagepath
+}
+
 /// We check functions that take only 1 argument,  this does not apply to functions
 /// with `dir_fd` argument, because `dir_fd` is not supported by pathlib,
 /// so check if it's set to non-default values

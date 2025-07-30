@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{Parentheses, remove_argument};
+use crate::rules::flake8_use_pathlib::helpers::is_pure_path_subclass;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
@@ -69,15 +70,7 @@ pub(crate) fn path_constructor_current_directory(
 
     let arguments = &call.arguments;
 
-    let is_pathlib = matches!(
-        segments,
-        [
-            "pathlib",
-            "Path" | "PurePath" | "PosixPath" | "PurePosixPath" | "WindowsPath" | "PureWindowsPath"
-        ]
-    );
-    let is_packagepath = matches!(segments, ["importlib", "metadata", "PackagePath"]);
-    if !(is_pathlib || is_packagepath) {
+    if !is_pure_path_subclass(segments) {
         return;
     }
 

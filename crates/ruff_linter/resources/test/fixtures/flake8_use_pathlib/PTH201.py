@@ -7,11 +7,6 @@ from pathlib import Path as pth
 _ = Path(".")
 _ = pth(".")
 _ = PurePath(".")
-_ = PosixPath(".")
-_ = PurePosixPath(".")
-_ = WindowsPath(".")
-_ = PureWindowsPath(".")
-_ = PackagePath(".")
 _ = Path("")
 
 Path('', )
@@ -74,3 +69,9 @@ Path(".", "folder")
 PurePath(".", "folder")
 
 Path()
+
+_ = PosixPath(".")
+_ = PurePosixPath(".")
+_ = WindowsPath(".")
+_ = PureWindowsPath(".")
+_ = PackagePath(".")
