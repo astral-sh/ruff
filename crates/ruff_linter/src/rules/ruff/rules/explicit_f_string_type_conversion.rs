@@ -179,7 +179,10 @@ fn needs_paren(precedence: OperatorPrecedence) -> bool {
 
 fn needs_paren_expr(arg: &Expr) -> bool {
     // Generator expressions need to be parenthesized in f-string expressions
-    if arg.is_generator_expr() {
+    if let Some(generator) = arg.as_generator_expr() {
+        if generator.parenthesized {
+            return false;
+        }
         return true;
     }
 

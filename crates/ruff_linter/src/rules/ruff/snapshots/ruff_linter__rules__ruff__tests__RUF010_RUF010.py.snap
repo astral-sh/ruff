@@ -380,6 +380,7 @@ RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
    54 |+f"{3!s}"
 55 55 | 
 56 56 | f"{str(x for x in [])}"
+57 57 | 
 
 RUF010.py:56:4: RUF010 [*] Use explicit conversion flag
    |
@@ -387,6 +388,8 @@ RUF010.py:56:4: RUF010 [*] Use explicit conversion flag
 55 |
 56 | f"{str(x for x in [])}"
    |    ^^^^^^^^^^^^^^^^^^ RUF010
+57 |
+58 | f"{str((x for x in []))}"
    |
    = help: Replace with conversion flag
 
@@ -396,3 +399,21 @@ RUF010.py:56:4: RUF010 [*] Use explicit conversion flag
 55 55 | 
 56    |-f"{str(x for x in [])}"
    56 |+f"{(x for x in [])!s}"
+57 57 | 
+58 58 | f"{str((x for x in []))}"
+
+RUF010.py:58:4: RUF010 [*] Use explicit conversion flag
+   |
+56 | f"{str(x for x in [])}"
+57 |
+58 | f"{str((x for x in []))}"
+   |    ^^^^^^^^^^^^^^^^^^^^ RUF010
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+55 55 | 
+56 56 | f"{str(x for x in [])}"
+57 57 | 
+58    |-f"{str((x for x in []))}"
+   58 |+f"{(x for x in [])!s}"
