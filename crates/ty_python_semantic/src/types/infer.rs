@@ -123,7 +123,7 @@ use crate::types::{
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
-use crate::unpack::{Unpack, UnpackPosition};
+use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::{Db, FxOrderSet, Program};
@@ -1900,13 +1900,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
                             value,
                             slice,
+                            ctx,
                             ..
                         }) = node
                         {
                             let value_ty = self.infer_expression(value);
                             let slice_ty = self.infer_expression(slice);
                             let result_ty = self
-                                .infer_subscript_expression_types(value, value_ty, slice_ty, None);
+                                .infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                             return (result_ty, is_modifiable);
                         }
                     }
@@ -3169,26 +3170,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let context_expr = with_item.context_expr(self.module());
         let target = with_item.target(self.module());
 
-        let target_ty = if with_item.is_async() {
-            let _context_expr_ty = self.infer_standalone_expression(context_expr);
-            todo_type!("async `with` statement")
-        } else {
-            match with_item.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
-                    unpacked.expression_type(target)
+        let target_ty = match with_item.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
                 }
-                TargetKind::Single => {
-                    let context_expr_ty = self.infer_standalone_expression(context_expr);
-                    self.infer_context_expression(
-                        context_expr,
-                        context_expr_ty,
-                        with_item.is_async(),
-                    )
-                }
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let context_expr_ty = self.infer_standalone_expression(context_expr);
+                self.infer_context_expression(context_expr, context_expr_ty, with_item.is_async())
             }
         };
 
@@ -3208,9 +3200,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         context_expression_type: Type<'db>,
         is_async: bool,
     ) -> Type<'db> {
-        // TODO: Handle async with statements (they use `aenter` and `aexit`)
         if is_async {
-            return todo_type!("async `with` statement");
+            return context_expression_type.aenter(self.db());
         }
 
         context_expression_type
@@ -4650,29 +4641,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let iterable = for_stmt.iterable(self.module());
         let target = for_stmt.target(self.module());
 
-        let loop_var_value_type = if for_stmt.is_async() {
-            let _iterable_type = self.infer_standalone_expression(iterable);
-            todo_type!("async iterables/iterators")
-        } else {
-            match for_stmt.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
+        let loop_var_value_type = match for_stmt.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
+                }
 
-                    unpacked.expression_type(target)
-                }
-                TargetKind::Single => {
-                    let iterable_type = self.infer_standalone_expression(iterable);
-                    iterable_type
-                        .try_iterate(self.db())
-                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                        .unwrap_or_else(|err| {
-                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                            err.fallback_element_type(self.db())
-                        })
-                }
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let iterable_type = self.infer_standalone_expression(iterable);
+
+                iterable_type
+                    .try_iterate_with_mode(
+                        self.db(),
+                        EvaluationMode::from_is_async(for_stmt.is_async()),
+                    )
+                    .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
             }
         };
 
@@ -5782,30 +5772,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        let target_type = if comprehension.is_async() {
-            // TODO: async iterables/iterators! -- Alex
-            let _iterable_type = infer_iterable_type();
-            todo_type!("async iterables/iterators")
-        } else {
-            match comprehension.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
+        let target_type = match comprehension.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
+                }
 
-                    unpacked.expression_type(target)
-                }
-                TargetKind::Single => {
-                    let iterable_type = infer_iterable_type();
-                    iterable_type
-                        .try_iterate(self.db())
-                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                        .unwrap_or_else(|err| {
-                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                            err.fallback_element_type(self.db())
-                        })
-                }
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let iterable_type = infer_iterable_type();
+
+                iterable_type
+                    .try_iterate_with_mode(
+                        self.db(),
+                        EvaluationMode::from_is_async(comprehension.is_async()),
+                    )
+                    .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                    .unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
             }
         };
 
@@ -6182,8 +6170,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_element_type(self.db())
             });
 
-        // TODO get type from `ReturnType` of generator
-        todo_type!("Generic `typing.Generator` type")
+        iterable_type
+            .generator_return_type(self.db())
+            .unwrap_or_else(Type::unknown)
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
@@ -6192,8 +6181,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = await_expression;
-        self.infer_expression(value);
-        todo_type!("generic `typing.Awaitable` type")
+        self.infer_expression(value).resolve_await(self.db())
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
@@ -7154,8 +7142,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the result would then become Any or Unknown, respectively).
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
+
             (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
+
             (
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
@@ -7176,6 +7166,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ),
                 _,
             ) => Some(todo),
+
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -7327,13 +7318,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::IntLiteral(i64::from(b2)),
                     op,
                 ),
-
-            (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
-                Some(Type::tuple(TupleType::new(
-                    self.db(),
-                    lhs.tuple(self.db()).concat(self.db(), rhs.tuple(self.db())),
-                )))
-            }
 
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
@@ -8388,7 +8372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
@@ -8398,7 +8382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
         }
@@ -8427,7 +8411,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice);
-                    self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
+                    self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                     return ty;
                 }
             }
@@ -8461,7 +8445,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty, Some(ctx));
+        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
 
@@ -8515,7 +8499,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_node: &ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
-        expr_context: Option<&ExprContext>,
+        expr_context: ExprContext,
     ) -> Type<'db> {
         match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
             (Type::NominalInstance(instance), _, _)
@@ -8873,15 +8857,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 } else {
-                    if let Some(expr_context) = expr_context {
-                        if !matches!(expr_context, ExprContext::Store) {
-                            report_non_subscriptable(
-                                &self.context,
-                                value_node.into(),
-                                value_ty,
-                                "__getitem__",
-                            );
-                        }
+                    if expr_context != ExprContext::Store {
+                        report_non_subscriptable(
+                            &self.context,
+                            value_node.into(),
+                            value_ty,
+                            "__getitem__",
+                        );
                     }
                 }
 
@@ -11011,8 +10993,8 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 
 /// Map based on a `Vec`. It doesn't enforce
 /// uniqueness on insertion. Instead, it relies on the caller
-/// that elements are uniuqe. For example, the way we visit definitions
-/// in the `TypeInference` builder make already implicitly guarantees that each definition
+/// that elements are unique. For example, the way we visit definitions
+/// in the `TypeInference` builder already implicitly guarantees that each definition
 /// is only visited once.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VecMap<K, V>(Vec<(K, V)>);

@@ -1,5 +1,5 @@
 use std::fmt::Formatter;
-use std::panic::{AssertUnwindSafe, RefUnwindSafe};
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::{cmp, fmt};
 
@@ -87,9 +87,7 @@ impl ProjectDatabase {
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
-        self.project().check(self, reporter)
+        self.project().check(self, &mut DummyReporter)
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
@@ -98,7 +96,6 @@ impl ProjectDatabase {
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
-        let reporter = AssertUnwindSafe(reporter);
         self.project().check(self, reporter)
     }
 

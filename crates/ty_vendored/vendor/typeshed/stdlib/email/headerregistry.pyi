@@ -52,6 +52,7 @@ class BaseHeader(str):
 
     The subclass should also make sure that a 'max_count' attribute is defined
     that is either None or 1. XXX: need to better define this API.
+
     """
 
     # max_count is actually more of an abstract ClassVar (not defined on the base class, but expected to be defined in subclasses)
@@ -76,6 +77,7 @@ class BaseHeader(str):
         The returned value is an ASCII-only string possibly containing linesep
         characters, and ending with a linesep character.  The string includes
         the header name and the ': ' separator.
+
         """
 
 class UnstructuredHeader:
@@ -98,6 +100,7 @@ class UnstructuredHeader:
         Because an 'unstructured' value must by definition constitute the entire
         value, this 'get' routine does not return a remaining value, only the
         parsed TokenList.
+
         """
 
     @classmethod
@@ -138,6 +141,7 @@ class DateHeader:
         Because an 'unstructured' value must by definition constitute the entire
         value, this 'get' routine does not return a remaining value, only the
         parsed TokenList.
+
         """
 
     @classmethod
@@ -268,6 +272,7 @@ class HeaderRegistry:
         use_default_map controls whether or not the default mapping of names to
         specialized classes is copied in to the registry when the factory is
         created.  The default is True.
+
         """
 
     def map_to_type(self, name: str, cls: type[BaseHeader]) -> None:
@@ -282,6 +287,7 @@ class HeaderRegistry:
         base_class with a specialized class from the registry or the
         default_class, and passing the name and value to the constructed
         class's constructor.
+
         """
 
 class Address:
@@ -313,6 +319,7 @@ class Address:
         attributes, all of which are read-only.  The addr_spec and the string
         value of the object are both quoted according to RFC5322 rules, but
         without any Content Transfer Encoding.
+
         """
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
@@ -335,6 +342,7 @@ class Group:
         string representation of a Group whose display_name is None is the same
         as the Address object, if there is one and only one Address object in
         the addresses list.
+
         """
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...

@@ -38,15 +38,21 @@ class BaseContext:
     # multiprocessing.*, so the signatures should be identical (modulo self).
     @staticmethod
     def current_process() -> BaseProcess:
-        """Return process object representing the current process"""
+        """
+        Return process object representing the current process
+        """
 
     @staticmethod
     def parent_process() -> BaseProcess | None:
-        """Return process object representing the parent process"""
+        """
+        Return process object representing the parent process
+        """
 
     @staticmethod
     def active_children() -> list[BaseProcess]:
-        """Return list of process objects corresponding to live child processes"""
+        """
+        Return list of process objects corresponding to live child processes
+        """
 
     def cpu_count(self) -> int:
         """Returns the number of CPUs in the system"""

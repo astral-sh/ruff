@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -7,7 +8,7 @@ use ruff_annotate_snippets::{
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
@@ -520,7 +521,7 @@ impl<'r> RenderableSnippets<'r> {
 #[derive(Debug)]
 struct RenderableSnippet<'r> {
     /// The actual snippet text.
-    snippet: &'r str,
+    snippet: Cow<'r, str>,
     /// The absolute line number corresponding to where this
     /// snippet begins.
     line_start: OneIndexed,
@@ -580,6 +581,12 @@ impl<'r> RenderableSnippet<'r> {
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
             .collect();
+
+        let EscapedSourceCode {
+            text: snippet,
+            annotations,
+        } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
+
         RenderableSnippet {
             snippet,
             line_start,
@@ -590,7 +597,7 @@ impl<'r> RenderableSnippet<'r> {
 
     /// Convert this to an "annotate" snippet.
     fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(self.snippet)
+        AnnotateSnippet::source(&self.snippet)
             .origin(path)
             .line_start(self.line_start.get())
             .annotations(
@@ -818,6 +825,204 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
         return path.as_str();
     }
     path
+}
+
+/// Given some source code and annotation ranges, this routine replaces
+/// unprintable characters with printable representations of them.
+///
+/// The source code and annotations returned are updated to reflect changes made
+/// to the source code (if any).
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable<'r>(
+    source: &'r str,
+    mut annotations: Vec<RenderableAnnotation<'r>>,
+) -> EscapedSourceCode<'r> {
+    // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
+    // `source`) is replaced with `len` bytes.
+    //
+    // When the index occurs before the start of the range, the range is
+    // offset by `len`. When the range occurs after or at the start but before
+    // the end, then the end of the range only is offset by `len`.
+    let mut update_ranges = |index: usize, len: u32| {
+        for ann in &mut annotations {
+            if index < usize::from(ann.range.start()) {
+                ann.range += TextSize::new(len - 1);
+            } else if index < usize::from(ann.range.end()) {
+                ann.range = ann.range.add_end(TextSize::new(len - 1));
+            }
+        }
+    };
+
+    // If `c` is an unprintable character, then this returns a printable
+    // representation of it (using a fancier Unicode codepoint).
+    let unprintable_replacement = |c: char| -> Option<char> {
+        match c {
+            '\x07' => Some('␇'),
+            '\x08' => Some('␈'),
+            '\x1b' => Some('␛'),
+            '\x7f' => Some('␡'),
+            _ => None,
+        }
+    };
+
+    let mut last_end = 0;
+    let mut result = String::new();
+    for (index, c) in source.char_indices() {
+        if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
+
+            let len = printable.text_len().to_u32();
+            update_ranges(result.text_len().to_usize(), len);
+
+            result.push(printable);
+            last_end = index + 1;
+        }
+    }
+
+    // No tabs or unprintable chars
+    if result.is_empty() {
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Borrowed(source),
+        }
+    } else {
+        result.push_str(&source[last_end..]);
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Owned(result),
+        }
+    }
+}
+
+struct EscapedSourceCode<'r> {
+    text: Cow<'r, str>,
+    annotations: Vec<RenderableAnnotation<'r>>,
+}
+
+impl<'r> EscapedSourceCode<'r> {
+    // This attempts to "fix up" the spans on each annotation  in the case where
+    // it's an empty span immediately following a line terminator.
+    //
+    // At present, `annotate-snippets` (both upstream and our vendored copy)
+    // will render annotations of such spans to point to the space immediately
+    // following the previous line. But ideally, this should point to the space
+    // immediately preceding the next line.
+    //
+    // After attempting to fix `annotate-snippets` and giving up after a couple
+    // hours, this routine takes a different tact: it adjusts the span to be
+    // non-empty and it will cover the first codepoint of the following line.
+    // This forces `annotate-snippets` to point to the right place.
+    //
+    // See also: <https://github.com/astral-sh/ruff/issues/15509> and
+    // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
+    // from which this was adapted.
+    fn fix_up_empty_spans_after_line_terminator(mut self) -> EscapedSourceCode<'r> {
+        for ann in &mut self.annotations {
+            let range = ann.range;
+            if !range.is_empty()
+                || range.start() == TextSize::from(0)
+                || range.start() >= self.text.text_len()
+            {
+                continue;
+            }
+            if !matches!(
+                self.text.as_bytes()[range.start().to_usize() - 1],
+                b'\n' | b'\r'
+            ) {
+                continue;
+            }
+            let start = range.start();
+            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            ann.range = TextRange::new(start, end);
+        }
+
+        self
+    }
+}
+
+/// Finds the closest [`TextSize`] not less than the offset given for which
+/// `is_char_boundary` is `true`. Unless the offset given is greater than
+/// the length of the underlying contents, in which case, the length of the
+/// contents is returned.
+///
+/// Can be replaced with `str::ceil_char_boundary` once it's stable.
+///
+/// # Examples
+///
+/// From `std`:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextLen, TextSize};
+///
+/// let source = "❤️🧡💛💚💙💜";
+/// assert_eq!(source.text_len(), TextSize::from(26));
+/// assert!(!source.is_char_boundary(13));
+///
+/// let closest = ceil_char_boundary(source, TextSize::from(13));
+/// assert_eq!(closest, TextSize::from(14));
+/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
+/// ```
+///
+/// Additional examples:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextRange, TextSize};
+///
+/// let source = "Hello";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(5)),
+///     TextSize::from(5)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(6)),
+///     TextSize::from(5)
+/// );
+///
+/// let source = "α";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(1)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(2)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(3)),
+///     TextSize::from(2)
+/// );
+/// ```
+pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
+    let upper_bound = offset
+        .to_u32()
+        .saturating_add(4)
+        .min(text.text_len().to_u32());
+    (offset.to_u32()..upper_bound)
+        .map(TextSize::from)
+        .find(|offset| text.is_char_boundary(offset.to_usize()))
+        .unwrap_or_else(|| TextSize::from(upper_bound))
 }
 
 #[cfg(test)]
@@ -2359,7 +2564,7 @@ watermelon
         }
 
         /// Returns a builder for tersely constructing diagnostics.
-        fn builder(
+        pub(super) fn builder(
             &mut self,
             identifier: &'static str,
             severity: Severity,
@@ -2426,7 +2631,7 @@ watermelon
         ///
         /// See the docs on `TestEnvironment::span` for the meaning of
         /// `path`, `line_offset_start` and `line_offset_end`.
-        fn primary(
+        pub(super) fn primary(
             mut self,
             path: &str,
             line_offset_start: &str,

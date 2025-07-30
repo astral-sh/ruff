@@ -58,6 +58,7 @@ def merge(
 
     >>> list(merge(['dog', 'horse'], ['cat', 'fish', 'kangaroo'], key=len))
     ['dog', 'cat', 'fish', 'horse', 'kangaroo']
+
     """
 
 def nlargest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:

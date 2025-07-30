@@ -65,7 +65,7 @@ pub struct ClientOptions {
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum DiagnosticMode {
+pub enum DiagnosticMode {
     /// Check only currently open files.
     #[default]
     OpenFilesOnly,
@@ -139,6 +139,13 @@ impl ClientOptions {
             diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
             overrides,
         }
+    }
+
+    /// Create a new `ClientOptions` with the specified diagnostic mode
+    #[must_use]
+    pub fn with_diagnostic_mode(mut self, mode: DiagnosticMode) -> Self {
+        self.diagnostic_mode = Some(mode);
+        self
     }
 }
 
