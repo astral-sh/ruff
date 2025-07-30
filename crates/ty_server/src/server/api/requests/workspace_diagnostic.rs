@@ -1,19 +1,20 @@
-use lsp_types::request::WorkspaceDiagnosticRequest;
-use lsp_types::{
-    FullDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
-    WorkspaceFullDocumentDiagnosticReport,
-};
-use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
 
 use crate::server::Result;
-use crate::server::api::diagnostics::to_lsp_diagnostic;
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
 use crate::session::SessionSnapshot;
 use crate::session::client::Client;
 use crate::system::file_to_url;
+use lsp_types::request::WorkspaceDiagnosticRequest;
+use lsp_types::{
+    FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult,
+    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
+};
 
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
@@ -25,18 +26,23 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     fn run(
         snapshot: SessionSnapshot,
         _client: &Client,
-        _params: WorkspaceDiagnosticParams,
+        params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         let index = snapshot.index();
 
         if !index.global_settings().diagnostic_mode().is_workspace() {
-            // VS Code sends us the workspace diagnostic request every 2 seconds, so these logs can
-            // be quite verbose.
-            tracing::trace!("Workspace diagnostics is disabled; returning empty report");
+            tracing::debug!("Workspace diagnostics is disabled; returning empty report");
             return Ok(WorkspaceDiagnosticReportResult::Report(
                 WorkspaceDiagnosticReport { items: vec![] },
             ));
         }
+
+        // Create a map of previous result IDs for efficient lookup
+        let mut previous_results: BTreeMap<_, _> = params
+            .previous_result_ids
+            .into_iter()
+            .map(|prev| (prev.uri, prev.value))
+            .collect();
 
         let mut items = Vec::new();
 
@@ -44,7 +50,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             let diagnostics = db.check();
 
             // Group diagnostics by URL
-            let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+            let mut diagnostics_by_url: BTreeMap<Url, Vec<_>> = BTreeMap::default();
 
             for diagnostic in diagnostics {
                 if let Some(span) = diagnostic.primary_span() {
@@ -66,6 +72,23 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                     .ok()
                     .and_then(|key| index.make_document_ref(key).ok())
                     .map(|doc| i64::from(doc.version()));
+                let result_id = Diagnostics::result_id_from_hash(&file_diagnostics);
+
+                // Check if this file's diagnostics have changed since the previous request
+                if let Some(previous_result_id) = previous_results.remove(&url) {
+                    if previous_result_id == result_id {
+                        // Diagnostics haven't changed, return unchanged report
+                        items.push(WorkspaceDocumentDiagnosticReport::Unchanged(
+                            WorkspaceUnchangedDocumentDiagnosticReport {
+                                uri: url,
+                                version,
+                                unchanged_document_diagnostic_report:
+                                    UnchangedDocumentDiagnosticReport { result_id },
+                            },
+                        ));
+                        continue;
+                    }
+                }
 
                 // Convert diagnostics to LSP format
                 let lsp_diagnostics = file_diagnostics
@@ -75,18 +98,40 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                     })
                     .collect::<Vec<_>>();
 
+                // Diagnostics have changed or this is the first request, return full report
                 items.push(WorkspaceDocumentDiagnosticReport::Full(
                     WorkspaceFullDocumentDiagnosticReport {
                         uri: url,
                         version,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            // TODO: We don't implement result ID caching yet
-                            result_id: None,
+                            result_id: Some(result_id),
                             items: lsp_diagnostics,
                         },
                     },
                 ));
             }
+        }
+
+        // Handle files that had diagnostics in previous request but no longer have any
+        // Any remaining entries in previous_results are files that were fixed
+        for (previous_url, _previous_result_id) in previous_results {
+            // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
+            let version = index
+                .key_from_url(previous_url.clone())
+                .ok()
+                .and_then(|key| index.make_document_ref(key).ok())
+                .map(|doc| i64::from(doc.version()));
+
+            items.push(WorkspaceDocumentDiagnosticReport::Full(
+                WorkspaceFullDocumentDiagnosticReport {
+                    uri: previous_url,
+                    version,
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: None, // No result ID needed for empty diagnostics
+                        items: vec![],   // No diagnostics
+                    },
+                },
+            ));
         }
 
         Ok(WorkspaceDiagnosticReportResult::Report(

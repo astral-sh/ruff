@@ -6,7 +6,7 @@ use ruff_db::system::{OsSystem, SystemPathBuf};
 
 pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::Server;
-pub use crate::session::ClientOptions;
+pub use crate::session::{ClientOptions, DiagnosticMode};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::{DocumentQuery, Session};
 
