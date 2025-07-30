@@ -11,9 +11,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static SERVER_WORK_DONE_TOKENS: AtomicUsize = AtomicUsize::new(0);
 
-/// A [work done progress](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workDoneProgress)
-/// that uses the client provided token if available, but falls back to a server initiated
-/// progress if supported by the client.
+/// A [work done progress][work-done-progress] that uses the client provided token if available,
+/// but falls back to a server initiated progress if supported by the client.
 ///
 /// The LSP specification supports client and server initiated work done progress reporting:
 /// * Client: Many requests have a work done progress token or extend `WorkDoneProgressParams`.
@@ -29,17 +28,20 @@ static SERVER_WORK_DONE_TOKENS: AtomicUsize = AtomicUsize::new(0);
 /// initiate a work done progress report using a unique string token.
 ///
 /// ## Server Initiated Progress
+///
 /// The implementation initiates a work done progress report lazily when no token is provided in the request.
 /// This creation happens async and the LSP specification requires that a server only
 /// sends `$/progress` notifications with that token if the create request was successful (no error):
 ///
-/// > code and message set in case an exception happens during the ‘window/workDoneProgress/create’ request.
+/// > code and message set in case an exception happens during the 'window/workDoneProgress/create' request.
 /// > In case an error occurs a server must not send any progress notification
 /// > using the token provided in the WorkDoneProgressCreateParams.
 ///
 /// The implementation doesn't block on the server response because it feels unfortunate to delay
 /// a client request only so that ty can show a progress bar. Therefore, the progress reporting
 /// will not be available immediately.
+///
+/// [work-done-progress]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workDoneProgress
 #[derive(Clone)]
 pub(super) struct LazyWorkDoneProgress {
     inner: Arc<Inner>,

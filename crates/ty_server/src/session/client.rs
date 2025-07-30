@@ -31,12 +31,9 @@ impl Client {
     /// The `response_handler` will be dispatched as soon as the client response
     /// is processed on the main-loop. The handler always runs on the main-loop thread.
     ///
-    /// # Note
-    /// This method takes a `session` so that we can register the pending-request
-    /// and send the response directly to the client. If this ever becomes too limiting (because we
-    /// need to send a request from somewhere where we don't have access to session), consider introducing
-    /// a new `send_deferred_request` method that doesn't take a session and instead sends
-    /// an `Action` to the main loop to send the request (the main loop has always access to session).
+    /// Use [`self.send_deferred_request`] if you are in a background task
+    /// where you don't have access to the session. But note, that the
+    /// request won't be send immediately, but rather queued up in the main loop
     pub(crate) fn send_request<R>(
         &self,
         session: &Session,
@@ -55,6 +52,13 @@ impl Client {
         );
     }
 
+    /// Sends a request of kind `R` to the client, with associated parameters.
+    ///
+    /// The request isn't sent immediately, but rather queued up in the main loop.
+    /// The `response_handler` will be dispatched as soon as the client response
+    /// is processed on the main-loop. The handler always runs on the main-loop thread.
+    ///
+    /// Use [`self.send_request`] if you are in a foreground task and have access to the session.
     pub(crate) fn send_deferred_request<R>(
         &self,
         params: R::Params,

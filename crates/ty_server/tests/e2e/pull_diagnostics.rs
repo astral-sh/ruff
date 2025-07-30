@@ -342,13 +342,11 @@ fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     let begin_params = server.await_notification::<lsp_types::notification::Progress>()?;
 
     // The params are already the ProgressParams type
-    if let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
+    let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
         begin_params.value
-    {
-        // Good, got Begin
-    } else {
+    else {
         return Err(anyhow::anyhow!("Expected Begin progress notification"));
-    }
+    };
 
     // Consume Report notifications - there may be multiple based on number of files
     // Keep consuming until we hit the End notification
