@@ -111,7 +111,6 @@ mod tests {
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_warns.py"))]
     #[test_case(Rule::LegacyFormPytestRaises, Path::new("RUF061_deprecated_call.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
-    #[test_case(Rule::BinaryOperatorIdentity, Path::new("RUF065.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -539,6 +538,7 @@ mod tests {
     #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::BinaryOperatorIdentity, Path::new("RUF065.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

@@ -34,7 +34,7 @@ complex_floor = (value + 1) // (value + 1)
 complex_mod = (x + y) % (x + y)
 
 # Literals
-literal_or = 5 | 5 
+literal_or = 5 | 5
 literal_and = 10 & 10
 literal_xor = 15 ^ 15
 literal_sub = 20 - 20
