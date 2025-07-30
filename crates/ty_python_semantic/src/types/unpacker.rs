@@ -64,8 +64,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable => value_type
-                .try_iterate(self.db())
+            UnpackKind::Iterable { mode } => value_type
+                .try_iterate_with_mode(self.db(), mode)
                 .map(|tuple| tuple.homogeneous_element_type(self.db()))
                 .unwrap_or_else(|err| {
                     err.report_diagnostic(
@@ -75,8 +75,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     );
                     err.fallback_element_type(self.db())
                 }),
-            UnpackKind::ContextManager { is_async } => {
-                if is_async {
+            UnpackKind::ContextManager { mode } => {
+                if mode.is_async() {
                     value_type.aenter(self.db())
                 } else {
                     value_type.try_enter(self.db()).unwrap_or_else(|err| {
