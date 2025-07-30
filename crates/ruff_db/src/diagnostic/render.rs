@@ -585,8 +585,7 @@ impl<'r> RenderableSnippet<'r> {
         let EscapedSourceCode {
             text: snippet,
             annotations,
-        } = replace_whitespace_and_unprintable(snippet, annotations)
-            .fix_up_empty_spans_after_line_terminator();
+        } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
 
         RenderableSnippet {
             snippet,
@@ -828,13 +827,18 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
-/// Given some source code and annotation ranges, this routine replaces tabs
-/// with ASCII whitespace, and unprintable characters with printable
-/// representations of them.
+/// Given some source code and annotation ranges, this routine replaces
+/// unprintable characters with printable representations of them.
 ///
 /// The source code and annotations returned are updated to reflect changes made
 /// to the source code (if any).
-fn replace_whitespace_and_unprintable<'r>(
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable<'r>(
     source: &'r str,
     mut annotations: Vec<RenderableAnnotation<'r>>,
 ) -> EscapedSourceCode<'r> {

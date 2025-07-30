@@ -228,7 +228,7 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source = replace_whitespace_and_unprintable(
+        let source = replace_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
             self.message.expect_range() - start_offset,
         )
@@ -271,12 +271,17 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 /// Given some source code and an annotation range, this routine replaces
-/// tabs with ASCII whitespace, and unprintable characters with printable
-/// representations of them.
+///  unprintable characters with printable representations of them.
 ///
 /// The source code returned has an annotation that is updated to reflect
 /// changes made to the source code (if any).
-fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
