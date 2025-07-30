@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -117,7 +118,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     );
 
     match argument {
-        Expr::List(ast::ExprList { elts: _, .. }) | Expr::Tuple(ast::ExprTuple { elts: _, .. }) => {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             // Convert `tuple([1, 2])` to `(1, 2)`
             diagnostic.set_fix({
                 // Check if the original call had a trailing comma after the argument
@@ -129,6 +130,16 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                     after_argument.trim_start().starts_with(',')
                 };
 
+                let needs_trailing_comma = if let [item] = elts.as_slice() {
+                    SimpleTokenizer::new(
+                        checker.locator().contents(),
+                        TextRange::new(item.end(), call.end()),
+                    )
+                    .all(|token| token.kind != SimpleTokenKind::Comma)
+                } else {
+                    false
+                };
+
                 // Replace `[` with `(`.
                 let elt_start = Edit::replacement(
                     "(".into(),
@@ -137,7 +148,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                 );
                 // Replace `]` with `)` or `,)`.
                 let elt_end = Edit::replacement(
-                    if has_trailing_comma {
+                    if has_trailing_comma || needs_trailing_comma {
                         ",)".into()
                     } else {
                         ")".into()
