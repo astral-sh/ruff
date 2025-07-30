@@ -2777,8 +2777,7 @@ impl KnownClass {
             | Self::Super
             | Self::GenericAlias
             | Self::Deque
-            | Self::Bytes
-            | Self::CoroutineType => true,
+            | Self::Bytes => true,
 
             // It doesn't really make sense to ask the question for `@final` types,
             // since these are "more than solid bases". But we'll anyway infer a `@final`
@@ -2808,7 +2807,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::VersionInfo
             | Self::Bool
-            | Self::NoneType => false,
+            | Self::NoneType
+            | Self::CoroutineType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.

@@ -70,6 +70,28 @@ def generator() -> Generator:
     reveal_type(result)  # revealed: Unknown
 ```
 
+## `yield from` with a generator that return `types.GeneratorType`
+
+`types.GeneratorType` is a nominal type that implements the `typing.Generator` protocol:
+
+```py
+from types import GeneratorType
+
+def inner_generator() -> GeneratorType[int, bytes, str]:
+    yield 1
+    yield 2
+    x = yield 3
+
+    # TODO: this should be `bytes`
+    reveal_type(x)  # revealed: @Todo(yield expressions)
+
+    return "done"
+
+def outer_generator():
+    result = yield from inner_generator()
+    reveal_type(result)  # revealed: str
+```
+
 ## Error cases
 
 ### Non-iterable type

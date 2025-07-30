@@ -4817,21 +4817,35 @@ impl<'db> Type<'db> {
     /// protocol.
     fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
-        // match on the protocol instance to get the `ReturnType` type parameter.
+        // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
+        // an ad-hoc solution that works for protocols and instances of classes that directly inherit
+        // from the `Generator` protocol, such as `types.GeneratorType`.
 
-        if let Type::ProtocolInstance(instance) = self {
-            if let Protocol::FromClass(class) = instance.inner {
-                if class.is_known(db, KnownClass::Generator) {
-                    if let Some(specialization) = class.class_literal_specialized(db, None).1 {
-                        if let [_, _, return_ty] = specialization.types(db) {
-                            return Some(*return_ty);
-                        }
+        let from_class_base = |base: ClassBase<'db>| {
+            let class = base.into_class()?;
+            if class.is_known(db, KnownClass::Generator) {
+                if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                    if let [_, _, return_ty] = specialization.types(db) {
+                        return Some(*return_ty);
                     }
                 }
             }
-        }
+            None
+        };
 
-        None
+        match self {
+            Type::NominalInstance(instance) => {
+                instance.class.iter_mro(db).find_map(from_class_base)
+            }
+            Type::ProtocolInstance(instance) => {
+                if let Protocol::FromClass(class) = instance.inner {
+                    class.iter_mro(db).find_map(from_class_base)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 
     /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)
