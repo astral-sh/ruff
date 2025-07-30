@@ -218,7 +218,10 @@ where
                 return;
             }
 
-            let result = ruff_db::panic::catch_unwind(|| R::run(snapshot, client, params));
+            let result = ruff_db::panic::catch_unwind(|| {
+                let snapshot = snapshot;
+                R::run(snapshot.0, client, params)
+            });
 
             if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
                 respond::<R>(&id, response, client);

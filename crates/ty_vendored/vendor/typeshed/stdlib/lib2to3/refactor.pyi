@@ -22,7 +22,9 @@ def get_all_fix_names(fixer_pkg: str, remove_prefix: bool = True) -> list[str]:
     """Return a sorted list of all available fix names in the given package."""
 
 def get_fixers_from_package(pkg_name: str) -> list[str]:
-    """Return the fully qualified names for fixers in the package pkg_name."""
+    """
+    Return the fully qualified names for fixers in the package pkg_name.
+    """
 
 class FixerError(Exception):
     """A fixer could not be loaded."""
@@ -96,7 +98,9 @@ class RefactoringTool:
         """
 
     def _read_python_source(self, filename: FileDescriptorOrPath) -> tuple[str, str]:
-        """Do our best to decode a Python source file correctly."""
+        """
+        Do our best to decode a Python source file correctly.
+        """
 
     def refactor_file(self, filename: StrPath, write: bool = False, doctests_only: bool = False) -> None:
         """Refactors a file."""
@@ -146,7 +150,9 @@ class RefactoringTool:
     def processed_file(
         self, new_text: str, filename: StrPath, old_text: str | None = None, write: bool = False, encoding: str | None = None
     ) -> None:
-        """Called when a file has been refactored and there may be changes."""
+        """
+        Called when a file has been refactored and there may be changes.
+        """
 
     def write_file(self, new_text: str, filename: FileDescriptorOrPath, old_text: str, encoding: str | None = None) -> None:
         """Writes a string to a file.
@@ -176,6 +182,7 @@ class RefactoringTool:
         A doctest is given as a block of lines, the first of which starts
         with ">>>" (possibly indented), while the remaining lines start
         with "..." (identically indented).
+
         """
 
     def summarize(self) -> None: ...

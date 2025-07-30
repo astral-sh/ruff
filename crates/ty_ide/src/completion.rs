@@ -66,9 +66,9 @@ enum CompletionTargetTokens<'t> {
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
-    /// No token was found, but we have the offset of the
-    /// cursor.
-    Unknown { offset: TextSize },
+    /// No token was found. We generally treat this like
+    /// `Generic` (i.e., offer scope based completions).
+    Unknown,
 }
 
 impl<'t> CompletionTargetTokens<'t> {
@@ -78,7 +78,7 @@ impl<'t> CompletionTargetTokens<'t> {
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let offset = match parsed.tokens().at_offset(offset) {
-            TokenAt::None => return Some(CompletionTargetTokens::Unknown { offset }),
+            TokenAt::None => return Some(CompletionTargetTokens::Unknown),
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
@@ -122,7 +122,7 @@ impl<'t> CompletionTargetTokens<'t> {
                 return None;
             } else {
                 let Some(last) = before.last() else {
-                    return Some(CompletionTargetTokens::Unknown { offset });
+                    return Some(CompletionTargetTokens::Unknown);
                 };
                 CompletionTargetTokens::Generic { token: last }
             },
@@ -171,7 +171,7 @@ impl<'t> CompletionTargetTokens<'t> {
                     node: covering_node.node(),
                 })
             }
-            CompletionTargetTokens::Unknown { offset } => {
+            CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
                 Some(CompletionTargetAst::Scoped {

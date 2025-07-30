@@ -253,7 +253,7 @@ def start_new(function: Callable[[Unpack[_Ts]], object], args: tuple[Unpack[_Ts]
 def start_new(function: Callable[..., object], args: tuple[Any, ...], kwargs: dict[str, Any], /) -> int: ...
 
 if sys.version_info >= (3, 10):
-    def interrupt_main(signum: signal.Signals = ..., /) -> None:
+    def interrupt_main(signum: signal.Signals = signal.SIGINT, /) -> None:
         """Simulate the arrival of the given signal in the main thread,
         where the corresponding signal handler will be executed.
         If *signum* is omitted, SIGINT is assumed.

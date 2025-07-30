@@ -351,6 +351,41 @@ fn benchmark_many_tuple_assignments(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_tuple_implicit_instance_attributes(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[many_tuple_assignments]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression benchmark for a case that used to hang:
+                // https://github.com/astral-sh/ty/issues/765
+                setup_micro_case(
+                    r#"
+                    from typing import Any
+
+                    class A:
+                        foo: tuple[Any, ...]
+
+                    class B(A):
+                        def __init__(self, parent: "C", x: tuple[Any]):
+                            self.foo = parent.foo + x
+
+                    class C(A):
+                        def __init__(self, parent: B, x: tuple[Any]):
+                            self.foo = parent.foo + x
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -630,6 +665,7 @@ criterion_group!(
     micro,
     benchmark_many_string_assignments,
     benchmark_many_tuple_assignments,
+    benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_many_enum_members,
