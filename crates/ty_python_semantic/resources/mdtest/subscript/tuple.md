@@ -4,7 +4,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.11"
 ```
 
 ```py
@@ -105,6 +105,7 @@ import os
 import stat
 
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
+reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
 # revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
 reveal_type(os.stat_result.__getitem__)
 ```
