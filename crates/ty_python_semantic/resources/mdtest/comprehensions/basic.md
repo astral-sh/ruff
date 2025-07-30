@@ -147,7 +147,7 @@ class Iterable:
         return Iterator()
 
 async def _():
-    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
+    # error: [not-iterable] "Object of type `Iterable` is not async-iterable"
     # revealed: Unknown
     [reveal_type(x) async for x in Iterable()]
 ```

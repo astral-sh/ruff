@@ -47,7 +47,7 @@ from typing_extensions import reveal_type
 class NotAsyncIterable: ...
 
 async def foo():
-    # error: [not-iterable] "Object of type `NotAsyncIterable` may not be iterable"
+    # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
     async for x in NotAsyncIterable():
         reveal_type(x)  # revealed: Unknown
 ```
@@ -66,7 +66,7 @@ async def foo():
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable] "Object of type `Iterator` may not be iterable"
+    # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
     async for x in Iterator():
         reveal_type(x)  # revealed: Unknown
 ```
@@ -83,7 +83,7 @@ class AsyncIterable:
         return NoAnext()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: Unknown
 ```
@@ -103,7 +103,7 @@ async def foo(flag: bool):
         def __aiter__(self) -> PossiblyUnboundAnext:
             return PossiblyUnboundAnext()
 
-    # error: [not-iterable] "Object of type `AsyncIterable` may not be iterable"
+    # error: [not-iterable] "Object of type `AsyncIterable` may not be async-iterable"
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
 ```
@@ -123,7 +123,7 @@ async def foo(flag: bool):
             def __aiter__(self) -> AsyncIterable:
                 return AsyncIterable()
 
-    # error: "Object of type `PossiblyUnboundAiter` may not be iterable"
+    # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
     async for x in PossiblyUnboundAiter():
         reveal_type(x)  # revealed: int
 ```
@@ -142,7 +142,7 @@ class AsyncIterable:
         return AsyncIterator()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
 ```
@@ -161,7 +161,7 @@ class AsyncIterable:
         return AsyncIterator()
 
 async def foo():
-    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
     async for x in AsyncIterable():
         reveal_type(x)  # revealed: int
 ```

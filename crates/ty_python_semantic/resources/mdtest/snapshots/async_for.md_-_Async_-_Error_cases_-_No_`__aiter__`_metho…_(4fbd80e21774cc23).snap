@@ -17,7 +17,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 3 | class NotAsyncIterable: ...
 4 | 
 5 | async def foo():
-6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` may not be iterable"
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
 7 |     async for x in NotAsyncIterable():
 8 |         reveal_type(x)  # revealed: Unknown
 ```
@@ -25,11 +25,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 # Diagnostics
 
 ```
-error[not-iterable]: Object of type `NotAsyncIterable` may not be iterable
+error[not-iterable]: Object of type `NotAsyncIterable` is not async-iterable
  --> src/mdtest_snippet.py:7:20
   |
 5 | async def foo():
-6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` may not be iterable"
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
 7 |     async for x in NotAsyncIterable():
   |                    ^^^^^^^^^^^^^^^^^^
 8 |         reveal_type(x)  # revealed: Unknown
@@ -43,7 +43,7 @@ info: rule `not-iterable` is enabled by default
 info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:8:21
   |
-6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` may not be iterable"
+6 |     # error: [not-iterable] "Object of type `NotAsyncIterable` is not async-iterable"
 7 |     async for x in NotAsyncIterable():
 8 |         reveal_type(x)  # revealed: Unknown
   |                     ^ `Unknown`

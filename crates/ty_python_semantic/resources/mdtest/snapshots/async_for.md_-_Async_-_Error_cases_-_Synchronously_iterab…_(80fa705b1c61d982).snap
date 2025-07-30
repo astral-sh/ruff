@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
  9 |         def __iter__(self) -> Iterator:
 10 |             return Iterator()
 11 | 
-12 |     # error: [not-iterable] "Object of type `Iterator` may not be iterable"
+12 |     # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
 13 |     async for x in Iterator():
 14 |         reveal_type(x)  # revealed: Unknown
 ```
@@ -31,10 +31,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 # Diagnostics
 
 ```
-error[not-iterable]: Object of type `Iterator` may not be iterable
+error[not-iterable]: Object of type `Iterator` is not async-iterable
   --> src/mdtest_snippet.py:13:20
    |
-12 |     # error: [not-iterable] "Object of type `Iterator` may not be iterable"
+12 |     # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
 13 |     async for x in Iterator():
    |                    ^^^^^^^^^^
 14 |         reveal_type(x)  # revealed: Unknown
@@ -48,7 +48,7 @@ info: rule `not-iterable` is enabled by default
 info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:14:21
    |
-12 |     # error: [not-iterable] "Object of type `Iterator` may not be iterable"
+12 |     # error: [not-iterable] "Object of type `Iterator` is not async-iterable"
 13 |     async for x in Iterator():
 14 |         reveal_type(x)  # revealed: Unknown
    |                     ^ `Unknown`

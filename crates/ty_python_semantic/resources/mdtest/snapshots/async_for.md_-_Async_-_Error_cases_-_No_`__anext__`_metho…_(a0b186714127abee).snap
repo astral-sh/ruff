@@ -21,7 +21,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
  7 |         return NoAnext()
  8 | 
  9 | async def foo():
-10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
 11 |     async for x in AsyncIterable():
 12 |         reveal_type(x)  # revealed: Unknown
 ```
@@ -29,11 +29,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 # Diagnostics
 
 ```
-error[not-iterable]: Object of type `AsyncIterable` is not iterable
+error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
   --> src/mdtest_snippet.py:11:20
    |
  9 | async def foo():
-10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
 12 |         reveal_type(x)  # revealed: Unknown
@@ -47,7 +47,7 @@ info: rule `not-iterable` is enabled by default
 info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:12:21
    |
-10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+10 |     # error: [not-iterable] "Object of type `AsyncIterable` is not async-iterable"
 11 |     async for x in AsyncIterable():
 12 |         reveal_type(x)  # revealed: Unknown
    |                     ^ `Unknown`

@@ -6987,6 +6987,17 @@ impl<'db> IterationError<'db> {
         }
     }
 
+    /// Does this error concern a synchronous or asynchronous iterable?
+    fn mode(&self) -> EvaluationMode {
+        match self {
+            Self::IterCallError { mode, .. } => *mode,
+            Self::IterReturnsInvalidIterator { mode, .. } => *mode,
+            Self::PossiblyUnboundIterAndGetitemError { .. }
+            | Self::UnboundIterAndGetitemError { .. } => EvaluationMode::Sync,
+            Self::UnboundAiterError => EvaluationMode::Async,
+        }
+    }
+
     /// Reports the diagnostic for this error.
     fn report_diagnostic(
         &self,
@@ -7000,6 +7011,7 @@ impl<'db> IterationError<'db> {
             db: &'a dyn Db,
             builder: LintDiagnosticGuardBuilder<'a, 'a>,
             iterable_type: Type<'a>,
+            mode: EvaluationMode,
         }
 
         impl<'a> Reporter<'a> {
@@ -7009,8 +7021,9 @@ impl<'db> IterationError<'db> {
             #[expect(clippy::wrong_self_convention)]
             fn is_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
-                    "Object of type `{iterable_type}` is not iterable",
+                    "Object of type `{iterable_type}` is not {maybe_async}iterable",
                     iterable_type = self.iterable_type.display(self.db),
+                    maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
                 diag
@@ -7021,8 +7034,9 @@ impl<'db> IterationError<'db> {
             /// `because` should explain why `iterable_type` is likely not iterable.
             fn may_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
-                    "Object of type `{iterable_type}` may not be iterable",
+                    "Object of type `{iterable_type}` may not be {maybe_async}iterable",
                     iterable_type = self.iterable_type.display(self.db),
+                    maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
                 diag
@@ -7033,10 +7047,12 @@ impl<'db> IterationError<'db> {
             return;
         };
         let db = context.db();
+        let mode = self.mode();
         let reporter = Reporter {
             db,
             builder,
             iterable_type,
+            mode,
         };
 
         // TODO: for all of these error variants, the "explanation" for the diagnostic
@@ -7295,7 +7311,7 @@ impl<'db> IterationError<'db> {
             },
 
             IterationError::UnboundAiterError => {
-                reporter.may_not("It has no `__aiter__` method");
+                reporter.is_not("It has no `__aiter__` method");
             }
         }
     }

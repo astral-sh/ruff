@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 10 |             def __aiter__(self) -> AsyncIterable:
 11 |                 return AsyncIterable()
 12 | 
-13 |     # error: "Object of type `PossiblyUnboundAiter` may not be iterable"
+13 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
 14 |     async for x in PossiblyUnboundAiter():
 15 |         reveal_type(x)  # revealed: int
 ```
@@ -32,10 +32,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md
 # Diagnostics
 
 ```
-error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be iterable
+error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iterable
   --> src/mdtest_snippet.py:14:20
    |
-13 |     # error: "Object of type `PossiblyUnboundAiter` may not be iterable"
+13 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
 14 |     async for x in PossiblyUnboundAiter():
    |                    ^^^^^^^^^^^^^^^^^^^^^^
 15 |         reveal_type(x)  # revealed: int
@@ -49,7 +49,7 @@ info: rule `not-iterable` is enabled by default
 info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:15:21
    |
-13 |     # error: "Object of type `PossiblyUnboundAiter` may not be iterable"
+13 |     # error: "Object of type `PossiblyUnboundAiter` may not be async-iterable"
 14 |     async for x in PossiblyUnboundAiter():
 15 |         reveal_type(x)  # revealed: int
    |                     ^ `int`
