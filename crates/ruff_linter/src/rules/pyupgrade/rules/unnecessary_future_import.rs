@@ -1,13 +1,13 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt, StmtRef};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
+use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
-use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
 
 /// ## What it does
 /// Checks for unnecessary `__future__` imports.
@@ -85,13 +85,9 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
-pub(crate) fn is_import_required_by_isort(
-    checker: &Checker,
-    stmt: StmtRef<'_>,
-    alias: &Alias,
-) -> bool {
+pub(crate) fn is_import_required_by_isort(checker: &Checker, stmt: StmtRef, alias: &Alias) -> bool {
     let name_import = match stmt {
-        StmtRef::ImportFrom(ruff_python_ast::StmtImportFrom { module, level, .. }) => {
+        StmtRef::ImportFrom(ast::StmtImportFrom { module, level, .. }) => {
             NameImport::ImportFrom(MemberNameImport {
                 module: module.as_ref().map(std::string::ToString::to_string),
                 name: ruff_python_semantic::Alias {
@@ -157,7 +153,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             unused_imports
                 .iter()
                 .map(|alias| &alias.name)
-                .map(ruff_python_ast::Identifier::as_str),
+                .map(ast::Identifier::as_str),
             statement,
             parent,
             checker.locator(),
