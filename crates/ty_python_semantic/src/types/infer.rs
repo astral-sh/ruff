@@ -3701,7 +3701,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "Cannot assign to object of type `{}` with no `__setitem__` method",
                         value_ty.display(self.db()),
                     ));
-                };
+                }
 
                 false
             }
