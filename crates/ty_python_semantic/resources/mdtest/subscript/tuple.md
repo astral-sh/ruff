@@ -28,73 +28,102 @@ reveal_type(b)  # revealed: Unknown
 Precise types for index operations are also inferred for tuple subclasses:
 
 ```py
-class HeterogeneousSubclass(tuple[int, str, int, bytes]): ...
+class I0: ...
+class I1: ...
+class I2: ...
+class I3: ...
+class I5: ...
+class HeterogeneousSubclass0(tuple[()]): ...
 
-# revealed: Overload[(self, index: Literal[-1, 3], /) -> bytes, (self, index: Literal[-4, -2, 0, 2], /) -> int, (self, index: Literal[-3, 1], /) -> str, (self, index: SupportsIndex, /) -> int | str | bytes, (self, index: slice[Any, Any, Any], /) -> tuple[int | str | bytes, ...]]
-reveal_type(HeterogeneousSubclass.__getitem__)
+# revealed: Overload[(self, index: SupportsIndex, /) -> Never, (self, index: slice[Any, Any, Any], /) -> tuple[()]]
+reveal_type(HeterogeneousSubclass0.__getitem__)
 
-def f(h: HeterogeneousSubclass, i: int):
-    reveal_type(h[0])  # revealed: int
-    reveal_type(h[1])  # revealed: str
-    reveal_type(h[2])  # revealed: int
-    reveal_type(h[3])  # revealed: bytes
-    reveal_type(h[-1])  # revealed: bytes
-    reveal_type(h[-2])  # revealed: int
-    reveal_type(h[-3])  # revealed: str
-    reveal_type(h[-4])  # revealed: int
-    reveal_type(h[i])  # revealed: int | str | bytes
+def f0(h0: HeterogeneousSubclass0, i: int):
+    reveal_type(h0[0])  # revealed: Never
+    reveal_type(h0[1])  # revealed: Never
+    reveal_type(h0[-1])  # revealed: Never
+    reveal_type(h0[i])  # revealed: Never
 
-class MixedSubclass(tuple[Exception, *tuple[str, ...], int, bytes, int, range]): ...
+class HeterogeneousSubclass1(tuple[I0]): ...
 
-# revealed: Overload[(self, index: Literal[-3], /) -> bytes, (self, index: Literal[4], /) -> str | int | bytes | range, (self, index: Literal[2, 3], /) -> str | int | bytes, (self, index: Literal[-1], /) -> range, (self, index: Literal[1], /) -> str | int, (self, index: Literal[-5], /) -> str | Exception, (self, index: Literal[-4, -2], /) -> int, (self, index: Literal[0], /) -> Exception, (self, index: SupportsIndex, /) -> Exception | str | int | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[Exception | str | int | bytes | range, ...]]
+# revealed: Overload[(self, index: SupportsIndex, /) -> I0, (self, index: slice[Any, Any, Any], /) -> tuple[I0, ...]]
+reveal_type(HeterogeneousSubclass1.__getitem__)
+
+def f0(h1: HeterogeneousSubclass1, i: int):
+    reveal_type(h1[0])  # revealed: I0
+    reveal_type(h1[1])  # revealed: I0
+    reveal_type(h1[-1])  # revealed: I0
+    reveal_type(h1[i])  # revealed: I0
+
+# Element at index 2 is deliberately the same as the element at index 1,
+# to illustrate that the `__getitem__` overloads for these two indices are combined
+class HeterogeneousSubclass4(tuple[I0, I1, I0, I3]): ...
+
+# revealed: Overload[(self, index: Literal[-4, -2, 0, 2], /) -> I0, (self, index: Literal[-3, 1], /) -> I1, (self, index: Literal[-1, 3], /) -> I3, (self, index: SupportsIndex, /) -> I0 | I1 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I3, ...]]
+reveal_type(HeterogeneousSubclass4.__getitem__)
+
+def f(h4: HeterogeneousSubclass4, i: int):
+    reveal_type(h4[0])  # revealed: I0
+    reveal_type(h4[1])  # revealed: I1
+    reveal_type(h4[2])  # revealed: I0
+    reveal_type(h4[3])  # revealed: I3
+    reveal_type(h4[-1])  # revealed: I3
+    reveal_type(h4[-2])  # revealed: I0
+    reveal_type(h4[-3])  # revealed: I1
+    reveal_type(h4[-4])  # revealed: I0
+    reveal_type(h4[i])  # revealed: I0 | I1 | I3
+
+class MixedSubclass(tuple[I0, *tuple[I1, ...], I2, I3, I2, I5]): ...
+
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-3], /) -> I3, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
 reveal_type(MixedSubclass.__getitem__)
 
 def g(m: MixedSubclass, i: int):
-    reveal_type(m[0])  # revealed: Exception
-    reveal_type(m[1])  # revealed: str | int
-    reveal_type(m[2])  # revealed: str | int | bytes
-    reveal_type(m[3])  # revealed: str | int | bytes
-    reveal_type(m[4])  # revealed: str | int | bytes | range
+    reveal_type(m[0])  # revealed: I0
+    reveal_type(m[1])  # revealed: I1 | I2
+    reveal_type(m[2])  # revealed: I1 | I2 | I3
+    reveal_type(m[3])  # revealed: I1 | I2 | I3
+    reveal_type(m[4])  # revealed: I1 | I2 | I3 | I5
 
-    reveal_type(m[-1])  # revealed: range
-    reveal_type(m[-2])  # revealed: int
-    reveal_type(m[-3])  # revealed: bytes
-    reveal_type(m[-4])  # revealed: int
-    reveal_type(m[-5])  # revealed: str | Exception
+    reveal_type(m[-1])  # revealed: I5
+    reveal_type(m[-2])  # revealed: I2
+    reveal_type(m[-3])  # revealed: I3
+    reveal_type(m[-4])  # revealed: I2
+    reveal_type(m[-5])  # revealed: I1 | I0
 
-    reveal_type(m[i])  # revealed: Exception | str | int | bytes | range
+    reveal_type(m[i])  # revealed: I0 | I1 | I2 | I3 | I5
 
-    # Ideally we would not include `Exception` in the unions for these,
+    # Ideally we would not include `I0` in the unions for these,
     # but it's not possible to do this using only synthesized overloads.
-    reveal_type(m[5])  # revealed: Exception | str | int | bytes | range
-    reveal_type(m[10])  # revealed: Exception | str | int | bytes | range
+    reveal_type(m[5])  # revealed: I0 | I1 | I2 | I3 | I5
+    reveal_type(m[10])  # revealed: I0 | I1 | I2 | I3 | I5
 
-    # Similarly, ideally these would just be `str` | Exception`,
+    # Similarly, ideally these would just be `I0` | I1`,
     # but achieving that with only synthesized overloads wouldn't be possible
-    reveal_type(m[-6])  # revealed: Exception | str | int | bytes | range
-    reveal_type(m[-10])  # revealed: Exception | str | int | bytes | range
+    reveal_type(m[-6])  # revealed: I0 | I1 | I2 | I3 | I5
+    reveal_type(m[-10])  # revealed: I0 | I1 | I2 | I3 | I5
 
-class MixedSubclass2(tuple[int, str, *tuple[bytes, ...], range]): ...
+class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
 
-# revealed: Overload[(self, index: Literal[-2], /) -> bytes | str, (self, index: Literal[1], /) -> str, (self, index: Literal[2], /) -> bytes | range, (self, index: Literal[-1], /) -> range, (self, index: Literal[0], /) -> int, (self, index: Literal[-3], /) -> bytes | str | int, (self, index: SupportsIndex, /) -> int | str | bytes | range, (self, index: slice[Any, Any, Any], /) -> tuple[int | str | bytes | range, ...]]
+# revealed: Overload[(self, index: Literal[-1], /) -> I3, (self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[2], /) -> I2 | I3, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
 reveal_type(MixedSubclass2.__getitem__)
 
 def g(m: MixedSubclass2, i: int):
-    reveal_type(m[0])  # revealed: int
-    reveal_type(m[1])  # revealed: str
-    reveal_type(m[2])  # revealed: bytes | range
+    reveal_type(m[0])  # revealed: I0
+    reveal_type(m[1])  # revealed: I1
+    reveal_type(m[2])  # revealed: I2 | I3
 
-    # Ideally this would just be `bytes | range`,
+    # Ideally this would just be `I2 | I3`,
     # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[3])  # revealed: int | str | bytes | range
+    reveal_type(m[3])  # revealed: I0 | I1 | I2 | I3
 
-    reveal_type(m[-1])  # revealed: range
-    reveal_type(m[-2])  # revealed: bytes | str
-    reveal_type(m[-3])  # revealed: bytes | str | int
+    reveal_type(m[-1])  # revealed: I3
+    reveal_type(m[-2])  # revealed: I2 | I1
+    reveal_type(m[-3])  # revealed: I2 | I1 | I0
 
-    # Ideally this would just be `int | str | bytes`,
+    # Ideally this would just be `I2 | I1 | I0`,
     # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[-4])  # revealed: int | str | bytes | range
+    reveal_type(m[-4])  # revealed: I0 | I1 | I2 | I3
 ```
 
 The stdlib API `os.stat` is a commonly used API that returns an instance of a tuple subclass
@@ -104,10 +133,38 @@ The stdlib API `os.stat` is a commonly used API that returns an instance of a tu
 import os
 import stat
 
+reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
 reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
+
+# revealed: tuple[<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(os.stat_result.__mro__)
+
+# There are no specific overloads for the `float` elements in `os.stat_result`,
+# because the fallback `(self, index: SupportsIndex, /) -> int | float` overload
+# gives the right result for those elements in the tuple, and we aim to synthesize
+# the minimum number of overloads for any given tuple
+#
 # revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
 reveal_type(os.stat_result.__getitem__)
+```
+
+Because of the synthesized `__getitem__` overloads we synthesize for tuples and tuple subclasses,
+tuples are naturally understood as being subtypes of protocols that have precise return types from
+`__getitem__` method members:
+
+```py
+from typing import Protocol, Literal
+from ty_extensions import static_assert, is_subtype_of
+
+class IntFromZeroSubscript(Protocol):
+    def __getitem__(self, index: Literal[0], /) -> int: ...
+
+static_assert(is_subtype_of(tuple[int, str], IntFromZeroSubscript))
+
+class TupleSubclass(tuple[int, str]): ...
+
+static_assert(is_subtype_of(TupleSubclass, IntFromZeroSubscript))
 ```
 
 ## Slices
