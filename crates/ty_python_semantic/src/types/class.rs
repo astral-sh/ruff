@@ -2688,7 +2688,8 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType| Self::CoroutineType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType
+            | Self::CoroutineType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -3659,7 +3660,9 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => module == self.canonical_module(db),
+            | Self::NamedTupleFallback
+            | Self::Awaitable
+            | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -3674,7 +3677,6 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
-            Self::Awaitable | Self::Generator => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions | KnownModule::Abc),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),
 
         }
