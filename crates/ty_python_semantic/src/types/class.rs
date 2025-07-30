@@ -2688,7 +2688,7 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType| Self::CoroutineType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2741,7 +2741,6 @@ impl KnownClass {
             | Self::Classmethod
             | Self::Awaitable
             | Self::Generator
-            | Self::CoroutineType
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
