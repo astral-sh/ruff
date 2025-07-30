@@ -213,10 +213,42 @@ impl DisplaySet<'_> {
         if formatted_len == 0 {
             self.format_label(line_offset, &annotation.label, stylesheet, buffer)
         } else {
+            // TODO(brent) All of this complicated checking of `hide_severity` should be reverted
+            // once we have real severities in Ruff. This code is trying to account for three
+            // different cases:
+            //
+            // - main diagnostic message for a lint diagnostic
+            // - main diagnostic message for a syntax error diagnostic
+            // - subdiagnostic message
+            //
+            // In the first case, signaled by `hide_severity = true` and a non-empty ID, we want to
+            // print the ID (the noqa code for ruff, e.g. F401) without brackets. In the second
+            // case, signaled by `hide_severity = true` and an ID of `Some("")`, Ruff currently adds
+            // a `SyntaxError: ` prefix to all of its syntax error messages, so we want to avoid
+            // printing any ID or severity in front of this. Finally, for subdiagnostics, we
+            // actually want to print the severity (usually `help`) regardless of the
+            // `hide_severity` setting. This is signaled by an ID of `None`.
+            //
+            // With real severities these should be reported like in ty:
+            //
+            // ```
+            // error[F401]: `math` imported but unused
+            // error[invalid-syntax]: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // instead of the current versions intended to mimic the old Ruff output format:
+            //
+            // ```
+            // F401 `math` imported but unused
+            // SyntaxError: Cannot use `match` statement on Python 3.9...
+            // ```
+            let hide_severity = annotation.annotation_type.is_none();
             let annotation_type = annotation_type_str(&annotation.annotation_type);
             if let Some(id) = annotation.id {
-                if annotation.annotation_type.is_none() {
-                    buffer.append(line_offset, id, *color);
+                if hide_severity {
+                    if !id.is_empty() {
+                        buffer.append(line_offset, &format!("{id} "), *color);
+                    }
                 } else {
                     buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
                 }
@@ -225,9 +257,7 @@ impl DisplaySet<'_> {
             }
 
             if !is_annotation_empty(annotation) {
-                if annotation.id.is_some() && annotation.annotation_type.is_none() {
-                    buffer.append(line_offset, " ", stylesheet.none);
-                } else {
+                if annotation.id.is_none() || !hide_severity {
                     buffer.append(line_offset, ": ", stylesheet.none);
                 }
                 self.format_label(line_offset, &annotation.label, stylesheet, buffer)?;

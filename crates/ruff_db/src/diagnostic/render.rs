@@ -248,7 +248,11 @@ impl<'a> ResolvedDiagnostic<'a> {
             .collect();
 
         let (id, message) = if config.hide_severity {
-            let id = diag.secondary_code().map(|code| code.to_string());
+            let id = Some(
+                diag.secondary_code()
+                    .map(|code| code.to_string())
+                    .unwrap_or_default(),
+            );
             let message = &diag.inner.message;
             let message = if diag
                 .fix()
