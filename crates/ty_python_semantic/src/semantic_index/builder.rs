@@ -2805,7 +2805,9 @@ impl<'ast> Unpackable<'ast> {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
             Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
-            Unpackable::WithItem { .. } => UnpackKind::ContextManager,
+            Unpackable::WithItem { is_async, .. } => UnpackKind::ContextManager {
+                is_async: *is_async,
+            },
         }
     }
 

@@ -1,4 +1,4 @@
-use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind};
+use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind, WorkDoneProgressOptions};
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -17,9 +17,10 @@ bitflags::bitflags! {
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
-        const FILE_WATCHER_SUPPORT = 1 << 11;
-        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 12;
-        const WORKSPACE_CONFIGURATION = 1 << 13;
+        const WORK_DONE_PROGRESS = 1 << 11;
+        const FILE_WATCHER_SUPPORT = 1 << 12;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
+        const WORKSPACE_CONFIGURATION = 1 << 14;
     }
 }
 
@@ -82,6 +83,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports hierarchical document symbols.
     pub(crate) const fn supports_hierarchical_document_symbols(self) -> bool {
         self.contains(Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports work done progress.
+    pub(crate) const fn supports_work_done_progress(self) -> bool {
+        self.contains(Self::WORK_DONE_PROGRESS)
     }
 
     /// Returns `true` if the client supports file watcher capabilities.
@@ -230,6 +236,15 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
+        if client_capabilities
+            .window
+            .as_ref()
+            .and_then(|window| window.work_done_progress)
+            .unwrap_or_default()
+        {
+            flags |= Self::WORK_DONE_PROGRESS;
+        }
+
         flags
     }
 }
@@ -240,6 +255,10 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
         identifier: Some(crate::DIAGNOSTIC_NAME.to_string()),
         inter_file_dependencies: true,
         workspace_diagnostics,
-        ..Default::default()
+        work_done_progress_options: WorkDoneProgressOptions {
+            // Currently, the server only supports reporting work done progress for "workspace"
+            // diagnostic mode.
+            work_done_progress: Some(workspace_diagnostics),
+        },
     }
 }

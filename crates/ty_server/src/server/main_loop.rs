@@ -1,7 +1,7 @@
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
 use crate::session::ClientOptions;
-use crate::session::client::Client;
+use crate::session::client::{Client, ClientResponseHandler};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
@@ -87,7 +87,7 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler(&client, response);
+                                handler.handle_response(&client, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
@@ -139,6 +139,9 @@ impl Server {
                             );
                         }
                     }
+
+                    Action::SendRequest(request) => client.send_request_raw(&self.session, request),
+
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
                             .initialize_workspaces(workspaces_with_options, &client);
@@ -335,6 +338,9 @@ pub(crate) enum Action {
     /// Retry a request that previously failed due to a salsa cancellation.
     RetryRequest(lsp_server::Request),
 
+    /// Send a request from the server to the client.
+    SendRequest(SendRequest),
+
     /// Initialize the workspace after the server received
     /// the options from the client.
     InitializeWorkspaces(Vec<(Url, ClientOptions)>),
@@ -346,4 +352,19 @@ pub(crate) enum Event {
     Message(lsp_server::Message),
 
     Action(Action),
+}
+
+pub(crate) struct SendRequest {
+    pub(crate) method: String,
+    pub(crate) params: serde_json::Value,
+    pub(crate) response_handler: ClientResponseHandler,
+}
+
+impl std::fmt::Debug for SendRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendRequest")
+            .field("method", &self.method)
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
 }

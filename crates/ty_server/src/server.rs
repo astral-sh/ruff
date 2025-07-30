@@ -19,13 +19,16 @@ use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
+mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use api::publish_settings_diagnostics;
-pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
+pub(crate) use main_loop::{
+    Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
+};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {

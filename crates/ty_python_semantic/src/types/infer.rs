@@ -3169,26 +3169,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let context_expr = with_item.context_expr(self.module());
         let target = with_item.target(self.module());
 
-        let target_ty = if with_item.is_async() {
-            let _context_expr_ty = self.infer_standalone_expression(context_expr);
-            todo_type!("async `with` statement")
-        } else {
-            match with_item.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
-                    unpacked.expression_type(target)
+        let target_ty = match with_item.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
                 }
-                TargetKind::Single => {
-                    let context_expr_ty = self.infer_standalone_expression(context_expr);
-                    self.infer_context_expression(
-                        context_expr,
-                        context_expr_ty,
-                        with_item.is_async(),
-                    )
-                }
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let context_expr_ty = self.infer_standalone_expression(context_expr);
+                self.infer_context_expression(context_expr, context_expr_ty, with_item.is_async())
             }
         };
 
@@ -3208,9 +3199,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         context_expression_type: Type<'db>,
         is_async: bool,
     ) -> Type<'db> {
-        // TODO: Handle async with statements (they use `aenter` and `aexit`)
         if is_async {
-            return todo_type!("async `with` statement");
+            return context_expression_type.aenter(self.db());
         }
 
         context_expression_type
@@ -6102,8 +6092,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 err.fallback_element_type(self.db())
             });
 
-        // TODO get type from `ReturnType` of generator
-        todo_type!("Generic `typing.Generator` type")
+        iterable_type
+            .generator_return_type(self.db())
+            .unwrap_or_else(Type::unknown)
     }
 
     fn infer_await_expression(&mut self, await_expression: &ast::ExprAwait) -> Type<'db> {
@@ -6112,8 +6103,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = await_expression;
-        self.infer_expression(value);
-        todo_type!("generic `typing.Awaitable` type")
+        self.infer_expression(value).resolve_await(self.db())
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
@@ -10905,8 +10895,8 @@ fn contains_string_literal(expr: &ast::Expr) -> bool {
 
 /// Map based on a `Vec`. It doesn't enforce
 /// uniqueness on insertion. Instead, it relies on the caller
-/// that elements are uniuqe. For example, the way we visit definitions
-/// in the `TypeInference` builder make already implicitly guarantees that each definition
+/// that elements are unique. For example, the way we visit definitions
+/// in the `TypeInference` builder already implicitly guarantees that each definition
 /// is only visited once.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct VecMap<K, V>(Vec<(K, V)>);

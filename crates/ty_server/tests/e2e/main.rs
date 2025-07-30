@@ -49,20 +49,23 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     DocumentDiagnosticRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
+    WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
-    InitializeResult, InitializedParams, PartialResultParams, PublishDiagnosticsClientCapabilities,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceFolder,
+    InitializeResult, InitializedParams, PartialResultParams, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Url,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
+use serde_json::json;
 use tempfile::TempDir;
 
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -153,6 +156,7 @@ impl TestServer {
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
+        initialization_options: Option<ClientOptions>,
     ) -> Result<Self> {
         setup_tracing();
 
@@ -200,7 +204,7 @@ impl TestServer {
             initialize_response: None,
             workspace_configurations,
         }
-        .initialize(workspace_folders, capabilities)
+        .initialize(workspace_folders, capabilities, initialization_options)
     }
 
     /// Perform LSP initialization handshake
@@ -208,13 +212,15 @@ impl TestServer {
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
+        initialization_options: Option<ClientOptions>,
     ) -> Result<Self> {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
             // TODO: This should be configurable by the test server builder. This might not be
             // required after client settings are implemented in the server.
-            initialization_options: Some(serde_json::Value::Object(serde_json::Map::new())),
+            initialization_options: initialization_options
+                .map(|options| json!({ "settings": options})),
             ..Default::default()
         };
 
@@ -587,7 +593,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
-    #[expect(dead_code)]
     pub(crate) fn change_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
@@ -626,18 +631,39 @@ impl TestServer {
     pub(crate) fn document_diagnostic_request(
         &mut self,
         path: impl AsRef<SystemPath>,
+        previous_result_id: Option<String>,
     ) -> Result<DocumentDiagnosticReportResult> {
         let params = DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
             },
             identifier: Some("ty".to_string()),
-            previous_result_id: None,
+            previous_result_id,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
         self.await_response::<DocumentDiagnosticReportResult>(id)
+    }
+
+    /// Send a `workspace/diagnostic` request with optional previous result IDs.
+    pub(crate) fn workspace_diagnostic_request(
+        &mut self,
+        previous_result_ids: Option<Vec<PreviousResultId>>,
+    ) -> Result<WorkspaceDiagnosticReportResult> {
+        let params = WorkspaceDiagnosticParams {
+            identifier: Some("ty".to_string()),
+            previous_result_ids: previous_result_ids.unwrap_or_default(),
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: Some(lsp_types::NumberOrString::String(
+                    "test-progress-token".to_string(),
+                )),
+            },
+            partial_result_params: PartialResultParams::default(),
+        };
+
+        let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
+        self.await_response::<WorkspaceDiagnosticReportResult>(id)
     }
 }
 
@@ -704,6 +730,7 @@ impl Drop for TestServer {
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
+    initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
 }
 
@@ -730,8 +757,14 @@ impl TestServerBuilder {
         Ok(Self {
             workspaces: Vec::new(),
             test_context: TestContext::new()?,
+            initialization_options: None,
             client_capabilities,
         })
+    }
+
+    pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
+        self.initialization_options = Some(options);
+        self
     }
 
     /// Add a workspace to the test server with the given root path and options.
@@ -843,7 +876,12 @@ impl TestServerBuilder {
 
     /// Build the test server
     pub(crate) fn build(self) -> Result<TestServer> {
-        TestServer::new(self.workspaces, self.test_context, self.client_capabilities)
+        TestServer::new(
+            self.workspaces,
+            self.test_context,
+            self.client_capabilities,
+            self.initialization_options,
+        )
     }
 }
 

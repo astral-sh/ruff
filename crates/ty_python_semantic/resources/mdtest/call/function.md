@@ -15,8 +15,7 @@ reveal_type(get_int())  # revealed: int
 async def get_int_async() -> int:
     return 42
 
-# TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
+reveal_type(get_int_async())  # revealed: CoroutineType[Any, Any, int]
 ```
 
 ## Generic

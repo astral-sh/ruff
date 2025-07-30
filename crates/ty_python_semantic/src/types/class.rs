@@ -19,7 +19,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
@@ -53,7 +53,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashSet, FxHasher};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -574,7 +574,24 @@ impl<'db> ClassType<'db> {
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        fn synthesize_getitem_overload_signature<'db>(
+            index_annotation: Type<'db>,
+            return_annotation: Type<'db>,
+        ) -> Signature<'db> {
+            let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
+            let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
+                .with_annotated_type(index_annotation);
+            let parameters = Parameters::new([self_parameter, index_parameter]);
+            Signature::new(parameters, Some(return_annotation))
+        }
+
         let (class_literal, specialization) = self.class_literal(db);
+
+        let fallback_member_lookup = || {
+            class_literal
+                .own_class_member(db, specialization, name)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        };
 
         let synthesize_simple_tuple_method = |return_type| {
             let parameters =
@@ -604,6 +621,162 @@ impl<'db> ClassType<'db> {
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_simple_tuple_method(return_type)
+            }
+
+            "__getitem__" if class_literal.is_tuple(db) => {
+                specialization
+                    .map(|spec| {
+                        let tuple = spec.tuple(db);
+
+                        let mut element_type_to_indices: FxHashMap<Type<'db>, Vec<i64>> =
+                            FxHashMap::default();
+
+                        match tuple {
+                            // E.g. for `tuple[int, str]`, we will generate the following overloads:
+                            //
+                            //    __getitem__(self, index: Literal[0, -2], /) -> int
+                            //    __getitem__(self, index: Literal[1, -1], /) -> str
+                            //
+                            TupleSpec::Fixed(fixed_length_tuple) => {
+                                let tuple_length = fixed_length_tuple.len();
+
+                                for (index, ty) in fixed_length_tuple.elements().enumerate() {
+                                    let entry = element_type_to_indices.entry(*ty).or_default();
+                                    if let Ok(index) = i64::try_from(index) {
+                                        entry.push(index);
+                                    }
+                                    if let Ok(index) = i64::try_from(tuple_length - index) {
+                                        entry.push(0 - index);
+                                    }
+                                }
+                            }
+
+                            // E.g. for `tuple[str, *tuple[float, ...], bytes, range]`, we will generate the following overloads:
+                            //
+                            //    __getitem__(self, index: Literal[0], /) -> str
+                            //    __getitem__(self, index: Literal[1], /) -> float | bytes
+                            //    __getitem__(self, index: Literal[2], /) -> float | bytes | range
+                            //    __getitem__(self, index: Literal[-1], /) -> range
+                            //    __getitem__(self, index: Literal[-2], /) -> bytes
+                            //    __getitem__(self, index: Literal[-3], /) -> float | str
+                            //
+                            TupleSpec::Variable(variable_length_tuple) => {
+                                for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
+                                    if let Ok(index) = i64::try_from(index) {
+                                        element_type_to_indices.entry(*ty).or_default().push(index);
+                                    }
+
+                                    let one_based_index = index + 1;
+
+                                    if let Ok(i) = i64::try_from(
+                                        variable_length_tuple.suffix.len() + one_based_index,
+                                    ) {
+                                        let overload_return = UnionType::from_elements(
+                                            db,
+                                            std::iter::once(variable_length_tuple.variable).chain(
+                                                variable_length_tuple
+                                                    .prefix
+                                                    .iter()
+                                                    .rev()
+                                                    .take(one_based_index)
+                                                    .copied(),
+                                            ),
+                                        );
+                                        element_type_to_indices
+                                            .entry(overload_return)
+                                            .or_default()
+                                            .push(0 - i);
+                                    }
+                                }
+
+                                for (index, ty) in
+                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                {
+                                    if let Some(index) =
+                                        index.checked_add(1).and_then(|i| i64::try_from(i).ok())
+                                    {
+                                        element_type_to_indices
+                                            .entry(*ty)
+                                            .or_default()
+                                            .push(0 - index);
+                                    }
+
+                                    if let Ok(i) =
+                                        i64::try_from(variable_length_tuple.prefix.len() + index)
+                                    {
+                                        let overload_return = UnionType::from_elements(
+                                            db,
+                                            std::iter::once(variable_length_tuple.variable).chain(
+                                                variable_length_tuple
+                                                    .suffix
+                                                    .iter()
+                                                    .take(index + 1)
+                                                    .copied(),
+                                            ),
+                                        );
+                                        element_type_to_indices
+                                            .entry(overload_return)
+                                            .or_default()
+                                            .push(i);
+                                    }
+                                }
+                            }
+                        }
+
+                        let all_elements_unioned =
+                            UnionType::from_elements(db, tuple.all_elements());
+
+                        let mut overload_signatures =
+                            Vec::with_capacity(element_type_to_indices.len().saturating_add(2));
+
+                        overload_signatures.extend(element_type_to_indices.into_iter().filter_map(
+                            |(return_type, mut indices)| {
+                                if return_type.is_equivalent_to(db, all_elements_unioned) {
+                                    return None;
+                                }
+
+                                // Sorting isn't strictly required, but leads to nicer `reveal_type` output
+                                indices.sort_unstable();
+
+                                let index_annotation = UnionType::from_elements(
+                                    db,
+                                    indices.into_iter().map(Type::IntLiteral),
+                                );
+
+                                Some(synthesize_getitem_overload_signature(
+                                    index_annotation,
+                                    return_type,
+                                ))
+                            },
+                        ));
+
+                        // Fallback overloads: for `tuple[int, str]`, we will generate the following overloads:
+                        //
+                        //    __getitem__(self, index: int, /) -> int | str
+                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[int | str, ...]
+                        //
+                        // and for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
+                        //
+                        //    __getitem__(self, index: int, /) -> str | float | bytes
+                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
+                        //
+                        overload_signatures.push(synthesize_getitem_overload_signature(
+                            KnownClass::SupportsIndex.to_instance(db),
+                            all_elements_unioned,
+                        ));
+
+                        overload_signatures.push(synthesize_getitem_overload_signature(
+                            KnownClass::Slice.to_instance(db),
+                            TupleType::homogeneous(db, all_elements_unioned),
+                        ));
+
+                        let getitem_signature =
+                            CallableSignature::from_overloads(overload_signatures);
+                        let getitem_type =
+                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        Place::bound(getitem_type).into()
+                    })
+                    .unwrap_or_else(fallback_member_lookup)
             }
 
             // ```py
@@ -672,9 +845,7 @@ impl<'db> ClassType<'db> {
                 Place::bound(synthesized_dunder).into()
             }
 
-            _ => class_literal
-                .own_class_member(db, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+            _ => fallback_member_lookup(),
         }
     }
 
@@ -1596,7 +1767,10 @@ impl<'db> ClassLiteral<'db> {
 
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
 
-        let signature_from_fields = |mut parameters: Vec<_>| {
+        let instance_ty =
+            Type::instance(db, self.apply_optional_specialization(db, specialization));
+
+        let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             let mut kw_only_field_seen = false;
             for (
                 field_name,
@@ -1669,21 +1843,26 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter = if kw_only_field_seen {
+                let mut parameter = if kw_only_field_seen || name == "__replace__" {
                     Parameter::keyword_only(field_name)
                 } else {
                     Parameter::positional_or_keyword(field_name)
                 }
                 .with_annotated_type(field_ty);
 
-                if let Some(default_ty) = default_ty {
+                if name == "__replace__" {
+                    // When replacing, we know there is a default value for the field
+                    // (the value that is currently assigned to the field)
+                    // assume this to be the declared type of the field
+                    parameter = parameter.with_default_type(field_ty);
+                } else if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
                 }
 
                 parameters.push(parameter);
             }
 
-            let mut signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            let mut signature = Signature::new(Parameters::new(parameters), return_ty);
             signature.inherited_generic_context = self.generic_context(db);
             Some(CallableType::function_like(db, signature))
         };
@@ -1701,16 +1880,13 @@ impl<'db> ClassLiteral<'db> {
 
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
-                    .with_annotated_type(Type::instance(
-                        db,
-                        self.apply_optional_specialization(db, specialization),
-                    ));
-                signature_from_fields(vec![self_parameter])
+                    .with_annotated_type(instance_ty);
+                signature_from_fields(vec![self_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::NamedTuple, "__new__") => {
                 let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
                     .with_annotated_type(KnownClass::Type.to_instance(db));
-                signature_from_fields(vec![cls_parameter])
+                signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::DataclassLike, "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassParams::ORDER) {
@@ -1721,16 +1897,10 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([
                         Parameter::positional_or_keyword(Name::new_static("self"))
                             // TODO: could be `Self`.
-                            .with_annotated_type(Type::instance(
-                                db,
-                                self.apply_optional_specialization(db, specialization),
-                            )),
+                            .with_annotated_type(instance_ty),
                         Parameter::positional_or_keyword(Name::new_static("other"))
                             // TODO: could be `Self`.
-                            .with_annotated_type(Type::instance(
-                                db,
-                                self.apply_optional_specialization(db, specialization),
-                            )),
+                            .with_annotated_type(instance_ty),
                     ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 );
@@ -1745,15 +1915,20 @@ impl<'db> ClassLiteral<'db> {
                     .place
                     .ignore_possibly_unbound()
             }
+            (CodeGeneratorKind::DataclassLike, "__replace__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
+            {
+                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(instance_ty);
+
+                signature_from_fields(vec![self_parameter], Some(instance_ty))
+            }
             (CodeGeneratorKind::DataclassLike, "__setattr__") => {
                 if has_dataclass_param(DataclassParams::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new([
                             Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(Type::instance(
-                                    db,
-                                    self.apply_optional_specialization(db, specialization),
-                                )),
+                                .with_annotated_type(instance_ty),
                             Parameter::positional_or_keyword(Name::new_static("name")),
                             Parameter::positional_or_keyword(Name::new_static("value")),
                         ]),
@@ -2610,10 +2785,13 @@ pub enum KnownClass {
     UnionType,
     GeneratorType,
     AsyncGeneratorType,
+    CoroutineType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Awaitable,
+    Generator,
     Deprecated,
     StdlibAlias,
     SpecialForm,
@@ -2685,7 +2863,8 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType
+            | Self::CoroutineType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2736,6 +2915,8 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
@@ -2801,12 +2982,15 @@ impl KnownClass {
             | Self::InitVar
             | Self::VersionInfo
             | Self::Bool
-            | Self::NoneType => false,
+            | Self::NoneType
+            | Self::CoroutineType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.
             Self::ABCMeta
             | Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -2855,6 +3039,8 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -2872,6 +3058,7 @@ impl KnownClass {
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
             | KnownClass::NoneType
             | KnownClass::Any
             | KnownClass::StdlibAlias
@@ -2917,7 +3104,11 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Iterable | Self::Iterator => true,
+            Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Awaitable
+            | Self::Generator => true,
 
             Self::Any
             | Self::Bool
@@ -2946,6 +3137,7 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::ModuleType
             | Self::FunctionType
             | Self::MethodType
@@ -3011,6 +3203,8 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Awaitable => "Awaitable",
+            Self::Generator => "Generator",
             Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -3021,6 +3215,7 @@ impl KnownClass {
             Self::WrapperDescriptorType => "WrapperDescriptorType",
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
+            Self::CoroutineType => "CoroutineType",
             Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
@@ -3281,11 +3476,14 @@ impl KnownClass {
             | Self::MethodType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
             | Self::NamedTuple
@@ -3366,12 +3564,15 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
@@ -3443,6 +3644,7 @@ impl KnownClass {
             | Self::WrapperDescriptorType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::SpecialForm
             | Self::ChainMap
             | Self::Counter
@@ -3457,6 +3659,8 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
@@ -3513,12 +3717,15 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "Awaitable" => Self::Awaitable,
+            "Generator" => Self::Generator,
             "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
             "GeneratorType" => Self::GeneratorType,
             "AsyncGeneratorType" => Self::AsyncGeneratorType,
+            "CoroutineType" => Self::CoroutineType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
             "UnionType" => Self::UnionType,
@@ -3623,11 +3830,14 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::WrapperDescriptorType
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => module == self.canonical_module(db),
+            | Self::NamedTupleFallback
+            | Self::Awaitable
+            | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar

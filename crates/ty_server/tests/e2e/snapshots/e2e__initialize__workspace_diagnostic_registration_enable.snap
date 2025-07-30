@@ -9,6 +9,7 @@ expression: registration
     "documentSelector": null,
     "identifier": "ty",
     "interFileDependencies": true,
+    "workDoneProgress": true,
     "workspaceDiagnostics": true
   }
 }

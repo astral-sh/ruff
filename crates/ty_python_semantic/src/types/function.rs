@@ -341,12 +341,16 @@ impl<'db> OverloadLiteral<'db> {
             GenericContext::from_type_params(db, index, type_params)
         });
 
+        let index = semantic_index(db, scope.file(db));
+        let is_generator = scope.file_scope_id(db).is_generator_function(index);
+
         Signature::from_function(
             db,
             generic_context,
             inherited_generic_context,
             definition,
             function_stmt_node,
+            is_generator,
         )
     }
 

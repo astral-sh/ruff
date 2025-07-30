@@ -4,13 +4,12 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.12.5"
+version = "0.12.7"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = "MIT"
-license-files = ["LICENSE"]
+license = { file = "LICENSE" }
 keywords = [
     "automation",
     "flake8",

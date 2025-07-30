@@ -2,6 +2,11 @@
 
 ## Indexing
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 t = (1, "a", "b")
 
@@ -18,6 +23,148 @@ reveal_type(a)  # revealed: Unknown
 
 b = t[-4]  # error: [index-out-of-bounds]
 reveal_type(b)  # revealed: Unknown
+```
+
+Precise types for index operations are also inferred for tuple subclasses:
+
+```py
+class I0: ...
+class I1: ...
+class I2: ...
+class I3: ...
+class I5: ...
+class HeterogeneousSubclass0(tuple[()]): ...
+
+# revealed: Overload[(self, index: SupportsIndex, /) -> Never, (self, index: slice[Any, Any, Any], /) -> tuple[()]]
+reveal_type(HeterogeneousSubclass0.__getitem__)
+
+def f0(h0: HeterogeneousSubclass0, i: int):
+    reveal_type(h0[0])  # revealed: Never
+    reveal_type(h0[1])  # revealed: Never
+    reveal_type(h0[-1])  # revealed: Never
+    reveal_type(h0[i])  # revealed: Never
+
+class HeterogeneousSubclass1(tuple[I0]): ...
+
+# revealed: Overload[(self, index: SupportsIndex, /) -> I0, (self, index: slice[Any, Any, Any], /) -> tuple[I0, ...]]
+reveal_type(HeterogeneousSubclass1.__getitem__)
+
+def f0(h1: HeterogeneousSubclass1, i: int):
+    reveal_type(h1[0])  # revealed: I0
+    reveal_type(h1[1])  # revealed: I0
+    reveal_type(h1[-1])  # revealed: I0
+    reveal_type(h1[i])  # revealed: I0
+
+# Element at index 2 is deliberately the same as the element at index 1,
+# to illustrate that the `__getitem__` overloads for these two indices are combined
+class HeterogeneousSubclass4(tuple[I0, I1, I0, I3]): ...
+
+# revealed: Overload[(self, index: Literal[-4, -2, 0, 2], /) -> I0, (self, index: Literal[-3, 1], /) -> I1, (self, index: Literal[-1, 3], /) -> I3, (self, index: SupportsIndex, /) -> I0 | I1 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I3, ...]]
+reveal_type(HeterogeneousSubclass4.__getitem__)
+
+def f(h4: HeterogeneousSubclass4, i: int):
+    reveal_type(h4[0])  # revealed: I0
+    reveal_type(h4[1])  # revealed: I1
+    reveal_type(h4[2])  # revealed: I0
+    reveal_type(h4[3])  # revealed: I3
+    reveal_type(h4[-1])  # revealed: I3
+    reveal_type(h4[-2])  # revealed: I0
+    reveal_type(h4[-3])  # revealed: I1
+    reveal_type(h4[-4])  # revealed: I0
+    reveal_type(h4[i])  # revealed: I0 | I1 | I3
+
+class MixedSubclass(tuple[I0, *tuple[I1, ...], I2, I3, I2, I5]): ...
+
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-3], /) -> I3, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
+reveal_type(MixedSubclass.__getitem__)
+
+def g(m: MixedSubclass, i: int):
+    reveal_type(m[0])  # revealed: I0
+    reveal_type(m[1])  # revealed: I1 | I2
+    reveal_type(m[2])  # revealed: I1 | I2 | I3
+    reveal_type(m[3])  # revealed: I1 | I2 | I3
+    reveal_type(m[4])  # revealed: I1 | I2 | I3 | I5
+
+    reveal_type(m[-1])  # revealed: I5
+    reveal_type(m[-2])  # revealed: I2
+    reveal_type(m[-3])  # revealed: I3
+    reveal_type(m[-4])  # revealed: I2
+    reveal_type(m[-5])  # revealed: I1 | I0
+
+    reveal_type(m[i])  # revealed: I0 | I1 | I2 | I3 | I5
+
+    # Ideally we would not include `I0` in the unions for these,
+    # but it's not possible to do this using only synthesized overloads.
+    reveal_type(m[5])  # revealed: I0 | I1 | I2 | I3 | I5
+    reveal_type(m[10])  # revealed: I0 | I1 | I2 | I3 | I5
+
+    # Similarly, ideally these would just be `I0` | I1`,
+    # but achieving that with only synthesized overloads wouldn't be possible
+    reveal_type(m[-6])  # revealed: I0 | I1 | I2 | I3 | I5
+    reveal_type(m[-10])  # revealed: I0 | I1 | I2 | I3 | I5
+
+class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
+
+# revealed: Overload[(self, index: Literal[-1], /) -> I3, (self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[2], /) -> I2 | I3, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
+reveal_type(MixedSubclass2.__getitem__)
+
+def g(m: MixedSubclass2, i: int):
+    reveal_type(m[0])  # revealed: I0
+    reveal_type(m[1])  # revealed: I1
+    reveal_type(m[2])  # revealed: I2 | I3
+
+    # Ideally this would just be `I2 | I3`,
+    # but that's not possible to achieve with synthesized overloads
+    reveal_type(m[3])  # revealed: I0 | I1 | I2 | I3
+
+    reveal_type(m[-1])  # revealed: I3
+    reveal_type(m[-2])  # revealed: I2 | I1
+    reveal_type(m[-3])  # revealed: I2 | I1 | I0
+
+    # Ideally this would just be `I2 | I1 | I0`,
+    # but that's not possible to achieve with synthesized overloads
+    reveal_type(m[-4])  # revealed: I0 | I1 | I2 | I3
+```
+
+The stdlib API `os.stat` is a commonly used API that returns an instance of a tuple subclass
+(`os.stat_result`), and therefore provides a good integration test for tuple subclasses.
+
+```py
+import os
+import stat
+
+reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
+reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
+reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
+
+# revealed: tuple[<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(os.stat_result.__mro__)
+
+# There are no specific overloads for the `float` elements in `os.stat_result`,
+# because the fallback `(self, index: SupportsIndex, /) -> int | float` overload
+# gives the right result for those elements in the tuple, and we aim to synthesize
+# the minimum number of overloads for any given tuple
+#
+# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
+reveal_type(os.stat_result.__getitem__)
+```
+
+Because of the synthesized `__getitem__` overloads we synthesize for tuples and tuple subclasses,
+tuples are naturally understood as being subtypes of protocols that have precise return types from
+`__getitem__` method members:
+
+```py
+from typing import Protocol, Literal
+from ty_extensions import static_assert, is_subtype_of
+
+class IntFromZeroSubscript(Protocol):
+    def __getitem__(self, index: Literal[0], /) -> int: ...
+
+static_assert(is_subtype_of(tuple[int, str], IntFromZeroSubscript))
+
+class TupleSubclass(tuple[int, str]): ...
+
+static_assert(is_subtype_of(TupleSubclass, IntFromZeroSubscript))
 ```
 
 ## Slices
