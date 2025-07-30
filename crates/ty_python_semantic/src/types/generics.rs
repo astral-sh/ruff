@@ -761,7 +761,9 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_tuple = formal_tuple.tuple(self.db);
                 let actual_tuple = actual_tuple.tuple(self.db);
-                let most_precise_length = formal_tuple.len().most_precise(actual_tuple.len());
+                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+                    return Ok(());
+                };
                 let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
                     return Ok(());
                 };

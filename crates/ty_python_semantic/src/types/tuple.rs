@@ -71,17 +71,30 @@ impl TupleLength {
         }
     }
 
-    pub(crate) fn most_precise(self, other: Self) -> Self {
+    /// Given two [`TupleLength`]s, return the more precise instance,
+    /// if it makes sense to consider one more precise than the other.
+    pub(crate) fn most_precise(self, other: Self) -> Option<Self> {
         match (self, other) {
-            // A fixed-length tuple is more precise than a variable-length one.
-            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(_, _))
-            | (TupleLength::Variable(_, _), fixed @ TupleLength::Fixed(_)) => fixed,
+            // A fixed-length tuple is equally as precise as another fixed-length tuple if they
+            // have the same length. For two differently sized fixed-length tuples, however,
+            // neither tuple length is more precise than the other: the two tuple lengths are
+            // entirely disjoint.
+            (TupleLength::Fixed(left), TupleLength::Fixed(right)) => {
+                (left == right).then_some(self)
+            }
 
-            // Otherwise the tuple with the larger number of required items is more precise.
-            _ => match self.minimum().cmp(&other.minimum()) {
-                Ordering::Less => other,
-                Ordering::Equal | Ordering::Greater => self,
-            },
+            // A fixed-length tuple is more precise than a variable-length one.
+            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(..))
+            | (TupleLength::Variable(..), fixed @ TupleLength::Fixed(_)) => Some(fixed),
+
+            // For two variable-length tuples, the tuple with the larger number
+            // of required items is more precise.
+            (TupleLength::Variable(..), TupleLength::Variable(..)) => {
+                Some(match self.minimum().cmp(&other.minimum()) {
+                    Ordering::Less => other,
+                    Ordering::Equal | Ordering::Greater => self,
+                })
+            }
         }
     }
 
