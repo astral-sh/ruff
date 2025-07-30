@@ -3696,7 +3696,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
             Err(CallDunderError::MethodNotAvailable) => {
-                report_invalid_item_assignment(&self.context, AnyNodeRef::from(&**value), value_ty);
+                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, &**value) {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to object of type `{}` with no `__setitem__` method",
+                        value_ty.display(self.db()),
+                    ));
+                };
+
                 false
             }
         }

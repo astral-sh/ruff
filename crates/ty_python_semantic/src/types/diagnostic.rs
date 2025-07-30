@@ -1821,21 +1821,6 @@ pub(super) fn report_invalid_attribute_assignment(
     );
 }
 
-pub(super) fn report_invalid_item_assignment(
-    context: &InferContext,
-    node: AnyNodeRef,
-    source_ty: Type,
-) {
-    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, node) else {
-        return;
-    };
-
-    builder.into_diagnostic(format_args!(
-        "Cannot assign to object of type `{}` with no `__setitem__` method",
-        source_ty.display(context.db()),
-    ));
-}
-
 pub(super) fn report_invalid_return_type(
     context: &InferContext,
     object_range: impl Ranged,
