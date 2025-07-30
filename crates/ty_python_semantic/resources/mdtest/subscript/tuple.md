@@ -240,9 +240,7 @@ def homogeneous(t: tuple[str, ...]) -> None:
     reveal_type(t[-3])  # revealed: str
     reveal_type(t[-4])  # revealed: str
 
-def mixed(s: tuple[str, ...]) -> None:
-    t = (1, 2, 3) + s + (8, 9, 10)
-
+def mixed(t: tuple[Literal[1], Literal[2], Literal[3], *tuple[str, ...], Literal[8], Literal[9], Literal[10]]) -> None:
     reveal_type(t[0])  # revealed: Literal[1]
     reveal_type(t[1])  # revealed: Literal[2]
     reveal_type(t[2])  # revealed: Literal[3]
