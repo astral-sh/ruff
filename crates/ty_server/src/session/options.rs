@@ -29,7 +29,6 @@ use super::settings::{GlobalSettings, WorkspaceSettings};
 /// endpoint. Most editors support this endpoint, so this is not a significant limitation.
 #[derive(Clone, Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
 pub(crate) struct InitializationOptions {
     /// The log level for the language server.
     pub(crate) log_level: Option<LogLevel>,
@@ -232,7 +231,7 @@ struct PythonExtension {
 impl Combine for PythonExtension {
     fn combine_with(&mut self, _other: Self) {
         unreachable!(
-            "`python_extension` is not expected to be combined with the intialization options as \
+            "`python_extension` is not expected to be combined with the initialization options as \
             it's only set by the ty VS Code extension in the `workspace/configuration` request."
         );
     }

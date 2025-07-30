@@ -66,6 +66,8 @@ impl Server {
             );
         }
 
+        tracing::info!("Initialization options: {initialization_options:?}");
+
         if let Some(error) = deserialization_error {
             tracing::error!(
                 "Failed to deserialize initialization options: {error}. \

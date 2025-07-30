@@ -22,7 +22,7 @@ fn empty_workspace_folders() -> Result<()> {
 fn single_workspace_folder() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .build()?
         .wait_until_workspaces_are_initialized()?;
 
@@ -41,7 +41,7 @@ fn workspace_diagnostic_registration_enable() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             workspace_root,
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
         )?
         .enable_diagnostic_dynamic_registration(true)
         .build()?
@@ -68,7 +68,7 @@ fn workspace_diagnostic_registration_disable() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             workspace_root,
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly)),
         )?
         .enable_diagnostic_dynamic_registration(true)
         .build()?

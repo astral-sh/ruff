@@ -198,7 +198,7 @@ impl Server {
             .resolved_client_capabilities
             .supports_workspace_configuration()
         {
-            tracing::debug!(
+            tracing::info!(
                 "Client does not support workspace configuration, initializing workspaces with \
                 using the initialization options"
             );
