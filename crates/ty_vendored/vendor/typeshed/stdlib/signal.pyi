@@ -311,7 +311,7 @@ def valid_signals() -> set[Signals]:
 def raise_signal(signalnum: _SIGNUM, /) -> None:
     """Send a signal to the executing process."""
 
-def set_wakeup_fd(fd: int, /, *, warn_on_full_buffer: bool = ...) -> int:
+def set_wakeup_fd(fd: int, /, *, warn_on_full_buffer: bool = True) -> int:
     """Sets the fd to be written to (with the signal number) when a signal comes in.
 
     A library can use this to wakeup select or poll.
@@ -321,5 +321,5 @@ def set_wakeup_fd(fd: int, /, *, warn_on_full_buffer: bool = ...) -> int:
     """
 
 if sys.platform == "linux":
-    def pidfd_send_signal(pidfd: int, sig: int, siginfo: None = None, flags: int = ..., /) -> None:
+    def pidfd_send_signal(pidfd: int, sig: int, siginfo: None = None, flags: int = 0, /) -> None:
         """Send a signal to a process referred to by a pid file descriptor."""

@@ -1610,7 +1610,10 @@ impl<'db> ClassLiteral<'db> {
 
         let field_policy = CodeGeneratorKind::from_class(db, self)?;
 
-        let signature_from_fields = |mut parameters: Vec<_>| {
+        let instance_ty =
+            Type::instance(db, self.apply_optional_specialization(db, specialization));
+
+        let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             let mut kw_only_field_seen = false;
             for (
                 field_name,
@@ -1683,21 +1686,26 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter = if kw_only_field_seen {
+                let mut parameter = if kw_only_field_seen || name == "__replace__" {
                     Parameter::keyword_only(field_name)
                 } else {
                     Parameter::positional_or_keyword(field_name)
                 }
                 .with_annotated_type(field_ty);
 
-                if let Some(default_ty) = default_ty {
+                if name == "__replace__" {
+                    // When replacing, we know there is a default value for the field
+                    // (the value that is currently assigned to the field)
+                    // assume this to be the declared type of the field
+                    parameter = parameter.with_default_type(field_ty);
+                } else if let Some(default_ty) = default_ty {
                     parameter = parameter.with_default_type(default_ty);
                 }
 
                 parameters.push(parameter);
             }
 
-            let mut signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            let mut signature = Signature::new(Parameters::new(parameters), return_ty);
             signature.inherited_generic_context = self.generic_context(db);
             Some(CallableType::function_like(db, signature))
         };
@@ -1715,16 +1723,13 @@ impl<'db> ClassLiteral<'db> {
 
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                     // TODO: could be `Self`.
-                    .with_annotated_type(Type::instance(
-                        db,
-                        self.apply_optional_specialization(db, specialization),
-                    ));
-                signature_from_fields(vec![self_parameter])
+                    .with_annotated_type(instance_ty);
+                signature_from_fields(vec![self_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::NamedTuple, "__new__") => {
                 let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
                     .with_annotated_type(KnownClass::Type.to_instance(db));
-                signature_from_fields(vec![cls_parameter])
+                signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
             (CodeGeneratorKind::DataclassLike, "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassParams::ORDER) {
@@ -1735,16 +1740,10 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([
                         Parameter::positional_or_keyword(Name::new_static("self"))
                             // TODO: could be `Self`.
-                            .with_annotated_type(Type::instance(
-                                db,
-                                self.apply_optional_specialization(db, specialization),
-                            )),
+                            .with_annotated_type(instance_ty),
                         Parameter::positional_or_keyword(Name::new_static("other"))
                             // TODO: could be `Self`.
-                            .with_annotated_type(Type::instance(
-                                db,
-                                self.apply_optional_specialization(db, specialization),
-                            )),
+                            .with_annotated_type(instance_ty),
                     ]),
                     Some(KnownClass::Bool.to_instance(db)),
                 );
@@ -1759,15 +1758,20 @@ impl<'db> ClassLiteral<'db> {
                     .place
                     .ignore_possibly_unbound()
             }
+            (CodeGeneratorKind::DataclassLike, "__replace__")
+                if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
+            {
+                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(instance_ty);
+
+                signature_from_fields(vec![self_parameter], Some(instance_ty))
+            }
             (CodeGeneratorKind::DataclassLike, "__setattr__") => {
                 if has_dataclass_param(DataclassParams::FROZEN) {
                     let signature = Signature::new(
                         Parameters::new([
                             Parameter::positional_or_keyword(Name::new_static("self"))
-                                .with_annotated_type(Type::instance(
-                                    db,
-                                    self.apply_optional_specialization(db, specialization),
-                                )),
+                                .with_annotated_type(instance_ty),
                             Parameter::positional_or_keyword(Name::new_static("name")),
                             Parameter::positional_or_keyword(Name::new_static("value")),
                         ]),

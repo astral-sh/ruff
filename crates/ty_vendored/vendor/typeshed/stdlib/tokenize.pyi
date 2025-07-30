@@ -185,7 +185,8 @@ def untokenize(iterable: Iterable[_Token]) -> str | Any:
     """
 
 def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Sequence[bytes]]:
-    """The detect_encoding() function is used to detect the encoding that should
+    """
+    The detect_encoding() function is used to detect the encoding that should
     be used to decode a Python source file.  It requires one argument, readline,
     in the same way as the tokenize() generator.
 
@@ -202,7 +203,8 @@ def detect_encoding(readline: Callable[[], bytes | bytearray]) -> tuple[str, Seq
     """
 
 def tokenize(readline: Callable[[], bytes | bytearray]) -> Generator[TokenInfo, None, None]:
-    """The tokenize() generator requires one argument, readline, which
+    """
+    The tokenize() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
     readline() method of built-in file objects.  Each call to the function
     should return one line of input as bytes.  Alternatively, readline

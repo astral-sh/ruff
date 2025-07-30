@@ -6,20 +6,20 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
-use crate::{Db, docstring::get_parameter_documentation, find_node::covering_node};
+use crate::{
+    Db, docstring::get_parameter_documentation, find_node::covering_node, stub_mapping::StubMapper,
+};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::{CallSignatureDetails, call_signature_details};
 
-// Limitations of the current implementation:
-
-// TODO - If the target function is declared in a stub file but defined (implemented)
-// in a source file, the documentation will not reflect the a docstring that appears
-// only in the implementation. To do this, we'll need to map the function or
-// method in the stub to the implementation and extract the docstring from there.
+// TODO: We may want to add special-case handling for calls to constructors
+// so the class docstring is used in place of (or inaddition to) any docstring
+// associated with the __new__ or __init__ call.
 
 /// Information about a function parameter
 #[derive(Debug, Clone)]
@@ -66,10 +66,6 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
 
-    if offset >= call_expr.end() {
-        return None;
-    }
-
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
         call_signature_details(db, file, call_expr);
@@ -101,11 +97,19 @@ fn get_call_expr(
     parsed: &ruff_db::parsed::ParsedModuleRef,
     offset: TextSize,
 ) -> Option<(&ast::ExprCall, usize)> {
+    let root_node: AnyNodeRef = parsed.syntax().into();
+
     // Create a range from the offset for the covering_node function.
-    let range = TextRange::new(offset, offset);
+    // Use length 1 if it fits within the root node, otherwise use zero-length range.
+    let one_char_range = TextRange::at(offset, TextSize::from(1));
+    let range = if root_node.range().contains_range(one_char_range) {
+        one_char_range
+    } else {
+        TextRange::at(offset, TextSize::from(0))
+    };
 
     // Find the covering node at the given position that is a function call.
-    let covering_node = covering_node(parsed.syntax().into(), range)
+    let covering_node = covering_node(root_node, range)
         .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
         .ok()?;
 
@@ -181,11 +185,32 @@ fn create_signature_details_from_call_signature_details(
 
 /// Determine appropriate documentation for a callable type based on its original type.
 fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>) -> String {
-    // TODO: If the definition is located within a stub file and no docstring
-    // is present, try to map the symbol to an implementation file and extract
-    // the docstring from that location.
     if let Some(definition) = definition {
-        definition.docstring(db).unwrap_or_default()
+        // First try to get the docstring from the original definition
+        let original_docstring = definition.docstring(db);
+
+        // If we got a docstring from the original definition, use it
+        if let Some(docstring) = original_docstring {
+            return docstring;
+        }
+
+        // If the definition is located within a stub file and no docstring
+        // is present, try to map the symbol to an implementation file and extract
+        // the docstring from that location.
+        let stub_mapper = StubMapper::new(db);
+        let resolved_definition = ResolvedDefinition::Definition(definition);
+
+        // Try to find the corresponding implementation definition
+        for mapped_definition in stub_mapper.map_definition(resolved_definition) {
+            if let ResolvedDefinition::Definition(impl_definition) = mapped_definition {
+                if let Some(impl_docstring) = impl_definition.docstring(db) {
+                    return impl_docstring;
+                }
+            }
+        }
+
+        // Fall back to empty string if no docstring found anywhere
+        String::new()
     } else {
         String::new()
     }
@@ -680,6 +705,95 @@ mod tests {
         assert_eq!(
             param2.documentation,
             Some("The second parameter description".to_string())
+        );
+    }
+
+    #[test]
+    fn signature_help_after_closing_paren() {
+        let test = cursor_test(
+            r#"
+        def func1(v: str) -> str:
+            return v
+
+        r = func1("")<CURSOR>
+        print(r)
+        "#,
+        );
+
+        let result = test.signature_help();
+        assert!(
+            result.is_none(),
+            "Signature help should return None after closing paren"
+        );
+    }
+
+    #[test]
+    fn signature_help_after_nested_closing_paren() {
+        let test = cursor_test(
+            r#"
+        def inner_func(x: str) -> str:
+            return x.upper()
+
+        def outer_func(a: int, b: str) -> str:
+            return f"{a}: {b}"
+
+        result = outer_func(42, inner_func("hello")<CURSOR>
+        "#,
+        );
+
+        // Should return signature help for the outer function call
+        // even though cursor is after the closing paren of the inner call
+        let result = test
+            .signature_help()
+            .expect("Should have signature help for outer function");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+        assert!(signature.label.contains("a: int") && signature.label.contains("b: str"));
+
+        // Should be on the second parameter (b: str) since we're after the inner call
+        assert_eq!(signature.active_parameter, Some(1));
+        assert_eq!(result.active_signature, Some(0));
+    }
+
+    #[test]
+    fn signature_help_stub_to_implementation_mapping() {
+        // Test that when a function is called from a stub file with no docstring,
+        // the signature help includes the docstring from the corresponding implementation file
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from lib import func
+result = func(<CURSOR>
+"#,
+            )
+            .source(
+                "lib.pyi",
+                r#"
+def func() -> str: ...
+"#,
+            )
+            .source(
+                "lib.py",
+                r#"
+def func() -> str:
+    """This function does something."""
+    return ""
+"#,
+            )
+            .build();
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+        assert_eq!(signature.label, "() -> str");
+
+        let expected_docstring = "This function does something.";
+        assert_eq!(
+            signature.documentation,
+            Some(expected_docstring.to_string())
         );
     }
 

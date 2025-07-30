@@ -21,7 +21,6 @@ use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::checkers::logical_lines::expand_indent;
 use crate::line_width::IndentWidth;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
-use crate::settings::LinterSettings;
 use crate::{AlwaysFixableViolation, Edit, Fix, Locator, Violation};
 
 /// Number of blank lines around top level classes and functions.
@@ -694,14 +693,12 @@ pub(crate) struct BlankLinesChecker<'a, 'b> {
     source_type: PySourceType,
     cell_offsets: Option<&'a CellOffsets>,
     context: &'a LintContext<'b>,
-    settings: &'a LinterSettings,
 }
 
 impl<'a, 'b> BlankLinesChecker<'a, 'b> {
     pub(crate) fn new(
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
-        settings: &'a LinterSettings,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         context: &'a LintContext<'b>,
@@ -712,7 +709,6 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             source_type,
             cell_offsets,
             context,
-            settings,
         }
     }
 
@@ -733,7 +729,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         let line_preprocessor = LinePreprocessor::new(
             tokens,
             self.locator,
-            self.settings.tab_size,
+            self.context.settings().tab_size,
             self.cell_offsets,
         );
 
@@ -879,7 +875,8 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 // `isort` defaults to 2 if before a class or function definition (except in stubs where it is one) and 1 otherwise.
                 // Defaulting to 2 (or 1 in stubs) here is correct because the variable is only used when testing the
                 // blank lines before a class or function definition.
-                u32::try_from(self.settings.isort.lines_after_imports).unwrap_or(max_lines_level)
+                u32::try_from(self.context.settings().isort.lines_after_imports)
+                    .unwrap_or(max_lines_level)
             } else {
                 max_lines_level
             }
@@ -941,8 +938,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             (LogicalLineKind::Import, Follows::FromImport)
                 | (LogicalLineKind::FromImport, Follows::Import)
         ) {
-            max_lines_level
-                .max(u32::try_from(self.settings.isort.lines_between_types).unwrap_or(u32::MAX))
+            max_lines_level.max(
+                u32::try_from(self.context.settings().isort.lines_between_types)
+                    .unwrap_or(u32::MAX),
+            )
         } else {
             expected_blank_lines_before_definition
         };

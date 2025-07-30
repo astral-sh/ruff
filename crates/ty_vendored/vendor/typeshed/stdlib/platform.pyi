@@ -23,6 +23,7 @@ def libc_ver(executable: str | None = None, lib: str = "", version: str = "", ch
     only usable for executables compiled using gcc.
 
     The file is read and scanned in chunks of chunksize bytes.
+
     """
 
 def win32_ver(release: str = "", version: str = "", csd: str = "", ptype: str = "") -> tuple[str, str, str, str]: ...
@@ -50,6 +51,7 @@ def java_ver(
 
     Values which cannot be determined are set to the defaults
     given as parameters (which all default to '').
+
     """
 
 def system_alias(system: str, release: str, version: str) -> tuple[str, str, str]:
@@ -58,6 +60,7 @@ def system_alias(system: str, release: str, version: str) -> tuple[str, str, str
 
     It also does some reordering of the information in some cases
     where it would otherwise cause confusion.
+
     """
 
 def architecture(executable: str = sys.executable, bits: str = "", linkage: str = "") -> tuple[str, str]:
@@ -78,6 +81,7 @@ def architecture(executable: str = sys.executable, bits: str = "", linkage: str 
     platforms. On some non-Unix platforms where the "file" command
     does not exist and the executable is set to the Python interpreter
     binary defaults from _default_architecture are used.
+
     """
 
 # This class is not exposed. It calls itself platform.uname_result_base.
@@ -97,7 +101,8 @@ class _uname_result_base(NamedTuple):
 # uname_result emulates a 6-field named tuple, but the processor field
 # is lazily evaluated rather than being passed in to the constructor.
 class uname_result(_uname_result_base):
-    """A uname_result that's largely compatible with a
+    """
+    A uname_result that's largely compatible with a
     simple namedtuple except that 'processor' is
     resolved late and cached to avoid calling "uname"
     except when needed.
@@ -121,12 +126,14 @@ def uname() -> uname_result:
     possible processor information as an additional tuple entry.
 
     Entries which cannot be determined are set to ''.
+
     """
 
 def system() -> str:
     """Returns the system/OS name, e.g. 'Linux', 'Windows' or 'Java'.
 
     An empty string is returned if the value cannot be determined.
+
     """
 
 def node() -> str:
@@ -134,24 +141,28 @@ def node() -> str:
     qualified)
 
     An empty string is returned if the value cannot be determined.
+
     """
 
 def release() -> str:
     """Returns the system's release, e.g. '2.2.0' or 'NT'
 
     An empty string is returned if the value cannot be determined.
+
     """
 
 def version() -> str:
     """Returns the system's release version, e.g. '#3 on degas'
 
     An empty string is returned if the value cannot be determined.
+
     """
 
 def machine() -> str:
     """Returns the machine type, e.g. 'i386'
 
     An empty string is returned if the value cannot be determined.
+
     """
 
 def processor() -> str:
@@ -161,6 +172,7 @@ def processor() -> str:
     determined. Note that many platforms do not provide this
     information or simply return the same value as for machine(),
     e.g.  NetBSD does this.
+
     """
 
 def python_implementation() -> str:
@@ -170,6 +182,7 @@ def python_implementation() -> str:
       'CPython' (C implementation of Python),
       'Jython' (Java implementation of Python),
       'PyPy' (Python implementation of Python).
+
     """
 
 def python_version() -> str:
@@ -177,6 +190,7 @@ def python_version() -> str:
 
     Note that unlike the Python sys.version, the returned value
     will always include the patchlevel (it defaults to 0).
+
     """
 
 def python_version_tuple() -> tuple[str, str, str]:
@@ -185,6 +199,7 @@ def python_version_tuple() -> tuple[str, str, str]:
 
     Note that unlike the Python sys.version, the returned value
     will always include the patchlevel (it defaults to 0).
+
     """
 
 def python_branch() -> str:
@@ -195,6 +210,7 @@ def python_branch() -> str:
     Python binary was built.
 
     If not available, an empty string is returned.
+
     """
 
 def python_revision() -> str:
@@ -205,16 +221,19 @@ def python_revision() -> str:
     Python binary was built.
 
     If not available, an empty string is returned.
+
     """
 
 def python_build() -> tuple[str, str]:
     """Returns a tuple (buildno, builddate) stating the Python
     build number and date as strings.
+
     """
 
 def python_compiler() -> str:
     """Returns a string identifying the compiler used for compiling
     Python.
+
     """
 
 def platform(aliased: bool = ..., terse: bool = ...) -> str:
@@ -233,6 +252,7 @@ def platform(aliased: bool = ..., terse: bool = ...) -> str:
 
     Setting terse to true causes the function to return only the
     absolute minimum information needed to identify the platform.
+
     """
 
 if sys.version_info >= (3, 10):

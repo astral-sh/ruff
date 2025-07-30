@@ -590,6 +590,16 @@ impl<'a> Checker<'a> {
             member,
         })
     }
+
+    /// Return the [`LintContext`] for the current analysis.
+    ///
+    /// Note that you should always prefer calling methods like `settings`, `report_diagnostic`, or
+    /// `is_rule_enabled` directly on [`Checker`] when possible. This method exists only for the
+    /// rare cases where rules or helper functions need to be accessed by both a `Checker` and a
+    /// `LintContext` in different analysis phases.
+    pub(crate) const fn context(&self) -> &'a LintContext<'a> {
+        self.context
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -3215,6 +3225,11 @@ impl<'a> LintContext<'a> {
     #[inline]
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &Diagnostic> {
         self.diagnostics.get_mut().iter()
+    }
+
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &LinterSettings {
+        self.settings
     }
 }
 
