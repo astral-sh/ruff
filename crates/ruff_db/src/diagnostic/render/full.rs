@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use ruff_diagnostics::Applicability;
+
     use crate::diagnostic::{
         DiagnosticFormat, Severity,
         render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
@@ -62,6 +64,42 @@ mod tests {
         5 |         pass
           |
         ");
+    }
+
+    #[test]
+    fn hide_severity() {
+        let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
+        env.hide_severity(true);
+        env.fix_applicability(Applicability::DisplayOnly);
+
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
+        F401 [*] `os` imported but unused
+         --> fib.py:1:8
+          |
+        1 | import os
+          |        ^^
+          |
+        help: Remove unused import: `os`
+
+        F841 [*] Local variable `x` is assigned to but never used
+         --> fib.py:6:5
+          |
+        4 | def fibonacci(n):
+        5 |     """Compute the nth number in the Fibonacci sequence."""
+        6 |     x = 1
+          |     ^
+        7 |     if n == 0:
+        8 |         return 0
+          |
+        help: Remove assignment to unused variable `x`
+
+        F821 Undefined name `a`
+         --> undef.py:1:4
+          |
+        1 | if a == 1: pass
+          |    ^
+          |
+        "#);
     }
 
     /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit c9b99e4.
