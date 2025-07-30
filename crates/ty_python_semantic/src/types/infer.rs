@@ -7690,38 +7690,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         right: Type<'db>,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
-        let is_str_literal_in_tuple = |literal: Type<'db>, tuple: TupleType<'db>| {
-            // Protect against doing a lot of work for pathologically large
-            // tuples.
-            //
-            // Ref: https://github.com/astral-sh/ruff/pull/18251#discussion_r2115909311
-            let (minimum_length, _) = tuple.tuple(self.db()).len().size_hint();
-            if minimum_length > 1 << 12 {
-                return None;
-            }
-
-            let mut definitely_true = false;
-            let mut definitely_false = true;
-            for element in tuple.tuple(self.db()).all_elements().copied() {
-                if element.is_string_literal() {
-                    if literal == element {
-                        definitely_true = true;
-                        definitely_false = false;
-                    }
-                } else if !literal.is_disjoint_from(self.db(), element) {
-                    definitely_false = false;
-                }
-            }
-
-            if definitely_true {
-                Some(true)
-            } else if definitely_false {
-                Some(false)
-            } else {
-                None
-            }
-        };
-
         // Note: identity (is, is not) for equal builtin types is unreliable and not part of the
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
@@ -7852,30 +7820,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-            }
-            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::In => {
-                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
-                    return Ok(Type::BooleanLiteral(answer));
-                }
-
-                self.infer_binary_type_comparison(
-                    KnownClass::Str.to_instance(self.db()),
-                    op,
-                    right,
-                    range,
-                )
-            }
-            (Type::StringLiteral(_), Type::Tuple(tuple)) if op == ast::CmpOp::NotIn => {
-                if let Some(answer) = is_str_literal_in_tuple(left, tuple) {
-                    return Ok(Type::BooleanLiteral(!answer));
-                }
-
-                self.infer_binary_type_comparison(
-                    KnownClass::Str.to_instance(self.db()),
-                    op,
-                    right,
-                    range,
-                )
             }
             (Type::StringLiteral(_), _) => self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
