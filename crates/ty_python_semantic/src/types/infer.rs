@@ -3655,16 +3655,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
             Err(CallDunderError::CallError(call_error_kind, bindings)) => {
-                if let Some(builder) = self.context.report_lint(&CALL_NON_CALLABLE, &**value) {
-                    match call_error_kind {
-                        CallErrorKind::NotCallable => {
+                match call_error_kind {
+                    CallErrorKind::NotCallable => {
+                        if let Some(builder) =
+                            self.context.report_lint(&CALL_NON_CALLABLE, &**value)
+                        {
                             builder.into_diagnostic(format_args!(
                                 "Method `__setitem__` of type `{}` is not callable on object of type `{}`",
                                 bindings.callable_type().display(self.db()),
                                 value_ty.display(self.db()),
                             ));
                         }
-                        CallErrorKind::BindingError => {
+                    }
+                    CallErrorKind::BindingError => {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_ASSIGNMENT, &**value)
+                        {
                             builder.into_diagnostic(format_args!(
                             "Method `__setitem__` of type `{}` cannot be called with arguments of type `{}` and `{}` \
                             on object of type `{}`",
@@ -3674,7 +3680,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             value_ty.display(self.db()),
                         ));
                         }
-                        CallErrorKind::PossiblyNotCallable => {
+                    }
+                    CallErrorKind::PossiblyNotCallable => {
+                        if let Some(builder) =
+                            self.context.report_lint(&CALL_NON_CALLABLE, &**value)
+                        {
                             builder.into_diagnostic(format_args!(
                             "Method `__setitem__` of type `{}` is possibly not callable on object of type `{}`",
                             bindings.callable_type().display(self.db()),
@@ -8738,18 +8748,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return err.fallback_return_type(self.db());
                     }
                     Err(CallDunderError::CallError(call_error_kind, bindings)) => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, value_node)
-                        {
-                            match call_error_kind {
-                                CallErrorKind::NotCallable => {
+                        match call_error_kind {
+                            CallErrorKind::NotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, value_node)
+                                {
                                     builder.into_diagnostic(format_args!(
                                     "Method `__getitem__` of type `{}` is not callable on object of type `{}`",
                                     bindings.callable_type().display(self.db()),
                                     value_ty.display(self.db()),
                                 ));
                                 }
-                                CallErrorKind::BindingError => {
+                            }
+                            CallErrorKind::BindingError => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                                {
                                     builder.into_diagnostic(format_args!(
                                         "Method `__getitem__` of type `{}` cannot be called with argument of \
                                         type `{}` on object of type `{}`",
@@ -8758,12 +8772,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         value_ty.display(self.db()),
                                     ));
                                 }
-                                CallErrorKind::PossiblyNotCallable => {
+                            }
+                            CallErrorKind::PossiblyNotCallable => {
+                                if let Some(builder) =
+                                    self.context.report_lint(&CALL_NON_CALLABLE, value_node)
+                                {
                                     builder.into_diagnostic(format_args!(
                                     "Method `__getitem__` of type `{}` is possibly not callable on object of type `{}`",
                                     bindings.callable_type().display(self.db()),
-                                    value_ty.display(self.db()),
-                                ));
+                                        value_ty.display(self.db()),
+                                    ));
                                 }
                             }
                         }

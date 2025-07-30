@@ -51,7 +51,7 @@ class Identity:
         return index
 
 a = Identity()
-# error: [call-non-callable] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with argument of type `Literal["a"]` on object of type `Identity`"
+# error: [invalid-argument-type] "Method `__getitem__` of type `bound method Identity.__getitem__(index: int) -> int` cannot be called with argument of type `Literal["a"]` on object of type `Identity`"
 a["a"]
 ```
 
@@ -104,6 +104,6 @@ class Identity:
         pass
 
 a = Identity()
-# error: [call-non-callable] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with arguments of type `Literal["a"]` and `Literal[0]` on object of type `Identity`"
+# error: [invalid-assignment] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with arguments of type `Literal["a"]` and `Literal[0]` on object of type `Identity`"
 a["a"] = 0
 ```
