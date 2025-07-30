@@ -7,16 +7,18 @@ pub(crate) mod types;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
     use ruff_python_ast::PythonVersion;
+    use ruff_python_semantic::{MemberNameImport, NameImport};
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::pyupgrade;
+    use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
@@ -293,5 +295,45 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn i002_conflict() {
+        let diagnostics = test_snippet(
+            "1",
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from_iter([
+                        // https://github.com/astral-sh/ruff/issues/18729
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "__future__".to_string(),
+                            "generator_stop".to_string(),
+                        )),
+                        // https://github.com/astral-sh/ruff/issues/16802
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "collections".to_string(),
+                            "Sequence".to_string(),
+                        )),
+                    ]),
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingRequiredImport,
+                    Rule::UnnecessaryFutureImport,
+                    Rule::DeprecatedImport,
+                ])
+            },
+        );
+        assert_diagnostics!(diagnostics, @r"
+        <filename>:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+        ℹ Safe fix
+          1 |+from __future__ import generator_stop
+        1 2 | 1
+
+        <filename>:1:1: I002 [*] Missing required import: `from collections import Sequence`
+        ℹ Safe fix
+          1 |+from collections import Sequence
+        1 2 | 1
+        ");
     }
 }
