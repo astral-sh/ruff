@@ -2,8 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{ExprBinOp, Operator};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
 /// Checks for binary operations between a value and itself with known identities.
@@ -41,7 +41,7 @@ pub(crate) struct BinaryOperatorIdentity {
     identity: String,
 }
 
-impl AlwaysFixableViolation for BinaryOperatorIdentity {
+impl Violation for BinaryOperatorIdentity {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -50,8 +50,8 @@ impl AlwaysFixableViolation for BinaryOperatorIdentity {
         )
     }
 
-    fn fix_title(&self) -> String {
-        format!("Replace with `{}`", self.identity)
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with `{}`", self.identity))
     }
 }
 
@@ -71,7 +71,7 @@ pub(crate) fn binary_operator_identity(checker: &Checker, bin_op: &ExprBinOp) {
     }
 
     // Skip boolean operations - they are logical operations, not identity simplifications
-    if left.as_boolean_literal_expr().is_some() {
+    if left.as_boolean_literal_expr().is_some() && right.as_boolean_literal_expr().is_some() {
         return;
     }
 
@@ -85,14 +85,11 @@ pub(crate) fn binary_operator_identity(checker: &Checker, bin_op: &ExprBinOp) {
         }
     };
 
-    let mut diagnostic = checker.report_diagnostic(
+    checker.report_diagnostic(
         BinaryOperatorIdentity {
             operator: *op,
-            identity: identity.clone(),
+            identity,
         },
         *range,
     );
-
-    let edit = Edit::range_replacement(identity, *range);
-    diagnostic.set_fix(Fix::safe_edit(edit));
 }
