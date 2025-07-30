@@ -69,10 +69,10 @@ impl InitializationOptions {
 /// of the server via the `workspace/didChangeConfiguration` notification.
 ///
 /// The representation of the options is split into two parts:
-/// 1. [`GlobalOptions`] which contains options that are global to the language server. They are
-///    applied to all workspaces managed by the language server.
-/// 2. [`WorkspaceOptions`] which contains options that are specific to a workspace. They are
-///    applied to the workspace these options are associated with.
+/// 1. Global options contains options that are global to the language server. They are applied to
+///    all workspaces managed by the language server.
+/// 2. Workspace options contains options that are specific to a workspace. They are applied to the
+///    workspace these options are associated with.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientOptions {
