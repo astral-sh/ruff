@@ -5,7 +5,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode};
 
-use crate::TestServerBuilder;
+use crate::{TestServer, TestServerBuilder};
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -234,7 +234,11 @@ def foo() -> str:
 
     // First request with no previous result IDs
     let first_response = server.workspace_diagnostic_request(None)?;
+
     insta::assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
+
+    // Consume all progress notifications sent during workspace diagnostics
+    consume_all_progress_notifications(&mut server)?;
 
     // Extract result IDs from the first response
     let previous_result_ids = match first_response {
@@ -317,6 +321,10 @@ def foo() -> str:
     // - File D: Full report (diagnostic content changed)
     // - File E: Full report (the range changes)
     let second_response = server.workspace_diagnostic_request(Some(previous_result_ids))?;
+
+    // Consume all progress notifications sent during the second workspace diagnostics
+    consume_all_progress_notifications(&mut server)?;
+
     insta::assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
 
     Ok(())
@@ -327,4 +335,32 @@ fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
     settings.bind_to_scope()
+}
+
+fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
+    // Always consume Begin
+    let begin_params = server.await_notification::<lsp_types::notification::Progress>()?;
+
+    // The params are already the ProgressParams type
+    let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
+        begin_params.value
+    else {
+        return Err(anyhow::anyhow!("Expected Begin progress notification"));
+    };
+
+    // Consume Report notifications - there may be multiple based on number of files
+    // Keep consuming until we hit the End notification
+    loop {
+        let params = server.await_notification::<lsp_types::notification::Progress>()?;
+
+        if let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::End(_)) =
+            params.value
+        {
+            // Found the End notification, we're done
+            break;
+        }
+        // Otherwise it's a Report notification, continue
+    }
+
+    Ok(())
 }

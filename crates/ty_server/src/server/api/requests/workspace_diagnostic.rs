@@ -1,13 +1,3 @@
-use std::collections::BTreeMap;
-
-use crate::server::Result;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
-use crate::server::api::traits::{
-    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
-};
-use crate::session::SessionSnapshot;
-use crate::session::client::Client;
-use crate::system::file_to_url;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
@@ -15,6 +5,20 @@ use lsp_types::{
     WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
     WorkspaceUnchangedDocumentDiagnosticReport,
 };
+use ruff_db::files::File;
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use ty_project::ProgressReporter;
+
+use crate::server::Result;
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::traits::{
+    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
+use crate::session::SessionSnapshot;
+use crate::session::client::Client;
+use crate::system::file_to_url;
 
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
@@ -25,7 +29,7 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
 impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     fn run(
         snapshot: SessionSnapshot,
-        _client: &Client,
+        client: &Client,
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         let index = snapshot.index();
@@ -44,10 +48,24 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             .map(|prev| (prev.uri, prev.value))
             .collect();
 
+        // Use the work done progress token from the client request, if provided
+        // Note: neither VS Code nor Zed currently support this,
+        // see https://github.com/microsoft/vscode-languageserver-node/issues/528
+        // That's why we fall back to server-initiated progress if no token is provided.
+        let work_done_progress = LazyWorkDoneProgress::new(
+            client,
+            params.work_done_progress_params.work_done_token,
+            "Checking",
+            snapshot.resolved_client_capabilities(),
+        );
+
+        // Collect all diagnostics from all projects with their database references
         let mut items = Vec::new();
 
         for db in snapshot.projects() {
-            let diagnostics = db.check();
+            let diagnostics = db.check_with_reporter(
+                &mut WorkspaceDiagnosticsProgressReporter::new(work_done_progress.clone()),
+            );
 
             // Group diagnostics by URL
             let mut diagnostics_by_url: BTreeMap<Url, Vec<_>> = BTreeMap::default();
@@ -149,6 +167,58 @@ impl RetriableRequestHandler for WorkspaceDiagnosticRequestHandler {
                 retrigger_request: true,
             })
             .ok(),
+        }
+    }
+}
+
+struct WorkspaceDiagnosticsProgressReporter {
+    total_files: usize,
+    checked_files: AtomicUsize,
+    work_done: LazyWorkDoneProgress,
+}
+
+impl WorkspaceDiagnosticsProgressReporter {
+    fn new(work_done: LazyWorkDoneProgress) -> Self {
+        Self {
+            total_files: 0,
+            checked_files: AtomicUsize::new(0),
+            work_done,
+        }
+    }
+
+    fn report_progress(&self) {
+        let checked = self.checked_files.load(Ordering::Relaxed);
+        let total = self.total_files;
+
+        #[allow(clippy::cast_possible_truncation)]
+        let percentage = if total > 0 {
+            Some((checked * 100 / total) as u32)
+        } else {
+            None
+        };
+
+        self.work_done
+            .report_progress(format!("{checked}/{total} files"), percentage);
+
+        if checked == total {
+            self.work_done
+                .set_finish_message(format!("Checked {total} files"));
+        }
+    }
+}
+
+impl ProgressReporter for WorkspaceDiagnosticsProgressReporter {
+    fn set_files(&mut self, files: usize) {
+        self.total_files += files;
+        self.report_progress();
+    }
+
+    fn report_file(&self, _file: &File) {
+        let checked = self.checked_files.fetch_add(1, Ordering::Relaxed) + 1;
+
+        if checked % 10 == 0 || checked == self.total_files {
+            // Report progress every 10 files or when all files are checked
+            self.report_progress();
         }
     }
 }

@@ -1,10 +1,5 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::Message;
@@ -15,6 +10,10 @@ use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use std::collections::{BTreeMap, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
@@ -339,7 +338,6 @@ impl Session {
         client: &Client,
     ) {
         assert!(!self.workspaces.all_initialized());
-
         for (url, options) in workspace_settings {
             tracing::debug!("Initializing workspace `{url}`");
 
@@ -453,6 +451,7 @@ impl Session {
                 .collect(),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
+            resolved_client_capabilities: self.resolved_client_capabilities,
         }
     }
 
@@ -643,6 +642,7 @@ pub(crate) struct SessionSnapshot {
     projects: Vec<ProjectDatabase>,
     index: Arc<Index>,
     position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
 }
 
 impl SessionSnapshot {
@@ -656,6 +656,10 @@ impl SessionSnapshot {
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 }
 
