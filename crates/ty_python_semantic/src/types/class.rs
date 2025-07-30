@@ -2614,10 +2614,13 @@ pub enum KnownClass {
     UnionType,
     GeneratorType,
     AsyncGeneratorType,
+    CoroutineType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Awaitable,
+    Generator,
     Deprecated,
     StdlibAlias,
     SpecialForm,
@@ -2689,7 +2692,8 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType
+            | Self::CoroutineType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2740,6 +2744,8 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
@@ -2805,12 +2811,15 @@ impl KnownClass {
             | Self::InitVar
             | Self::VersionInfo
             | Self::Bool
-            | Self::NoneType => false,
+            | Self::NoneType
+            | Self::CoroutineType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.
             Self::ABCMeta
             | Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -2859,6 +2868,8 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -2876,6 +2887,7 @@ impl KnownClass {
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
             | KnownClass::NoneType
             | KnownClass::Any
             | KnownClass::StdlibAlias
@@ -2921,7 +2933,11 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Iterable | Self::Iterator => true,
+            Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Awaitable
+            | Self::Generator => true,
 
             Self::Any
             | Self::Bool
@@ -2950,6 +2966,7 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::ModuleType
             | Self::FunctionType
             | Self::MethodType
@@ -3015,6 +3032,8 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Awaitable => "Awaitable",
+            Self::Generator => "Generator",
             Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -3025,6 +3044,7 @@ impl KnownClass {
             Self::WrapperDescriptorType => "WrapperDescriptorType",
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
+            Self::CoroutineType => "CoroutineType",
             Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
@@ -3285,11 +3305,14 @@ impl KnownClass {
             | Self::MethodType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
             | Self::NamedTuple
@@ -3370,12 +3393,15 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
@@ -3447,6 +3473,7 @@ impl KnownClass {
             | Self::WrapperDescriptorType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::SpecialForm
             | Self::ChainMap
             | Self::Counter
@@ -3461,6 +3488,8 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
@@ -3517,12 +3546,15 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "Awaitable" => Self::Awaitable,
+            "Generator" => Self::Generator,
             "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
             "GeneratorType" => Self::GeneratorType,
             "AsyncGeneratorType" => Self::AsyncGeneratorType,
+            "CoroutineType" => Self::CoroutineType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
             "UnionType" => Self::UnionType,
@@ -3627,11 +3659,14 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::WrapperDescriptorType
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => module == self.canonical_module(db),
+            | Self::NamedTupleFallback
+            | Self::Awaitable
+            | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
