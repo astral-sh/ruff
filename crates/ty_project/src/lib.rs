@@ -228,7 +228,7 @@ impl Project {
     pub(crate) fn check(
         self,
         db: &ProjectDatabase,
-        mut reporter: AssertUnwindSafe<&mut dyn ProgressReporter>,
+        reporter: &mut dyn ProgressReporter,
     ) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
