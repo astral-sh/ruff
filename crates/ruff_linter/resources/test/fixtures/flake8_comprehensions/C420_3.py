@@ -1,9 +1,9 @@
 class C: a = None
-dict.fromkeys("abc")  # OK
+{C.a: None for C.a in "abc"}
 print(C.a)
 
 x = [None]
-dict.fromkeys("abc")  # OK
+{x[0]: None for x[0] in "abc"}
 print(x)
 
 class C(list):
@@ -12,8 +12,9 @@ class C(list):
         if isinstance(index, slice): item = tuple(item)
         return item
 x = C()
-dict.fromkeys("abc")  # OK
-print(x) 
+{x[:0]: None for x[:0] in "abc"}
+print(x)
 
 # C420: side-effecting assignment targets
+# These should NOT trigger C420 because they have side-effecting assignment targets
 # See https://github.com/astral-sh/ruff/issues/19511
