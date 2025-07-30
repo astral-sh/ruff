@@ -131,11 +131,15 @@ reveal_type(takes_in_protocol(ExplicitGenericSub[str]()))  # revealed: str
 def takes_mixed_tuple_suffix[T](x: tuple[int, bytes, *tuple[str, ...], T, int]) -> T:
     return x[-2]
 
-# TODO: revealed: Literal[True]
-reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
-
 def takes_mixed_tuple_prefix[T](x: tuple[int, T, *tuple[str, ...], bool, int]) -> T:
     return x[1]
+
+def _(x: tuple[int, bytes, *tuple[str, ...], bool, int]):
+    reveal_type(takes_mixed_tuple_suffix(x))  # revealed: bool
+    reveal_type(takes_mixed_tuple_prefix(x))  # revealed: bytes
+
+# TODO: revealed: Literal[True]
+reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
 
 # TODO: revealed: Literal[b"foo"]
 reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
@@ -143,15 +147,21 @@ reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # re
 def takes_fixed_tuple[T](x: tuple[T, int]) -> T:
     return x[0]
 
+def _(x: tuple[str, int]):
+    reveal_type(takes_fixed_tuple(x))  # revealed: str
+
 reveal_type(takes_fixed_tuple((True, 42)))  # revealed: Literal[True]
 
 def takes_homogeneous_tuple[T](x: tuple[T, ...]) -> T:
     return x[0]
 
-# TODO: revealed: Literal[42]
-reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Unknown
-# TODO: revealed: Literal[42, 43]
-reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Unknown
+def _(x: tuple[str, int], y: tuple[bool, ...], z: tuple[int, str, *tuple[range, ...], bytes]):
+    reveal_type(takes_homogeneous_tuple(x))  # revealed: str | int
+    reveal_type(takes_homogeneous_tuple(y))  # revealed: bool
+    reveal_type(takes_homogeneous_tuple(z))  # revealed: int | str | range | bytes
+
+reveal_type(takes_homogeneous_tuple((42,)))  # revealed: Literal[42]
+reveal_type(takes_homogeneous_tuple((42, 43)))  # revealed: Literal[42, 43]
 ```
 
 ## Inferring a bound typevar
