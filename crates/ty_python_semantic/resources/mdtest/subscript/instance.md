@@ -1,6 +1,6 @@
 # Instance subscript
 
-## Getitem unbound
+## `__getitem__` unbound
 
 ```py
 class NotSubscriptable: ...
@@ -8,7 +8,7 @@ class NotSubscriptable: ...
 a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
 ```
 
-## Getitem not callable
+## `__getitem__` not callable
 
 ```py
 class NotSubscriptable:
@@ -18,7 +18,7 @@ class NotSubscriptable:
 a = NotSubscriptable()[0]
 ```
 
-## Valid getitem
+## Valid `__getitem__`
 
 ```py
 class Identity:
@@ -28,7 +28,7 @@ class Identity:
 reveal_type(Identity()[0])  # revealed: int
 ```
 
-## Getitem union
+## `__getitem__` union
 
 ```py
 def _(flag: bool):
@@ -41,4 +41,15 @@ def _(flag: bool):
                 return str(index)
 
     reveal_type(Identity()[0])  # revealed: int | str
+```
+
+## `__setitem__` with no `__getitem__`
+
+```py
+class NoGetitem:
+    def __setitem__(self, index: int, value: int) -> None:
+        pass
+
+a = NoGetitem()
+a[0] = 0
 ```
