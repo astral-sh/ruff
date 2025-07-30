@@ -193,9 +193,10 @@ impl DisplaySet<'_> {
         stylesheet: &Stylesheet,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
+        let hide_severity = annotation.annotation_type.is_none();
         let color = get_annotation_style(&annotation.annotation_type, stylesheet);
         let formatted_len = if let Some(id) = &annotation.id {
-            if annotation.annotation_type.is_none() {
+            if hide_severity {
                 id.len()
             } else {
                 2 + id.len() + annotation_type_len(&annotation.annotation_type)
@@ -242,7 +243,6 @@ impl DisplaySet<'_> {
             // F401 `math` imported but unused
             // SyntaxError: Cannot use `match` statement on Python 3.9...
             // ```
-            let hide_severity = annotation.annotation_type.is_none();
             let annotation_type = annotation_type_str(&annotation.annotation_type);
             if let Some(id) = annotation.id {
                 if hide_severity {
