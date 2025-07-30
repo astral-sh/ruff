@@ -3654,6 +3654,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     attribute,
                 );
             }
+
             assignable
         };
 

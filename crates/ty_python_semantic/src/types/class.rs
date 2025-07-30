@@ -23,8 +23,8 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    TypeRelationError, TypeRelationResult, TypeTransformer, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarKind, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxOrderSet, KnownModule, Program,
@@ -409,49 +409,71 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
+        self.try_is_subclass_of(db, other).is_pass()
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn try_is_subclass_of(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> TypeRelationResult {
+        self.try_has_relation_to(db, other, TypeRelation::Subtyping)
+    }
+
+    pub(super) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> TypeRelationResult {
         // TODO: remove this branch once we have proper support for TypedDicts.
         if self.is_known(db, KnownClass::Dict)
             && other
                 .iter_mro(db)
                 .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
         {
-            return true;
+            return TypeRelationResult::Pass;
         }
 
-        self.iter_mro(db).any(|base| {
-            match base {
+        let mut results = Vec::new();
+        for base in self.iter_mro(db) {
+            let res = match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => other.is_object(db).into(),
+                    TypeRelation::Assignability => (!other.is_final(db)).into(),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => TypeRelationResult::todo_fail(),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        (base == other).into()
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to(
+                        if base.origin(db) == other.origin(db) {
+                            base.specialization(db).try_has_relation_to(
                                 db,
                                 other.specialization(db),
                                 relation,
                             )
+                        } else {
+                            TypeRelationResult::todo_fail()
+                        }
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
+                        TypeRelationResult::todo_fail()
+                    }
                 },
+            };
+            if res.is_pass() {
+                return res;
             }
-        })
+            results.push(res);
+        }
+
+        TypeRelationResult::Fail(TypeRelationError::from_results(results))
     }
 
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {

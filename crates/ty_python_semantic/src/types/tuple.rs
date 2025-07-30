@@ -22,11 +22,11 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
-use crate::types::Truthiness;
+use crate::types::TypeRelationError;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
-    UnionBuilder, UnionType, cyclic::PairVisitor,
+    Truthiness, Type, TypeMapping, TypeRelation, TypeRelationResult, TypeTransformer,
+    TypeVarInstance, TypeVarVariance, UnionBuilder, UnionType, cyclic::PairVisitor,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
@@ -229,12 +229,12 @@ impl<'db> TupleType<'db> {
         self.tuple(db).find_legacy_typevars(db, typevars);
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn try_has_relation_to(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> TypeRelationResult {
         self.tuple(db)
             .has_relation_to(db, other.tuple(db), relation)
     }
@@ -399,13 +399,19 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> TypeRelationResult {
         match other {
             Tuple::Fixed(other) => {
-                self.0.len() == other.0.len()
-                    && (self.0.iter())
-                        .zip(&other.0)
-                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                if self.0.len() != other.0.len() {
+                    return TypeRelationResult::todo_fail();
+                }
+                for (self_ty, other_ty) in self.0.iter().zip(&other.0) {
+                    let res = self_ty.try_has_relation_to(db, *other_ty, relation);
+                    if res.is_fail() {
+                        return res;
+                    }
+                }
+                TypeRelationResult::Pass
             }
 
             Tuple::Variable(other) => {
@@ -414,24 +420,34 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 let mut self_iter = self.0.iter();
                 for other_ty in &other.prefix {
                     let Some(self_ty) = self_iter.next() else {
-                        return false;
+                        return TypeRelationResult::todo_fail();
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    if let TypeRelationResult::Fail(e) =
+                        self_ty.try_has_relation_to(db, *other_ty, relation)
+                    {
+                        return TypeRelationResult::Fail(e);
                     }
                 }
                 for other_ty in other.suffix.iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
-                        return false;
+                        return TypeRelationResult::todo_fail();
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    if let TypeRelationResult::Fail(e) =
+                        self_ty.try_has_relation_to(db, *other_ty, relation)
+                    {
+                        return TypeRelationResult::Fail(e);
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                for self_ty in self_iter {
+                    let res = self_ty.try_has_relation_to(db, other.variable, relation);
+                    if res.is_fail() {
+                        return res;
+                    }
+                }
+                TypeRelationResult::Pass
             }
         }
     }
@@ -741,7 +757,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> TypeRelationResult {
         match other {
             Tuple::Fixed(other) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -756,7 +772,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // length.
                 if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
                 {
-                    return false;
+                    return TypeRelationResult::todo_fail();
                 }
 
                 // In addition, the other tuple must have enough elements to match up with this
@@ -765,23 +781,27 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let mut other_iter = other.elements().copied();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
-                        return false;
+                        return TypeRelationResult::todo_fail();
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    if let TypeRelationResult::Fail(e) =
+                        self_ty.try_has_relation_to(db, other_ty, relation)
+                    {
+                        return TypeRelationResult::Fail(e);
                     }
                 }
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
-                        return false;
+                        return TypeRelationResult::todo_fail();
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    if let TypeRelationResult::Fail(e) =
+                        self_ty.try_has_relation_to(db, other_ty, relation)
+                    {
+                        return TypeRelationResult::Fail(e);
                     }
                 }
 
-                true
+                TypeRelationResult::Pass
             }
 
             Tuple::Variable(other) => {
@@ -799,26 +819,28 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !self
+                let results = self
                     .prenormalized_prefix_elements(db, self_prenormalize_variable)
                     .zip_longest(
                         other.prenormalized_prefix_elements(db, other_prenormalize_variable),
                     )
-                    .all(|pair| match pair {
+                    .map(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
+                            self_ty.try_has_relation_to(db, other_ty, relation)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.try_has_relation_to(db, other.variable, relation)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            TypeRelationResult::todo_fail()
                         }
                     })
-                {
-                    return false;
+                    .collect::<Vec<_>>();
+
+                if !results.iter().all(TypeRelationResult::is_pass) {
+                    return TypeRelationResult::Fail(TypeRelationError::from_results(results));
                 }
 
                 let self_suffix: Vec<_> = self
@@ -827,27 +849,31 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let other_suffix: Vec<_> = other
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
-                if !(self_suffix.iter().rev())
+
+                let results = (self_suffix.iter().rev())
                     .zip_longest(other_suffix.iter().rev())
-                    .all(|pair| match pair {
+                    .map(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
+                            self_ty.try_has_relation_to(db, *other_ty, relation)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.try_has_relation_to(db, other.variable, relation)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            TypeRelationResult::todo_fail()
                         }
                     })
-                {
-                    return false;
+                    .collect::<Vec<_>>();
+
+                if !results.iter().all(TypeRelationResult::is_pass) {
+                    return TypeRelationResult::Fail(TypeRelationError::from_results(results));
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                self.variable
+                    .try_has_relation_to(db, other.variable, relation)
             }
         }
     }
@@ -1080,7 +1106,12 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        relation: TypeRelation,
+    ) -> TypeRelationResult {
         match self {
             Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
             Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),

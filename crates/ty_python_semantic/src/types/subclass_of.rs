@@ -3,7 +3,7 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance,
+    TypeRelationResult, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -148,21 +148,23 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> TypeRelationResult {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                relation.is_assignability()
+                relation.is_assignability().into()
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                other_class.is_object(db) || relation.is_assignability()
+                (other_class.is_object(db) || relation.is_assignability()).into()
             }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
+                relation.is_assignability().into()
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to(db, other_class, relation)
+                self_class.try_has_relation_to(db, other_class, relation)
             }
         }
     }
