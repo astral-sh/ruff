@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 
 use crate::server::Result;
-use crate::server::api::diagnostics::to_lsp_diagnostic;
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -33,8 +31,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         let index = snapshot.index();
 
         if !index.global_settings().diagnostic_mode().is_workspace() {
-            // VS Code sends us the workspace diagnostic request every 2 seconds, so these logs can
-            // be quite verbose.
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
             return Ok(WorkspaceDiagnosticReportResult::Report(
                 WorkspaceDiagnosticReport { items: vec![] },
@@ -76,19 +72,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                     .ok()
                     .and_then(|key| index.make_document_ref(key).ok())
                     .map(|doc| i64::from(doc.version()));
-
-                // Generate result ID based on raw diagnostic content only
-                let mut hasher = DefaultHasher::new();
-                file_diagnostics.hash(&mut hasher);
-                let result_id = format!("{:x}", hasher.finish());
-
-                // Convert diagnostics to LSP format
-                let lsp_diagnostics = file_diagnostics
-                    .into_iter()
-                    .map(|diagnostic| {
-                        to_lsp_diagnostic(db, &diagnostic, snapshot.position_encoding())
-                    })
-                    .collect::<Vec<_>>();
+                let result_id = Diagnostics::result_id_from_hash(&file_diagnostics);
 
                 // Check if this file's diagnostics have changed since the previous request
                 if let Some(previous_result_id) = previous_results.remove(&url) {
@@ -105,6 +89,14 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                         continue;
                     }
                 }
+
+                // Convert diagnostics to LSP format
+                let lsp_diagnostics = file_diagnostics
+                    .into_iter()
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(db, &diagnostic, snapshot.position_encoding())
+                    })
+                    .collect::<Vec<_>>();
 
                 // Diagnostics have changed or this is the first request, return full report
                 items.push(WorkspaceDocumentDiagnosticReport::Full(

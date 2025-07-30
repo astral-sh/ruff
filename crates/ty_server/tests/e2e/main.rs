@@ -159,7 +159,7 @@ impl TestServer {
         workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
-        global_options: Option<ClientOptions>,
+        initialization_options: Option<ClientOptions>,
     ) -> Result<Self> {
         setup_tracing();
 
@@ -208,7 +208,7 @@ impl TestServer {
             workspace_configurations,
             registered_capabilities: Vec::new(),
         }
-        .initialize(workspace_folders, capabilities, global_options)
+        .initialize(workspace_folders, capabilities, initialization_options)
     }
 
     /// Perform LSP initialization handshake
@@ -216,14 +216,15 @@ impl TestServer {
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
         capabilities: ClientCapabilities,
-        global_options: Option<ClientOptions>,
+        initialization_options: Option<ClientOptions>,
     ) -> Result<Self> {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
             // TODO: This should be configurable by the test server builder. This might not be
             // required after client settings are implemented in the server.
-            initialization_options: global_options.map(|options| json!({ "settings": options})),
+            initialization_options: initialization_options
+                .map(|options| json!({ "settings": options})),
             ..Default::default()
         };
 
@@ -634,13 +635,14 @@ impl TestServer {
     pub(crate) fn document_diagnostic_request(
         &mut self,
         path: impl AsRef<SystemPath>,
+        previous_result_id: Option<String>,
     ) -> Result<DocumentDiagnosticReportResult> {
         let params = DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
             },
             identifier: Some("ty".to_string()),
-            previous_result_id: None,
+            previous_result_id,
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         };
@@ -729,7 +731,7 @@ impl Drop for TestServer {
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
     workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
-    global_options: Option<ClientOptions>,
+    initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
 }
 
@@ -756,13 +758,13 @@ impl TestServerBuilder {
         Ok(Self {
             workspaces: Vec::new(),
             test_context: TestContext::new()?,
-            global_options: None,
+            initialization_options: None,
             client_capabilities,
         })
     }
 
-    pub(crate) fn with_global_options(mut self, options: ClientOptions) -> Self {
-        self.global_options = Some(options);
+    pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
+        self.initialization_options = Some(options);
         self
     }
 
@@ -868,7 +870,7 @@ impl TestServerBuilder {
             self.workspaces,
             self.test_context,
             self.client_capabilities,
-            self.global_options,
+            self.initialization_options,
         )
     }
 }

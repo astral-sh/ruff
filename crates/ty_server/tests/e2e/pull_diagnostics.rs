@@ -9,6 +9,8 @@ use crate::TestServerBuilder;
 
 #[test]
 fn on_did_open() -> Result<()> {
+    let _filter = filter_result_id();
+
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
@@ -24,7 +26,7 @@ def foo() -> str:
         .wait_until_workspaces_are_initialized()?;
 
     server.open_text_document(foo, &foo_content, 1);
-    let diagnostics = server.document_diagnostic_request(foo)?;
+    let diagnostics = server.document_diagnostic_request(foo, None)?;
 
     insta::assert_debug_snapshot!(diagnostics);
 
@@ -32,11 +34,128 @@ def foo() -> str:
 }
 
 #[test]
+fn document_diagnostic_caching_unchanged() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(foo, &foo_content, 1);
+
+    // First request with no previous result ID
+    let first_response = server.document_diagnostic_request(foo, None)?;
+
+    // Extract result ID from first response
+    let result_id = match &first_response {
+        lsp_types::DocumentDiagnosticReportResult::Report(
+            lsp_types::DocumentDiagnosticReport::Full(report),
+        ) => report
+            .full_document_diagnostic_report
+            .result_id
+            .as_ref()
+            .expect("First response should have a result ID")
+            .clone(),
+        _ => panic!("First response should be a full report"),
+    };
+
+    // Second request with the previous result ID - should return Unchanged
+    let second_response = server.document_diagnostic_request(foo, Some(result_id))?;
+
+    // Verify it's an unchanged report
+    match second_response {
+        lsp_types::DocumentDiagnosticReportResult::Report(
+            lsp_types::DocumentDiagnosticReport::Unchanged(_),
+        ) => {
+            // Success - got unchanged report as expected
+        }
+        _ => panic!("Expected an unchanged report when diagnostics haven't changed"),
+    }
+
+    Ok(())
+}
+
+#[test]
+fn document_diagnostic_caching_changed() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content_v1 = "\
+def foo() -> str:
+    return 42
+";
+    let foo_content_v2 = "\
+def foo() -> str:
+    return \"fixed\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_file(foo, foo_content_v1)?
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(foo, &foo_content_v1, 1);
+
+    // First request with no previous result ID
+    let first_response = server.document_diagnostic_request(foo, None)?;
+
+    // Extract result ID from first response
+    let result_id = match &first_response {
+        lsp_types::DocumentDiagnosticReportResult::Report(
+            lsp_types::DocumentDiagnosticReport::Full(report),
+        ) => report
+            .full_document_diagnostic_report
+            .result_id
+            .as_ref()
+            .expect("First response should have a result ID")
+            .clone(),
+        _ => panic!("First response should be a full report"),
+    };
+
+    // Change the document to fix the error
+    server.change_text_document(
+        foo,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: foo_content_v2.to_string(),
+        }],
+        2,
+    );
+
+    // Second request with the previous result ID - should return a new full report
+    let second_response = server.document_diagnostic_request(foo, Some(result_id))?;
+
+    // Verify it's a full report (not unchanged)
+    match second_response {
+        lsp_types::DocumentDiagnosticReportResult::Report(
+            lsp_types::DocumentDiagnosticReport::Full(report),
+        ) => {
+            // Should have no diagnostics now
+            assert_eq!(report.full_document_diagnostic_report.items.len(), 0);
+        }
+        _ => panic!("Expected a full report when diagnostics have changed"),
+    }
+
+    Ok(())
+}
+
+#[test]
 fn workspace_diagnostic_caching() -> Result<()> {
-    // Redact result_id values since they are hash-based and non-deterministic
-    let mut settings = insta::Settings::clone_current();
-    settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
-    let _scoped = settings.bind_to_scope();
+    let _filter = filter_result_id();
 
     let workspace_root = SystemPath::new("src");
 
@@ -80,6 +199,20 @@ def foo() -> int:
     return \"hello\"  # Different error: expected int, got str
 ";
 
+    // File E: Modified but same diagnostic (e.g., new function added but original error remains)
+    let file_e = SystemPath::new("src/modified_same_error.py");
+    let file_e_content_v1 = "\
+def foo() -> str:
+    return 42  # Error: expected str, got int
+";
+    let file_e_content_v2 = "\
+def bar() -> int:
+    return 100  # New function added at the top
+
+def foo() -> str:
+    return 42  # Same error: expected str, got int
+";
+
     let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
 
     let mut server = TestServerBuilder::new()?
@@ -87,11 +220,12 @@ def foo() -> int:
             workspace_root,
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )?
-        .with_global_options(global_options)
+        .with_initialization_options(global_options)
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
         .with_file(file_c, file_c_content_v1)?
         .with_file(file_d, file_d_content_v1)?
+        .with_file(file_e, file_e_content_v1)?
         .enable_pull_diagnostics(true)
         .build()?
         .wait_until_workspaces_are_initialized()?;
@@ -105,19 +239,16 @@ def foo() -> int:
     // Extract result IDs from the first response
     let previous_result_ids = match first_response {
         WorkspaceDiagnosticReportResult::Report(report) => {
-            report.items.into_iter().filter_map(|item| {
-                match item {
-                    WorkspaceDocumentDiagnosticReport::Full(full_report) => {
-                        let result_id = full_report.full_document_diagnostic_report.result_id?;
-                        Some(PreviousResultId {
-                            uri: full_report.uri,
-                            value: result_id,
-                        })
-                    }
-                    WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
-                        // Shouldn't happen in the first request
-                        None
-                    }
+            report.items.into_iter().filter_map(|item| match item {
+                WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+                    let result_id = full_report.full_document_diagnostic_report.result_id?;
+                    Some(PreviousResultId {
+                        uri: full_report.uri,
+                        value: result_id,
+                    })
+                }
+                WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
+                    panic!("The first response must be a full report, not unchanged");
                 }
             })
         }
@@ -127,11 +258,12 @@ def foo() -> int:
     }
     .collect();
 
-    // Make changes to files B, C, and D (leave A unchanged)
+    // Make changes to files B, C, D, and E (leave A unchanged)
     // Need to open files before changing them
     server.open_text_document(file_b, &file_b_content_v1, 1);
     server.open_text_document(file_c, &file_c_content_v1, 1);
     server.open_text_document(file_d, &file_d_content_v1, 1);
+    server.open_text_document(file_e, &file_e_content_v1, 1);
 
     // File B: Add a new error
     server.change_text_document(
@@ -166,14 +298,33 @@ def foo() -> int:
         2,
     );
 
+    // File E: Modify the file but keep the same diagnostic
+    server.change_text_document(
+        file_e,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_e_content_v2.to_string(),
+        }],
+        2,
+    );
+
     // Second request with previous result IDs
     // Expected results:
     // - File A: Unchanged report (diagnostic hasn't changed)
     // - File B: Full report (new diagnostic appeared)
     // - File C: Full report with empty diagnostics (diagnostic was removed)
     // - File D: Full report (diagnostic content changed)
+    // - File E: Full report (the range changes)
     let second_response = server.workspace_diagnostic_request(Some(previous_result_ids))?;
     insta::assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
 
     Ok(())
+}
+
+// Redact result_id values since they are hash-based and non-deterministic
+fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
+    settings.bind_to_scope()
 }
