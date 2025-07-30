@@ -1900,13 +1900,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript {
                             value,
                             slice,
+                            ctx,
                             ..
                         }) = node
                         {
                             let value_ty = self.infer_expression(value);
                             let slice_ty = self.infer_expression(slice);
-                            let result_ty =
-                                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                            let result_ty = self
+                                .infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                             return (result_ty, is_modifiable);
                         }
                     }
@@ -8308,7 +8309,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
@@ -8318,7 +8319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
         }
@@ -8330,7 +8331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
             slice,
-            ctx: _,
+            ctx,
         } = subscript;
         let value_ty = self.infer_expression(value);
         let mut constraint_keys = vec![];
@@ -8347,7 +8348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice);
-                    self.infer_subscript_expression_types(value, value_ty, slice_ty);
+                    self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
                     return ty;
                 }
             }
@@ -8381,7 +8382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty);
+        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
 
@@ -8435,6 +8436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_node: &ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
+        expr_context: ExprContext,
     ) -> Type<'db> {
         match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
             (Type::NominalInstance(instance), _, _)
@@ -8444,11 +8446,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
+                    expr_context,
                 )
             }
 
             (Type::Union(union), _, _) => union.map(self.db(), |element| {
-                self.infer_subscript_expression_types(value_node, *element, slice_ty)
+                self.infer_subscript_expression_types(value_node, *element, slice_ty, expr_context)
             }),
 
             // TODO: we can map over the intersection and fold the results back into an intersection,
@@ -8579,6 +8582,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value_node,
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
+                expr_context,
             ),
 
             (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => {
@@ -8771,12 +8775,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 } else {
-                    report_non_subscriptable(
-                        &self.context,
-                        value_node.into(),
-                        value_ty,
-                        "__getitem__",
-                    );
+                    if expr_context != ExprContext::Store {
+                        report_non_subscriptable(
+                            &self.context,
+                            value_node.into(),
+                            value_ty,
+                            "__getitem__",
+                        );
+                    }
                 }
 
                 Type::unknown()
