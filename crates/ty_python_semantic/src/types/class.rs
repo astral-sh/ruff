@@ -53,7 +53,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
+use rustc_hash::{FxHashSet, FxHasher};
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -628,8 +628,8 @@ impl<'db> ClassType<'db> {
                     .map(|spec| {
                         let tuple = spec.tuple(db);
 
-                        let mut element_type_to_indices: FxHashMap<Type<'db>, Vec<i64>> =
-                            FxHashMap::default();
+                        let mut element_type_to_indices: FxOrderMap<Type<'db>, Vec<i64>> =
+                            FxOrderMap::default();
 
                         match tuple {
                             // E.g. for `tuple[int, str]`, we will generate the following overloads:
