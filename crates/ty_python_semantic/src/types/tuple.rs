@@ -71,6 +71,20 @@ impl TupleLength {
         }
     }
 
+    pub(crate) fn most_precise(self, other: Self) -> Self {
+        match (self, other) {
+            // A fixed-length tuple is more precise than a variable-length one.
+            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(_, _))
+            | (TupleLength::Variable(_, _), fixed @ TupleLength::Fixed(_)) => fixed,
+
+            // Otherwise the tuple with the larger number of required items is more precise.
+            _ => match self.minimum().cmp(&other.minimum()) {
+                Ordering::Less => other,
+                Ordering::Equal | Ordering::Greater => self,
+            },
+        }
+    }
+
     pub(crate) fn display_minimum(self) -> String {
         let minimum_length = self.minimum();
         match self {

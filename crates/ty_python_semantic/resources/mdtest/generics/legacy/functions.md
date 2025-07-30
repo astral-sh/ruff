@@ -152,11 +152,8 @@ def _(x: tuple[int, bytes, *tuple[str, ...], bool, int]):
     reveal_type(takes_mixed_tuple_suffix(x))  # revealed: bool
     reveal_type(takes_mixed_tuple_prefix(x))  # revealed: bytes
 
-# TODO: revealed: Literal[True]
-reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
-
-# TODO: revealed: Literal[b"foo"]
-reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Unknown
+reveal_type(takes_mixed_tuple_suffix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[True]
+reveal_type(takes_mixed_tuple_prefix((1, b"foo", "bar", "baz", True, 42)))  # revealed: Literal[b"foo"]
 
 def takes_fixed_tuple(x: tuple[T, int]) -> T:
     return x[0]
