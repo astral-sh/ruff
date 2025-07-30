@@ -2,23 +2,6 @@
 
 Async `for` loops do not work according to the synchronous iteration protocol.
 
-## Invalid async for loop
-
-```py
-async def foo():
-    class Iterator:
-        def __next__(self) -> int:
-            return 42
-
-    class Iterable:
-        def __iter__(self) -> Iterator:
-            return Iterator()
-
-    async for x in Iterator():
-        # TODO: should emit an error, `__aiter__` is not defined
-        reveal_type(x)  # revealed: Unknown
-```
-
 ## Basic async for loop
 
 ```py
@@ -50,4 +33,135 @@ async def foo():
     async for x, y in AsyncIterable():
         reveal_type(x)  # revealed: int
         reveal_type(y)  # revealed: str
+```
+
+## Error cases
+
+<!-- snapshot-diagnostics -->
+
+### No `__aiter__` method
+
+```py
+from typing_extensions import reveal_type
+
+class NotAsyncIterable: ...
+
+async def foo():
+    # error: [not-iterable] "Object of type `NotAsyncIterable` may not be iterable"
+    async for x in NotAsyncIterable():
+        reveal_type(x)  # revealed: Unknown
+```
+
+### Synchronously iterable, but not asynchronously iterable
+
+```py
+from typing_extensions import reveal_type
+
+async def foo():
+    class Iterator:
+        def __next__(self) -> int:
+            return 42
+
+    class Iterable:
+        def __iter__(self) -> Iterator:
+            return Iterator()
+
+    # error: [not-iterable] "Object of type `Iterator` may not be iterable"
+    async for x in Iterator():
+        reveal_type(x)  # revealed: Unknown
+```
+
+### No `__anext__` method
+
+```py
+from typing_extensions import reveal_type
+
+class NoAnext: ...
+
+class AsyncIterable:
+    def __aiter__(self) -> NoAnext:
+        return NoAnext()
+
+async def foo():
+    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    async for x in AsyncIterable():
+        reveal_type(x)  # revealed: Unknown
+```
+
+### Possibly unbound `__anext__` method
+
+```py
+from typing_extensions import reveal_type
+
+async def foo(flag: bool):
+    class PossiblyUnboundAnext:
+        if flag:
+            async def __anext__(self) -> int:
+                return 42
+
+    class AsyncIterable:
+        def __aiter__(self) -> PossiblyUnboundAnext:
+            return PossiblyUnboundAnext()
+
+    # error: [not-iterable] "Object of type `AsyncIterable` may not be iterable"
+    async for x in AsyncIterable():
+        reveal_type(x)  # revealed: int
+```
+
+### Possibly unbound `__aiter__` method
+
+```py
+from typing_extensions import reveal_type
+
+async def foo(flag: bool):
+    class AsyncIterable:
+        async def __anext__(self) -> int:
+            return 42
+
+    class PossiblyUnboundAiter:
+        if flag:
+            def __aiter__(self) -> AsyncIterable:
+                return AsyncIterable()
+
+    # error: "Object of type `PossiblyUnboundAiter` may not be iterable"
+    async for x in PossiblyUnboundAiter():
+        reveal_type(x)  # revealed: int
+```
+
+### Wrong signature for `__aiter__`
+
+```py
+from typing_extensions import reveal_type
+
+class AsyncIterator:
+    async def __anext__(self) -> int:
+        return 42
+
+class AsyncIterable:
+    def __aiter__(self, arg: int) -> AsyncIterator:  # wrong
+        return AsyncIterator()
+
+async def foo():
+    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    async for x in AsyncIterable():
+        reveal_type(x)  # revealed: int
+```
+
+### Wrong signature for `__anext__`
+
+```py
+from typing_extensions import reveal_type
+
+class AsyncIterator:
+    async def __anext__(self, arg: int) -> int:  # wrong
+        return 42
+
+class AsyncIterable:
+    def __aiter__(self) -> AsyncIterator:
+        return AsyncIterator()
+
+async def foo():
+    # error: [not-iterable] "Object of type `AsyncIterable` is not iterable"
+    async for x in AsyncIterable():
+        reveal_type(x)  # revealed: int
 ```

@@ -27,6 +27,7 @@ If all of the comprehensions are `async`, on the other hand, the code was still 
 
 ```py
 async def test():
+    # error: [not-iterable] "Object of type `range` may not be iterable"
     return [[x async for x in elements(n)] async for n in range(3)]
 ```
 

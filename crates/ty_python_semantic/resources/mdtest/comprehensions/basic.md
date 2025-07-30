@@ -147,7 +147,7 @@ class Iterable:
         return Iterator()
 
 async def _():
-    # TODO: this should emit an error, `__aiter__` is not defined
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
     # revealed: Unknown
     [reveal_type(x) async for x in Iterable()]
 ```
