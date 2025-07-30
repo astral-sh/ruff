@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{Alias, Stmt, StmtRef};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -85,21 +85,23 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
-pub(crate) fn is_import_required_by_isort(checker: &Checker, stmt: &Stmt, alias: &Alias) -> bool {
+pub(crate) fn is_import_required_by_isort(
+    checker: &Checker,
+    stmt: StmtRef<'_>,
+    alias: &Alias,
+) -> bool {
     let name_import = match stmt {
-        ruff_python_ast::Stmt::ImportFrom(ruff_python_ast::StmtImportFrom {
-            module,
-            level,
-            ..
-        }) => NameImport::ImportFrom(MemberNameImport {
-            module: module.as_ref().map(std::string::ToString::to_string),
-            name: ruff_python_semantic::Alias {
-                name: alias.name.to_string(),
-                as_name: None,
-            },
-            level: *level,
-        }),
-        ruff_python_ast::Stmt::Import(_) => NameImport::Import(ModuleNameImport {
+        StmtRef::ImportFrom(ruff_python_ast::StmtImportFrom { module, level, .. }) => {
+            NameImport::ImportFrom(MemberNameImport {
+                module: module.as_ref().map(std::string::ToString::to_string),
+                name: ruff_python_semantic::Alias {
+                    name: alias.name.to_string(),
+                    as_name: None,
+                },
+                level: *level,
+            })
+        }
+        StmtRef::Import(_) => NameImport::Import(ModuleNameImport {
             name: ruff_python_semantic::Alias {
                 name: alias.name.to_string(),
                 as_name: None,
@@ -123,7 +125,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             continue;
         }
 
-        if is_import_required_by_isort(checker, stmt, alias) {
+        if is_import_required_by_isort(checker, stmt.into(), alias) {
             continue;
         }
 

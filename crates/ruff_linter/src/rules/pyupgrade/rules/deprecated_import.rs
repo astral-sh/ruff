@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Alias, Stmt, StmtImportFrom};
+use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
@@ -720,9 +720,8 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         return;
     }
 
-    let stmt = Stmt::ImportFrom(import_from_stmt.clone());
     for alias in &import_from_stmt.names {
-        if is_import_required_by_isort(checker, &stmt, alias) {
+        if is_import_required_by_isort(checker, StmtRef::ImportFrom(import_from_stmt), alias) {
             return;
         }
     }
