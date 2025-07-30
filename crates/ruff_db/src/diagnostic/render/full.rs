@@ -67,7 +67,7 @@ mod tests {
     }
 
     #[test]
-    fn hide_severity() {
+    fn hide_severity_output() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
         env.fix_applicability(Applicability::DisplayOnly);
@@ -100,6 +100,34 @@ mod tests {
           |    ^
           |
         "#);
+    }
+
+    #[test]
+    fn hide_severity_syntax_errors() {
+        let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
+        env.hide_severity(true);
+
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        SyntaxError: Expected one or more symbol names after import
+         --> syntax_errors.py:1:15
+          |
+        1 | from os import
+          |               ^
+        2 |
+        3 | if call(foo
+          |
+
+        SyntaxError: Expected ')', found newline
+         --> syntax_errors.py:3:12
+          |
+        1 | from os import
+        2 |
+        3 | if call(foo
+          |            ^
+        4 |     def bar():
+        5 |         pass
+          |
+        ");
     }
 
     /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit c9b99e4.
