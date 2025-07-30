@@ -265,8 +265,14 @@ impl<'a> ResolvedDiagnostic<'a> {
             (id, message)
         };
 
+        let level = if config.hide_severity {
+            AnnotateLevel::None
+        } else {
+            diag.inner.severity.to_annotate()
+        };
+
         ResolvedDiagnostic {
-            level: diag.inner.severity.to_annotate(),
+            level,
             id,
             message,
             annotations,
