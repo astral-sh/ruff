@@ -40,7 +40,7 @@ class OnceIterator(Generic[T]):
 
     def __next__(self) -> T:
         if self.returned:
-            raise StopIteration
+            raise StopIteration(42)
 
         self.returned = True
         return self.value
@@ -58,8 +58,15 @@ for x in Once("a"):
 def generator() -> Generator:
     result = yield from Once("a")
 
-    # The `StopIteration` exception might have a `value` attribute which the default of `None`,
-    # or it could have been customized. So we just return `Unknown` here:
+    # At runtime, the value of `result` will be the `.value` attribute of the `StopIteration`
+    # error raised by `OnceIterator` to signal to the interpreter that the iterator has been
+    # exhausted. Here that will always be 42, but this information cannot be captured in the
+    # signature of `OnceIterator.__next__`, since exceptions lie outside the type signature.
+    # We therefore just infer `Unknown` here.
+    #
+    # If the `StopIteration` error in `OnceIterator.__next__` had been simply `raise StopIteration`
+    # (the more common case), then the `.value` attribute of the `StopIteration` instance
+    # would default to `None`.
     reveal_type(result)  # revealed: Unknown
 ```
 
