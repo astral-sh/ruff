@@ -254,7 +254,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
         let specialization = self.specialization(db);
 
-        // if the class is the thing definint the variable, then it can
+        // if the class is the thing defining the variable, then it can
         // reference it without it being applied to the specialization
         std::iter::once(origin.variance_of(db, type_var))
             .chain(

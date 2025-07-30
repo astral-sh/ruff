@@ -390,5 +390,145 @@ static_assert(not is_subtype_of(D[Any], D[A]))
 static_assert(not is_subtype_of(D[Any], D[B]))
 ```
 
+## Class Attributes
+
+### Mutable Attributes
+
+Normal attribtues are mutable, and so are invariant (see [inv]).
+
+```py
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    x: T
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+One might think that normal attributes are
+
+### Immutable Attributes
+
+Immutable attributes can't be written to, and so don't have the same problem as mutable ones.
+
+```py
+from dataclasses import dataclass
+from typing import Final, NamedTuple
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    x: Final[T]
+
+@dataclass(frozen=True)
+class D[U]:
+    y: U
+
+class E[V](NamedTuple):
+    z: V
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+
+static_assert(is_subtype_of(E[B], E[A]))
+static_assert(not is_subtype_of(E[A], E[B]))
+```
+
+### Properties
+
+Properties are covariant if they are get-only and invariant if they are getset
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    @property
+    def x(self) -> T | None:
+        return None
+
+class D[U]:
+    @property
+    def y(self) -> T | None:
+        return None
+
+    @y.setter
+    def value(self, value: U): ...
+```
+
+while accessing `D().x` will give you an `int`, the descriptor methods say this should be
+contravariant
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+### Implicit Attributes
+
+Implicit attributes work like normal ones
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+class C[T]:
+    def f(self) -> None:
+        self.x: T | None = None
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(not is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+### Constructors: excluding `__init__` and `__new__`
+
+We consider it invalid to call `__init__` explicitly on an existing object. Likewise, `__new__` is
+only used at the beginning of an object's life. As such, we don't need to worry about the variance
+impact of these methods.
+
+```py
+from ty_extensions import static_assert, is_subtype_of
+
+class A: ...
+class B(A): ...
+
+class C[T]:
+    def __init__(self, x: T): ...
+    def __new__(self, x: T): ...
+
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(is_subtype_of(C[A], C[B]))
+```
+
+This example is then bivariant because it doesn't use `T` outside of the two exempted methods.
+
+This holds likewise for dataclasses with synthesized **init**
+
+```py
+from dataclasses import dataclass
+
+@dataclass(init=True)
+class D[T]: ...
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(is_subtype_of(D[A], D[B]))
+```
+
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
