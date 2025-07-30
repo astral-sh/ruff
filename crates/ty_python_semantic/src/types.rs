@@ -4749,6 +4749,21 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn try_async_iterate(self, db: &'db dyn Db) -> Cow<'db, TupleSpec<'db>> {
+        match self.try_call_dunder(db, "__aiter__", CallArguments::none()) {
+            Ok(bindings) => {
+                let iterator = bindings.return_type(db);
+                match iterator.try_call_dunder(db, "__anext__", CallArguments::none()) {
+                    Ok(dunder_anext_outcome) => Cow::Owned(TupleSpec::homogeneous(
+                        dunder_anext_outcome.return_type(db).resolve_await(db),
+                    )),
+                    Err(_) => Cow::Owned(TupleSpec::homogeneous(Type::unknown())),
+                }
+            }
+            Err(_) => Cow::Owned(TupleSpec::homogeneous(Type::unknown())),
+        }
+    }
+
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
@@ -4818,7 +4833,7 @@ impl<'db> Type<'db> {
     fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
-        // an ad-hoc solution that works for protocols and instances of classes that directly inherit
+        // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
         // from the `Generator` protocol, such as `types.GeneratorType`.
 
         let from_class_base = |base: ClassBase<'db>| {

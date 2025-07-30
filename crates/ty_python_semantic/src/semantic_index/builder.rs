@@ -2804,7 +2804,15 @@ impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
+            Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
+                is_async: *is_async,
+            },
+            Unpackable::Comprehension {
+                node: ast::Comprehension { is_async, .. },
+                ..
+            } => UnpackKind::Iterable {
+                is_async: *is_async,
+            },
             Unpackable::WithItem { is_async, .. } => UnpackKind::ContextManager {
                 is_async: *is_async,
             },

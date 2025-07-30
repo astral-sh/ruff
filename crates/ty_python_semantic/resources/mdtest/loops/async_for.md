@@ -15,12 +15,8 @@ async def foo():
             return Iterator()
 
     async for x in Iterator():
-        pass
-
-    # TODO: should reveal `Unknown` because `__aiter__` is not defined
-    # revealed: @Todo(async iterables/iterators)
-    # error: [possibly-unresolved-reference]
-    reveal_type(x)
+        # TODO: should emit an error, `__aiter__` is not defined
+        reveal_type(x)  # revealed: Unknown
 ```
 
 ## Basic async for loop
@@ -35,11 +31,23 @@ async def foo():
         def __aiter__(self) -> IntAsyncIterator:
             return IntAsyncIterator()
 
-    # TODO(Alex): async iterables/iterators!
     async for x in IntAsyncIterable():
-        pass
+        reveal_type(x)  # revealed: int
+```
 
-    # error: [possibly-unresolved-reference]
-    # revealed: @Todo(async iterables/iterators)
-    reveal_type(x)
+## Async for loop with unpacking
+
+```py
+async def foo():
+    class AsyncIterator:
+        async def __anext__(self) -> tuple[int, str]:
+            return 42, "hello"
+
+    class AsyncIterable:
+        def __aiter__(self) -> AsyncIterator:
+            return AsyncIterator()
+
+    async for x, y in AsyncIterable():
+        reveal_type(x)  # revealed: int
+        reveal_type(y)  # revealed: str
 ```

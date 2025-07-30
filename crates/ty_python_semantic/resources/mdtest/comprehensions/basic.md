@@ -128,7 +128,7 @@ class AsyncIterable:
         return AsyncIterator()
 
 async def _():
-    # revealed: @Todo(async iterables/iterators)
+    # revealed: int
     [reveal_type(x) async for x in AsyncIterable()]
 ```
 
@@ -147,6 +147,7 @@ class Iterable:
         return Iterator()
 
 async def _():
-    # revealed: @Todo(async iterables/iterators)
+    # TODO: this should emit an error, `__aiter__` is not defined
+    # revealed: Unknown
     [reveal_type(x) async for x in Iterable()]
 ```

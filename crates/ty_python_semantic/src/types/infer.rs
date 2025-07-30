@@ -4560,21 +4560,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let iterable = for_stmt.iterable(self.module());
         let target = for_stmt.target(self.module());
 
-        let loop_var_value_type = if for_stmt.is_async() {
-            let _iterable_type = self.infer_standalone_expression(iterable);
-            todo_type!("async iterables/iterators")
-        } else {
-            match for_stmt.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
-
-                    unpacked.expression_type(target)
+        let loop_var_value_type = match for_stmt.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
                 }
-                TargetKind::Single => {
-                    let iterable_type = self.infer_standalone_expression(iterable);
+
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let iterable_type = self.infer_standalone_expression(iterable);
+
+                if for_stmt.is_async() {
+                    iterable_type
+                        .try_async_iterate(self.db())
+                        .homogeneous_element_type(self.db())
+                } else {
                     iterable_type
                         .try_iterate(self.db())
                         .map(|tuple| tuple.homogeneous_element_type(self.db()))
@@ -5692,22 +5694,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        let target_type = if comprehension.is_async() {
-            // TODO: async iterables/iterators! -- Alex
-            let _iterable_type = infer_iterable_type();
-            todo_type!("async iterables/iterators")
-        } else {
-            match comprehension.target_kind() {
-                TargetKind::Sequence(unpack_position, unpack) => {
-                    let unpacked = infer_unpack_types(self.db(), unpack);
-                    if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked.diagnostics());
-                    }
-
-                    unpacked.expression_type(target)
+        let target_type = match comprehension.target_kind() {
+            TargetKind::Sequence(unpack_position, unpack) => {
+                let unpacked = infer_unpack_types(self.db(), unpack);
+                if unpack_position == UnpackPosition::First {
+                    self.context.extend(unpacked.diagnostics());
                 }
-                TargetKind::Single => {
-                    let iterable_type = infer_iterable_type();
+
+                unpacked.expression_type(target)
+            }
+            TargetKind::Single => {
+                let iterable_type = infer_iterable_type();
+
+                if comprehension.is_async() {
+                    iterable_type
+                        .try_async_iterate(self.db())
+                        .homogeneous_element_type(self.db())
+                } else {
                     iterable_type
                         .try_iterate(self.db())
                         .map(|tuple| tuple.homogeneous_element_type(self.db()))
