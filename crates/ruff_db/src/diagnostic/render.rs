@@ -866,48 +866,17 @@ fn replace_whitespace_and_unprintable<'r>(
         }
     };
 
-    const TAB_SIZE: usize = 4;
-    let mut width = 0;
-    let mut column = 0;
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        let old_width = width;
-        match c {
-            '\n' | '\r' => {
-                width = 0;
-                column = 0;
-            }
-            '\t' => {
-                let tab_offset = TAB_SIZE - (column % TAB_SIZE);
-                width += tab_offset;
-                column += tab_offset;
+        if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
 
-                let tab_width =
-                    u32::try_from(width - old_width).expect("small width because of tab size");
-                result.push_str(&source[last_end..index]);
+            let len = printable.text_len().to_u32();
+            update_ranges(result.text_len().to_usize(), len);
 
-                update_ranges(result.text_len().to_usize(), tab_width);
-
-                for _ in 0..tab_width {
-                    result.push(' ');
-                }
-                last_end = index + 1;
-            }
-            _ => {
-                width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-                column += 1;
-
-                if let Some(printable) = unprintable_replacement(c) {
-                    result.push_str(&source[last_end..index]);
-
-                    let len = printable.text_len().to_u32();
-                    update_ranges(result.text_len().to_usize(), len);
-
-                    result.push(printable);
-                    last_end = index + 1;
-                }
-            }
+            result.push(printable);
+            last_end = index + 1;
         }
     }
 
