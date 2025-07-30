@@ -12,13 +12,6 @@ impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
     }
-
-    pub(crate) fn combine(mut self, other: &GlobalSettings) -> GlobalSettings {
-        if self.diagnostic_mode.is_workspace() || other.diagnostic_mode.is_workspace() {
-            self.diagnostic_mode = DiagnosticMode::Workspace;
-        }
-        self
-    }
 }
 
 /// Resolved client settings for a specific workspace.

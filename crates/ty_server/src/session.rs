@@ -16,6 +16,7 @@ use lsp_types::{
     DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
+use options::{Combine, GlobalOptions};
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -70,12 +71,8 @@ pub(crate) struct Session {
     /// That's what we use the default project for.
     default_project: DefaultProject,
 
-    /// Global settings for the language server.
-    ///
-    /// This starts off with the default values, but is updated with the resolved settings once the
-    /// workspace initialization is complete in [`initialize_workspaces`].
-    ///
-    /// [`initialize_workspaces`]: Session::initialize_workspaces
+    initialization_options: InitializationOptions,
+
     global_settings: Arc<GlobalSettings>,
 
     /// The global position encoding, negotiated during LSP initialization.
@@ -120,6 +117,7 @@ impl Session {
         resolved_client_capabilities: ResolvedClientCapabilities,
         position_encoding: PositionEncoding,
         workspace_urls: Vec<Url>,
+        initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
@@ -138,6 +136,7 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             default_project: DefaultProject::new(),
+            initialization_options,
             global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
             resolved_client_capabilities,
@@ -153,6 +152,10 @@ impl Session {
 
     pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
         &mut self.request_queue
+    }
+
+    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
+        &self.initialization_options
     }
 
     pub(crate) fn is_shutdown_requested(&self) -> bool {
@@ -359,21 +362,31 @@ impl Session {
     ) {
         assert!(!self.workspaces.all_initialized());
 
-        let mut combined_global_settings: Option<GlobalSettings> = None;
+        // These are the options combined from all the global options received by the server for
+        // each workspace via the workspace configuration request.
+        let mut combined_global_options: Option<GlobalOptions> = None;
 
         for (url, options) in workspace_settings {
             tracing::debug!("Initializing workspace `{url}`");
 
-            let (global_settings, workspace_settings) = options.into_settings();
+            // Combine the global options specified during initialization with the
+            // workspace-specific options to create the final workspace options.
+            let ClientOptions { global, workspace } = self
+                .initialization_options
+                .options
+                .clone()
+                .combine(options.clone());
+
+            combined_global_options = if let Some(global_options) = combined_global_options.take() {
+                Some(global_options.combine(global))
+            } else {
+                Some(global)
+            };
+
+            let workspace_settings = workspace.into_settings();
             let Some((root, workspace)) = self.workspaces.initialize(&url, workspace_settings)
             else {
                 continue;
-            };
-
-            // TODO: Provide diagnostics if the global settings are different across workspaces
-            combined_global_settings = match combined_global_settings {
-                Some(settings) => Some(settings.combine(&global_settings)),
-                None => Some(global_settings),
             };
 
             // For now, create one project database per workspace.
@@ -441,16 +454,19 @@ impl Session {
             publish_settings_diagnostics(self, client, root);
         }
 
-        let global_settings = combined_global_settings.unwrap();
-        if global_settings.diagnostic_mode().is_workspace() {
-            for project in self.projects.values_mut() {
-                if project.db.check_mode() != CheckMode::AllFiles {
-                    project.db.set_check_mode(CheckMode::AllFiles);
+        if let Some(global_options) = combined_global_options.take() {
+            let global_settings = global_options.into_settings();
+            if global_settings.diagnostic_mode().is_workspace() {
+                for project in self.projects.values_mut() {
+                    if project.db.check_mode() != CheckMode::AllFiles {
+                        project.db.set_check_mode(CheckMode::AllFiles);
+                    }
                 }
             }
+            self.global_settings = Arc::new(global_settings);
         }
-        self.register_diagnostic_capability(client, global_settings.diagnostic_mode());
-        self.global_settings = Arc::new(global_settings);
+
+        self.register_diagnostic_capability(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -471,7 +487,7 @@ impl Session {
     ///
     /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
     /// capabilities.
-    fn register_diagnostic_capability(&mut self, client: &Client, diagnostic_mode: DiagnosticMode) {
+    fn register_diagnostic_capability(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
 
         if !self
@@ -480,6 +496,8 @@ impl Session {
         {
             return;
         }
+
+        let diagnostic_mode = self.global_settings.diagnostic_mode;
 
         if self.diagnostic_capability_registered {
             client.send_request::<UnregisterCapability>(
@@ -491,7 +509,7 @@ impl Session {
                     }],
                 },
                 |_: &Client, ()| {
-                    tracing::info!("Unregistered diagnostic capability");
+                    tracing::debug!("Unregistered diagnostic capability");
                 },
             );
         }
@@ -518,7 +536,7 @@ impl Session {
                 registrations: vec![registration],
             },
             move |_: &Client, ()| {
-                tracing::info!(
+                tracing::debug!(
                     "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
                 );
             },

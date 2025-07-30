@@ -4,7 +4,7 @@ use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use ty_project::metadata::Options;
+use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
@@ -12,11 +12,22 @@ use crate::logging::LogLevel;
 
 use super::settings::{GlobalSettings, WorkspaceSettings};
 
-/// Static initialization options that are set once at server startup that never change.
+/// Initialization options that are set once at server startup that never change.
 ///
-/// These are equivalent to command-line arguments and configure fundamental server behavior. Any
-/// changes to these options require a server restart to take effect.
-#[derive(Debug, Deserialize, Default)]
+/// There are two sets of options that are defined here:
+/// 1. Options that are static, set once and are required at server startup. Any changes to these
+///    options require a server restart to take effect.
+/// 2. Options that are dynamic and can change during the runtime of the server, such as the
+///    diagnostic mode.
+///
+/// The dynamic options are also accepted during the initialization phase, so that we can support
+/// clients that do not support the `workspace/didChangeConfiguration` notification.
+///
+/// Note that this structure has a limitation in that there's no way to specify different options
+/// for different workspaces in the initialization options which means that the server will not
+/// support multiple workspaces for clients that do not implement the `workspace/configuration`
+/// endpoint. Most editors support this endpoint, so this is not a significant limitation.
+#[derive(Clone, Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub(crate) struct InitializationOptions {
@@ -27,11 +38,19 @@ pub(crate) struct InitializationOptions {
     ///
     /// Tildes (`~`) and environment variables (e.g., `$HOME`) are expanded.
     pub(crate) log_file: Option<SystemPathBuf>,
+
+    /// The remaining options that are dynamic and can change during the runtime of the server.
+    #[serde(flatten)]
+    pub(crate) options: ClientOptions,
 }
 
 impl InitializationOptions {
     /// Create the initialization options from the given JSON value that corresponds to the
     /// initialization options sent by the client.
+    ///
+    /// It returns a tuple of the initialization options and an optional error if the JSON value
+    /// could not be deserialized into the initialization options. In case of an error, the default
+    /// initialization options are returned.
     pub(crate) fn from_value(
         options: Option<Value>,
     ) -> (InitializationOptions, Option<serde_json::Error>) {
@@ -50,20 +69,61 @@ impl InitializationOptions {
 /// asking for workspace configuration. These options are dynamic and can change during the runtime
 /// of the server via the `workspace/didChangeConfiguration` notification.
 ///
-/// Usually, these options are at per-workspace level, but these can also include options that
-/// needs to be applied globally such as the diagnostic mode. It's included here because they can
-/// be changed dynamically by the client.
+/// The representation of the options is split into two parts:
+/// 1. [`GlobalOptions`] which contains options that are global to the language server. They are
+///    applied to all workspaces managed by the language server.
+/// 2. [`WorkspaceOptions`] which contains options that are specific to a workspace. They are
+///    applied to the workspace these options are associated with.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientOptions {
-    /// Diagnostic mode for the language server.
-    ///
-    /// This applies to all of the workspaces that are managed by the language server.
-    diagnostic_mode: Option<DiagnosticMode>,
+    #[serde(flatten)]
+    pub(crate) global: GlobalOptions,
 
+    #[serde(flatten)]
+    pub(crate) workspace: WorkspaceOptions,
+}
+
+impl ClientOptions {
+    #[must_use]
+    pub fn with_diagnostic_mode(mut self, diagnostic_mode: DiagnosticMode) -> Self {
+        self.global.diagnostic_mode = Some(diagnostic_mode);
+        self
+    }
+}
+
+impl Combine for ClientOptions {
+    fn combine_with(&mut self, other: Self) {
+        self.global.combine_with(other.global);
+        self.workspace.combine_with(other.workspace);
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GlobalOptions {
+    /// Diagnostic mode for the language server.
+    diagnostic_mode: Option<DiagnosticMode>,
+}
+
+impl GlobalOptions {
+    pub(crate) fn into_settings(self) -> GlobalSettings {
+        GlobalSettings {
+            diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
+        }
+    }
+}
+
+impl Combine for GlobalOptions {
+    fn combine_with(&mut self, other: Self) {
+        self.diagnostic_mode.combine_with(other.diagnostic_mode);
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkspaceOptions {
     /// Whether to disable language services like code completions, hover, etc.
-    ///
-    /// This is applied for individual workspaces.
     disable_language_services: Option<bool>,
 
     /// Information about the currently active Python environment in the VS Code Python extension.
@@ -72,13 +132,12 @@ pub struct ClientOptions {
     python_extension: Option<PythonExtension>,
 }
 
-impl ClientOptions {
-    /// Returns the client settings that are relevant to the language server.
-    pub(crate) fn into_settings(self) -> (GlobalSettings, WorkspaceSettings) {
+impl WorkspaceOptions {
+    pub(crate) fn into_settings(self) -> WorkspaceSettings {
         let overrides = self.python_extension.and_then(|extension| {
             let active_environment = extension.active_environment?;
 
-            let mut overrides = ProjectOptionsOverrides::new(None, Options::default());
+            let mut overrides = ProjectOptionsOverrides::new(None, TyOptions::default());
 
             overrides.fallback_python = if let Some(environment) = &active_environment.environment {
                 environment.folder_uri.to_file_path().ok().and_then(|path| {
@@ -102,35 +161,34 @@ impl ClientOptions {
 
             if let Some(python) = &overrides.fallback_python {
                 tracing::debug!(
-                    "Using the Python environment selected in the VS Code Python extension in case the configuration doesn't specify a Python environment: {python}",
+                    "Using the Python environment selected in the VS Code Python extension \
+                    in case the configuration doesn't specify a Python environment: {python}",
                     python = python.path()
                 );
             }
 
             if let Some(version) = &overrides.fallback_python_version {
                 tracing::debug!(
-                    "Using the Python version selected in the VS Code Python extension: {version} in case the configuration doesn't specify a Python version",
+                    "Using the Python version selected in the VS Code Python extension: {version} \
+                    in case the configuration doesn't specify a Python version",
                 );
             }
 
             Some(overrides)
         });
 
-        (
-            GlobalSettings {
-                diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
-            },
-            WorkspaceSettings {
-                disable_language_services: self.disable_language_services.unwrap_or_default(),
-                overrides,
-            },
-        )
+        WorkspaceSettings {
+            disable_language_services: self.disable_language_services.unwrap_or_default(),
+            overrides,
+        }
     }
+}
 
-    #[must_use]
-    pub fn with_diagnostic_mode(mut self, diagnostic_mode: DiagnosticMode) -> Self {
-        self.diagnostic_mode = Some(diagnostic_mode);
-        self
+impl Combine for WorkspaceOptions {
+    fn combine_with(&mut self, other: Self) {
+        self.disable_language_services
+            .combine_with(other.disable_language_services);
+        self.python_extension.combine_with(other.python_extension);
     }
 }
 
@@ -157,10 +215,27 @@ impl DiagnosticMode {
     }
 }
 
+impl Combine for DiagnosticMode {
+    fn combine_with(&mut self, other: Self) {
+        if other.is_workspace() {
+            *self = DiagnosticMode::Workspace;
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct PythonExtension {
     active_environment: Option<ActiveEnvironment>,
+}
+
+impl Combine for PythonExtension {
+    fn combine_with(&mut self, _other: Self) {
+        unreachable!(
+            "`python_extension` is not expected to be combined with the intialization options as \
+            it's only set by the ty VS Code extension in the `workspace/configuration` request."
+        );
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -200,3 +275,81 @@ pub(crate) struct PythonExecutable {
     pub(crate) uri: Url,
     pub(crate) sys_prefix: SystemPathBuf,
 }
+
+pub(crate) trait Combine {
+    #[must_use]
+    fn combine(mut self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        self.combine_with(other);
+        self
+    }
+
+    fn combine_with(&mut self, other: Self);
+}
+
+impl<T> Combine for Option<T>
+where
+    T: Combine,
+{
+    fn combine(self, other: Self) -> Self
+    where
+        Self: Sized,
+    {
+        match (self, other) {
+            (Some(a), Some(b)) => Some(a.combine(b)),
+            (None, Some(b)) => Some(b),
+            (a, _) => a,
+        }
+    }
+
+    fn combine_with(&mut self, other: Self) {
+        match (self, other) {
+            (Some(a), Some(b)) => {
+                a.combine_with(b);
+            }
+            (a @ None, Some(b)) => {
+                *a = Some(b);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl<T> Combine for Vec<T> {
+    fn combine_with(&mut self, _other: Self) {
+        // No-op, use own elements
+    }
+}
+
+/// Implements [`Combine`] for a value that always returns `self` when combined with another value.
+macro_rules! impl_noop_combine {
+    ($name:ident) => {
+        impl Combine for $name {
+            #[inline(always)]
+            fn combine_with(&mut self, _other: Self) {}
+
+            #[inline(always)]
+            fn combine(self, _other: Self) -> Self {
+                self
+            }
+        }
+    };
+}
+
+// std types
+impl_noop_combine!(bool);
+impl_noop_combine!(usize);
+impl_noop_combine!(u8);
+impl_noop_combine!(u16);
+impl_noop_combine!(u32);
+impl_noop_combine!(u64);
+impl_noop_combine!(u128);
+impl_noop_combine!(isize);
+impl_noop_combine!(i8);
+impl_noop_combine!(i16);
+impl_noop_combine!(i32);
+impl_noop_combine!(i64);
+impl_noop_combine!(i128);
+impl_noop_combine!(String);

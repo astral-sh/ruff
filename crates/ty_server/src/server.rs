@@ -148,6 +148,7 @@ impl Server {
                 resolved_client_capabilities,
                 position_encoding,
                 workspace_urls,
+                initialization_options,
                 native_system,
             )?,
             resolved_client_capabilities,

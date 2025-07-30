@@ -187,7 +187,29 @@ impl Server {
     }
 
     /// Requests workspace configurations from the client for all the workspaces in the session.
+    ///
+    /// If the client does not support workspace configuration, it initializes the workspaces
+    /// using the initialization options provided by the client.
     fn request_workspace_configurations(&mut self, client: &Client) {
+        if !self
+            .resolved_client_capabilities
+            .supports_workspace_configuration()
+        {
+            tracing::debug!(
+                "Client does not support workspace configuration, initializing workspaces with \
+                using the initialization options"
+            );
+            client.queue_action(Action::InitializeWorkspaces(
+                self.session
+                    .workspaces()
+                    .urls()
+                    .cloned()
+                    .map(|url| (url, self.session.initialization_options().options.clone()))
+                    .collect::<Vec<_>>(),
+            ));
+            return;
+        }
+
         let urls = self
             .session
             .workspaces()

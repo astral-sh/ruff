@@ -19,6 +19,7 @@ bitflags::bitflags! {
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const FILE_WATCHER_SUPPORT = 1 << 11;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 12;
+        const WORKSPACE_CONFIGURATION = 1 << 13;
     }
 }
 
@@ -26,6 +27,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
         self.contains(Self::WORKSPACE_DIAGNOSTIC_REFRESH)
+    }
+
+    /// Returns `true` if the client supports workspace configuration.
+    pub(crate) const fn supports_workspace_configuration(self) -> bool {
+        self.contains(Self::WORKSPACE_CONFIGURATION)
     }
 
     /// Returns `true` if the client supports inlay hint refresh.
@@ -99,6 +105,13 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::WORKSPACE_DIAGNOSTIC_REFRESH;
+        }
+
+        if workspace
+            .and_then(|workspace| workspace.configuration)
+            .unwrap_or_default()
+        {
+            flags |= Self::WORKSPACE_CONFIGURATION;
         }
 
         if workspace
