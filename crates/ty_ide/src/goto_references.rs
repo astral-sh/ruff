@@ -48,7 +48,7 @@ mod tests {
                 return "No references found".to_string();
             }
 
-            reference_results.sort_by_key(|reference| reference.file());
+            reference_results.sort_by_key(ReferenceTarget::file);
 
             self.render_diagnostics(reference_results.into_iter().enumerate().map(
                 |(i, ref_item)| -> ReferenceResult {
