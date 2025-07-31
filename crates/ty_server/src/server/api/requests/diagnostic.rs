@@ -29,11 +29,11 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        let diagnostics = compute_diagnostics(db, &snapshot);
+        let diagnostics = compute_diagnostics(db, snapshot);
 
         let Some(diagnostics) = diagnostics else {
             return Ok(DocumentDiagnosticReportResult::Report(

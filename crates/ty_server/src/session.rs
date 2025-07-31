@@ -2,9 +2,9 @@
 
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
-use lsp_server::Message;
+use lsp_server::{Message, RequestId};
 use lsp_types::notification::{Exit, Notification};
-use lsp_types::request::{Request, Shutdown};
+use lsp_types::request::{Request, Shutdown, WorkspaceDiagnosticRequest};
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use options::GlobalOptions;
 use ruff_db::Db;
@@ -24,7 +24,7 @@ pub(crate) use self::options::AllOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
-use crate::server::publish_settings_diagnostics;
+use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
@@ -40,6 +40,8 @@ mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
+    revision: u64,
+
     /// A native system to use with the [`LSPSystem`].
     native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
 
@@ -81,6 +83,8 @@ pub(crate) struct Session {
     in_test: bool,
 
     deferred_messages: VecDeque<Message>,
+
+    suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
 }
 
 /// LSP State for a Project
@@ -137,6 +141,8 @@ impl Session {
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
             in_test,
+            suspended_workspace_diagnostics_request: None,
+            revision: 0,
         })
     }
 
@@ -153,6 +159,39 @@ impl Session {
 
     pub(crate) fn set_shutdown_requested(&mut self, requested: bool) {
         self.shutdown_requested = requested;
+    }
+
+    pub(crate) fn set_suspended_workspace_diagnostics_request(
+        &mut self,
+        request: SuspendedWorkspaceDiagnosticRequest,
+        client: &Client,
+    ) {
+        self.suspended_workspace_diagnostics_request =
+            request.resume_if_revision_changed(self.revision, client);
+    }
+
+    pub(crate) fn take_suspended_workspace_diagnostic_request(
+        &mut self,
+    ) -> Option<SuspendedWorkspaceDiagnosticRequest> {
+        self.suspended_workspace_diagnostics_request.take()
+    }
+
+    pub(crate) fn resume_suspended_workspace_diagnostic_request(&mut self, client: &Client) {
+        self.suspended_workspace_diagnostics_request = self
+            .suspended_workspace_diagnostics_request
+            .take()
+            .and_then(|request| {
+                if !self.request_queue.incoming().is_pending(&request.id) {
+                    // Clear out the suspended request if the request has been cancelled.
+                    return None;
+                }
+
+                request.resume_if_revision_changed(self.revision, client)
+            });
+    }
+
+    fn bump_revision(&mut self) {
+        self.revision += 1;
     }
 
     /// The LSP specification doesn't allow configuration requests during initialization,
@@ -318,6 +357,8 @@ impl Session {
                 .cloned()
         });
 
+        self.bump_revision();
+
         self.project_db_mut(path)
             .apply_changes(changes, overrides.as_ref())
     }
@@ -465,6 +506,7 @@ impl Session {
             position_encoding: self.position_encoding,
             in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
+            revision: self.revision,
         }
     }
 
@@ -483,12 +525,14 @@ impl Session {
         document: NotebookDocument,
     ) {
         self.index_mut().open_notebook_document(path, document);
+        self.bump_revision();
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
     pub(crate) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
         self.index_mut().open_text_document(path, document);
+        self.bump_revision();
     }
 
     /// Updates a text document at the associated `key`.
@@ -501,14 +545,21 @@ impl Session {
         new_version: DocumentVersion,
     ) -> crate::Result<()> {
         let position_encoding = self.position_encoding;
-        self.index_mut()
-            .update_text_document(key, content_changes, new_version, position_encoding)
+        self.index_mut().update_text_document(
+            key,
+            content_changes,
+            new_version,
+            position_encoding,
+        )?;
+        self.bump_revision();
+        Ok(())
     }
 
     /// De-registers a document, specified by its key.
     /// Calling this multiple times for the same document is a logic error.
     pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
         self.index_mut().close_document(key)?;
+        self.bump_revision();
         Ok(())
     }
 
@@ -656,6 +707,7 @@ pub(crate) struct SessionSnapshot {
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
     in_test: bool,
+    revision: u64,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -688,6 +740,10 @@ impl SessionSnapshot {
 
     pub(crate) const fn in_test(&self) -> bool {
         self.in_test
+    }
+
+    pub(crate) fn revision(&self) -> u64 {
+        self.revision
     }
 }
 
@@ -845,5 +901,29 @@ impl DefaultProject {
 
     pub(crate) fn try_get_mut(&mut self) -> Option<&mut ProjectState> {
         self.0.get_mut()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct SuspendedWorkspaceDiagnosticRequest {
+    pub(crate) id: RequestId,
+    pub(crate) params: serde_json::Value,
+    pub(crate) revision: u64,
+}
+
+impl SuspendedWorkspaceDiagnosticRequest {
+    fn resume_if_revision_changed(self, current_revision: u64, client: &Client) -> Option<Self> {
+        if self.revision == current_revision {
+            return Some(self);
+        }
+
+        tracing::debug!("Resuming workspace diagnostics request after revision bump");
+        client.queue_action(Action::RetryRequest(lsp_server::Request {
+            id: self.id,
+            method: WorkspaceDiagnosticRequest::METHOD.to_string(),
+            params: self.params,
+        }));
+
+        None
     }
 }

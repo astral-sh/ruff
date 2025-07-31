@@ -33,10 +33,10 @@
 //! See the `./requests` and `./notifications` directories for concrete implementations of these
 //! traits in action.
 
-use std::borrow::Cow;
-
 use crate::session::client::Client;
 use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
+use lsp_server::RequestId;
+use std::borrow::Cow;
 
 use lsp_types::Url;
 use lsp_types::notification::Notification;
@@ -93,10 +93,27 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+
+    fn process(
+        id: &RequestId,
+        db: &ProjectDatabase,
+        snapshot: DocumentSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) {
+        let result = Self::run_with_snapshot(db, &snapshot, client, params);
+
+        if let Err(err) = &result {
+            tracing::error!("An error occurred with request ID {id}: {err}");
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        }
+
+        client.respond(id, result);
+    }
 }
 
 /// A request handler that can be run on a background thread.
@@ -106,8 +123,24 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// operations that require access to the entire session state, such as fetching workspace
 /// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
-    fn run(
+    fn process(
+        id: &RequestId,
         snapshot: SessionSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) {
+        let result = Self::run(&snapshot, client, params);
+
+        if let Err(err) = &result {
+            tracing::error!("An error occurred with request ID {id}: {err}");
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        }
+
+        client.respond(id, result);
+    }
+
+    fn run(
+        snapshot: &SessionSnapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;

@@ -1,14 +1,15 @@
 use crate::PositionEncoding;
-use crate::server::Result;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
 use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
-use crate::session::SessionSnapshot;
+use crate::server::{Action, Result};
 use crate::session::client::Client;
 use crate::session::index::Index;
+use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
 use crate::system::file_to_url;
+use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
     FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
@@ -33,10 +34,11 @@ impl RequestHandler for WorkspaceDiagnosticRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     fn run(
-        snapshot: SessionSnapshot,
+        snapshot: &SessionSnapshot,
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
+        tracing::debug!("Computing workspace diagnostics");
         let index = snapshot.index();
 
         if !index.global_settings().diagnostic_mode().is_workspace() {
@@ -49,7 +51,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         let writer = ResponseWriter::new(
             params.partial_result_params.partial_result_token,
             params.previous_result_ids,
-            &snapshot,
+            snapshot,
             client,
         );
 
@@ -70,6 +72,61 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         }
 
         Ok(reporter.into_final_report())
+    }
+
+    fn process(
+        id: &RequestId,
+        snapshot: SessionSnapshot,
+        client: &Client,
+        params: WorkspaceDiagnosticParams,
+    ) {
+        // if streaming: it's a partial result if we did send any changes to the client but a regular report otherwise.
+        // for non-streaming, it's always a full report.
+        // We can simply test if all items are unchanged
+        let result = Self::run(&snapshot, client, params.clone());
+
+        // Test if this is a no-op result, in which case we should long-poll the request and
+        // only respond once some diagnostics have changed to get the latest result ids.
+        //
+        // Bull response: This the simple case. Simply test if all diagnostics are unchanged (or empty)
+        // Streaming: This trickier but follows the same principle.
+        // * If the server sent any partial results, then `result` is a `Partial` result (in which
+        //   case we shouldn't do any long polling because some diagnostics changed).
+        // * If this is a full report, then check if all items are unchanged (or empty), the same as for
+        //   the non-streaming case.
+        if let Ok(WorkspaceDiagnosticReportResult::Report(full)) = &result {
+            let all_unchanged = full
+                .items
+                .iter()
+                .all(|item| matches!(item, WorkspaceDocumentDiagnosticReport::Unchanged(_)));
+
+            if all_unchanged {
+                tracing::debug!(
+                    "Suspending workspace diagnostic request, all diagnostics are unchanged or the project has no diagnostics"
+                );
+
+                client.queue_action(Action::SuspendWorkspaceDiagnostics(Box::new(
+                    SuspendedWorkspaceDiagnosticRequest {
+                        id: id.clone(),
+                        params: serde_json::to_value(&params).unwrap(),
+                        revision: snapshot.revision(),
+                    },
+                )));
+
+                // Don't respond, keep the response open (long polling).
+                return;
+            }
+
+            tracing::debug!(
+                "Respond to workspace diagnostic request with full report because some diagnostics changed"
+            );
+        } else {
+            tracing::debug!(
+                "Respond to workspace diagnostic request because it's a partial result or an error"
+            );
+        }
+
+        client.respond(id, result);
     }
 }
 
@@ -207,7 +264,7 @@ impl<'a> ResponseWriter<'a> {
                 token,
                 is_test: snapshot.in_test(),
                 last_flush: Instant::now(),
-                batched: Vec::new(),
+                changed: Vec::new(),
                 unchanged: Vec::with_capacity(previous_result_ids.len()),
             })
         } else {
@@ -242,10 +299,27 @@ impl<'a> ResponseWriter<'a> {
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let is_unchanged = self
-            .previous_result_ids
-            .remove(&url)
-            .is_some_and(|previous_result_id| previous_result_id == result_id);
+        let is_unchanged = if let Some(previous) = self.previous_result_ids.remove(&url) {
+            if previous == result_id {
+                true
+            } else {
+                tracing::debug!(
+                    "Result id for {} changed from {} to {}",
+                    url,
+                    previous,
+                    result_id
+                );
+                false
+            }
+        } else {
+            tracing::debug!("No previous result id for {}", url);
+            false
+        };
+
+        // let is_unchanged = self
+        //     .previous_result_ids
+        //     .remove(&url)
+        //     .is_some_and(|previous_result_id| previous_result_id == result_id);
 
         let report = if is_unchanged {
             WorkspaceDocumentDiagnosticReport::Unchanged(
@@ -306,7 +380,7 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
-        for previous_url in self.previous_result_ids.into_keys() {
+        for (previous_url, previous_result_id) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index
@@ -315,22 +389,43 @@ impl<'a> ResponseWriter<'a> {
                 .and_then(|key| self.index.make_document_ref(key).ok())
                 .map(|doc| i64::from(doc.version()));
 
-            items.push(WorkspaceDocumentDiagnosticReport::Full(
-                WorkspaceFullDocumentDiagnosticReport {
+            tracing::debug!("Reporting empty diagnostics for {}", previous_url);
+
+            let new_result_id = Diagnostics::result_id_from_hash(&[]);
+
+            // VS code keeps sending the previous result id for files that it has seen before
+            // even if we sent a full report in an earlier response say that the diagnostics
+            // are now empty. That's why we need to keep sending a result ID even if the diagnostics are empty.
+            // so that we don't keep sending Full reports if the file still has no diagnostics (which
+            // breaks long polling
+            let report = if new_result_id == previous_result_id {
+                WorkspaceDocumentDiagnosticReport::Unchanged(
+                    WorkspaceUnchangedDocumentDiagnosticReport {
+                        uri: previous_url,
+                        version,
+                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                            result_id: new_result_id,
+                        },
+                    },
+                )
+            } else {
+                WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                     uri: previous_url,
                     version,
                     full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                        result_id: None, // No result ID needed for empty diagnostics
-                        items: vec![],   // No diagnostics
+                        result_id: Some(new_result_id),
+                        items: vec![], // No diagnostics
                     },
-                },
-            ));
+                })
+            };
+
+            items.push(report);
         }
 
         match &mut self.mode {
             ReportingMode::Streaming(streaming) => {
                 items.extend(
-                    std::mem::take(&mut streaming.batched)
+                    std::mem::take(&mut streaming.changed)
                         .into_iter()
                         .map(WorkspaceDocumentDiagnosticReport::Full),
                 );
@@ -388,7 +483,7 @@ struct Streaming {
     /// The implementation uses batching to avoid too many
     /// requests for large projects (can slow down the entire
     /// analysis).
-    batched: Vec<WorkspaceFullDocumentDiagnosticReport>,
+    changed: Vec<WorkspaceFullDocumentDiagnosticReport>,
     /// All the unchanged reports. Don't stream them,
     /// since nothing has changed.
     unchanged: Vec<WorkspaceUnchangedDocumentDiagnosticReport>,
@@ -398,7 +493,7 @@ impl Streaming {
     fn write_report(&mut self, report: WorkspaceDocumentDiagnosticReport) {
         match report {
             WorkspaceDocumentDiagnosticReport::Full(full) => {
-                self.batched.push(full);
+                self.changed.push(full);
             }
             WorkspaceDocumentDiagnosticReport::Unchanged(unchanged) => {
                 self.unchanged.push(unchanged);
@@ -407,13 +502,13 @@ impl Streaming {
     }
 
     fn maybe_flush(&mut self) {
-        if self.batched.is_empty() {
+        if self.changed.is_empty() {
             return;
         }
 
         // Flush every ~50ms or whenever we have two items and this is a test run.
         let should_flush = if self.is_test {
-            self.batched.len() >= 2
+            self.changed.len() >= 2
         } else {
             self.last_flush.elapsed().as_millis() >= 50
         };
@@ -422,7 +517,7 @@ impl Streaming {
         }
 
         let items = self
-            .batched
+            .changed
             .drain(..)
             .map(WorkspaceDocumentDiagnosticReport::Full)
             .collect();
