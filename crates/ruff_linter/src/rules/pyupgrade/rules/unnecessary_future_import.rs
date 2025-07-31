@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
-use ruff_python_semantic::{MemberNameImport, ModuleNameImport, NameImport};
+use ruff_python_semantic::NameImport;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -94,27 +94,20 @@ pub(crate) fn is_import_required_by_isort(
     stmt: StmtRef,
     alias: &Alias,
 ) -> bool {
-    let name_import = match stmt {
-        StmtRef::ImportFrom(ast::StmtImportFrom { module, level, .. }) => {
-            NameImport::ImportFrom(MemberNameImport {
-                module: module.as_ref().map(std::string::ToString::to_string),
-                name: ruff_python_semantic::Alias {
-                    name: alias.name.to_string(),
-                    as_name: None,
-                },
-                level: *level,
-            })
+    let segments: &[&str] = match stmt {
+        StmtRef::ImportFrom(ast::StmtImportFrom {
+            module: Some(module),
+            ..
+        }) => &[module.as_str(), alias.name.as_str()],
+        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. }) | StmtRef::Import(_) => {
+            &[alias.name.as_str()]
         }
-        StmtRef::Import(_) => NameImport::Import(ModuleNameImport {
-            name: ruff_python_semantic::Alias {
-                name: alias.name.to_string(),
-                as_name: None,
-            },
-        }),
         _ => return false,
     };
 
-    required_imports.contains(&name_import)
+    required_imports
+        .iter()
+        .any(|required_import| required_import.qualified_name().segments() == segments)
 }
 
 /// UP010
