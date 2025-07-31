@@ -9,7 +9,6 @@ use crate::{
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
-        tuple::{TupleType, walk_tuple_type},
         walk_bound_method_type, walk_bound_super_type, walk_bound_type_var_type,
         walk_callable_type, walk_intersection_type, walk_known_instance_type,
         walk_method_wrapper_type, walk_property_instance_type, walk_type_alias_type,
@@ -31,10 +30,6 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_intersection_type(&mut self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
         walk_intersection_type(db, intersection, self);
-    }
-
-    fn visit_tuple_type(&mut self, db: &'db dyn Db, tuple: TupleType<'db>) {
-        walk_tuple_type(db, tuple, self);
     }
 
     fn visit_callable_type(&mut self, db: &'db dyn Db, callable: CallableType<'db>) {
@@ -127,7 +122,6 @@ pub(crate) trait TypeVisitor<'db> {
 enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
-    Tuple(TupleType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -177,7 +171,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
-            Type::Tuple(tuple) => TypeKind::NonAtomic(NonAtomicType::Tuple(tuple)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
@@ -224,7 +217,6 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_intersection_type(db, intersection);
         }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
-        NonAtomicType::Tuple(tuple) => visitor.visit_tuple_type(db, tuple),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
         NonAtomicType::MethodWrapper(method_wrapper) => {

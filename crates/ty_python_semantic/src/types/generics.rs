@@ -12,11 +12,11 @@ use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    BoundTypeVarInstance, KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
-    declaration_type,
+    BoundTypeVarInstance, KnownClass, KnownInstanceType, Type, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -94,6 +94,8 @@ pub(crate) fn bind_typevar<'db>(
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<BoundTypeVarInstance<'db>>,
+    // If this is the generic context for a class, is it a known class?
+    known_class: Option<KnownClass>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -116,6 +118,7 @@ impl<'db> GenericContext<'db> {
         index: &'db SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
+        known_class: Option<KnownClass>,
     ) -> Self {
         let variables: FxOrderSet<_> = type_params_node
             .iter()
@@ -123,7 +126,7 @@ impl<'db> GenericContext<'db> {
                 Self::variable_from_type_param(db, index, binding_context, type_param)
             })
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, known_class)
     }
 
     fn variable_from_type_param(
@@ -173,7 +176,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(db, variables, None))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -181,6 +184,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
         bases: impl Iterator<Item = Type<'db>>,
+        known_class: Option<KnownClass>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
@@ -189,7 +193,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(db, variables, known_class))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -231,7 +235,17 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialize_partial(db, &vec![None; self.variables(db).len()])
+        let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
+        if self.known_class(db) == Some(KnownClass::Tuple) {
+            Specialization::new(
+                db,
+                self,
+                partial.types(db),
+                TupleType::homogeneous(db, Type::unknown()),
+            )
+        } else {
+            partial
+        }
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -351,7 +365,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, self.known_class(db))
     }
 }
 
@@ -401,24 +415,14 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
         visitor.visit_type(db, *ty);
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        walk_tuple_type(db, tuple, visitor);
     }
 }
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
-        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
-            return tuple;
-        }
-        if let [element_type] = self.types(db) {
-            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
-                return tuple.tuple(db);
-            }
-        }
-        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
-            .expect("tuple[Unknown, ...] should never contain Never")
-            .tuple(db)
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
+        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -628,6 +632,16 @@ impl<'db> Specialization<'db> {
             }
         }
 
+        match (self.tuple_inner(db), other.tuple_inner(db)) {
+            (Some(_), None) | (None, Some(_)) => return false,
+            (None, None) => {}
+            (Some(self_tuple), Some(other_tuple)) => {
+                if !self_tuple.is_equivalent_to(db, other_tuple) {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 
@@ -640,6 +654,8 @@ impl<'db> Specialization<'db> {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, binding_context, typevars);
         }
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
     }
 }
 
@@ -834,22 +850,25 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_tuple = formal_tuple.tuple(self.db);
-                let actual_tuple = actual_tuple.tuple(self.db);
-                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
-                    return Ok(());
-                };
-                let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                for (formal_element, actual_element) in
-                    formal_tuple.all_elements().zip(actual_tuple.all_elements())
-                {
-                    self.infer(*formal_element, *actual_element)?;
+            (
+                Type::NominalInstance(NominalInstanceType { class: class1, .. }),
+                Type::NominalInstance(NominalInstanceType { class: class2, .. })
+            ) if class1.tuple_spec(self.db).is_some() => {
+                if let (Some(formal_tuple), Some(actual_tuple)) = (class1.tuple_spec(self.db), class2.tuple_spec(self.db)) {
+                    let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+                        return Ok(());
+                    };
+                    let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    for (formal_element, actual_element) in
+                        formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                    {
+                        self.infer(*formal_element, *actual_element)?;
+                    }
                 }
             }
 

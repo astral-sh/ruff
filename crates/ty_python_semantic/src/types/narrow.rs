@@ -11,8 +11,9 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, NominalInstanceType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -182,14 +183,6 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::Tuple(tuple) => UnionType::try_from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .copied()
-                    .map(|element| self.generate_constraint(db, element)),
-            ),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
@@ -236,6 +229,17 @@ impl ClassInfoConstraintFunction {
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
 
+            Type::NominalInstance(NominalInstanceType { class, .. }) => {
+                class.tuple_spec(db).and_then(|tuple| {
+                    UnionType::try_from_elements(
+                        db,
+                        tuple
+                            .all_elements()
+                            .map(|element| self.generate_constraint(db, *element)),
+                    )
+                })
+            }
+
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BooleanLiteral(_)
@@ -252,7 +256,6 @@ impl ClassInfoConstraintFunction {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::SpecialForm(_)
-            | Type::NominalInstance(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::IntLiteral(_)
@@ -623,20 +626,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            match rhs_ty {
-                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
-                    self.db,
-                    rhs_tuple.tuple(self.db).all_elements(),
-                )),
-
-                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
+            if let Type::StringLiteral(string_literal) = rhs_ty {
+                Some(UnionType::from_elements(
                     self.db,
                     string_literal
                         .iter_each_char(self.db)
                         .map(Type::StringLiteral),
-                )),
-
-                _ => None,
+                ))
+            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
+                // N.B. Strictly speaking this is unsound, since a tuple subclass might override `__contains__`
+                // but we'd still apply the narrowing here. This seems unlikely, however, and narrowing is
+                // generally unsound in numerous ways anyway (attribute narrowing, subscript, narrowing,
+                // narrowing of globals, etc.). So this doesn't seem worth worrying about too much.
+                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
+            } else {
+                None
             }
         } else {
             None

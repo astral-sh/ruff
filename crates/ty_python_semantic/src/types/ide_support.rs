@@ -137,7 +137,6 @@ impl<'db> AllMembers<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)

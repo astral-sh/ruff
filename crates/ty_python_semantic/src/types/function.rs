@@ -338,7 +338,7 @@ impl<'db> OverloadLiteral<'db> {
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, definition, type_params)
+            GenericContext::from_type_params(db, index, definition, type_params, None)
         });
 
         let index = semantic_index(db, scope.file(db));
@@ -993,8 +993,6 @@ fn is_instance_truthiness<'db>(
                 .as_ref()
                 .is_some_and(is_instance),
         ),
-
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
 
         Type::FunctionLiteral(..) => {
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
