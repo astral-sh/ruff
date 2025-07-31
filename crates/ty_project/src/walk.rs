@@ -217,7 +217,7 @@ impl<'a> ProjectFilesWalker<'a> {
 
                             if entry.file_type().is_symlink() {
                                 let res = fs::canonicalize(entry.path());
-                                if !res.map_or(false, |path_buf| {path_buf.is_file()}) {
+                                if !res.is_ok_and(|path_buf| {path_buf.is_file()}) {
                                     return WalkState::Continue;
                                 }
                             }
