@@ -144,15 +144,6 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 
-impl<'db> Type<'db> {
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Self::Tuple(tuple)
-    }
-}
-
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -181,17 +172,17 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(TupleType::new(
+        Type::tuple(
             db,
-            TupleSpec::from(FixedLengthTuple::empty()),
-        ))
+            TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty())),
+        )
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::from_elements(types)))
+        Type::tuple(db, TupleType::new(db, TupleSpec::from_elements(types)))
     }
 
     #[cfg(test)]
@@ -201,14 +192,14 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(TupleType::new(
+        Type::tuple(
             db,
-            VariableLengthTuple::mixed(prefix, variable, suffix),
-        ))
+            TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix)),
+        )
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::homogeneous(element)))
+        Type::tuple(db, TupleType::new(db, TupleSpec::homogeneous(element)))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
@@ -962,10 +953,9 @@ impl<T> Tuple<T> {
         VariableLengthTuple::homogeneous(element)
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Tuple<T> {
         FixedLengthTuple::from_elements(elements).into()
     }
-
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
@@ -1118,10 +1108,10 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn is_disjoint_from_impl(
-        &'db self,
+    pub(super) fn is_disjoint_from_impl(
+        &self,
         db: &'db dyn Db,
-        other: &'db Self,
+        other: &Self,
         visitor: &mut PairVisitor<'db>,
     ) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
@@ -1138,18 +1128,23 @@ impl<'db> Tuple<Type<'db>> {
         #[allow(clippy::items_after_statements)]
         fn any_disjoint<'db>(
             db: &'db dyn Db,
-            a: impl IntoIterator<Item = &'db Type<'db>>,
-            b: impl IntoIterator<Item = &'db Type<'db>>,
+            a: impl IntoIterator<Item = Type<'db>>,
+            b: impl IntoIterator<Item = Type<'db>>,
             visitor: &mut PairVisitor<'db>,
         ) -> bool {
             a.into_iter().zip(b).any(|(self_element, other_element)| {
-                self_element.is_disjoint_from_impl(db, *other_element, visitor)
+                self_element.is_disjoint_from_impl(db, other_element, visitor)
             })
         }
 
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
+                if any_disjoint(
+                    db,
+                    self_tuple.elements().copied(),
+                    other_tuple.elements().copied(),
+                    visitor,
+                ) {
                     return true;
                 }
             }
@@ -1157,16 +1152,16 @@ impl<'db> Tuple<Type<'db>> {
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
                 if any_disjoint(
                     db,
-                    self_tuple.prefix_elements(),
-                    other_tuple.prefix_elements(),
+                    self_tuple.prefix_elements().copied(),
+                    other_tuple.prefix_elements().copied(),
                     visitor,
                 ) {
                     return true;
                 }
                 if any_disjoint(
                     db,
-                    self_tuple.suffix_elements().rev(),
-                    other_tuple.suffix_elements().rev(),
+                    self_tuple.suffix_elements().rev().copied(),
+                    other_tuple.suffix_elements().rev().copied(),
                     visitor,
                 ) {
                     return true;
@@ -1175,13 +1170,18 @@ impl<'db> Tuple<Type<'db>> {
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
+                if any_disjoint(
+                    db,
+                    fixed.elements().copied(),
+                    variable.prefix_elements().copied(),
+                    visitor,
+                ) {
                     return true;
                 }
                 if any_disjoint(
                     db,
-                    fixed.elements().rev(),
-                    variable.suffix_elements().rev(),
+                    fixed.elements().rev().copied(),
+                    variable.suffix_elements().rev().copied(),
                     visitor,
                 ) {
                     return true;
