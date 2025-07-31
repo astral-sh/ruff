@@ -380,7 +380,7 @@ macro_rules! assert_diagnostics {
     }};
     ($value:expr, @$snapshot:literal) => {{
         insta::with_settings!({ omit_expression => true }, {
-            insta::assert_snapshot!($crate::test::print_messages(&$value), $snapshot);
+            insta::assert_snapshot!($crate::test::print_messages(&$value), @$snapshot);
         });
     }};
     ($name:expr, $value:expr) => {{
