@@ -3636,75 +3636,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let value_ty = self.infer_expression(value);
         let slice_ty = self.infer_expression(slice);
 
+        let db = self.db();
+        let context = &self.context;
+
         match value_ty.try_call_dunder(
-            self.db(),
+            db,
             "__setitem__",
             CallArguments::positional([slice_ty, assigned_ty]),
         ) {
             Ok(_) => true,
-            Err(_err @ CallDunderError::PossiblyUnbound { .. }) => {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, &**value)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `__setitem__` of type `{}` is possibly unbound",
-                        value_ty.display(self.db()),
-                    ));
-                }
-                false
-            }
-            Err(CallDunderError::CallError(call_error_kind, bindings)) => {
-                match call_error_kind {
-                    CallErrorKind::NotCallable => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, &**value)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Method `__setitem__` of type `{}` is not callable on object of type `{}`",
-                                bindings.callable_type().display(self.db()),
-                                value_ty.display(self.db()),
-                            ));
-                        }
-                    }
-                    CallErrorKind::BindingError => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_ASSIGNMENT, &**value)
-                        {
-                            builder.into_diagnostic(format_args!(
-                            "Method `__setitem__` of type `{}` cannot be called with arguments of type `{}` and `{}` \
-                            on object of type `{}`",
-                            bindings.callable_type().display(self.db()),
-                            slice_ty.display(self.db()),
-                            assigned_ty.display(self.db()),
-                            value_ty.display(self.db()),
+            Err(err) => match err {
+                CallDunderError::PossiblyUnbound { .. } => {
+                    if let Some(builder) =
+                        context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, &**value)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Method `__setitem__` of type `{}` is possibly unbound",
+                            value_ty.display(db),
                         ));
+                    }
+                    false
+                }
+                CallDunderError::CallError(call_error_kind, bindings) => {
+                    match call_error_kind {
+                        CallErrorKind::NotCallable => {
+                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` is not callable \
+                                    on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+                        CallErrorKind::BindingError => {
+                            if let Some(builder) =
+                                context.report_lint(&INVALID_ASSIGNMENT, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` cannot be called with \
+                                    arguments of type `{}` and `{}` on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    slice_ty.display(db),
+                                    assigned_ty.display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+                        CallErrorKind::PossiblyNotCallable => {
+                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` is possibly not \
+                                    callable on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
                         }
                     }
-                    CallErrorKind::PossiblyNotCallable => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, &**value)
-                        {
-                            builder.into_diagnostic(format_args!(
-                            "Method `__setitem__` of type `{}` is possibly not callable on object of type `{}`",
-                            bindings.callable_type().display(self.db()),
-                            value_ty.display(self.db()),
+                    false
+                }
+                CallDunderError::MethodNotAvailable => {
+                    if let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, &**value) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to object of type `{}` with no `__setitem__` method",
+                            value_ty.display(db),
                         ));
-                        }
                     }
-                }
-                false
-            }
-            Err(CallDunderError::MethodNotAvailable) => {
-                if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, &**value) {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to object of type `{}` with no `__setitem__` method",
-                        value_ty.display(self.db()),
-                    ));
-                }
 
-                false
-            }
+                    false
+                }
+            },
         }
     }
 
