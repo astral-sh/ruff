@@ -109,9 +109,12 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                // Only show the bare class name here; ClassBase::display would render this as
-                // type[<class 'Foo'>] instead of type[Foo].
-                SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                    write!(f, "type[{}]", class.name(self.db))
+                }
+                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                    write!(f, "type[{}]", alias.display(self.db))
+                }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
