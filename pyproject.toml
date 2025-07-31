@@ -9,7 +9,8 @@ description = "An extremely fast Python linter and code formatter, written in Ru
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
     "automation",
     "flake8",
