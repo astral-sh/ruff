@@ -75,7 +75,7 @@ def f(h4: HeterogeneousSubclass4, i: int):
 
 class MixedSubclass(tuple[I0, *tuple[I1, ...], I2, I3, I2, I5]): ...
 
-# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-3], /) -> I3, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-3], /) -> I3, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
 reveal_type(MixedSubclass.__getitem__)
 
 def g(m: MixedSubclass, i: int):
@@ -105,7 +105,7 @@ def g(m: MixedSubclass, i: int):
 
 class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
 
-# revealed: Overload[(self, index: Literal[-1], /) -> I3, (self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[2], /) -> I2 | I3, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: Literal[-1], /) -> I3, (self, index: Literal[2], /) -> I2 | I3, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
 reveal_type(MixedSubclass2.__getitem__)
 
 def g(m: MixedSubclass2, i: int):

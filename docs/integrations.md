@@ -109,7 +109,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
   rev: v0.12.7
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
     # Run the formatter.
     - id: ruff-format
 ```
@@ -122,7 +122,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
   rev: v0.12.7
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
@@ -136,7 +136,7 @@ To avoid running on Jupyter Notebooks, remove `jupyter` from the list of allowed
   rev: v0.12.7
   hooks:
     # Run the linter.
-    - id: ruff
+    - id: ruff-check
       types_or: [ python, pyi ]
       args: [ --fix ]
     # Run the formatter.
