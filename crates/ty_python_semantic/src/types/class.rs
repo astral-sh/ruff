@@ -1085,6 +1085,13 @@ impl<'db> ClassType<'db> {
     /// *or a subclass of `tuple`, or a subclass of a specialization of `tuple`*,
     /// return its tuple specification.
     pub(super) fn tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+        // Avoid an expensive MRO traversal for common stdlib classes.
+        if self
+            .known(db)
+            .is_some_and(|known_class| !known_class.is_tuple_subclass())
+        {
+            return None;
+        }
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
             .find_map(|class| class.own_tuple_spec(db))
@@ -3492,6 +3499,81 @@ impl KnownClass {
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback => false,
+        }
+    }
+
+    pub(crate) const fn is_tuple_subclass(self) -> bool {
+        match self {
+            KnownClass::Tuple | KnownClass::VersionInfo => true,
+
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::Any
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NamedTuple
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::InitVar
+            | KnownClass::NamedTupleFallback => false,
         }
     }
 
