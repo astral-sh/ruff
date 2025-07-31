@@ -270,7 +270,7 @@ print()
     #[test]
     fn file_level() {
         let mut env = TestEnvironment::new();
-        env.add("example.py", "def foo():\n\treturn 1");
+        env.add("example.py", "\n");
         env.format(DiagnosticFormat::Full);
 
         let mut diagnostic = env.err().build();
