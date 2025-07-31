@@ -5,7 +5,7 @@ use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
-use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
+use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
@@ -86,7 +86,9 @@ impl ProjectDatabase {
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
-        self.project().check(self, &mut DummyReporter)
+        let mut collector = CollectReporter::default();
+        self.project().check(self, &mut collector);
+        collector.into_sorted(self)
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
@@ -94,8 +96,8 @@ impl ProjectDatabase {
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
-    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
-        self.project().check(self, reporter)
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) {
+        self.project().check(self, reporter);
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
