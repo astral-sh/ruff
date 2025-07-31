@@ -18,25 +18,27 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        match (class, class.known(db)) {
-            (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
-            (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
-                Type::tuple(TupleType::homogeneous(db, Type::unknown()))
-            }
-            (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
-                Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
-            }
-            _ => {
-                let class_literal = class.class_literal(db).0;
-                if class_literal.is_protocol(db) {
-                    Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-                } else if class_literal.is_typed_dict(db) {
-                    TypedDictType::from(db, class)
-                } else {
-                    Self::NominalInstance(NominalInstanceType::from_class(class))
-                }
-            }
+        let class_literal = class.class_literal(db).0;
+
+        if class.is_known(db, KnownClass::Any) {
+            Self::Dynamic(DynamicType::Any)
+        } else if class_literal.is_protocol(db) {
+            Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+        } else if class_literal.is_typed_dict(db) {
+            TypedDictType::from(db, class)
+        } else {
+            Self::NominalInstance(NominalInstanceType::from_class(class))
         }
+    }
+
+    pub(crate) fn tuple(db: &'db dyn Db, tuple: Option<TupleType<'db>>) -> Self {
+        let Some(tuple) = tuple else {
+            return Type::Never;
+        };
+        tuple
+            .to_class_type(db)
+            .map(|class| Type::instance(db, class))
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
@@ -128,7 +130,21 @@ impl<'db> NominalInstanceType<'db> {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
+        let self_spec = self.class.tuple_spec(db);
+        if let Some(self_spec) = self_spec.as_deref() {
+            let other_spec = other.class.tuple_spec(db);
+            if let Some(other_spec) = other_spec.as_deref() {
+                if self_spec.is_disjoint_from_impl(db, other_spec, visitor) {
+                    return true;
+                }
+            }
+        }
         !self.class.could_coexist_in_mro_with(db, other.class)
     }
 
