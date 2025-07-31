@@ -27,7 +27,7 @@ use crate::types::{
     infer_definition_types,
 };
 use crate::{
-    Db, FxOrderSet, KnownModule, Program,
+    Db, FxIndexMap, FxOrderSet, KnownModule, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,
@@ -628,8 +628,8 @@ impl<'db> ClassType<'db> {
                     .map(|spec| {
                         let tuple = spec.tuple(db);
 
-                        let mut element_type_to_indices: FxOrderMap<Type<'db>, Vec<i64>> =
-                            FxOrderMap::default();
+                        let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
+                            FxIndexMap::default();
 
                         match tuple {
                             // E.g. for `tuple[int, str]`, we will generate the following overloads:
