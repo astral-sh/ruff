@@ -4213,14 +4213,14 @@ pub(crate) struct SliceLiteral {
     pub(crate) step: Option<i32>,
 }
 
-impl<'db> Type<'db> {
-    /// If this type represents a valid slice literal, returns a [`SliceLiteral`] describing it.
+impl<'db> ClassType<'db> {
+    /// If this class is a specialization of `slice`, returns a [`SliceLiteral`] describing it.
     /// Otherwise returns `None`.
     ///
-    /// The type must be a specialization of the `slice` builtin type, where the specialized
-    /// typevars are statically known integers or `None`.
+    /// The specialization must be one in which the typevars are solved as being statically known
+    /// integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self.into_nominal_instance()?.class else {
+        let ClassType::Generic(alias) = self else {
             return None;
         };
         if !alias.origin(db).is_known(db, KnownClass::Slice) {
