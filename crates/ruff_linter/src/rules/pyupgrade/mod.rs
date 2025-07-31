@@ -336,4 +336,62 @@ mod tests {
         1 2 | 1
         ");
     }
+
+    #[test]
+    fn up035_partial_required_import() {
+        let diagnostics = test_snippet(
+            "from pipes import quote, Template",
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from_iter([
+                        // https://github.com/astral-sh/ruff/issues/18729
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "__future__".to_string(),
+                            "generator_stop".to_string(),
+                        )),
+                        // https://github.com/astral-sh/ruff/issues/16802
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "collections".to_string(),
+                            "Sequence".to_string(),
+                        )),
+                        // Only bail out if _all_ the names in UP035 are required. `pipes.Template`
+                        // isn't flagged by UP035, so requiring it shouldn't prevent `pipes.quote`
+                        // from getting a diagnostic.
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "pipes".to_string(),
+                            "Template".to_string(),
+                        )),
+                    ]),
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingRequiredImport,
+                    Rule::UnnecessaryFutureImport,
+                    Rule::DeprecatedImport,
+                ])
+            },
+        );
+        assert_diagnostics!(diagnostics, @r"
+        <filename>:1:1: UP035 [*] Import from `shlex` instead: `quote`
+          |
+        1 | from pipes import quote, Template
+          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+          |
+          = help: Import from `shlex`
+
+        ℹ Safe fix
+        1   |-from pipes import quote, Template
+          1 |+from shlex import quote
+
+        <filename>:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+        ℹ Safe fix
+          1 |+from __future__ import generator_stop
+        1 2 | from pipes import quote, Template
+
+        <filename>:1:1: I002 [*] Missing required import: `from collections import Sequence`
+        ℹ Safe fix
+          1 |+from collections import Sequence
+        1 2 | from pipes import quote, Template
+        ");
+    }
 }

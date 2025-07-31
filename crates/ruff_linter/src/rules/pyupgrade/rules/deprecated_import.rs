@@ -411,6 +411,7 @@ struct ImportReplacer<'a> {
     stylist: &'a Stylist<'a>,
     tokens: &'a Tokens,
     version: PythonVersion,
+    skip_aliases: std::collections::HashSet<&'a str>,
 }
 
 impl<'a> ImportReplacer<'a> {
@@ -421,6 +422,7 @@ impl<'a> ImportReplacer<'a> {
         stylist: &'a Stylist<'a>,
         tokens: &'a Tokens,
         version: PythonVersion,
+        skip_aliases: std::collections::HashSet<&'a str>,
     ) -> Self {
         Self {
             import_from_stmt,
@@ -429,6 +431,7 @@ impl<'a> ImportReplacer<'a> {
             stylist,
             tokens,
             version,
+            skip_aliases,
         }
     }
 
@@ -438,6 +441,9 @@ impl<'a> ImportReplacer<'a> {
         if self.module == "typing" {
             if self.version >= PythonVersion::PY39 {
                 for member in &self.import_from_stmt.names {
+                    if self.skip_aliases.contains(&member.name.as_str()) {
+                        continue;
+                    }
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
                         if &member.name == *name {
                             Some(*target)
@@ -674,6 +680,9 @@ impl<'a> ImportReplacer<'a> {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
         for name in &self.import_from_stmt.names {
+            if self.skip_aliases.contains(&name.name.as_str()) {
+                continue;
+            }
             if candidates.contains(&name.name.as_str()) {
                 matched_names.push(name);
             } else {
@@ -720,9 +729,10 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         return;
     }
 
+    let mut skip_aliases = std::collections::HashSet::new();
     for alias in &import_from_stmt.names {
         if is_import_required_by_isort(checker, StmtRef::ImportFrom(import_from_stmt), alias) {
-            return;
+            skip_aliases.insert(alias.name.as_str());
         }
     }
 
@@ -733,6 +743,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         checker.stylist(),
         checker.tokens(),
         checker.target_version(),
+        skip_aliases,
     );
 
     for (operation, fix) in fixer.without_renames() {
