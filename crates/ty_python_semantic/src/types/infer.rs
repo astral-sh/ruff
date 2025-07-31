@@ -8365,19 +8365,142 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         slice_ty: Type<'db>,
         expr_context: ExprContext,
     ) -> Type<'db> {
-        match (value_ty, slice_ty, slice_ty.slice_literal(self.db())) {
-            (Type::NominalInstance(instance), _, _)
-                if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
+        let db = self.db();
+        let context = &self.context;
+
+        let fallback_subscript_expression_type_inference = || {
+            // If the class defines `__getitem__`, return its return type.
+            //
+            // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
+            match value_ty.try_call_dunder(db, "__getitem__", CallArguments::positional([slice_ty]))
+            {
+                Ok(outcome) => return outcome.return_type(db),
+                Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
+                    if let Some(builder) =
+                        context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Method `__getitem__` of type `{}` is possibly unbound",
+                            value_ty.display(db),
+                        ));
+                    }
+
+                    return err.fallback_return_type(db);
+                }
+                Err(CallDunderError::CallError(_, bindings)) => {
+                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                        builder.into_diagnostic(format_args!(
+                            "Method `__getitem__` of type `{}` \
+                                 is not callable on object of type `{}`",
+                            bindings.callable_type().display(db),
+                            value_ty.display(db),
+                        ));
+                    }
+
+                    return bindings.return_type(db);
+                }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    // try `__class_getitem__`
+                }
+            }
+
+            // Otherwise, if the value is itself a class and defines `__class_getitem__`,
+            // return its return type.
+            //
+            // TODO: lots of classes are only subscriptable at runtime on Python 3.9+,
+            // *but* we should also allow them to be subscripted in stubs
+            // (and in annotations if `from __future__ import annotations` is enabled),
+            // even if the target version is Python 3.8 or lower,
+            // despite the fact that there will be no corresponding `__class_getitem__`
+            // method in these `sys.version_info` branches.
+            if value_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
+                let dunder_class_getitem_method = value_ty.member(db, "__class_getitem__").place;
+
+                match dunder_class_getitem_method {
+                    Place::Unbound => {}
+                    Place::Type(ty, boundness) => {
+                        if boundness == Boundness::PossiblyUnbound {
+                            if let Some(builder) =
+                                context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__class_getitem__` of type `{}` \
+                                        is possibly unbound",
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+
+                        match ty.try_call(db, &CallArguments::positional([value_ty, slice_ty])) {
+                            Ok(bindings) => return bindings.return_type(db),
+                            Err(CallError(_, bindings)) => {
+                                if let Some(builder) =
+                                    context.report_lint(&CALL_NON_CALLABLE, value_node)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Method `__class_getitem__` of type `{}` \
+                                             is not callable on object of type `{}`",
+                                        bindings.callable_type().display(db),
+                                        value_ty.display(db),
+                                    ));
+                                }
+                                return bindings.return_type(db);
+                            }
+                        }
+                    }
+                }
+
+                if let Type::ClassLiteral(class) = value_ty {
+                    if class.is_known(db, KnownClass::Type) {
+                        return KnownClass::GenericAlias.to_instance(db);
+                    }
+
+                    if class.generic_context(db).is_some() {
+                        // TODO: specialize the generic class using these explicit type
+                        // variable assignments. This branch is only encountered when an
+                        // explicit class specialization appears inside of some other subscript
+                        // expression, e.g. `tuple[list[int], ...]`. We have already inferred
+                        // the type of the outer subscript slice as a value expression, which
+                        // means we can't re-infer the inner specialization here as a type
+                        // expression.
+                        return value_ty;
+                    }
+                }
+
+                // TODO: properly handle old-style generics; get rid of this temporary hack
+                if !value_ty
+                    .into_class_literal()
+                    .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
+                {
+                    report_non_subscriptable(
+                        context,
+                        value_node.into(),
+                        value_ty,
+                        "__class_getitem__",
+                    );
+                }
+            } else {
+                if expr_context != ExprContext::Store {
+                    report_non_subscriptable(context, value_node.into(), value_ty, "__getitem__");
+                }
+            }
+
+            Type::unknown()
+        };
+
+        match (value_ty, slice_ty) {
+            (Type::NominalInstance(instance), _)
+                if instance.class.is_known(db, KnownClass::VersionInfo) =>
             {
                 self.infer_subscript_expression_types(
                     value_node,
-                    Type::version_info_tuple(self.db()),
+                    Type::version_info_tuple(db),
                     slice_ty,
                     expr_context,
                 )
             }
 
-            (Type::Union(union), _, _) => union.map(self.db(), |element| {
+            (Type::Union(union), _) => union.map(db, |element| {
                 self.infer_subscript_expression_types(value_node, *element, slice_ty, expr_context)
             }),
 
@@ -8385,117 +8508,127 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // but we need to make sure we avoid emitting a diagnostic if one positive element has a `__getitem__`
             // method but another does not. This means `infer_subscript_expression_types`
             // needs to return a `Result` rather than eagerly emitting diagnostics.
-            (Type::Intersection(_), _, _) => {
+            (Type::Intersection(_), _) => {
                 todo_type!("Subscript expressions on intersections")
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::Tuple(tuple_ty), Type::IntLiteral(int), _) if i32::try_from(int).is_ok() => {
-                let tuple = tuple_ty.tuple(self.db());
-                tuple
-                    .py_index(
-                        self.db(),
-                        i32::try_from(int).expect("checked in branch arm"),
-                    )
-                    .unwrap_or_else(|_| {
-                        report_index_out_of_bounds(
-                            &self.context,
-                            "tuple",
-                            value_node.into(),
-                            value_ty,
-                            tuple.len().display_minimum(),
-                            int,
-                        );
-                        Type::unknown()
-                    })
+            (Type::Tuple(tuple_ty), Type::IntLiteral(i64_int)) => {
+                let Ok(i32_int) = i32::try_from(i64_int) else {
+                    return fallback_subscript_expression_type_inference();
+                };
+                let tuple = tuple_ty.tuple(db);
+                tuple.py_index(db, i32_int).unwrap_or_else(|_| {
+                    report_index_out_of_bounds(
+                        context,
+                        "tuple",
+                        value_node.into(),
+                        value_ty,
+                        tuple.len().display_minimum(),
+                        i64_int,
+                    );
+                    Type::unknown()
+                })
             }
 
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
-            (Type::Tuple(tuple_ty), _, Some(SliceLiteral { start, stop, step })) => {
-                let TupleSpec::Fixed(tuple) = tuple_ty.tuple(self.db()) else {
+            (Type::Tuple(tuple_ty), Type::NominalInstance(NominalInstanceType { class, .. })) => {
+                let Some(SliceLiteral { start, stop, step }) = class.slice_literal(db) else {
+                    return fallback_subscript_expression_type_inference();
+                };
+                let TupleSpec::Fixed(tuple) = tuple_ty.tuple(db) else {
                     return todo_type!("slice into variable-length tuple");
                 };
 
-                if let Ok(new_elements) = tuple.py_slice(self.db(), start, stop, step) {
-                    TupleType::from_elements(self.db(), new_elements.copied())
+                if let Ok(new_elements) = tuple.py_slice(db, start, stop, step) {
+                    TupleType::from_elements(db, new_elements.copied())
                 } else {
-                    report_slice_step_size_zero(&self.context, value_node.into());
+                    report_slice_step_size_zero(context, value_node.into());
                     Type::unknown()
                 }
             }
 
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::StringLiteral(literal_ty), Type::IntLiteral(int), _)
-                if i32::try_from(int).is_ok() =>
-            {
-                let literal_value = literal_ty.value(self.db());
+            (Type::StringLiteral(literal_ty), Type::IntLiteral(i64_int)) => {
+                let Ok(i32_int) = i32::try_from(i64_int) else {
+                    return fallback_subscript_expression_type_inference();
+                };
+                let literal_value = literal_ty.value(db);
                 (&mut literal_value.chars())
-                    .py_index(
-                        self.db(),
-                        i32::try_from(int).expect("checked in branch arm"),
-                    )
-                    .map(|ch| Type::string_literal(self.db(), &ch.to_string()))
+                    .py_index(db, i32_int)
+                    .map(|ch| Type::string_literal(db, &ch.to_string()))
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
-                            &self.context,
+                            context,
                             "string",
                             value_node.into(),
                             value_ty,
                             literal_value.chars().count(),
-                            int,
+                            i64_int,
                         );
                         Type::unknown()
                     })
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (Type::StringLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
-                let literal_value = literal_ty.value(self.db());
+            (
+                Type::StringLiteral(literal_ty),
+                Type::NominalInstance(NominalInstanceType { class, .. }),
+            ) => {
+                let Some(SliceLiteral { start, stop, step }) = class.slice_literal(db) else {
+                    return fallback_subscript_expression_type_inference();
+                };
 
+                let literal_value = literal_ty.value(db);
                 let chars: Vec<_> = literal_value.chars().collect();
 
-                if let Ok(new_chars) = chars.py_slice(self.db(), start, stop, step) {
+                if let Ok(new_chars) = chars.py_slice(db, start, stop, step) {
                     let literal: String = new_chars.collect();
-                    Type::string_literal(self.db(), &literal)
+                    Type::string_literal(db, &literal)
                 } else {
-                    report_slice_step_size_zero(&self.context, value_node.into());
+                    report_slice_step_size_zero(context, value_node.into());
                     Type::unknown()
                 }
             }
 
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
-            (Type::BytesLiteral(literal_ty), Type::IntLiteral(int), _)
-                if i32::try_from(int).is_ok() =>
-            {
-                let literal_value = literal_ty.value(self.db());
+            (Type::BytesLiteral(literal_ty), Type::IntLiteral(i64_int)) => {
+                let Ok(i32_int) = i32::try_from(i64_int) else {
+                    return fallback_subscript_expression_type_inference();
+                };
+                let literal_value = literal_ty.value(db);
                 literal_value
-                    .py_index(
-                        self.db(),
-                        i32::try_from(int).expect("checked in branch arm"),
-                    )
+                    .py_index(db, i32_int)
                     .map(|byte| Type::IntLiteral((*byte).into()))
                     .unwrap_or_else(|_| {
                         report_index_out_of_bounds(
-                            &self.context,
+                            context,
                             "bytes literal",
                             value_node.into(),
                             value_ty,
                             literal_value.len(),
-                            int,
+                            i64_int,
                         );
                         Type::unknown()
                     })
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (Type::BytesLiteral(literal_ty), _, Some(SliceLiteral { start, stop, step })) => {
-                let literal_value = literal_ty.value(self.db());
+            (
+                Type::BytesLiteral(literal_ty),
+                Type::NominalInstance(NominalInstanceType { class, .. }),
+            ) => {
+                let Some(SliceLiteral { start, stop, step }) = class.slice_literal(db) else {
+                    return fallback_subscript_expression_type_inference();
+                };
 
-                if let Ok(new_bytes) = literal_value.py_slice(self.db(), start, stop, step) {
+                let literal_value = literal_ty.value(db);
+
+                if let Ok(new_bytes) = literal_value.py_slice(db, start, stop, step) {
                     let new_bytes: Vec<u8> = new_bytes.copied().collect();
-                    Type::bytes_literal(self.db(), &new_bytes)
+                    Type::bytes_literal(db, &new_bytes)
                 } else {
-                    report_slice_step_size_zero(&self.context, value_node.into());
+                    report_slice_step_size_zero(context, value_node.into());
                     Type::unknown()
                 }
             }
@@ -8504,7 +8637,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::Tuple(_) | Type::StringLiteral(_) | Type::BytesLiteral(_),
                 Type::BooleanLiteral(bool),
-                _,
             ) => self.infer_subscript_expression_types(
                 value_node,
                 value_ty,
@@ -8512,8 +8644,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 expr_context,
             ),
 
-            (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars), _) => {
-                let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
+            (Type::SpecialForm(SpecialFormType::Protocol), Type::Tuple(typevars)) => {
+                let TupleSpec::Fixed(typevars) = typevars.tuple(db) else {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
@@ -8526,7 +8658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(Type::unknown)
             }
 
-            (Type::SpecialForm(SpecialFormType::Protocol), typevar, _) => self
+            (Type::SpecialForm(SpecialFormType::Protocol), typevar) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
@@ -8535,13 +8667,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
                 .unwrap_or_else(Type::unknown),
 
-            (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Protocol")
             }
 
-            (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars), _) => {
-                let TupleSpec::Fixed(typevars) = typevars.tuple(self.db()) else {
+            (Type::SpecialForm(SpecialFormType::Generic), Type::Tuple(typevars)) => {
+                let TupleSpec::Fixed(typevars) = typevars.tuple(db) else {
                     // TODO: emit a diagnostic
                     return Type::unknown();
                 };
@@ -8554,7 +8686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(Type::unknown)
             }
 
-            (Type::SpecialForm(SpecialFormType::Generic), typevar, _) => self
+            (Type::SpecialForm(SpecialFormType::Generic), typevar) => self
                 .legacy_generic_class_context(
                     value_node,
                     std::slice::from_ref(&typevar),
@@ -8563,157 +8695,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
                 .unwrap_or_else(Type::unknown),
 
-            (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _, _) => {
+            (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
                 // TODO: emit a diagnostic
                 todo_type!("doubly-specialized typing.Generic")
             }
 
-            (Type::SpecialForm(special_form), _, _) if special_form.class().is_special_form() => {
+            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
                 todo_type!("Inference of subscript on special form")
             }
 
-            (Type::KnownInstance(known_instance), _, _)
+            (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
             {
                 todo_type!("Inference of subscript on special form")
             }
 
-            (value_ty, slice_ty, _) => {
-                // If the class defines `__getitem__`, return its return type.
-                //
-                // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
-                match value_ty.try_call_dunder(
-                    self.db(),
-                    "__getitem__",
-                    CallArguments::positional([slice_ty]),
-                ) {
-                    Ok(outcome) => return outcome.return_type(self.db()),
-                    Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` is possibly unbound",
-                                value_ty.display(self.db()),
-                            ));
-                        }
-
-                        return err.fallback_return_type(self.db());
-                    }
-                    Err(CallDunderError::CallError(_, bindings)) => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, value_node)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` \
-                                 is not callable on object of type `{}`",
-                                bindings.callable_type().display(self.db()),
-                                value_ty.display(self.db()),
-                            ));
-                        }
-
-                        return bindings.return_type(self.db());
-                    }
-                    Err(CallDunderError::MethodNotAvailable) => {
-                        // try `__class_getitem__`
-                    }
-                }
-
-                // Otherwise, if the value is itself a class and defines `__class_getitem__`,
-                // return its return type.
-                //
-                // TODO: lots of classes are only subscriptable at runtime on Python 3.9+,
-                // *but* we should also allow them to be subscripted in stubs
-                // (and in annotations if `from __future__ import annotations` is enabled),
-                // even if the target version is Python 3.8 or lower,
-                // despite the fact that there will be no corresponding `__class_getitem__`
-                // method in these `sys.version_info` branches.
-                if value_ty.is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db())) {
-                    let dunder_class_getitem_method =
-                        value_ty.member(self.db(), "__class_getitem__").place;
-
-                    match dunder_class_getitem_method {
-                        Place::Unbound => {}
-                        Place::Type(ty, boundness) => {
-                            if boundness == Boundness::PossiblyUnbound {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Method `__class_getitem__` of type `{}` \
-                                        is possibly unbound",
-                                        value_ty.display(self.db()),
-                                    ));
-                                }
-                            }
-
-                            match ty.try_call(
-                                self.db(),
-                                &CallArguments::positional([value_ty, slice_ty]),
-                            ) {
-                                Ok(bindings) => return bindings.return_type(self.db()),
-                                Err(CallError(_, bindings)) => {
-                                    if let Some(builder) =
-                                        self.context.report_lint(&CALL_NON_CALLABLE, value_node)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Method `__class_getitem__` of type `{}` \
-                                             is not callable on object of type `{}`",
-                                            bindings.callable_type().display(self.db()),
-                                            value_ty.display(self.db()),
-                                        ));
-                                    }
-                                    return bindings.return_type(self.db());
-                                }
-                            }
-                        }
-                    }
-
-                    if let Type::ClassLiteral(class) = value_ty {
-                        if class.is_known(self.db(), KnownClass::Type) {
-                            return KnownClass::GenericAlias.to_instance(self.db());
-                        }
-
-                        if class.generic_context(self.db()).is_some() {
-                            // TODO: specialize the generic class using these explicit type
-                            // variable assignments. This branch is only encountered when an
-                            // explicit class specialization appears inside of some other subscript
-                            // expression, e.g. `tuple[list[int], ...]`. We have already inferred
-                            // the type of the outer subscript slice as a value expression, which
-                            // means we can't re-infer the inner specialization here as a type
-                            // expression.
-                            return value_ty;
-                        }
-                    }
-
-                    // TODO: properly handle old-style generics; get rid of this temporary hack
-                    if !value_ty.into_class_literal().is_some_and(|class| {
-                        class
-                            .iter_mro(self.db(), None)
-                            .contains(&ClassBase::Generic)
-                    }) {
-                        report_non_subscriptable(
-                            &self.context,
-                            value_node.into(),
-                            value_ty,
-                            "__class_getitem__",
-                        );
-                    }
-                } else {
-                    if expr_context != ExprContext::Store {
-                        report_non_subscriptable(
-                            &self.context,
-                            value_node.into(),
-                            value_ty,
-                            "__getitem__",
-                        );
-                    }
-                }
-
-                Type::unknown()
-            }
+            _ => fallback_subscript_expression_type_inference(),
         }
     }
 
