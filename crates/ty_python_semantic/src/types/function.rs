@@ -78,7 +78,7 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
     KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, walk_type_mapping,
+    UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1082,6 +1082,8 @@ pub enum KnownFunction {
     EnumMembers,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.has_member`
+    HasMember,
     /// `ty_extensions.top_materialization`
     TopMaterialization,
     /// `ty_extensions.bottom_materialization`
@@ -1150,6 +1152,7 @@ impl KnownFunction {
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
+            | Self::HasMember
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1184,6 +1187,16 @@ impl KnownFunction {
                             .message(format_args!("`{}`", revealed_type.display(db))),
                     );
                 }
+            }
+
+            KnownFunction::HasMember => {
+                let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
+                    return;
+                };
+                let ty_members = all_members(db, *ty);
+                overload.set_return_type(Type::BooleanLiteral(
+                    ty_members.iter().any(|m| m.name == member.value(db)),
+                ));
             }
 
             KnownFunction::AssertType => {
@@ -1444,6 +1457,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
+                | KnownFunction::HasMember
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
