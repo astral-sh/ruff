@@ -222,7 +222,6 @@ impl<'db> Completion<'db> {
                 // "struct" here as a more general "object." ---AG
                 Type::NominalInstance(_)
                 | Type::PropertyInstance(_)
-                | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypedDict(_) => CompletionKind::Struct,
                 Type::IntLiteral(_)
