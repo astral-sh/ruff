@@ -749,6 +749,51 @@ def singleton_check(value: Singleton) -> str:
             assert_never(value)
 ```
 
+## `__eq__` and `__ne__`
+
+### No `__eq__` or `__ne__` overrides
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+reveal_type(Color.RED == Color.RED)  # revealed: Literal[True]
+reveal_type(Color.RED != Color.RED)  # revealed: Literal[False]
+```
+
+### Overridden `__eq__`
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+reveal_type(Color.RED == Color.RED)  # revealed: bool
+```
+
+### Overridden `__ne__`
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+reveal_type(Color.RED != Color.RED)  # revealed: bool
+```
+
 ## References
 
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>

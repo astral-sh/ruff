@@ -7695,6 +7695,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
+
+        let try_dunder = |policy: MemberLookupPolicy| {
+            let rich_comparison = |op| self.infer_rich_comparison(left, right, op, policy);
+            let membership_test_comparison = |op, range: TextRange| {
+                self.infer_membership_test_comparison(left, right, op, range)
+            };
+
+            match op {
+                ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
+                ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
+                ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
+                ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
+                ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
+                ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
+                ast::CmpOp::In => {
+                    membership_test_comparison(MembershipTestCompareOperator::In, range)
+                }
+                ast::CmpOp::NotIn => {
+                    membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
+                }
+                ast::CmpOp::Is => {
+                    if left.is_disjoint_from(self.db(), right) {
+                        Ok(Type::BooleanLiteral(false))
+                    } else if left.is_singleton(self.db())
+                        && left.is_equivalent_to(self.db(), right)
+                    {
+                        Ok(Type::BooleanLiteral(true))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(self.db()))
+                    }
+                }
+                ast::CmpOp::IsNot => {
+                    if left.is_disjoint_from(self.db(), right) {
+                        Ok(Type::BooleanLiteral(true))
+                    } else if left.is_singleton(self.db())
+                        && left.is_equivalent_to(self.db(), right)
+                    {
+                        Ok(Type::BooleanLiteral(false))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(self.db()))
+                    }
+                }
+            }
+        };
+
         match (left, right) {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
@@ -7896,12 +7941,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Ok(Type::BooleanLiteral(literal_1 == literal_2))
+                match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Ok(Type::BooleanLiteral(literal_1 == literal_2)),
+                }
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Ok(Type::BooleanLiteral(literal_1 != literal_2))
+                match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => Ok(ty),
+                    Err(_) => Ok(Type::BooleanLiteral(literal_1 != literal_2)),
+                }
             }
 
             (Type::Tuple(_), Type::NominalInstance(instance))
@@ -7993,48 +8044,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Lookup the rich comparison `__dunder__` methods
-            _ => {
-                let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
-                let membership_test_comparison = |op, range: TextRange| {
-                    self.infer_membership_test_comparison(left, right, op, range)
-                };
-                match op {
-                    ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-                    ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-                    ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-                    ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-                    ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-                    ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-                    ast::CmpOp::In => {
-                        membership_test_comparison(MembershipTestCompareOperator::In, range)
-                    }
-                    ast::CmpOp::NotIn => {
-                        membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-                    }
-                    ast::CmpOp::Is => {
-                        if left.is_disjoint_from(self.db(), right) {
-                            Ok(Type::BooleanLiteral(false))
-                        } else if left.is_singleton(self.db())
-                            && left.is_equivalent_to(self.db(), right)
-                        {
-                            Ok(Type::BooleanLiteral(true))
-                        } else {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        }
-                    }
-                    ast::CmpOp::IsNot => {
-                        if left.is_disjoint_from(self.db(), right) {
-                            Ok(Type::BooleanLiteral(true))
-                        } else if left.is_singleton(self.db())
-                            && left.is_equivalent_to(self.db(), right)
-                        {
-                            Ok(Type::BooleanLiteral(false))
-                        } else {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        }
-                    }
-                }
-            }
+            _ => try_dunder(MemberLookupPolicy::default()),
         }
     }
 
@@ -8047,14 +8057,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         left: Type<'db>,
         right: Type<'db>,
         op: RichCompareOperator,
+        policy: MemberLookupPolicy,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
         let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder(db, op.dunder(), CallArguments::positional([right]))
-                .map(|outcome| outcome.return_type(db))
-                .ok()
+            left.try_call_dunder_with_policy(
+                db,
+                op.dunder(),
+                &mut CallArguments::positional([right]),
+                policy,
+            )
+            .map(|outcome| outcome.return_type(db))
+            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -8067,7 +8083,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // When no appropriate method returns any value other than NotImplemented,
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) {
+            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+                && !policy.mro_no_object_fallback()
+            {
                 Some(KnownClass::Bool.to_instance(db))
             } else {
                 None
