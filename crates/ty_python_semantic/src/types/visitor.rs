@@ -163,7 +163,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
-            Type::Tuple(tuple) => TypeKind::NonAtomic(NonAtomicType::Tuple(tuple)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))

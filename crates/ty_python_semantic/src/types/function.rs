@@ -944,8 +944,6 @@ fn is_instance_truthiness<'db>(
                 .is_some_and(is_instance),
         ),
 
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
-
         Type::FunctionLiteral(..) => {
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
         }

@@ -76,6 +76,11 @@ impl Display for DisplayRepresentation<'_> {
                 match (instance.class, instance.class.known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
+                        .specialization(self.db)
+                        .tuple(self.db)
+                        .display(self.db)
+                        .fmt(f),
                     (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
                     (ClassType::Generic(alias), _) => alias.display(self.db).fmt(f),
                 }
@@ -201,7 +206,6 @@ impl Display for DisplayRepresentation<'_> {
                     name = enum_literal.name(self.db),
                 )
             }
-            Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),

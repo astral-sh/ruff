@@ -151,7 +151,6 @@ impl<'db> ClassBase<'db> {
             | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)

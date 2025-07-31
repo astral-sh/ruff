@@ -100,10 +100,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
-        (Type::Tuple(_), _) => Ordering::Less,
-        (_, Type::Tuple(_)) => Ordering::Greater,
-
         (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => left.cmp(right),
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,

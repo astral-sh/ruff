@@ -144,15 +144,6 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 
-impl<'db> Type<'db> {
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Self::Tuple(tuple)
-    }
-}
-
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -181,17 +172,17 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(TupleType::new(
+        Type::tuple(
             db,
-            TupleSpec::from(FixedLengthTuple::empty()),
-        ))
+            TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty())),
+        )
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::from_elements(types)))
+        Type::tuple(db, TupleType::new(db, TupleSpec::from_elements(types)))
     }
 
     #[cfg(test)]
@@ -201,14 +192,14 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
-        Type::tuple(TupleType::new(
+        Type::tuple(
             db,
-            VariableLengthTuple::mixed(prefix, variable, suffix),
-        ))
+            TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix)),
+        )
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::homogeneous(element)))
+        Type::tuple(db, TupleType::new(db, TupleSpec::homogeneous(element)))
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
@@ -970,10 +961,9 @@ impl<T> Tuple<T> {
         VariableLengthTuple::homogeneous(element)
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Tuple<T> {
         FixedLengthTuple::from_elements(elements).into()
     }
-
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }

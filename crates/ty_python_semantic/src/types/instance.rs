@@ -7,9 +7,12 @@ use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
+use crate::types::{
+    DynamicType, GenericAlias, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -18,17 +21,31 @@ impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         match (class, class.known(db)) {
             (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
-            (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
-                TupleType::homogeneous(db, Type::unknown())
-            }
-            (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
-                Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
-            }
             _ if class.class_literal(db).0.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
             }
             _ => Self::NominalInstance(NominalInstanceType::from_class(class)),
         }
+    }
+
+    pub(crate) fn tuple(db: &'db dyn Db, tuple: Option<TupleType<'db>>) -> Self {
+        let Some(tuple) = tuple else {
+            return Type::Never;
+        };
+        let Some(tuple_class) = KnownClass::Tuple.try_to_class_literal(db) else {
+            return Type::unknown();
+        };
+        let specialization = Specialization::new(
+            db,
+            GenericContext::new(db, FxOrderSet::default()),
+            Box::default(),
+            Some(tuple),
+        );
+        let alias = GenericAlias::new(db, tuple_class, specialization);
+        Type::NominalInstance(NominalInstanceType {
+            class: ClassType::Generic(alias),
+            _phantom: PhantomData,
+        })
     }
 
     pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
