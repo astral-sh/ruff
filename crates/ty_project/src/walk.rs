@@ -5,6 +5,7 @@ use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use rustc_hash::{FxBuildHasher, FxHashSet};
+use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -187,7 +188,7 @@ impl<'a> ProjectFilesWalker<'a> {
                             };
                         }
 
-                        if entry.file_type().is_file() {
+                        if entry.file_type().is_file() || entry.file_type().is_symlink() {
                             // Ignore any non python files to avoid creating too many entries in `Files`.
                             if entry
                                 .path()
@@ -211,6 +212,13 @@ impl<'a> ProjectFilesWalker<'a> {
                                         tracing::debug!("Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.", path=entry.path());
                                         return WalkState::Continue;
                                     },
+                                }
+                            }
+
+                            if entry.file_type().is_symlink() {
+                                let res = fs::canonicalize(entry.path());
+                                if !res.map_or(false, |path_buf| {path_buf.is_file()}) {
+                                    return WalkState::Continue;
                                 }
                             }
 
