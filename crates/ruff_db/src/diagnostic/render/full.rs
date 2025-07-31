@@ -5,7 +5,10 @@ mod tests {
 
     use crate::diagnostic::{
         Annotation, DiagnosticFormat, Severity,
-        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+        render::tests::{
+            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+            create_syntax_error_diagnostics,
+        },
     };
 
     #[test]
@@ -283,6 +286,46 @@ print()
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
         --> example.py:1:1
+        ");
+    }
+
+    /// Check that ranges in notebooks are remapped relative to the cells.
+    #[test]
+    fn notebook_output() {
+        let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        error[unused-import]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+        3 | # cell 2
+        4 | import math
+          |
+        help: Remove unused import: `os`
+
+        error[unused-import]: `math` imported but unused
+         --> notebook.ipynb:cell 2:2:8
+          |
+        2 | import os
+        3 | # cell 2
+        4 | import math
+          |        ^^^^
+        5 |
+        6 | print('hello world')
+          |
+        help: Remove unused import: `math`
+
+        error[unused-variable]: Local variable `x` is assigned to but never used
+          --> notebook.ipynb:cell 3:4:5
+           |
+         8 | def foo():
+         9 |     print()
+        10 |     x = 1
+           |     ^
+           |
+        help: Remove assignment to unused variable `x`
         ");
     }
 }
