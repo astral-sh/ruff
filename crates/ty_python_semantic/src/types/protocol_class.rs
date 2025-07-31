@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
 use itertools::Itertools;
@@ -215,6 +216,31 @@ impl<'db> ProtocolInterface<'db> {
             data.find_legacy_typevars(db, typevars);
         }
     }
+
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolInterfaceDisplay<'db> {
+            db: &'db dyn Db,
+            interface: ProtocolInterface<'db>,
+        }
+
+        impl std::fmt::Display for ProtocolInterfaceDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_char('{')?;
+                for (i, (name, data)) in self.interface.inner(self.db).iter().enumerate() {
+                    write!(f, "\"{name}\": {data}", data = data.display(self.db))?;
+                    if i < self.interface.inner(self.db).len() - 1 {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_char('}')
+            }
+        }
+
+        ProtocolInterfaceDisplay {
+            db,
+            interface: self,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -254,6 +280,41 @@ impl<'db> ProtocolMemberData<'db> {
         Self {
             kind: self.kind.materialize(db, variance),
             qualifiers: self.qualifiers,
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolMemberDataDisplay<'db> {
+            db: &'db dyn Db,
+            data: ProtocolMemberKind<'db>,
+        }
+
+        impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.data {
+                    ProtocolMemberKind::Method(callable) => {
+                        write!(f, "MethodMember(`{}`)", callable.display(self.db))
+                    }
+                    ProtocolMemberKind::Property(property) => {
+                        let mut d = f.debug_struct("PropertyMember");
+                        if let Some(getter) = property.getter(self.db) {
+                            d.field("getter", &format_args!("`{}`", &getter.display(self.db)));
+                        }
+                        if let Some(setter) = property.setter(self.db) {
+                            d.field("setter", &format_args!("`{}`", &setter.display(self.db)));
+                        }
+                        d.finish()
+                    }
+                    ProtocolMemberKind::Other(ty) => {
+                        write!(f, "AttributeMember(`{}`)", ty.display(self.db))
+                    }
+                }
+            }
+        }
+
+        ProtocolMemberDataDisplay {
+            db,
+            data: self.kind,
         }
     }
 }

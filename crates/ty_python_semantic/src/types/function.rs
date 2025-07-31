@@ -68,7 +68,7 @@ use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::generics::{GenericContext, walk_generic_context};
@@ -1088,6 +1088,8 @@ pub enum KnownFunction {
     TopMaterialization,
     /// `ty_extensions.bottom_materialization`
     BottomMaterialization,
+    /// `ty_extensions.reveal_protocol_interface`
+    RevealProtocolInterface,
 }
 
 impl KnownFunction {
@@ -1153,6 +1155,7 @@ impl KnownFunction {
             | Self::EnumMembers
             | Self::StaticAssert
             | Self::HasMember
+            | Self::RevealProtocolInterface
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1345,6 +1348,33 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
 
+            KnownFunction::RevealProtocolInterface => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let Some(protocol_class) = param_type
+                    .into_class_literal()
+                    .and_then(|class| class.into_protocol_class(db))
+                else {
+                    report_bad_argument_to_protocol_interface(
+                        context,
+                        call_expression,
+                        *param_type,
+                    );
+                    return;
+                };
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed protocol interface");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        protocol_class.interface(db).display(db)
+                    )));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
@@ -1458,6 +1488,7 @@ pub(crate) mod tests {
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
                 | KnownFunction::HasMember
+                | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
