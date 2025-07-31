@@ -189,10 +189,15 @@ fn background_request_task<R: traits::BackgroundRequestHandler>(
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
+    tracing::debug!("Running background request task for method: {}", R::METHOD);
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
 
     Ok(Task::background(schedule, move |session: &Session| {
+        tracing::debug!(
+            "Running background request task for method on background thread: {}",
+            R::METHOD
+        );
         let cancellation_token = session
             .request_queue()
             .incoming()
@@ -209,7 +214,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -219,13 +224,11 @@ where
                 return;
             }
 
-            let result = ruff_db::panic::catch_unwind(|| {
+            if let Err(error) = ruff_db::panic::catch_unwind(|| {
                 let snapshot = snapshot;
-                R::run(snapshot.0, client, params)
-            });
-
-            if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
-                respond::<R>(&id, response, client);
+                R::process(&id, snapshot.0, client, params);
+            }) {
+                panic_response::<R>(&id, client, &error, retry);
             }
         })
     }))
@@ -288,58 +291,50 @@ where
                 return;
             }
 
-            let result = ruff_db::panic::catch_unwind(|| {
-                R::run_with_snapshot(&db, snapshot, client, params)
-            });
-
-            if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
-                respond::<R>(&id, response, client);
+            if let Err(error) =
+                ruff_db::panic::catch_unwind(|| R::process(&id, &db, snapshot, client, params))
+            {
+                panic_response::<R>(&id, client, &error, retry);
             }
         })
     }))
 }
 
-fn request_result_to_response<R>(
+fn panic_response<R>(
     id: &RequestId,
     client: &Client,
-    result: std::result::Result<
-        Result<<<R as RequestHandler>::RequestType as Request>::Result>,
-        PanicError,
-    >,
+    error: &PanicError,
     request: Option<lsp_server::Request>,
-) -> Option<Result<<<R as RequestHandler>::RequestType as Request>::Result>>
-where
+) where
     R: traits::RetriableRequestHandler,
 {
-    match result {
-        Ok(response) => Some(response),
-        Err(error) => {
-            // Check if the request was canceled due to some modifications to the salsa database.
-            if error.payload.downcast_ref::<salsa::Cancelled>().is_some() {
-                // If the query supports retry, re-queue the request.
-                // The query is still likely to succeed if the user modified any other document.
-                if let Some(request) = request {
-                    tracing::trace!(
-                        "request id={} method={} was cancelled by salsa, re-queueing for retry",
-                        request.id,
-                        request.method
-                    );
-                    client.retry(request);
-                } else {
-                    tracing::trace!(
-                        "request id={} was cancelled by salsa, sending content modified",
-                        id
-                    );
-                    respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
-                }
-                None
-            } else {
-                Some(Err(Error {
-                    code: lsp_server::ErrorCode::InternalError,
-                    error: anyhow!("request handler {error}"),
-                }))
-            }
+    // Check if the request was canceled due to some modifications to the salsa database.
+    if error.payload.downcast_ref::<salsa::Cancelled>().is_some() {
+        // If the query supports retry, re-queue the request.
+        // The query is still likely to succeed if the user modified any other document.
+        if let Some(request) = request {
+            tracing::trace!(
+                "request id={} method={} was cancelled by salsa, re-queueing for retry",
+                request.id,
+                request.method
+            );
+            client.retry(request);
+        } else {
+            tracing::trace!(
+                "request id={} was cancelled by salsa, sending content modified",
+                id
+            );
+            respond_silent_error(id.clone(), client, R::salsa_cancellation_error());
         }
+    } else {
+        respond::<R>(
+            id,
+            Err(Error {
+                code: lsp_server::ErrorCode::InternalError,
+                error: anyhow!("request handler {error}"),
+            }),
+            client,
+        );
     }
 }
 
@@ -352,7 +347,13 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             client.show_error_message("ty encountered a problem. Check the logs for more details.");
+
+            return;
         }
+
+        // if there's any pending workspace diagnostic long-polling request.
+        // Continue it if the session revision changed (e.g. because some document changed).
+        session.resume_suspended_workspace_diagnostic_request(client);
     }))
 }
 
