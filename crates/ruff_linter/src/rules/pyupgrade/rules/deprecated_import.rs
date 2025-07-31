@@ -14,6 +14,8 @@ use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_require
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
+use super::RequiredImports;
+
 /// An import was moved and renamed as part of a deprecation.
 /// For example, `typing.AbstractSet` was moved to `collections.abc.Set`.
 #[derive(Debug, PartialEq, Eq)]
@@ -411,7 +413,7 @@ struct ImportReplacer<'a> {
     stylist: &'a Stylist<'a>,
     tokens: &'a Tokens,
     version: PythonVersion,
-    skip_aliases: std::collections::HashSet<&'a str>,
+    required_imports: &'a RequiredImports,
 }
 
 impl<'a> ImportReplacer<'a> {
@@ -422,7 +424,7 @@ impl<'a> ImportReplacer<'a> {
         stylist: &'a Stylist<'a>,
         tokens: &'a Tokens,
         version: PythonVersion,
-        skip_aliases: std::collections::HashSet<&'a str>,
+        required_imports: &'a RequiredImports,
     ) -> Self {
         Self {
             import_from_stmt,
@@ -431,7 +433,7 @@ impl<'a> ImportReplacer<'a> {
             stylist,
             tokens,
             version,
-            skip_aliases,
+            required_imports,
         }
     }
 
@@ -441,7 +443,11 @@ impl<'a> ImportReplacer<'a> {
         if self.module == "typing" {
             if self.version >= PythonVersion::PY39 {
                 for member in &self.import_from_stmt.names {
-                    if self.skip_aliases.contains(&member.name.as_str()) {
+                    if is_import_required_by_isort(
+                        self.required_imports,
+                        StmtRef::ImportFrom(self.import_from_stmt),
+                        member,
+                    ) {
                         continue;
                     }
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
@@ -680,10 +686,13 @@ impl<'a> ImportReplacer<'a> {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
         for name in &self.import_from_stmt.names {
-            if self.skip_aliases.contains(&name.name.as_str()) {
-                continue;
-            }
-            if candidates.contains(&name.name.as_str()) {
+            if is_import_required_by_isort(
+                self.required_imports,
+                StmtRef::ImportFrom(self.import_from_stmt),
+                name,
+            ) {
+                unmatched_names.push(name);
+            } else if candidates.contains(&name.name.as_str()) {
                 matched_names.push(name);
             } else {
                 unmatched_names.push(name);
@@ -729,13 +738,6 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         return;
     }
 
-    let mut skip_aliases = std::collections::HashSet::new();
-    for alias in &import_from_stmt.names {
-        if is_import_required_by_isort(checker, StmtRef::ImportFrom(import_from_stmt), alias) {
-            skip_aliases.insert(alias.name.as_str());
-        }
-    }
-
     let fixer = ImportReplacer::new(
         import_from_stmt,
         module,
@@ -743,7 +745,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         checker.stylist(),
         checker.tokens(),
         checker.target_version(),
-        skip_aliases,
+        &checker.settings().isort.required_imports,
     );
 
     for (operation, fix) in fixer.without_renames() {

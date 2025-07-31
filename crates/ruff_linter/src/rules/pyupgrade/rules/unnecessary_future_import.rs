@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -85,7 +87,13 @@ const PY37_PLUS_REMOVE_FUTURES: &[&str] = &[
     "generator_stop",
 ];
 
-pub(crate) fn is_import_required_by_isort(checker: &Checker, stmt: StmtRef, alias: &Alias) -> bool {
+pub(crate) type RequiredImports = BTreeSet<NameImport>;
+
+pub(crate) fn is_import_required_by_isort(
+    required_imports: &RequiredImports,
+    stmt: StmtRef,
+    alias: &Alias,
+) -> bool {
     let name_import = match stmt {
         StmtRef::ImportFrom(ast::StmtImportFrom { module, level, .. }) => {
             NameImport::ImportFrom(MemberNameImport {
@@ -106,11 +114,7 @@ pub(crate) fn is_import_required_by_isort(checker: &Checker, stmt: StmtRef, alia
         _ => return false,
     };
 
-    checker
-        .settings()
-        .isort
-        .required_imports
-        .contains(&name_import)
+    required_imports.contains(&name_import)
 }
 
 /// UP010
@@ -121,7 +125,11 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &
             continue;
         }
 
-        if is_import_required_by_isort(checker, stmt.into(), alias) {
+        if is_import_required_by_isort(
+            &checker.settings().isort.required_imports,
+            stmt.into(),
+            alias,
+        ) {
             continue;
         }
 
