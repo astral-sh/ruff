@@ -44,7 +44,7 @@ mod tests {
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[invalid-syntax]: SyntaxError: Expected one or more symbol names after import
+        error[invalid-syntax]: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
         1 | from os import
@@ -53,7 +53,7 @@ mod tests {
         3 | if call(foo
           |
 
-        error[invalid-syntax]: SyntaxError: Expected ')', found newline
+        error[invalid-syntax]: Expected ')', found newline
          --> syntax_errors.py:3:12
           |
         1 | from os import
@@ -108,7 +108,7 @@ mod tests {
         env.hide_severity(true);
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        SyntaxError: Expected one or more symbol names after import
+        invalid-syntax: Expected one or more symbol names after import
          --> syntax_errors.py:1:15
           |
         1 | from os import
@@ -117,7 +117,7 @@ mod tests {
         3 | if call(foo
           |
 
-        SyntaxError: Expected ')', found newline
+        invalid-syntax: Expected ')', found newline
          --> syntax_errors.py:3:12
           |
         1 | from os import

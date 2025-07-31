@@ -162,8 +162,8 @@ mod tests {
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        syntax_errors.py:1:15: SyntaxError: Expected one or more symbol names after import
-        syntax_errors.py:3:12: SyntaxError: Expected ')', found newline
+        syntax_errors.py:1:15: invalid-syntax: Expected one or more symbol names after import
+        syntax_errors.py:3:12: invalid-syntax: Expected ')', found newline
         ");
     }
 
@@ -171,8 +171,8 @@ mod tests {
     fn syntax_errors() {
         let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        syntax_errors.py:1:15: error[invalid-syntax] SyntaxError: Expected one or more symbol names after import
-        syntax_errors.py:3:12: error[invalid-syntax] SyntaxError: Expected ')', found newline
+        syntax_errors.py:1:15: error[invalid-syntax] Expected one or more symbol names after import
+        syntax_errors.py:3:12: error[invalid-syntax] Expected ')', found newline
         ");
     }
 

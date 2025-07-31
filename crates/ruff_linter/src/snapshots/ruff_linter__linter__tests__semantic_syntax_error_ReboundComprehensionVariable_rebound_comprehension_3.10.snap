@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:1:2: SyntaxError: assignment expression cannot rebind comprehension variable
+<filename>:1:2: invalid-syntax: assignment expression cannot rebind comprehension variable
   |
 1 | [x:= 2 for x in range(2)]
   |  ^

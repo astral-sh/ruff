@@ -2886,10 +2886,10 @@ if call(foo
         env.format(format);
 
         let diagnostics = vec![
-            env.invalid_syntax("SyntaxError: Expected one or more symbol names after import")
+            env.invalid_syntax("Expected one or more symbol names after import")
                 .primary("syntax_errors.py", "1:14", "1:15", "")
                 .build(),
-            env.invalid_syntax("SyntaxError: Expected ')', found newline")
+            env.invalid_syntax("Expected ')', found newline")
                 .primary("syntax_errors.py", "3:11", "3:12", "")
                 .build(),
         ];
