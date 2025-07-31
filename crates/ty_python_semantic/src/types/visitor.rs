@@ -119,7 +119,6 @@ pub(crate) trait TypeVisitor<'db> {
 enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
-    Tuple(TupleType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -169,7 +168,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
-            Type::Tuple(tuple) => TypeKind::NonAtomic(NonAtomicType::Tuple(tuple)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
@@ -214,7 +212,6 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_intersection_type(db, intersection);
         }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
-        NonAtomicType::Tuple(tuple) => visitor.visit_tuple_type(db, tuple),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
         NonAtomicType::MethodWrapper(method_wrapper) => {

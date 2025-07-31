@@ -39,9 +39,13 @@ class HeterogeneousSubclass0(tuple[()]): ...
 reveal_type(HeterogeneousSubclass0.__getitem__)
 
 def f0(h0: HeterogeneousSubclass0, i: int):
-    reveal_type(h0[0])  # revealed: Never
-    reveal_type(h0[1])  # revealed: Never
-    reveal_type(h0[-1])  # revealed: Never
+    # error: [index-out-of-bounds]
+    reveal_type(h0[0])  # revealed: Unknown
+    # error: [index-out-of-bounds]
+    reveal_type(h0[1])  # revealed: Unknown
+    # error: [index-out-of-bounds]
+    reveal_type(h0[-1])  # revealed: Unknown
+
     reveal_type(h0[i])  # revealed: Never
 
 class HeterogeneousSubclass1(tuple[I0]): ...
@@ -51,7 +55,8 @@ reveal_type(HeterogeneousSubclass1.__getitem__)
 
 def f0(h1: HeterogeneousSubclass1, i: int):
     reveal_type(h1[0])  # revealed: I0
-    reveal_type(h1[1])  # revealed: I0
+    # error: [index-out-of-bounds]
+    reveal_type(h1[1])  # revealed: Unknown
     reveal_type(h1[-1])  # revealed: I0
     reveal_type(h1[i])  # revealed: I0
 
@@ -84,24 +89,18 @@ def g(m: MixedSubclass, i: int):
     reveal_type(m[2])  # revealed: I1 | I2 | I3
     reveal_type(m[3])  # revealed: I1 | I2 | I3
     reveal_type(m[4])  # revealed: I1 | I2 | I3 | I5
+    reveal_type(m[5])  # revealed: I1 | I2 | I3 | I5
+    reveal_type(m[10])  # revealed: I1 | I2 | I3 | I5
 
     reveal_type(m[-1])  # revealed: I5
     reveal_type(m[-2])  # revealed: I2
     reveal_type(m[-3])  # revealed: I3
     reveal_type(m[-4])  # revealed: I2
-    reveal_type(m[-5])  # revealed: I1 | I0
+    reveal_type(m[-5])  # revealed: I0 | I1
+    reveal_type(m[-6])  # revealed: I0 | I1
+    reveal_type(m[-10])  # revealed: I0 | I1
 
     reveal_type(m[i])  # revealed: I0 | I1 | I2 | I3 | I5
-
-    # Ideally we would not include `I0` in the unions for these,
-    # but it's not possible to do this using only synthesized overloads.
-    reveal_type(m[5])  # revealed: I0 | I1 | I2 | I3 | I5
-    reveal_type(m[10])  # revealed: I0 | I1 | I2 | I3 | I5
-
-    # Similarly, ideally these would just be `I0` | I1`,
-    # but achieving that with only synthesized overloads wouldn't be possible
-    reveal_type(m[-6])  # revealed: I0 | I1 | I2 | I3 | I5
-    reveal_type(m[-10])  # revealed: I0 | I1 | I2 | I3 | I5
 
 class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
 
@@ -112,18 +111,12 @@ def g(m: MixedSubclass2, i: int):
     reveal_type(m[0])  # revealed: I0
     reveal_type(m[1])  # revealed: I1
     reveal_type(m[2])  # revealed: I2 | I3
-
-    # Ideally this would just be `I2 | I3`,
-    # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[3])  # revealed: I0 | I1 | I2 | I3
+    reveal_type(m[3])  # revealed: I2 | I3
 
     reveal_type(m[-1])  # revealed: I3
-    reveal_type(m[-2])  # revealed: I2 | I1
-    reveal_type(m[-3])  # revealed: I2 | I1 | I0
-
-    # Ideally this would just be `I2 | I1 | I0`,
-    # but that's not possible to achieve with synthesized overloads
-    reveal_type(m[-4])  # revealed: I0 | I1 | I2 | I3
+    reveal_type(m[-2])  # revealed: I1 | I2
+    reveal_type(m[-3])  # revealed: I0 | I1 | I2
+    reveal_type(m[-4])  # revealed: I0 | I1 | I2
 ```
 
 The stdlib API `os.stat` is a commonly used API that returns an instance of a tuple subclass
