@@ -1,5 +1,4 @@
-"""
-A generic class to build line-oriented command interpreters.
+"""A generic class to build line-oriented command interpreters.
 
 Interpreters constructed with this class obey the following conventions:
 
@@ -62,6 +61,7 @@ class Cmd:
     framework.  There is no good reason to instantiate Cmd itself; rather,
     it's useful as a superclass of an interpreter class you define yourself
     in order to inherit Cmd's methods and encapsulate action methods.
+
     """
 
     prompt: str
@@ -88,17 +88,20 @@ class Cmd:
         is done automatically. The optional arguments stdin and stdout
         specify alternate input and output file objects; if not specified,
         sys.stdin and sys.stdout are used.
+
         """
     old_completer: Callable[[str, int], str | None] | None
     def cmdloop(self, intro: Any | None = None) -> None:
         """Repeatedly issue a prompt, accept input, parse an initial prefix
         off the received input, and dispatch to action methods, passing them
         the remainder of the line as argument.
+
         """
 
     def precmd(self, line: str) -> str:
         """Hook method executed just before the command line is
         interpreted, but after the input prompt is generated and issued.
+
         """
 
     def postcmd(self, stop: bool, line: str) -> bool:
@@ -110,6 +113,7 @@ class Cmd:
     def postloop(self) -> None:
         """Hook method executed once when the cmdloop() method is about to
         return.
+
         """
 
     def parseline(self, line: str) -> tuple[str | None, str | None, str]:
@@ -126,6 +130,7 @@ class Cmd:
         see the precmd() and postcmd() methods for useful execution hooks.
         The return value is a flag indicating whether interpretation of
         commands by the interpreter should stop.
+
         """
 
     def emptyline(self) -> bool:
@@ -133,6 +138,7 @@ class Cmd:
 
         If this method is not overridden, it repeats the last nonempty
         command entered.
+
         """
 
     def default(self, line: str) -> None:
@@ -140,6 +146,7 @@ class Cmd:
 
         If this method is not overridden, it prints an error message and
         returns.
+
         """
 
     def completedefault(self, *ignored: Any) -> list[str]:
@@ -147,6 +154,7 @@ class Cmd:
         complete_*() method is available.
 
         By default, it returns an empty list.
+
         """
 
     def completenames(self, text: str, *ignored: Any) -> list[str]: ...

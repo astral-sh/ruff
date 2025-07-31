@@ -1,8 +1,6 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use countme::Count;
-
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
@@ -11,7 +9,7 @@ use crate::Db;
 use crate::files::{File, FilePath};
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
@@ -38,11 +36,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     };
 
     SourceText {
-        inner: Arc::new(SourceTextInner {
-            kind,
-            read_error,
-            count: Count::new(),
-        }),
+        inner: Arc::new(SourceTextInner { kind, read_error }),
     }
 }
 
@@ -75,21 +69,21 @@ impl SourceText {
     pub fn as_str(&self) -> &str {
         match &self.inner.kind {
             SourceTextKind::Text(source) => source,
-            SourceTextKind::Notebook(notebook) => notebook.source_code(),
+            SourceTextKind::Notebook { notebook } => notebook.source_code(),
         }
     }
 
     /// Returns the underlying notebook if this is a notebook file.
     pub fn as_notebook(&self) -> Option<&Notebook> {
         match &self.inner.kind {
-            SourceTextKind::Notebook(notebook) => Some(notebook),
+            SourceTextKind::Notebook { notebook } => Some(notebook),
             SourceTextKind::Text(_) => None,
         }
     }
 
     /// Returns `true` if this is a notebook source file.
     pub fn is_notebook(&self) -> bool {
-        matches!(&self.inner.kind, SourceTextKind::Notebook(_))
+        matches!(&self.inner.kind, SourceTextKind::Notebook { .. })
     }
 
     /// Returns `true` if there was an error when reading the content of the file.
@@ -114,7 +108,7 @@ impl std::fmt::Debug for SourceText {
             SourceTextKind::Text(text) => {
                 dbg.field(text);
             }
-            SourceTextKind::Notebook(notebook) => {
+            SourceTextKind::Notebook { notebook } => {
                 dbg.field(notebook);
             }
         }
@@ -125,29 +119,19 @@ impl std::fmt::Debug for SourceText {
 
 #[derive(Eq, PartialEq, get_size2::GetSize)]
 struct SourceTextInner {
-    #[get_size(ignore)]
-    count: Count<SourceText>,
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, get_size2::GetSize)]
 enum SourceTextKind {
     Text(String),
-    Notebook(Box<Notebook>),
-}
-
-impl get_size2::GetSize for SourceTextKind {
-    fn get_heap_size(&self) -> usize {
-        match self {
-            SourceTextKind::Text(text) => text.get_heap_size(),
-            // TODO: The `get-size` derive does not support ignoring enum variants.
-            //
-            // Jupyter notebooks are not very relevant for memory profiling, and contain
-            // arbitrary JSON values that do not implement the `GetSize` trait.
-            SourceTextKind::Notebook(_) => 0,
-        }
-    }
+    Notebook {
+        // Jupyter notebooks are not very relevant for memory profiling, and contain
+        // arbitrary JSON values that do not implement the `GetSize` trait.
+        #[get_size(ignore)]
+        notebook: Box<Notebook>,
+    },
 }
 
 impl From<String> for SourceTextKind {
@@ -158,7 +142,9 @@ impl From<String> for SourceTextKind {
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook(Box::new(notebook))
+        SourceTextKind::Notebook {
+            notebook: Box::new(notebook),
+        }
     }
 }
 
@@ -171,7 +157,7 @@ pub enum SourceTextError {
 }
 
 /// Computes the [`LineIndex`] for `file`.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
     let _span = tracing::trace_span!("line_index", ?file).entered();
 

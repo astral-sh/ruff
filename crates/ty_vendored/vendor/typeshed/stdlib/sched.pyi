@@ -1,5 +1,4 @@
-"""
-A generally useful event scheduler class.
+"""A generally useful event scheduler class.
 
 Each instance of this class manages its own queue.
 No multi-threading is implied; you are supposed to hack that
@@ -72,6 +71,7 @@ class scheduler:
 
         Returns an ID for the event which can be used to remove it,
         if necessary.
+
         """
 
     def enter(
@@ -80,6 +80,7 @@ class scheduler:
         """A variant that specifies the time as a relative time.
 
         This is actually the more commonly used interface.
+
         """
 
     def run(self, blocking: bool = True) -> float | None:
@@ -104,6 +105,7 @@ class scheduler:
         just after an event is executed, a delay of 0 is executed, to
         avoid monopolizing the CPU when other threads are also
         runnable.
+
         """
 
     def cancel(self, event: Event) -> None:
@@ -111,6 +113,7 @@ class scheduler:
 
         This must be presented the ID as returned by enter().
         If the event is not in the queue, this raises ValueError.
+
         """
 
     def empty(self) -> bool:
@@ -122,4 +125,5 @@ class scheduler:
 
         Events are named tuples with fields for:
             time, priority, action, arguments, kwargs
+
         """

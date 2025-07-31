@@ -6,7 +6,7 @@
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Two levels up
@@ -16,7 +16,7 @@ def f():
     x = 1
     def g():
         def h():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Skips class scope
@@ -28,7 +28,7 @@ def f():
     class C:
         x = 2
         def g():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Reads respect annotation-only declarations
@@ -82,6 +82,52 @@ def f():
     def g():
         nonlocal x
         x = "hello"  # error: [invalid-assignment] "Object of type `Literal["hello"]` is not assignable to `int`"
+```
+
+## The types of `nonlocal` binding get unioned
+
+Without a type declaration, we union the bindings in enclosing scopes to infer a type. But name
+resolution stops at the closest binding that isn't declared `nonlocal`, and we ignore bindings
+outside of that one:
+
+```py
+def a():
+    # This binding is shadowed in `b`, so we ignore it in inner scopes.
+    x = 1
+
+    def b():
+        x = 2
+
+        def c():
+            nonlocal x
+            x = 3
+
+            def d():
+                nonlocal x
+                reveal_type(x)  # revealed: Literal[3, 2]
+                x = 4
+                reveal_type(x)  # revealed: Literal[4]
+
+                def e():
+                    reveal_type(x)  # revealed: Literal[4, 3, 2]
+```
+
+However, currently the union of types that we build is incomplete. We walk parent scopes, but not
+sibling scopes, child scopes, second-cousin-once-removed scopes, etc:
+
+```py
+def a():
+    x = 1
+    def b():
+        nonlocal x
+        x = 2
+
+    def c():
+        def d():
+            nonlocal x
+            x = 3
+        # TODO: This should include 2 and 3.
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -203,7 +249,7 @@ def f():
         x = 2
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+            reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## `nonlocal` "chaining"
@@ -217,7 +263,7 @@ def f():
         nonlocal x
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 And the `nonlocal` chain can skip over a scope that doesn't bind the variable:
@@ -231,7 +277,7 @@ def f1():
             # No binding; this scope gets skipped.
             def f4():
                 nonlocal x
-                reveal_type(x)  # revealed: Unknown | Literal[1]
+                reveal_type(x)  # revealed: Literal[1]
 ```
 
 But a `global` statement breaks the chain:
@@ -307,7 +353,7 @@ affected by `g`:
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     reveal_type(x)  # revealed: Literal[1]
 ```
 
@@ -319,9 +365,9 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
         x += 1
-        reveal_type(x)  # revealed: Unknown | Literal[2]
+        reveal_type(x)  # revealed: Literal[2]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -333,7 +379,7 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -389,4 +435,14 @@ def f():
         # This is allowed, because of the subsequent definition of `x`.
         nonlocal x
     x = 1
+```
+
+## Narrowing nonlocal types to `Never` doesn't make them unbound
+
+```py
+def foo():
+    x: int = 1
+    def bar():
+        if isinstance(x, str):
+            reveal_type(x)  # revealed: Never
 ```

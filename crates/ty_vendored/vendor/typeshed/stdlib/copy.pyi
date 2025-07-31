@@ -1,5 +1,4 @@
-"""
-Generic (shallow and deep) copying operations.
+"""Generic (shallow and deep) copying operations.
 
 Interface summary:
 
@@ -51,7 +50,7 @@ __getstate__() and __setstate__().  See the documentation for module
 """
 
 import sys
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar, type_check_only
 from typing_extensions import Self
 
 __all__ = ["Error", "copy", "deepcopy"]
@@ -59,6 +58,7 @@ __all__ = ["Error", "copy", "deepcopy"]
 _T = TypeVar("_T")
 _SR = TypeVar("_SR", bound=_SupportsReplace)
 
+@type_check_only
 class _SupportsReplace(Protocol):
     # In reality doesn't support args, but there's no other great way to express this.
     def __replace__(self, *args: Any, **kwargs: Any) -> Self: ...

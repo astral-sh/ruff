@@ -1,6 +1,4 @@
-"""
-Read from and write to tar format archives.
-"""
+"""Read from and write to tar format archives."""
 
 import bz2
 import io
@@ -10,7 +8,7 @@ from builtins import list as _list  # aliases to avoid name clashes with fields 
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
 from types import TracebackType
-from typing import IO, ClassVar, Literal, Protocol, overload
+from typing import IO, ClassVar, Final, Literal, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated
 
 if sys.version_info >= (3, 14):
@@ -51,6 +49,7 @@ if sys.version_info >= (3, 13):
 _FilterFunction: TypeAlias = Callable[[TarInfo, str], TarInfo | None]
 _TarfileFilter: TypeAlias = Literal["fully_trusted", "tar", "data"] | _FilterFunction
 
+@type_check_only
 class _Fileobj(Protocol):
     def read(self, size: int, /) -> bytes: ...
     def write(self, b: bytes, /) -> object: ...
@@ -61,58 +60,61 @@ class _Fileobj(Protocol):
     # name: str | bytes
     # mode: Literal["rb", "r+b", "wb", "xb"]
 
+@type_check_only
 class _Bz2ReadableFileobj(bz2._ReadableFileobj):
     def close(self) -> object: ...
 
+@type_check_only
 class _Bz2WritableFileobj(bz2._WritableFileobj):
     def close(self) -> object: ...
 
 # tar constants
-NUL: bytes
-BLOCKSIZE: int
-RECORDSIZE: int
-GNU_MAGIC: bytes
-POSIX_MAGIC: bytes
+NUL: Final = b"\0"
+BLOCKSIZE: Final = 512
+RECORDSIZE: Final = 10240
+GNU_MAGIC: Final = b"ustar  \0"
+POSIX_MAGIC: Final = b"ustar\x0000"
 
-LENGTH_NAME: int
-LENGTH_LINK: int
-LENGTH_PREFIX: int
+LENGTH_NAME: Final = 100
+LENGTH_LINK: Final = 100
+LENGTH_PREFIX: Final = 155
 
-REGTYPE: bytes
-AREGTYPE: bytes
-LNKTYPE: bytes
-SYMTYPE: bytes
-CONTTYPE: bytes
-BLKTYPE: bytes
-DIRTYPE: bytes
-FIFOTYPE: bytes
-CHRTYPE: bytes
+REGTYPE: Final = b"0"
+AREGTYPE: Final = b"\0"
+LNKTYPE: Final = b"1"
+SYMTYPE: Final = b"2"
+CHRTYPE: Final = b"3"
+BLKTYPE: Final = b"4"
+DIRTYPE: Final = b"5"
+FIFOTYPE: Final = b"6"
+CONTTYPE: Final = b"7"
 
-GNUTYPE_LONGNAME: bytes
-GNUTYPE_LONGLINK: bytes
-GNUTYPE_SPARSE: bytes
+GNUTYPE_LONGNAME: Final = b"L"
+GNUTYPE_LONGLINK: Final = b"K"
+GNUTYPE_SPARSE: Final = b"S"
 
-XHDTYPE: bytes
-XGLTYPE: bytes
-SOLARIS_XHDTYPE: bytes
+XHDTYPE: Final = b"x"
+XGLTYPE: Final = b"g"
+SOLARIS_XHDTYPE: Final = b"X"
 
-USTAR_FORMAT: int
-GNU_FORMAT: int
-PAX_FORMAT: int
-DEFAULT_FORMAT: int
+_TarFormat: TypeAlias = Literal[0, 1, 2]  # does not exist at runtime
+USTAR_FORMAT: Final = 0
+GNU_FORMAT: Final = 1
+PAX_FORMAT: Final = 2
+DEFAULT_FORMAT: Final = PAX_FORMAT
 
 # tarfile constants
 
-SUPPORTED_TYPES: tuple[bytes, ...]
-REGULAR_TYPES: tuple[bytes, ...]
-GNU_TYPES: tuple[bytes, ...]
-PAX_FIELDS: tuple[str, ...]
-PAX_NUMBER_FIELDS: dict[str, type]
-PAX_NAME_FIELDS: set[str]
+SUPPORTED_TYPES: Final[tuple[bytes, ...]]
+REGULAR_TYPES: Final[tuple[bytes, ...]]
+GNU_TYPES: Final[tuple[bytes, ...]]
+PAX_FIELDS: Final[tuple[str, ...]]
+PAX_NUMBER_FIELDS: Final[dict[str, type]]
+PAX_NAME_FIELDS: Final[set[str]]
 
-ENCODING: str
+ENCODING: Final[str]
 
-class ExFileObject(io.BufferedReader):
+class ExFileObject(io.BufferedReader):  # undocumented
     def __init__(self, tarfile: TarFile, tarinfo: TarInfo) -> None: ...
 
 class TarFile:
@@ -122,13 +124,13 @@ class TarFile:
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
     fileobj: _Fileobj | None
-    format: int | None
+    format: _TarFormat | None
     tarinfo: type[TarInfo]
     dereference: bool | None
     ignore_zeros: bool | None
     encoding: str | None
     errors: str
-    fileobject: type[ExFileObject]
+    fileobject: type[ExFileObject]  # undocumented
     pax_headers: Mapping[str, str] | None
     debug: int | None
     errorlevel: int | None
@@ -178,13 +180,13 @@ class TarFile:
             errorlevel: int | None = None,
             copybufsize: int | None = None,  # undocumented
         ) -> None:
-            """Open an (uncompressed) tar archive 'name'. 'mode' is either 'r' to
+            """Open an (uncompressed) tar archive `name'. `mode' is either 'r' to
             read from an existing archive, 'a' to append data to an existing
-            file or 'w' to create a new file overwriting an existing one. 'mode'
+            file or 'w' to create a new file overwriting an existing one. `mode'
             defaults to 'r'.
-            If 'fileobj' is given, it is used for reading or writing data. If it
-            can be determined, 'mode' is overridden by 'fileobj's mode.
-            'fileobj' is not closed, when TarFile is closed.
+            If `fileobj' is given, it is used for reading or writing data. If it
+            can be determined, `mode' is overridden by `fileobj's mode.
+            `fileobj' is not closed, when TarFile is closed.
             """
 
     def __enter__(self) -> Self: ...
@@ -818,7 +820,7 @@ class TarFile:
         the same order as the list returned by getmembers().
         """
 
-    def list(self, verbose: bool = True, *, members: _list[TarInfo] | None = None) -> None:
+    def list(self, verbose: bool = True, *, members: Iterable[TarInfo] | None = None) -> None:
         """Print a table of contents to sys.stdout. If 'verbose' is False, only
         the names of the members are printed. If it is True, an 'ls -l'-like
         output is produced. 'members' is optional and must be a subset of the
@@ -917,7 +919,12 @@ class TarFile:
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a character or block device called targetpath."""
 
-    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
+    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
+        """Make a (symbolic) link called targetpath. If it cannot be created
+        (platform limitation), we try to make a copy of the referenced file
+        instead of a link.
+        """
+
     def makelink_with_filter(
         self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
     ) -> None:  # undocumented
@@ -1057,7 +1064,7 @@ class TarInfo:
     offset_data: int
     sparse: bytes | None
     mode: int
-    type: bytes
+    type: bytes  # usually one of the TYPE constants, but could be an arbitrary byte
     linkname: str
     uid: int
     gid: int
@@ -1112,7 +1119,7 @@ class TarInfo:
     def get_info(self) -> Mapping[str, str | int | bytes | Mapping[str, str]]:
         """Return the TarInfo's attributes as a dictionary."""
 
-    def tobuf(self, format: int | None = 2, encoding: str | None = "utf-8", errors: str = "surrogateescape") -> bytes:
+    def tobuf(self, format: _TarFormat | None = 2, encoding: str | None = "utf-8", errors: str = "surrogateescape") -> bytes:
         """Return a tar header as a string of 512 byte blocks."""
 
     def create_ustar_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str) -> bytes:

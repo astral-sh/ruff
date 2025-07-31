@@ -1,5 +1,4 @@
-"""
-Module doctest -- a framework for running examples in docstrings.
+"""Module doctest -- a framework for running examples in docstrings.
 
 In simplest use, end each module M to be tested with:
 
@@ -124,7 +123,8 @@ BLANKLINE_MARKER: str
 ELLIPSIS_MARKER: str
 
 class Example:
-    """A single doctest example, consisting of source code and expected
+    """
+    A single doctest example, consisting of source code and expected
     output.  `Example` defines the following attributes:
 
       - source: A single Python statement, always ending with a newline.
@@ -177,7 +177,8 @@ class Example:
     def __eq__(self, other: object) -> bool: ...
 
 class DocTest:
-    """A collection of doctest examples that should be run in a single
+    """
+    A collection of doctest examples that should be run in a single
     namespace.  Each `DocTest` defines the following attributes:
 
       - examples: the list of examples.
@@ -215,7 +216,8 @@ class DocTest:
         lineno: int | None,
         docstring: str | None,
     ) -> None:
-        """Create a new DocTest containing the given examples.  The
+        """
+        Create a new DocTest containing the given examples.  The
         DocTest's globals are initialized with a copy of `globs`.
         """
 
@@ -224,10 +226,13 @@ class DocTest:
     def __eq__(self, other: object) -> bool: ...
 
 class DocTestParser:
-    """A class used to parse strings containing doctest examples."""
+    """
+    A class used to parse strings containing doctest examples.
+    """
 
     def parse(self, string: str, name: str = "<string>") -> list[str | Example]:
-        """Divide the given string into examples and intervening text,
+        """
+        Divide the given string into examples and intervening text,
         and return them as a list of alternating Examples and strings.
         Line numbers for the Examples are 0-based.  The optional
         argument `name` is a name identifying this string, and is only
@@ -235,7 +240,8 @@ class DocTestParser:
         """
 
     def get_doctest(self, string: str, globs: dict[str, Any], name: str, filename: str | None, lineno: int | None) -> DocTest:
-        """Extract all doctest examples from the given string, and
+        """
+        Extract all doctest examples from the given string, and
         collect them into a `DocTest` object.
 
         `globs`, `name`, `filename`, and `lineno` are attributes for
@@ -244,7 +250,8 @@ class DocTestParser:
         """
 
     def get_examples(self, string: str, name: str = "<string>") -> list[Example]:
-        """Extract all doctest examples from the given string, and return
+        """
+        Extract all doctest examples from the given string, and return
         them as a list of `Example` objects.  Line numbers are
         0-based, because it's most common in doctests that nothing
         interesting appears on the same line as opening triple-quote,
@@ -255,7 +262,8 @@ class DocTestParser:
         """
 
 class DocTestFinder:
-    """A class used to extract the DocTests that are relevant to a given
+    """
+    A class used to extract the DocTests that are relevant to a given
     object, from its docstring and the docstrings of its contained
     objects.  Doctests can currently be extracted from the following
     object types: modules, functions, classes, methods, staticmethods,
@@ -265,7 +273,8 @@ class DocTestFinder:
     def __init__(
         self, verbose: bool = False, parser: DocTestParser = ..., recurse: bool = True, exclude_empty: bool = True
     ) -> None:
-        """Create a new doctest finder.
+        """
+        Create a new doctest finder.
 
         The optional argument `parser` specifies a class or
         function that should be used to create new DocTest objects (or
@@ -288,7 +297,8 @@ class DocTestFinder:
         globs: dict[str, Any] | None = None,
         extraglobs: dict[str, Any] | None = None,
     ) -> list[DocTest]:
-        """Return a list of the DocTests that are defined by the given
+        """
+        Return a list of the DocTests that are defined by the given
         object's docstring, or by any of its contained objects'
         docstrings.
 
@@ -319,12 +329,14 @@ class DocTestFinder:
         defaults to the module's `__dict__`, if specified, or {}
         otherwise.  If `extraglobs` is not specified, then it defaults
         to {}.
+
         """
 
 _Out: TypeAlias = Callable[[str], object]
 
 class DocTestRunner:
-    """A class used to run DocTest test cases, and accumulate statistics.
+    """
+    A class used to run DocTest test cases, and accumulate statistics.
     The `run` method is used to process a single DocTest case.  It
     returns a TestResults instance.
 
@@ -394,7 +406,8 @@ class DocTestRunner:
         skips: int
     test: DocTest
     def __init__(self, checker: OutputChecker | None = None, verbose: bool | None = None, optionflags: int = 0) -> None:
-        """Create a new test runner.
+        """
+        Create a new test runner.
 
         Optional keyword arg `checker` is the `OutputChecker` that
         should be used to compare the expected outputs and actual
@@ -411,25 +424,32 @@ class DocTestRunner:
         """
 
     def report_start(self, out: _Out, test: DocTest, example: Example) -> None:
-        """Report that the test runner is about to process the given
+        """
+        Report that the test runner is about to process the given
         example.  (Only displays a message if verbose=True)
         """
 
     def report_success(self, out: _Out, test: DocTest, example: Example, got: str) -> None:
-        """Report that the given example ran successfully.  (Only
+        """
+        Report that the given example ran successfully.  (Only
         displays a message if verbose=True)
         """
 
     def report_failure(self, out: _Out, test: DocTest, example: Example, got: str) -> None:
-        """Report that the given example failed."""
+        """
+        Report that the given example failed.
+        """
 
     def report_unexpected_exception(self, out: _Out, test: DocTest, example: Example, exc_info: ExcInfo) -> None:
-        """Report that the given example raised an unexpected exception."""
+        """
+        Report that the given example raised an unexpected exception.
+        """
 
     def run(
         self, test: DocTest, compileflags: int | None = None, out: _Out | None = None, clear_globs: bool = True
     ) -> TestResults:
-        """Run the examples in `test`, and display the results using the
+        """
+        Run the examples in `test`, and display the results using the
         writer function `out`.
 
         The examples are run in the namespace `test.globs`.  If
@@ -449,7 +469,8 @@ class DocTestRunner:
         """
 
     def summarize(self, verbose: bool | None = None) -> TestResults:
-        """Print a summary of all the test cases that have been run by
+        """
+        Print a summary of all the test cases that have been run by
         this DocTestRunner, and return a TestResults instance.
 
         The optional `verbose` argument controls how detailed the
@@ -460,7 +481,8 @@ class DocTestRunner:
     def merge(self, other: DocTestRunner) -> None: ...
 
 class OutputChecker:
-    """A class used to check whether the actual output from a doctest
+    """
+    A class used to check whether the actual output from a doctest
     example matches the expected output.  `OutputChecker` defines two
     methods: `check_output`, which compares a given pair of outputs,
     and returns true if they match; and `output_difference`, which
@@ -468,7 +490,8 @@ class OutputChecker:
     """
 
     def check_output(self, want: str, got: str, optionflags: int) -> bool:
-        """Return True iff the actual output from an example (`got`)
+        """
+        Return True iff the actual output from an example (`got`)
         matches the expected output (`want`).  These strings are
         always considered to match if they are identical; but
         depending on what option flags the test runner is using,
@@ -478,7 +501,8 @@ class OutputChecker:
         """
 
     def output_difference(self, example: Example, got: str, optionflags: int) -> str:
-        """Return a string describing the differences between the
+        """
+        Return a string describing the differences between the
         expected output for a given example (`example`) and the actual
         output (`got`).  `optionflags` is the set of option flags used
         to compare `want` and `got`.
@@ -606,6 +630,7 @@ class DebugRunner(DocTestRunner):
 
       >>> test.globs
       {}
+
     """
 
 master: DocTestRunner | None
@@ -629,8 +654,8 @@ def testmod(
     from module m (or the current module if m is not supplied), starting
     with m.__doc__.
 
-    Also test examples reachable from dict m.__test__ if it exists and is
-    not None.  m.__test__ maps names to functions, classes and strings;
+    Also test examples reachable from dict m.__test__ if it exists.
+    m.__test__ maps names to functions, classes and strings;
     function and class docstrings are tested even if the name is private;
     strings are tested directly, as if they were docstrings.
 
@@ -699,7 +724,8 @@ def testfile(
     parser: DocTestParser = ...,
     encoding: str | None = None,
 ) -> TestResults:
-    """Test examples in the given file.  Return (#failures, #tests).
+    """
+    Test examples in the given file.  Return (#failures, #tests).
 
     Optional keyword arg "module_relative" specifies how filenames
     should be interpreted:
@@ -783,7 +809,8 @@ def run_docstring_examples(
     compileflags: int | None = None,
     optionflags: int = 0,
 ) -> None:
-    """Test examples in the given object's docstring (`f`), using `globs`
+    """
+    Test examples in the given object's docstring (`f`), using `globs`
     as globals.  Optional argument `name` is used in failure messages.
     If the optional argument `verbose` is true, then generate output
     even if there are no failures.
@@ -853,7 +880,8 @@ def DocTestSuite(
     test_finder: DocTestFinder | None = None,
     **options: Any,
 ) -> _DocTestSuite:
-    """Convert doctest tests for a module to a unittest test suite.
+    """
+    Convert doctest tests for a module to a unittest test suite.
 
     This converts each documentation string in a module that
     contains doctest tests to a unittest test case.  If any of the

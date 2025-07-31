@@ -1,5 +1,5 @@
 use crate::{Db, Program, PythonVersionWithSource};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use std::fmt::Write;
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
@@ -23,7 +23,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
         crate::PythonVersionSource::ConfigFile(source) => {
             if let Some(span) = source.span(db) {
                 let mut sub_diagnostic = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!("Python {version} was assumed when {action}"),
                 );
                 sub_diagnostic.annotate(Annotation::primary(span).message(format_args!(
@@ -39,7 +39,7 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
         crate::PythonVersionSource::PyvenvCfgFile(source) => {
             if let Some(span) = source.span(db) {
                 let mut sub_diagnostic = SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format_args!(
                         "Python {version} was assumed when {action} because of your virtual environment"
                     ),

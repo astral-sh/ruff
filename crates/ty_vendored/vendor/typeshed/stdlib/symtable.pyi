@@ -1,6 +1,4 @@
-"""
-Interface to the compiler's internal symbol tables
-"""
+"""Interface to the compiler's internal symbol tables"""
 
 import sys
 from _collections_abc import dict_keys
@@ -45,8 +43,8 @@ class SymbolTable:
         def get_type(self) -> str:
             """Return the type of the symbol table.
 
-            The value returned is one of the values in
-            the ``SymbolTableType`` enumeration.
+            The values returned are 'class', 'module', 'function',
+            'annotation', 'TypeVar bound', 'type alias', and 'type parameter'.
             """
 
     def get_id(self) -> int:

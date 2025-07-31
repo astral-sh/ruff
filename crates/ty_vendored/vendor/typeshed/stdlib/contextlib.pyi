@@ -1,6 +1,4 @@
-"""
-Utilities for with-statement contexts.  See PEP 343.
-"""
+"""Utilities for with-statement contexts.  See PEP 343."""
 
 import abc
 import sys
@@ -8,7 +6,7 @@ from _typeshed import FileDescriptorOrPath, Unused
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Generator, Iterator
 from types import TracebackType
-from typing import IO, Any, Generic, Protocol, TypeVar, overload, runtime_checkable
+from typing import IO, Any, Generic, Protocol, TypeVar, overload, runtime_checkable, type_check_only
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 __all__ = [
@@ -203,6 +201,7 @@ def asynccontextmanager(func: Callable[_P, AsyncIterator[_T_co]]) -> Callable[_P
             <cleanup>
     """
 
+@type_check_only
 class _SupportsClose(Protocol):
     def close(self) -> object: ...
 
@@ -223,12 +222,14 @@ class closing(AbstractContextManager[_SupportsCloseT, None]):
             <block>
         finally:
             f.close()
+
     """
 
     def __init__(self, thing: _SupportsCloseT) -> None: ...
     def __exit__(self, *exc_info: Unused) -> None: ...
 
 if sys.version_info >= (3, 10):
+    @type_check_only
     class _SupportsAclose(Protocol):
         def aclose(self) -> Awaitable[object]: ...
 
@@ -250,6 +251,7 @@ if sys.version_info >= (3, 10):
                 <block>
             finally:
                 await agen.aclose()
+
         """
 
         def __init__(self, thing: _SupportsAcloseT) -> None: ...

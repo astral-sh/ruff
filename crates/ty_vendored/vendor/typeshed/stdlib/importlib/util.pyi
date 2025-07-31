@@ -1,6 +1,4 @@
-"""
-Utility code for constructing importers, etc.
-"""
+"""Utility code for constructing importers, etc."""
 
 import importlib.machinery
 import sys
@@ -37,18 +35,21 @@ if sys.version_info < (3, 12):
 
         The decorator assumes that the decorated function takes the module name as
         the second argument.
+
         """
 
     def set_loader(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __loader__ on the returned module.
 
         This function is deprecated.
+
         """
 
     def set_package(fxn: Callable[_P, types.ModuleType]) -> Callable[_P, types.ModuleType]:
         """Set __package__ on the returned module.
 
         This function is deprecated.
+
         """
 
 def resolve_name(name: str, package: str | None) -> str:
@@ -69,6 +70,7 @@ def find_spec(name: str, package: str | None = None) -> importlib.machinery.Modu
 
     The name and package arguments work the same as importlib.import_module().
     In other words, relative module names (with leading dots) work.
+
     """
 
 class LazyLoader(Loader):

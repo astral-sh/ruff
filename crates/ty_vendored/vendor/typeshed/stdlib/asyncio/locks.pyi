@@ -1,6 +1,4 @@
-"""
-Synchronization primitives.
-"""
+"""Synchronization primitives."""
 
 import enum
 import sys
@@ -82,6 +80,7 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
         else:
            # lock is acquired
            ...
+
     """
 
     _waiters: deque[Future[Any]] | None

@@ -1,10 +1,10 @@
-"""
-codecs -- Python Codec Registry, API and helpers.
+"""codecs -- Python Codec Registry, API and helpers.
 
 
 Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+
 """
 
 import types
@@ -156,6 +156,7 @@ def getencoder(encoding: str) -> _Encoder:
     its encoder function.
 
     Raises a LookupError in case the encoding cannot be found.
+
     """
 
 def getdecoder(encoding: str) -> _Decoder:
@@ -163,6 +164,7 @@ def getdecoder(encoding: str) -> _Decoder:
     its decoder function.
 
     Raises a LookupError in case the encoding cannot be found.
+
     """
 
 def getincrementalencoder(encoding: str) -> _IncrementalEncoder:
@@ -171,6 +173,7 @@ def getincrementalencoder(encoding: str) -> _IncrementalEncoder:
 
     Raises a LookupError in case the encoding cannot be found
     or the codecs doesn't provide an incremental encoder.
+
     """
 
 @overload
@@ -180,6 +183,7 @@ def getincrementaldecoder(encoding: _BufferedEncoding) -> _BufferedIncrementalDe
 
     Raises a LookupError in case the encoding cannot be found
     or the codecs doesn't provide an incremental decoder.
+
     """
 
 @overload
@@ -189,6 +193,7 @@ def getreader(encoding: str) -> _StreamReader:
     its StreamReader class or factory function.
 
     Raises a LookupError in case the encoding cannot be found.
+
     """
 
 def getwriter(encoding: str) -> _StreamWriter:
@@ -196,6 +201,7 @@ def getwriter(encoding: str) -> _StreamWriter:
     its StreamWriter class or factory function.
 
     Raises a LookupError in case the encoding cannot be found.
+
     """
 
 def open(
@@ -252,10 +258,12 @@ def EncodedFile(file: _Stream, data_encoding: str, file_encoding: str | None = N
     .data_encoding and .file_encoding which reflect the given
     parameters of the same name. The attributes can be used for
     introspection by Python programs.
+
     """
 
 def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -> Generator[bytes, None, None]:
-    """Encoding iterator.
+    """
+    Encoding iterator.
 
     Encodes the input strings from the iterator using an IncrementalEncoder.
 
@@ -264,7 +272,8 @@ def iterencode(iterator: Iterable[str], encoding: str, errors: str = "strict") -
     """
 
 def iterdecode(iterator: Iterable[bytes], encoding: str, errors: str = "strict") -> Generator[str, None, None]:
-    """Decoding iterator.
+    """
+    Decoding iterator.
 
     Decodes the input strings from the iterator using an IncrementalDecoder.
 
@@ -322,6 +331,7 @@ class Codec:
                            (only for encoding).
 
     The set of allowed values can be extended via register_error.
+
     """
 
     # These are sort of @abstractmethod but sort of not.
@@ -340,6 +350,7 @@ class Codec:
         The encoder must be able to handle zero length input and
         return an empty object of the output object type in this
         situation.
+
         """
 
     def decode(self, input: bytes, errors: str = "strict") -> tuple[str, int]:
@@ -360,17 +371,20 @@ class Codec:
         The decoder must be able to handle zero length input and
         return an empty object of the output object type in this
         situation.
+
         """
 
 class IncrementalEncoder:
-    """An IncrementalEncoder encodes an input in multiple steps. The input can
+    """
+    An IncrementalEncoder encodes an input in multiple steps. The input can
     be passed piece by piece to the encode() method. The IncrementalEncoder
     remembers the state of the encoding process between calls to encode().
     """
 
     errors: str
     def __init__(self, errors: str = "strict") -> None:
-        """Creates an IncrementalEncoder instance.
+        """
+        Creates an IncrementalEncoder instance.
 
         The IncrementalEncoder may use different error handling schemes by
         providing the errors keyword argument. See the module docstring
@@ -379,28 +393,37 @@ class IncrementalEncoder:
 
     @abstractmethod
     def encode(self, input: str, final: bool = False) -> bytes:
-        """Encodes input and returns the resulting object."""
+        """
+        Encodes input and returns the resulting object.
+        """
 
     def reset(self) -> None:
-        """Resets the encoder to the initial state."""
+        """
+        Resets the encoder to the initial state.
+        """
     # documentation says int but str is needed for the subclass.
     def getstate(self) -> int | str:
-        """Return the current state of the encoder."""
+        """
+        Return the current state of the encoder.
+        """
 
     def setstate(self, state: int | str) -> None:
-        """Set the current state of the encoder. state must have been
+        """
+        Set the current state of the encoder. state must have been
         returned by getstate().
         """
 
 class IncrementalDecoder:
-    """An IncrementalDecoder decodes an input in multiple steps. The input can
+    """
+    An IncrementalDecoder decodes an input in multiple steps. The input can
     be passed piece by piece to the decode() method. The IncrementalDecoder
     remembers the state of the decoding process between calls to decode().
     """
 
     errors: str
     def __init__(self, errors: str = "strict") -> None:
-        """Create an IncrementalDecoder instance.
+        """
+        Create an IncrementalDecoder instance.
 
         The IncrementalDecoder may use different error handling schemes by
         providing the errors keyword argument. See the module docstring
@@ -409,13 +432,18 @@ class IncrementalDecoder:
 
     @abstractmethod
     def decode(self, input: ReadableBuffer, final: bool = False) -> str:
-        """Decode input and returns the resulting object."""
+        """
+        Decode input and returns the resulting object.
+        """
 
     def reset(self) -> None:
-        """Reset the decoder to the initial state."""
+        """
+        Reset the decoder to the initial state.
+        """
 
     def getstate(self) -> tuple[bytes, int]:
-        """Return the current state of the decoder.
+        """
+        Return the current state of the decoder.
 
         This must be a (buffered_input, additional_state_info) tuple.
         buffered_input must be a bytes object containing bytes that
@@ -427,7 +455,8 @@ class IncrementalDecoder:
         """
 
     def setstate(self, state: tuple[bytes, int]) -> None:
-        """Set the current state of the decoder.
+        """
+        Set the current state of the decoder.
 
         state must have been returned by getstate().  The effect of
         setstate((b"", 0)) must be equivalent to reset().
@@ -435,7 +464,8 @@ class IncrementalDecoder:
 
 # These are not documented but used in encodings/*.py implementations.
 class BufferedIncrementalEncoder(IncrementalEncoder):
-    """This subclass of IncrementalEncoder can be used as the baseclass for an
+    """
+    This subclass of IncrementalEncoder can be used as the baseclass for an
     incremental encoder if the encoder must keep some of the output in a
     buffer between calls to encode().
     """
@@ -447,7 +477,8 @@ class BufferedIncrementalEncoder(IncrementalEncoder):
     def encode(self, input: str, final: bool = False) -> bytes: ...
 
 class BufferedIncrementalDecoder(IncrementalDecoder):
-    """This subclass of IncrementalDecoder can be used as the baseclass for an
+    """
+    This subclass of IncrementalDecoder can be used as the baseclass for an
     incremental decoder if the decoder must be able to handle incomplete
     byte sequences.
     """
@@ -500,6 +531,7 @@ class StreamWriter(Codec):
         output is put into a clean state, that allows appending
         of new fresh data without having to rescan the whole
         stream to recover state.
+
         """
 
     def seek(self, offset: int, whence: int = 0) -> None: ...
@@ -564,6 +596,7 @@ class StreamReader(Codec):
 
         size, if given, is passed as size argument to the
         read() method.
+
         """
 
     def readlines(self, sizehint: int | None = None, keepends: bool = True) -> list[str]:
@@ -574,7 +607,8 @@ class StreamReader(Codec):
         method and are included in the list entries.
 
         sizehint, if given, is ignored since there is no efficient
-        way to finding the true end-of-line.
+        way of finding the true end-of-line.
+
         """
 
     def reset(self) -> None:
@@ -583,6 +617,7 @@ class StreamReader(Codec):
         Note that no stream repositioning should take place.
         This method is primarily intended to be able to recover
         from decoding errors.
+
         """
 
     def seek(self, offset: int, whence: int = 0) -> None:
@@ -609,6 +644,7 @@ class StreamReaderWriter(TextIO):
     The design is such that one can use the factory functions
     returned by the codec.lookup() function to construct the
     instance.
+
     """
 
     stream: _Stream
@@ -622,6 +658,7 @@ class StreamReaderWriter(TextIO):
 
         Error handling is done in the same way as defined for the
         StreamWriter/Readers.
+
         """
 
     def read(self, size: int = -1) -> str: ...
@@ -664,6 +701,7 @@ class StreamRecoder(BinaryIO):
 
     In the other direction, data is read from the underlying stream using
     a Reader instance and then encoded and returned to the caller.
+
     """
 
     data_encoding: str
@@ -693,6 +731,7 @@ class StreamRecoder(BinaryIO):
 
         Error handling is done in the same way as defined for the
         StreamWriter/Readers.
+
         """
 
     def read(self, size: int = -1) -> bytes: ...

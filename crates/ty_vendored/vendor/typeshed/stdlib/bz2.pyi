@@ -1,5 +1,4 @@
-"""
-Interface to the libbzip2 compression library.
+"""Interface to the libbzip2 compression library.
 
 This module provides a file interface, classes for incremental
 (de)compression, and functions for one-shot (de)compression.
@@ -76,6 +75,7 @@ def open(
     For text mode, a BZ2File object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error
     handling behavior, and line ending(s).
+
     """
 
 @overload

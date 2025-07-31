@@ -1,18 +1,17 @@
-"""
-Fraction, infinite-precision, rational numbers.
-"""
+"""Fraction, infinite-precision, rational numbers."""
 
 import sys
 from collections.abc import Callable
 from decimal import Decimal
 from numbers import Rational, Real
-from typing import Any, Literal, Protocol, SupportsIndex, overload
+from typing import Any, Literal, Protocol, SupportsIndex, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 _ComparableNum: TypeAlias = int | float | Decimal | Real
 
 __all__ = ["Fraction"]
 
+@type_check_only
 class _ConvertibleToIntegerRatio(Protocol):
     def as_integer_ratio(self) -> tuple[int | Rational, int | Rational]: ...
 
@@ -34,6 +33,7 @@ class Fraction(Rational):
       - float and Decimal instances
 
       - other Rational instances (including integers)
+
     """
 
     @overload
@@ -66,6 +66,7 @@ class Fraction(Rational):
         Fraction(9, 4)
         >>> Fraction(Decimal('1.47'))
         Fraction(147, 100)
+
         """
 
     @overload
@@ -102,6 +103,7 @@ class Fraction(Rational):
             Fraction(9, 4)
             >>> Fraction(Decimal('1.47'))
             Fraction(147, 100)
+
             """
 
     @classmethod
@@ -109,6 +111,7 @@ class Fraction(Rational):
         """Converts a finite float to a rational number, exactly.
 
         Beware that Fraction.from_float(0.3) != Fraction(3, 10).
+
         """
 
     @classmethod
@@ -124,6 +127,7 @@ class Fraction(Rational):
         Fraction(311, 99)
         >>> Fraction(4321, 8765).limit_denominator(10000)
         Fraction(4321, 8765)
+
         """
 
     def as_integer_ratio(self) -> tuple[int, int]:
@@ -247,6 +251,7 @@ class Fraction(Rational):
             If b is not an integer, the result will be a float or complex
             since roots are generally irrational. If b is an integer, the
             result will be rational.
+
             """
 
         @overload
@@ -261,6 +266,7 @@ class Fraction(Rational):
             If b is not an integer, the result will be a float or complex
             since roots are generally irrational. If b is an integer, the
             result will be rational.
+
             """
 
         @overload
@@ -353,4 +359,5 @@ class Fraction(Rational):
             """Converts a finite real number to a rational number, exactly.
 
             Beware that Fraction.from_number(0.3) != Fraction(3, 10).
+
             """

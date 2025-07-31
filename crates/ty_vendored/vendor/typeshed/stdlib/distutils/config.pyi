@@ -1,5 +1,4 @@
-"""
-distutils.pypirc
+"""distutils.pypirc
 
 Provides the PyPIRCCommand class, the base class for the command classes
 that uses .pypirc in the distutils.command package.

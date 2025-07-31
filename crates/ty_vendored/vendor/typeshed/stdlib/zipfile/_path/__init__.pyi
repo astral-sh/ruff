@@ -1,5 +1,4 @@
 """
-
 A Path-like interface for zipfiles.
 
 This codebase is shared between zipfile.Path in the stdlib
@@ -23,14 +22,17 @@ if sys.version_info >= (3, 12):
     __all__ = ["Path"]
 
     class InitializedState:
-        """Mix-in to save the initialization state for pickling."""
+        """
+        Mix-in to save the initialization state for pickling.
+        """
 
         def __init__(self, *args: object, **kwargs: object) -> None: ...
         def __getstate__(self) -> tuple[list[object], dict[object, object]]: ...
         def __setstate__(self, state: Sequence[tuple[list[object], dict[object, object]]]) -> None: ...
 
     class CompleteDirs(InitializedState, ZipFile):
-        """A ZipFile subclass that ensures that implied directories
+        """
+        A ZipFile subclass that ensures that implied directories
         are always included in the namelist.
 
         >>> list(CompleteDirs._implied_dirs(['foo/bar.txt', 'foo/bar/baz.txt']))
@@ -40,14 +42,16 @@ if sys.version_info >= (3, 12):
         """
 
         def resolve_dir(self, name: str) -> str:
-            """If the name represents a directory, return that name
+            """
+            If the name represents a directory, return that name
             as a directory (with the trailing slash).
             """
 
         @overload
         @classmethod
         def make(cls, source: ZipFile) -> CompleteDirs:
-            """Given a source (filename or zipfile), return an
+            """
+            Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
 
@@ -57,12 +61,14 @@ if sys.version_info >= (3, 12):
         if sys.version_info >= (3, 13):
             @classmethod
             def inject(cls, zf: _ZF) -> _ZF:
-                """Given a writable zip file zf, inject directory entries for
+                """
+                Given a writable zip file zf, inject directory entries for
                 any directories implied by the presence of children.
                 """
 
     class Path:
-        """A :class:`importlib.resources.abc.Traversable` interface for zip files.
+        """
+        A :class:`importlib.resources.abc.Traversable` interface for zip files.
 
         Implements many of the features users enjoy from
         :class:`pathlib.Path`.
@@ -166,7 +172,8 @@ if sys.version_info >= (3, 12):
         root: CompleteDirs
         at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None:
-            """Construct a Path from a ZipFile or filename.
+            """
+            Construct a Path from a ZipFile or filename.
 
             Note: When the source is an existing ZipFile object,
             its type (__class__) will be mutated to a
@@ -199,7 +206,8 @@ if sys.version_info >= (3, 12):
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
-            """Open this entry as text or binary following the semantics
+            """
+            Open this entry as text or binary following the semantics
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """
@@ -223,12 +231,15 @@ if sys.version_info >= (3, 12):
         def glob(self, pattern: str) -> Iterator[Self]: ...
         def rglob(self, pattern: str) -> Iterator[Self]: ...
         def is_symlink(self) -> Literal[False]:
-            """Return whether this path is a symlink."""
+            """
+            Return whether this path is a symlink.
+            """
 
         def relative_to(self, other: Path, *extra: StrPath) -> str: ...
         def match(self, path_pattern: str) -> bool: ...
         def __eq__(self, other: object) -> bool:
-            """>>> Path(zipfile.ZipFile(io.BytesIO(), 'w')) == 'foo'
+            """
+            >>> Path(zipfile.ZipFile(io.BytesIO(), 'w')) == 'foo'
             False
             """
 

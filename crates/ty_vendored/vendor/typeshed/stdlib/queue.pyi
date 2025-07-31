@@ -1,9 +1,8 @@
-"""
-A multi-producer, multi-consumer queue.
-"""
+"""A multi-producer, multi-consumer queue."""
 
 import sys
 from _queue import Empty as Empty, SimpleQueue as SimpleQueue
+from _typeshed import SupportsRichComparisonT
 from threading import Condition, Lock
 from types import GenericAlias
 from typing import Any, Generic, TypeVar
@@ -156,13 +155,13 @@ class Queue(Generic[_T]):
         E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
         """
 
-class PriorityQueue(Queue[_T]):
+class PriorityQueue(Queue[SupportsRichComparisonT]):
     """Variant of Queue that retrieves open entries in priority order (lowest first).
 
     Entries are typically tuples of the form:  (priority number, data).
     """
 
-    queue: list[_T]
+    queue: list[SupportsRichComparisonT]
 
 class LifoQueue(Queue[_T]):
     """Variant of Queue that retrieves most recently added entries first."""

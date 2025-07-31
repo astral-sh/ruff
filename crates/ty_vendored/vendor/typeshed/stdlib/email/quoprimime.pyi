@@ -1,5 +1,4 @@
-"""
-Quoted-printable content transfer encoding per RFCs 2045-2047.
+"""Quoted-printable content transfer encoding per RFCs 2045-2047.
 
 This module handles the content transfer encoding method defined in RFC 2045
 to encode US ASCII-like 8-bit data called 'quoted-printable'.  It is used to
@@ -95,6 +94,7 @@ def body_encode(body: str, maxlinelen: int = 76, eol: str = "\n") -> str:
     The minimum maxlinelen is 4 to have room for a quoted character ("=XX")
     followed by a soft line break.  Smaller values will generate a
     ValueError.
+
     """
 
 def decode(encoded: str, eol: str = "\n") -> str:

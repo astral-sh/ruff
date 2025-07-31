@@ -1,5 +1,4 @@
-"""
-distutils.command.install_egg_info
+"""distutils.command.install_egg_info
 
 Implements the Distutils 'install_egg_info' command, for installing
 a package's PKG-INFO metadata.

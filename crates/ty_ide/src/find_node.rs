@@ -52,9 +52,7 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
     if visitor.ancestors.is_empty() {
         visitor.ancestors.push(root);
     }
-    CoveringNode {
-        nodes: visitor.ancestors,
-    }
+    CoveringNode::from_ancestors(visitor.ancestors)
 }
 
 /// The node with a minimal range that fully contains the search range.
@@ -67,6 +65,12 @@ pub(crate) struct CoveringNode<'a> {
 }
 
 impl<'a> CoveringNode<'a> {
+    /// Creates a new `CoveringNode` from a list of ancestor nodes.
+    /// The ancestors should be ordered from root to the covering node.
+    pub(crate) fn from_ancestors(ancestors: Vec<AnyNodeRef<'a>>) -> Self {
+        Self { nodes: ancestors }
+    }
+
     /// Returns the covering node found.
     pub(crate) fn node(&self) -> AnyNodeRef<'a> {
         *self
@@ -110,6 +114,12 @@ impl<'a> CoveringNode<'a> {
         }
         self.nodes.truncate(index + 1);
         Ok(self)
+    }
+
+    /// Returns an iterator over the ancestor nodes, starting from the root
+    /// and ending with the covering node.
+    pub(crate) fn ancestors(&self) -> impl Iterator<Item = AnyNodeRef<'a>> + '_ {
+        self.nodes.iter().copied()
     }
 
     /// Finds the index of the node that fully covers the range and

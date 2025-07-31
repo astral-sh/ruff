@@ -533,18 +533,8 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             }
         }
         Expr::TString(ast::ExprTString { value, .. }) => {
-            for t_string_part in value.iter_mut() {
-                match t_string_part {
-                    ast::TStringPart::Literal(string_literal) => {
-                        visitor.visit_string_literal(string_literal);
-                    }
-                    ast::TStringPart::FString(f_string) => {
-                        visitor.visit_f_string(f_string);
-                    }
-                    ast::TStringPart::TString(t_string) => {
-                        visitor.visit_t_string(t_string);
-                    }
-                }
+            for t_string in value.iter_mut() {
+                visitor.visit_t_string(t_string);
             }
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {

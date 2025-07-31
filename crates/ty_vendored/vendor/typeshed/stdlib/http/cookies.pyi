@@ -1,5 +1,4 @@
 """
-
 Here's a sample session to show how to use this module.
 At the moment, this is the only documentation.
 
@@ -189,7 +188,8 @@ class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
         """Dictionary style assignment."""
 
 class SimpleCookie(BaseCookie[str]):
-    """SimpleCookie supports strings as cookie values.  When setting
+    """
+    SimpleCookie supports strings as cookie values.  When setting
     the value using the dictionary assignment notation, SimpleCookie
     calls the builtin str() to convert the value to a string.  Values
     received from HTTP are kept as strings.

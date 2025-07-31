@@ -372,11 +372,11 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("app"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("app"),
+              root: "/app",
+              options: Options(),
+            )
             "#);
         });
 
@@ -410,11 +410,11 @@ mod tests {
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(&project, @r#"
-                ProjectMetadata(
-                  name: Name("backend"),
-                  root: "/app",
-                  options: Options(),
-                )
+            ProjectMetadata(
+              name: Name("backend"),
+              root: "/app",
+              options: Options(),
+            )
             "#);
         });
 
@@ -552,16 +552,16 @@ unclosed table, expected `]`
 
         with_escaped_paths(|| {
             assert_ron_snapshot!(root, @r#"
-                              ProjectMetadata(
-                                name: Name("project-root"),
-                                root: "/app",
-                                options: Options(
-                                  src: Some(SrcOptions(
-                                    root: Some("src"),
-                                  )),
-                                ),
-                              )
-                              "#);
+            ProjectMetadata(
+              name: Name("project-root"),
+              root: "/app",
+              options: Options(
+                src: Some(SrcOptions(
+                  root: Some("src"),
+                )),
+              ),
+            )
+            "#);
         });
 
         Ok(())

@@ -1,6 +1,4 @@
-"""
-functools.py - Tools for working with functions and callable objects
-"""
+"""functools.py - Tools for working with functions and callable objects"""
 
 import sys
 import types
@@ -64,7 +62,16 @@ else:
         """
 
 @overload
-def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T: ...
+def reduce(function: Callable[[_T, _T], _T], iterable: Iterable[_T], /) -> _T:
+    """Apply a function of two arguments cumulatively to the items of an iterable, from left to right.
+
+    This effectively reduces the iterable to a single value.  If initial is present,
+    it is placed before the items of the iterable in the calculation, and serves as
+    a default when the iterable is empty.
+
+    For example, reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])
+    calculates ((((1 + 2) + 3) + 4) + 5).
+    """
 
 class _CacheInfo(NamedTuple):
     """CacheInfo(hits, misses, maxsize, currsize)"""
@@ -128,6 +135,7 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
     Access the underlying function with f.__wrapped__.
 
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
+
     """
 
 @overload
@@ -427,6 +435,7 @@ def _make_key(
     If there is only a single argument and its data type is known to cache
     its hash value, then that argument is returned without a wrapper.  This
     saves space and improves lookup speed.
+
     """
 
 if sys.version_info >= (3, 14):

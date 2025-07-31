@@ -1,6 +1,4 @@
-"""
-Support for running coroutines in parallel with staggered start times.
-"""
+"""Support for running coroutines in parallel with staggered start times."""
 
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
@@ -60,4 +58,5 @@ async def staggered_race(
           ``len(exceptions)`` is equal to the number of coroutines actually
           started, and the order is the same as in ``coro_fns``. The winning
           coroutine's entry is ``None``.
+
     """

@@ -1,5 +1,4 @@
-"""
-JSON (JavaScript Object Notation) <https://json.org> is a subset of
+"""JSON (JavaScript Object Notation) <https://json.org> is a subset of
 JavaScript syntax (ECMA-262 3rd edition) used as a lightweight data
 interchange format.
 
@@ -158,6 +157,7 @@ def dumps(
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
+
     """
 
 def dump(
@@ -214,6 +214,7 @@ def dump(
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg; otherwise ``JSONEncoder`` is used.
+
     """
 
 def loads(

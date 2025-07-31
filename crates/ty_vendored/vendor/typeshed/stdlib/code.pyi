@@ -1,6 +1,4 @@
-"""
-Utilities needed to emulate Python's interactive interpreter.
-"""
+"""Utilities needed to emulate Python's interactive interpreter."""
 
 import sys
 from codeop import CommandCompiler, compile_command as compile_command
@@ -16,6 +14,7 @@ class InteractiveInterpreter:
     This class deals with parsing and interpreter state (the user's
     namespace); it doesn't deal with input buffering or prompting or
     input file naming (the filename is always passed in explicitly).
+
     """
 
     locals: dict[str, Any]  # undocumented
@@ -27,6 +26,7 @@ class InteractiveInterpreter:
         namespace in which code will be executed; it defaults to a newly
         created dictionary with key "__name__" set to "__console__" and
         key "__doc__" set to None.
+
         """
 
     def runsource(self, source: str, filename: str = "<input>", symbol: str = "single") -> bool:
@@ -51,6 +51,7 @@ class InteractiveInterpreter:
         an exception is raised).  The return value can be used to
         decide whether to use sys.ps1 or sys.ps2 to prompt the next
         line.
+
         """
 
     def runcode(self, code: CodeType) -> None:
@@ -63,6 +64,7 @@ class InteractiveInterpreter:
         A note about KeyboardInterrupt: this exception may occur
         elsewhere in this code, and may not always be caught.  The
         caller should be prepared to deal with it.
+
         """
     if sys.version_info >= (3, 13):
         def showsyntaxerror(self, filename: str | None = None, *, source: str = "") -> None:
@@ -75,6 +77,7 @@ class InteractiveInterpreter:
             "<string>" when reading from a string).
 
             The output is written by self.write(), below.
+
             """
     else:
         def showsyntaxerror(self, filename: str | None = None) -> None:
@@ -87,6 +90,7 @@ class InteractiveInterpreter:
             "<string>" when reading from a string).
 
             The output is written by self.write(), below.
+
             """
 
     def showtraceback(self) -> None:
@@ -95,6 +99,7 @@ class InteractiveInterpreter:
         We remove the first stack item because it is our own code.
 
         The output is written by self.write(), below.
+
         """
 
     def write(self, data: str) -> None:
@@ -102,6 +107,7 @@ class InteractiveInterpreter:
 
         The base implementation writes to sys.stderr; a subclass may
         replace this with a different implementation.
+
         """
 
 class InteractiveConsole(InteractiveInterpreter):
@@ -109,6 +115,7 @@ class InteractiveConsole(InteractiveInterpreter):
 
     This class builds on InteractiveInterpreter and adds prompting
     using the familiar sys.ps1 and sys.ps2, and input buffering.
+
     """
 
     buffer: list[str]  # undocumented
@@ -124,6 +131,7 @@ class InteractiveConsole(InteractiveInterpreter):
 
             The optional filename argument should specify the (file)name
             of the input stream; it will show up in tracebacks.
+
             """
 
         def push(self, line: str, filename: str | None = None) -> bool:
@@ -138,6 +146,7 @@ class InteractiveConsole(InteractiveInterpreter):
             is left as it was after the line was appended.  The return
             value is 1 if more input is required, 0 if the line was dealt
             with in some way (this is the same as runsource()).
+
             """
     else:
         def __init__(self, locals: dict[str, Any] | None = None, filename: str = "<console>") -> None:
@@ -148,6 +157,7 @@ class InteractiveConsole(InteractiveInterpreter):
 
             The optional filename argument should specify the (file)name
             of the input stream; it will show up in tracebacks.
+
             """
 
         def push(self, line: str) -> bool:
@@ -162,6 +172,7 @@ class InteractiveConsole(InteractiveInterpreter):
             is left as it was after the line was appended.  The return
             value is 1 if more input is required, 0 if the line was dealt
             with in some way (this is the same as runsource()).
+
             """
 
     def interact(self, banner: str | None = None, exitmsg: str | None = None) -> None:
@@ -178,6 +189,7 @@ class InteractiveConsole(InteractiveInterpreter):
         printed when exiting. Pass the empty string to suppress
         printing an exit message. If exitmsg is not given or None,
         a default message is printed.
+
         """
 
     def resetbuffer(self) -> None:
@@ -192,6 +204,7 @@ class InteractiveConsole(InteractiveInterpreter):
         The base implementation uses the built-in function
         input(); a subclass may replace this with a different
         implementation.
+
         """
 
 if sys.version_info >= (3, 13):
@@ -215,6 +228,7 @@ if sys.version_info >= (3, 13):
         local -- passed to InteractiveInterpreter.__init__()
         exitmsg -- passed to InteractiveConsole.interact()
         local_exit -- passed to InteractiveConsole.__init__()
+
         """
 
 else:
@@ -236,4 +250,5 @@ else:
         readfunc -- if not None, replaces InteractiveConsole.raw_input()
         local -- passed to InteractiveInterpreter.__init__()
         exitmsg -- passed to InteractiveConsole.interact()
+
         """

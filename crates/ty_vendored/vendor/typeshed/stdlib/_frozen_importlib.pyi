@@ -1,10 +1,10 @@
-"""
-Core implementation of import.
+"""Core implementation of import.
 
 This module is NOT meant to be directly imported! It has been designed such
 that it can be bootstrapped into Python as the implementation of import. As
 such it requires the injection of specific modules and attributes in order to
 work. One should use importlib as the public-facing version of this module.
+
 """
 
 import importlib.abc
@@ -32,6 +32,7 @@ def __import__(
     being imported (e.g. ``from module import <fromlist>``).  The 'level'
     argument represents the package location to import from in a relative
     import (e.g. ``from ..pkg import mod`` would have a 'level' of 2).
+
     """
 
 def spec_from_loader(
@@ -80,6 +81,7 @@ class ModuleSpec:
 
     Only finders (see importlib.abc.MetaPathFinder and
     importlib.abc.PathEntryFinder) should modify ModuleSpec instances.
+
     """
 
     def __init__(
@@ -109,12 +111,20 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find the built-in module.
+
+            If 'path' is ever specified then the search is considered a failure.
+
+            This method is deprecated.  Use find_spec() instead.
+
+            """
 
     @classmethod
     def find_spec(
@@ -130,6 +140,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
         """Load the specified module into sys.modules and return it.
 
         This method is deprecated.  Use loader.exec_module() instead.
+
         """
 
     @classmethod
@@ -142,7 +153,12 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
-        def module_repr(module: types.ModuleType) -> str: ...
+        def module_repr(module: types.ModuleType) -> str:
+            """Return repr for the module.
+
+            The method is deprecated.  The import machinery does the job itself.
+
+            """
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
@@ -165,12 +181,18 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find a frozen module.
+
+            This method is deprecated.  Use find_spec() instead.
+
+            """
 
     @classmethod
     def find_spec(
@@ -186,6 +208,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
         """Load a frozen module.
 
         This method is deprecated.  Use exec_module() instead.
+
         """
 
     @classmethod
@@ -198,7 +221,12 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
-        def module_repr(m: types.ModuleType) -> str: ...
+        def module_repr(m: types.ModuleType) -> str:
+            """Return repr for the module.
+
+            The method is deprecated.  The import machinery does the job itself.
+
+            """
     if sys.version_info >= (3, 10):
         @staticmethod
         def create_module(spec: ModuleSpec) -> types.ModuleType | None:
@@ -206,7 +234,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
     else:
         @classmethod
         def create_module(cls, spec: ModuleSpec) -> types.ModuleType | None:
-            """Set __file__, if able."""
+            """Use default semantics for module creation."""
 
     @staticmethod
     def exec_module(module: types.ModuleType) -> None: ...

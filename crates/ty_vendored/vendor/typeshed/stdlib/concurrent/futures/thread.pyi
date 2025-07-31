@@ -1,6 +1,4 @@
-"""
-Implements ThreadPoolExecutor.
-"""
+"""Implements ThreadPoolExecutor."""
 
 import queue
 import sys
@@ -91,7 +89,9 @@ else:
     ) -> None: ...
 
 class BrokenThreadPool(BrokenExecutor):
-    """Raised when a worker thread in a ThreadPoolExecutor failed initializing."""
+    """
+    Raised when a worker thread in a ThreadPoolExecutor failed initializing.
+    """
 
 class ThreadPoolExecutor(Executor):
     if sys.version_info >= (3, 14):

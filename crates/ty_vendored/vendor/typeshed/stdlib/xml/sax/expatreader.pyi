@@ -1,5 +1,4 @@
 """
-
 SAX driver for the pyexpat C module.  This driver works with
 pyexpat.__version__ == '2.22'.
 """

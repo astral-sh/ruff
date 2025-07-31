@@ -1,6 +1,4 @@
-"""
-Base class for fixers (optional, but recommended).
-"""
+"""Base class for fixers (optional, but recommended)."""
 
 from _typeshed import Incomplete, StrPath
 from abc import ABCMeta, abstractmethod

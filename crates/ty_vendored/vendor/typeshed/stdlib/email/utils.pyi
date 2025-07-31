@@ -1,6 +1,4 @@
-"""
-Miscellaneous utilities.
-"""
+"""Miscellaneous utilities."""
 
 import datetime
 import sys
@@ -44,7 +42,8 @@ def unquote(str: str) -> str:
 
 # `strict` parameter added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
 def parseaddr(addr: str | list[str], *, strict: bool = True) -> tuple[str, str]:
-    """Parse addr into its constituent realname and email address parts.
+    """
+    Parse addr into its constituent realname and email address parts.
 
     Return a tuple of realname and email address, unless the parse fails, in
     which case return a 2-tuple of ('', '').
@@ -137,6 +136,7 @@ if sys.version_info >= (3, 14):
         argument should be a datetime instance, and it is converted to the
         local time zone according to the system time zone database.  If *dt* is
         naive (that is, dt.tzinfo is None), it is assumed to be in local time.
+
         """
 
 elif sys.version_info >= (3, 12):
@@ -149,6 +149,7 @@ elif sys.version_info >= (3, 12):
         local time zone according to the system time zone database.  If *dt* is
         naive (that is, dt.tzinfo is None), it is assumed to be in local time.
         The isdst parameter is ignored.
+
         """
 
     @overload
@@ -168,6 +169,7 @@ else:
         is or is not (respectively) in effect for the specified time.  A
         negative value for *isdst* causes the localtime() function to attempt
         to divine whether summer time is in effect for the specified time.
+
         """
 
 def make_msgid(idstring: str | None = None, domain: str | None = None) -> str:

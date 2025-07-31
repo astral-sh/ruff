@@ -253,7 +253,6 @@ does["not"]["exist"] = 0
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
 non_subscriptable = 1
-# error: [non-subscriptable]
 non_subscriptable[0] = 0
 # error: [non-subscriptable]
 reveal_type(non_subscriptable[0])  # revealed: Unknown

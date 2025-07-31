@@ -6,14 +6,13 @@ use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode, ceil_char_boundary,
+};
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::Locator;
-use crate::fs::relativize_path;
-use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
@@ -21,8 +20,6 @@ use crate::settings::types::UnsafeFixes;
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
-        /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS   = 1 << 0;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
         const SHOW_FIX_DIFF     = 1 << 1;
         /// Whether to show the source code of a diagnostic.
@@ -30,17 +27,27 @@ bitflags! {
     }
 }
 
-#[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
-    unsafe_fixes: UnsafeFixes,
+    config: DisplayDiagnosticConfig,
+}
+
+impl Default for TextEmitter {
+    fn default() -> Self {
+        Self {
+            flags: EmitterFlags::default(),
+            config: DisplayDiagnosticConfig::default()
+                .format(DiagnosticFormat::Concise)
+                .hide_severity(true)
+                .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize()),
+        }
+    }
 }
 
 impl TextEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
-        self.flags
-            .set(EmitterFlags::SHOW_FIX_STATUS, show_fix_status);
+        self.config = self.config.show_fix_status(show_fix_status);
         self
     }
 
@@ -58,7 +65,21 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
-        self.unsafe_fixes = unsafe_fixes;
+        self.config = self
+            .config
+            .fix_applicability(unsafe_fixes.required_applicability());
+        self
+    }
+
+    #[must_use]
+    pub fn with_preview(mut self, preview: bool) -> Self {
+        self.config = self.config.preview(preview);
+        self
+    }
+
+    #[must_use]
+    pub fn with_color(mut self, color: bool) -> Self {
+        self.config = self.config.color(color);
         self
     }
 }
@@ -71,51 +92,10 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in diagnostics {
+            write!(writer, "{}", message.display(context, &self.config))?;
+
             let filename = message.expect_ruff_filename();
-            write!(
-                writer,
-                "{path}{sep}",
-                path = relativize_path(&filename).bold(),
-                sep = ":".cyan(),
-            )?;
-
-            let start_location = message.expect_ruff_start_location();
             let notebook_index = context.notebook_index(&filename);
-
-            // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let diagnostic_location = if let Some(notebook_index) = notebook_index {
-                write!(
-                    writer,
-                    "cell {cell}{sep}",
-                    cell = notebook_index
-                        .cell(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    sep = ":".cyan(),
-                )?;
-
-                LineColumn {
-                    line: notebook_index
-                        .cell_row(start_location.line)
-                        .unwrap_or(OneIndexed::MIN),
-                    column: start_location.column,
-                }
-            } else {
-                start_location
-            };
-
-            writeln!(
-                writer,
-                "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.line,
-                col = diagnostic_location.column,
-                sep = ":".cyan(),
-                code_and_body = RuleCodeAndBody {
-                    message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
-                    unsafe_fixes: self.unsafe_fixes,
-                }
-            )?;
-
             if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
                 // The `0..0` range is used to highlight file-level diagnostics.
                 if message.expect_range() != TextRange::default() {
@@ -186,7 +166,7 @@ pub(super) struct MessageCodeFrame<'a> {
 
 impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let suggestion = self.message.suggestion();
+        let suggestion = self.message.first_help_text();
         let footers = if let Some(suggestion) = suggestion {
             vec![Level::Help.title(suggestion)]
         } else {
@@ -248,7 +228,7 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source = replace_whitespace_and_unprintable(
+        let source = replace_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
             self.message.expect_range() - start_offset,
         )
@@ -291,16 +271,20 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 /// Given some source code and an annotation range, this routine replaces
-/// tabs with ASCII whitespace, and unprintable characters with printable
-/// representations of them.
+///  unprintable characters with printable representations of them.
 ///
 /// The source code returned has an annotation that is updated to reflect
 /// changes made to the source code (if any).
-fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
 
     // Updates the range given by the caller whenever a single byte (at
     // `index` in `source`) is replaced with `len` bytes.
@@ -329,19 +313,7 @@ fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange)
     };
 
     for (index, c) in source.char_indices() {
-        let old_width = line_width.get();
-        line_width = line_width.add_char(c);
-
-        if matches!(c, '\t') {
-            let tab_width = u32::try_from(line_width.get() - old_width)
-                .expect("small width because of tab size");
-            result.push_str(&source[last_end..index]);
-            for _ in 0..tab_width {
-                result.push(' ');
-            }
-            last_end = index + 1;
-            update_range(index, tab_width);
-        } else if let Some(printable) = unprintable_replacement(c) {
+        if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
             result.push(printable);
             last_end = index + 1;
@@ -396,9 +368,8 @@ impl<'a> SourceCode<'a> {
         if self.text.as_bytes()[self.annotation_range.start().to_usize() - 1] != b'\n' {
             return self;
         }
-        let locator = Locator::new(&self.text);
         let start = self.annotation_range.start();
-        let end = locator.ceil_char_boundary(start + TextSize::from(1));
+        let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
         SourceCode {
             annotation_range: TextRange::new(start, end),
             ..self

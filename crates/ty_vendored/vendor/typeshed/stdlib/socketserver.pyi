@@ -1,5 +1,4 @@
-"""
-Generic socket server classes.
+"""Generic socket server classes.
 
 This module tries to capture the various aspects of defining a server:
 
@@ -116,6 +115,7 @@ BaseServer:
   example: read entries from a SQL database (requires overriding
   get_request() to return a table entry from the database).
   entry is processed by a RequestHandlerClass.
+
 """
 
 import sys
@@ -200,6 +200,7 @@ class BaseServer:
 
     - RequestHandlerClass
     - socket
+
     """
 
     server_address: _Address
@@ -236,6 +237,7 @@ class BaseServer:
         """Called to clean-up the server.
 
         May be overridden.
+
         """
 
     def finish_request(self, request: _RequestType, client_address: _RetAddress) -> None:
@@ -246,6 +248,7 @@ class BaseServer:
         """Handle an error gracefully.  May be overridden.
 
         The default is to print a traceback and continue.
+
         """
 
     def handle_timeout(self) -> None:
@@ -258,18 +261,21 @@ class BaseServer:
         """Call finish_request.
 
         Overridden by ForkingMixIn and ThreadingMixIn.
+
         """
 
     def server_activate(self) -> None:
         """Called by constructor to activate the server.
 
         May be overridden.
+
         """
 
     def verify_request(self, request: _RequestType, client_address: _RetAddress) -> bool:
         """Verify the request.  May be overridden.
 
         Return True if we should proceed with this request.
+
         """
 
     def __enter__(self) -> Self: ...
@@ -333,6 +339,7 @@ class TCPServer(BaseServer):
     - server_address
     - RequestHandlerClass
     - socket
+
     """
 
     address_family: int
@@ -355,18 +362,21 @@ class TCPServer(BaseServer):
         """Return socket file number.
 
         Interface required by selector.
+
         """
 
     def get_request(self) -> tuple[_socket, _RetAddress]:
         """Get the request and client address from the socket.
 
         May be overridden.
+
         """
 
     def server_bind(self) -> None:
         """Called by constructor to bind the socket.
 
         May be overridden.
+
         """
 
 class UDPServer(TCPServer):
@@ -433,6 +443,7 @@ class ThreadingMixIn:
         """Same as in BaseServer but as a thread.
 
         In addition, exception handling is done here.
+
         """
 
     def process_request(self, request: _RequestType, client_address: _RetAddress) -> None:
@@ -468,6 +479,7 @@ class BaseRequestHandler:
     needs access to per-server information) as self.server.  Since a
     separate instance is created for each request, the handle() method
     can define other arbitrary instance variables.
+
     """
 
     # `request` is technically of type _RequestType,

@@ -1,6 +1,4 @@
-"""
-Optimized C implementation for the Python pickle module.
-"""
+"""Optimized C implementation for the Python pickle module."""
 
 from _typeshed import ReadableBuffer, SupportsWrite
 from collections.abc import Callable, Iterable, Iterator, Mapping

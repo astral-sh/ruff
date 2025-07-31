@@ -1,6 +1,4 @@
-"""
-Helpers for introspecting and wrapping annotations.
-"""
+"""Helpers for introspecting and wrapping annotations."""
 
 import sys
 from typing import Literal
@@ -41,6 +39,7 @@ if sys.version_info >= (3, 14):
         * owner: The owning object (module, class, or function).
         * is_argument: Does nothing, retained for compatibility.
         * is_class: True if the forward reference was created in class scope.
+
         """
 
         __forward_is_argument__: bool
@@ -134,6 +133,7 @@ if sys.version_info >= (3, 14):
         class, or function that the __annotate__ function derives from). With the
         FORWARDREF format, it is used to provide better evaluation capabilities
         on the generated ForwardRef objects.
+
         """
 
     @overload
@@ -233,6 +233,7 @@ if sys.version_info >= (3, 14):
         This is intended as a helper for tools that support the STRING format but do
         not have access to the code that originally produced the annotations. It uses
         repr() for most objects.
+
         """
 
     def annotations_to_string(annotations: SupportsItems[str, object]) -> dict[str, str]:

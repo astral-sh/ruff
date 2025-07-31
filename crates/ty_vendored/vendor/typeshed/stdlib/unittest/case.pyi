@@ -1,22 +1,18 @@
-"""
-Test case implementation
-"""
+"""Test case implementation"""
 
 import logging
 import sys
 import unittest.result
 from _typeshed import SupportsDunderGE, SupportsDunderGT, SupportsDunderLE, SupportsDunderLT, SupportsRSub, SupportsSub
+from builtins import _ClassInfo
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence, Set as AbstractSet
 from contextlib import AbstractContextManager
 from re import Pattern
 from types import GenericAlias, TracebackType
 from typing import Any, AnyStr, Final, Generic, NoReturn, Protocol, SupportsAbs, SupportsRound, TypeVar, overload
-from typing_extensions import Never, ParamSpec, Self, TypeAlias
+from typing_extensions import Never, ParamSpec, Self
 from unittest._log import _AssertLogsContext, _LoggingWatcher
 from warnings import WarningMessage
-
-if sys.version_info >= (3, 10):
-    from types import UnionType
 
 _T = TypeVar("_T")
 _S = TypeVar("_S", bound=SupportsSub[Any, Any])
@@ -47,7 +43,8 @@ class _AssertRaisesBaseContext(_BaseTestCaseContext):
     # This returns Self if args is the empty list, and None otherwise.
     # but it's not possible to construct an overload which expresses that
     def handle(self, name: str, args: list[Any], kwargs: dict[str, Any]) -> Any:
-        """If args is empty, assertRaises/Warns is being used as a
+        """
+        If args is empty, assertRaises/Warns is being used as a
         context manager, so check for a 'msg' kwarg and return self.
         If args is not empty, call a callable passing positional and keyword
         arguments.
@@ -69,16 +66,23 @@ if sys.version_info >= (3, 11):
 
 def expectedFailure(test_item: _FT) -> _FT: ...
 def skip(reason: str) -> Callable[[_FT], _FT]:
-    """Unconditionally skip a test."""
+    """
+    Unconditionally skip a test.
+    """
 
 def skipIf(condition: object, reason: str) -> Callable[[_FT], _FT]:
-    """Skip a test if the condition is true."""
+    """
+    Skip a test if the condition is true.
+    """
 
 def skipUnless(condition: object, reason: str) -> Callable[[_FT], _FT]:
-    """Skip a test unless the condition is true."""
+    """
+    Skip a test unless the condition is true.
+    """
 
 class SkipTest(Exception):
-    """Raise this exception in a test to skip it.
+    """
+    Raise this exception in a test to skip it.
 
     Usually you can use TestCase.skipTest() or one of the skipping decorators
     instead of raising this directly.
@@ -87,14 +91,6 @@ class SkipTest(Exception):
     def __init__(self, reason: str) -> None: ...
 
 class _SupportsAbsAndDunderGE(SupportsDunderGE[Any], SupportsAbs[Any], Protocol): ...
-
-# Keep this alias in sync with builtins._ClassInfo
-# We can't import it from builtins or pytype crashes,
-# due to the fact that pytype uses a custom builtins stub rather than typeshed's builtins stub
-if sys.version_info >= (3, 10):
-    _ClassInfo: TypeAlias = type | UnionType | tuple[_ClassInfo, ...]
-else:
-    _ClassInfo: TypeAlias = type | tuple[_ClassInfo, ...]
 
 class TestCase:
     """A class whose instances are single test cases.
@@ -496,6 +492,7 @@ class TestCase:
          Example:
             - [0, 1, 1] and [1, 0, 1] compare equal.
             - [0, 0, 1] and [0, 1] compare unequal.
+
         """
 
     def addTypeEqualityFunc(self, typeobj: type[Any], function: Callable[..., None]) -> None:
@@ -540,6 +537,7 @@ class TestCase:
             list2: The second list to compare.
             msg: Optional message to use on failure instead of a list of
                     differences.
+
         """
 
     def assertTupleEqual(self, tuple1: tuple[Any, ...], tuple2: tuple[Any, ...], msg: Any = None) -> None:
@@ -652,10 +650,8 @@ class TestCase:
         assertRegexpMatches = assertRegex
         assertNotRegexpMatches = assertNotRegex
         assertRaisesRegexp = assertRaisesRegex
-        def assertDictContainsSubset(
-            self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None
-        ) -> None: ...
-
+        def assertDictContainsSubset(self, subset: Mapping[Any, Any], dictionary: Mapping[Any, Any], msg: object = None) -> None:
+            """Checks whether dictionary is a superset of subset."""
     if sys.version_info >= (3, 10):
         # Runtime has *args, **kwargs, but will error if any are supplied
         def __init_subclass__(cls, *args: Never, **kwargs: Never) -> None: ...

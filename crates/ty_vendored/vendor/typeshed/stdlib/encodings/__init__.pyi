@@ -1,5 +1,4 @@
-"""
-Standard "encodings" Package
+"""Standard "encodings" Package
 
     Standard Python encoding modules are stored in this package
     directory.
@@ -26,6 +25,7 @@ Standard "encodings" Package
 Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+
 """
 
 from codecs import CodecInfo
@@ -41,6 +41,7 @@ def normalize_encoding(encoding: str | bytes) -> str:
     becomes '_'. Leading and trailing underscores are removed.
 
     Note that encoding names should be ASCII only.
+
     """
 
 def search_function(encoding: str) -> CodecInfo | None: ...

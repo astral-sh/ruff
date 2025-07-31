@@ -1,6 +1,4 @@
-"""
-Fix incompatible imports and module references.
-"""
+"""Fix incompatible imports and module references."""
 
 from _typeshed import StrPath
 from collections.abc import Generator

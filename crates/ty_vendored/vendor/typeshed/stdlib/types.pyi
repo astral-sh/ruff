@@ -1,5 +1,4 @@
 """
-
 Define names for built-in types that aren't directly accessible as a builtin.
 """
 
@@ -849,6 +848,7 @@ class DynamicClassAttribute(property):
     Subclass from this to use a different method of accessing virtual attributes
     and still be treated properly by the inspect module. (Enum uses this since
     Python 3.10 .)
+
     """
 
     fget: Callable[[Any], Any] | None

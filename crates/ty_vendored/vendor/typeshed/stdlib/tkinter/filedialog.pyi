@@ -1,5 +1,4 @@
-"""
-File selection dialog classes.
+"""File selection dialog classes.
 
 Classes:
 
@@ -55,6 +54,7 @@ class FileDialog:
     the dialog keeps no memory of previous state.  Note that memory is
     kept even when the dialog is canceled.  (All this emulates the
     behavior of the Macintosh file selection dialogs.)
+
     """
 
     title: str

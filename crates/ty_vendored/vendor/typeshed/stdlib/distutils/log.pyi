@@ -1,6 +1,4 @@
-"""
-A simple log mechanism styled after PEP 282.
-"""
+"""A simple log mechanism styled after PEP 282."""
 
 from typing import Any, Final
 

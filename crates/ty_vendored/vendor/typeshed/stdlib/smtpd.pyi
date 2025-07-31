@@ -1,5 +1,4 @@
-"""
-An RFC 5321 smtp proxy with optional RFC 1870 and RFC 6531 extensions.
+"""An RFC 5321 smtp proxy with optional RFC 1870 and RFC 6531 extensions.
 
 Usage: %(program)s [options] [localhost:localport [remotehost:remoteport]]
 
@@ -152,6 +151,7 @@ class SMTPServer(asyncore.dispatcher):
         This function should return None for a normal `250 Ok' response;
         otherwise, it should return the desired response string in RFC 821
         format.
+
         """
 
 class DebuggingServer(SMTPServer): ...

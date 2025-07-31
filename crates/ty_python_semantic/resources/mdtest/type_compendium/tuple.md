@@ -19,14 +19,20 @@ def _(p: P, q: Q):
 ## Instantiating tuples
 
 Like all classes, tuples can be instantiated by invoking the `tuple` class. When instantiating a
-specialization of `tuple` we (TODO: should) check that the values passed in match the element types
-defined in the specialization.
+specialization of `tuple` we check that the values passed in match the element types defined in the
+specialization.
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
 from typing_extensions import Iterable, Never
 
 reveal_type(tuple())  # revealed: tuple[()]
 reveal_type(tuple[int]((1,)))  # revealed: tuple[int]
+reveal_type(tuple[int, *tuple[str, ...]]((1,)))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(().__class__())  # revealed: tuple[()]
 reveal_type((1, 2).__class__((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
@@ -54,6 +60,63 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+```
+
+## Instantiating tuple subclasses
+
+Tuple subclasses inherit the special-cased constructors from their tuple superclasses:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing_extensions import Iterable, Never
+
+class UnspecializedTupleSubclass(tuple): ...
+class EmptyTupleSubclass(tuple[()]): ...
+class SingleElementTupleSubclass(tuple[int]): ...
+class VariadicTupleSubclass(tuple[int, ...]): ...
+class MixedTupleSubclass(tuple[int, *tuple[str, ...]]): ...
+
+reveal_type(UnspecializedTupleSubclass())  # revealed: UnspecializedTupleSubclass
+reveal_type(UnspecializedTupleSubclass(()))  # revealed: UnspecializedTupleSubclass
+reveal_type(UnspecializedTupleSubclass((1, 2, "foo")))  # revealed: UnspecializedTupleSubclass
+reveal_type(UnspecializedTupleSubclass([1, 2, "foo", b"bar"]))  # revealed: UnspecializedTupleSubclass
+
+reveal_type(EmptyTupleSubclass())  # revealed: EmptyTupleSubclass
+reveal_type(EmptyTupleSubclass(()))  # revealed: EmptyTupleSubclass
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[()]`, found `tuple[Literal[1], Literal[2]]`"
+reveal_type(EmptyTupleSubclass((1, 2)))  # revealed: EmptyTupleSubclass
+
+reveal_type(SingleElementTupleSubclass((1,)))  # revealed: SingleElementTupleSubclass
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
+reveal_type(SingleElementTupleSubclass())  # revealed: SingleElementTupleSubclass
+
+reveal_type(VariadicTupleSubclass())  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass(()))  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass([1, 2, 3]))  # revealed: VariadicTupleSubclass
+reveal_type(VariadicTupleSubclass((1, 2, 3, 4)))  # revealed: VariadicTupleSubclass
+
+reveal_type(MixedTupleSubclass((1,)))  # revealed: MixedTupleSubclass
+reveal_type(MixedTupleSubclass((1, "foo")))  # revealed: MixedTupleSubclass
+
+# error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int, *tuple[str, ...]]`, found `tuple[Literal[1], Literal[b"foo"]]`"
+reveal_type(MixedTupleSubclass((1, b"foo")))  # revealed: MixedTupleSubclass
+
+# error: [missing-argument] "No argument provided for required parameter `iterable`"
+reveal_type(MixedTupleSubclass())  # revealed: MixedTupleSubclass
+
+def _(empty: EmptyTupleSubclass, single_element: SingleElementTupleSubclass, mixed: MixedTupleSubclass, x: tuple[int, int]):
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[()]`, found `tuple[Literal[1], Literal[2]]`"
+    empty.__class__((1, 2))
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `tuple[int]`, found `tuple[Literal[1], Literal[2]]`"
+    single_element.__class__((1, 2))
+    # error: [missing-argument] "No argument provided for required parameter `iterable`"
+    mixed.__class__()
 ```
 
 ## Subtyping relationships

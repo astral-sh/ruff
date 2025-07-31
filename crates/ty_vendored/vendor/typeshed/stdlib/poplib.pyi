@@ -1,5 +1,4 @@
-"""
-A POP3 client class.
+"""A POP3 client class.
 
 Based on the J. Myers POP3 draft, Jan. 96
 """

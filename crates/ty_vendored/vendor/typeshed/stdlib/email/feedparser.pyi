@@ -1,5 +1,4 @@
-"""
-FeedParser - An email feed parser.
+"""FeedParser - An email feed parser.
 
 The feed parser implements an interface for incrementally parsing an email
 message, line by line.  This has advantages for certain applications, such as
@@ -34,6 +33,7 @@ class FeedParser(Generic[_MessageT]):
         The policy keyword specifies a policy object that controls a number of
         aspects of the parser's operation.  The default policy maintains
         backward compatibility.
+
         """
 
     @overload
@@ -54,6 +54,7 @@ class BytesFeedParser(FeedParser[_MessageT]):
         The policy keyword specifies a policy object that controls a number of
         aspects of the parser's operation.  The default policy maintains
         backward compatibility.
+
         """
 
     @overload

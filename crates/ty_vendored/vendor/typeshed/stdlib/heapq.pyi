@@ -1,5 +1,4 @@
-"""
-Heap queue algorithm (a.k.a. priority queue).
+"""Heap queue algorithm (a.k.a. priority queue).
 
 Heaps are arrays for which a[k] <= a[2*k+1] and a[k] <= a[2*k+2] for
 all k, counting elements from 0.  For the sake of comparison,
@@ -59,6 +58,7 @@ def merge(
 
     >>> list(merge(['dog', 'horse'], ['cat', 'fish', 'kangaroo'], key=len))
     ['dog', 'cat', 'fish', 'horse', 'kangaroo']
+
     """
 
 def nlargest(n: int, iterable: Iterable[_S], key: Callable[[_S], SupportsRichComparison] | None = None) -> list[_S]:

@@ -33,6 +33,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
     use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
@@ -378,14 +379,14 @@ mod tests {
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-           --> stdlib/builtins.pyi:338:7
+           --> stdlib/builtins.pyi:337:7
             |
-        336 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
-        337 |
-        338 | class int:
+        335 | _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
+        336 |
+        337 | class int:
             |       ^^^
-        339 |     """int([x]) -> integer
-        340 |     int(x, base=10) -> integer
+        338 |     """int([x]) -> integer
+        339 |     int(x, base=10) -> integer
             |
         info: Source
          --> main.py:4:18
@@ -412,14 +413,14 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
-            --> stdlib/builtins.pyi:2892:7
+            --> stdlib/builtins.pyi:2890:7
              |
-        2890 |         """See PEP 585"""
-        2891 |
-        2892 | class dict(MutableMapping[_KT, _VT]):
+        2888 |         """See PEP 585"""
+        2889 |
+        2890 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
-        2893 |     """dict() -> new empty dictionary
-        2894 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2891 |     """dict() -> new empty dictionary
+        2892 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         info: Source
          --> main.py:6:5
@@ -640,7 +641,7 @@ f(**kwargs<CURSOR>)
 
     impl IntoDiagnostic for GotoTypeDefinitionDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            let mut source = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Source");
             source.annotate(Annotation::primary(
                 Span::from(self.source.file()).with_range(self.source.range()),
             ));

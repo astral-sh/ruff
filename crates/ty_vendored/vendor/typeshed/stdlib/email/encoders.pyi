@@ -1,6 +1,4 @@
-"""
-Encodings and related functions.
-"""
+"""Encodings and related functions."""
 
 from email.message import Message
 

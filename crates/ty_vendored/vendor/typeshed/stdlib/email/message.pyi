@@ -1,6 +1,4 @@
-"""
-Basic message object for the email package object model.
-"""
+"""Basic message object for the email package object model."""
 
 from _typeshed import MaybeNone
 from collections.abc import Generator, Iterator, Sequence
@@ -334,6 +332,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
             rawparam = msg.get_param('foo')
             param = email.utils.collapse_rfc2231_value(rawparam)
+
         """
 
     @overload

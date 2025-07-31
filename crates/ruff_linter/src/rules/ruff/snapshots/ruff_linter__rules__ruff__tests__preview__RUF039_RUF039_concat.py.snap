@@ -65,7 +65,7 @@ RUF039_concat.py:12:5: RUF039 [*] First argument to `re.findall()` is not raw st
 14 14 |     """
 15 15 | )
 
-RUF039_concat.py:26:5: RUF039 First argument to `re.match()` is not raw bytes literal
+RUF039_concat.py:26:5: RUF039 [*] First argument to `re.match()` is not raw bytes literal
    |
 24 | )
 25 | re.match(
@@ -75,6 +75,16 @@ RUF039_concat.py:26:5: RUF039 First argument to `re.match()` is not raw bytes li
 28 | )
    |
    = help: Replace with raw bytes literal
+
+ℹ Safe fix
+23 23 |     f'much?'
+24 24 | )
+25 25 | re.match(
+26    |-    b'reak'
+   26 |+    rb'reak'
+27 27 |     br'eak'
+28 28 | )
+29 29 | re.search(
 
 RUF039_concat.py:30:8: RUF039 First argument to `re.search()` is not raw string
    |
@@ -295,7 +305,7 @@ RUF039_concat.py:52:5: RUF039 [*] First argument to `regex.findall()` is not raw
 54 54 |     """
 55 55 | )
 
-RUF039_concat.py:66:5: RUF039 First argument to `regex.match()` is not raw bytes literal
+RUF039_concat.py:66:5: RUF039 [*] First argument to `regex.match()` is not raw bytes literal
    |
 64 | )
 65 | regex.match(
@@ -305,6 +315,16 @@ RUF039_concat.py:66:5: RUF039 First argument to `regex.match()` is not raw bytes
 68 | )
    |
    = help: Replace with raw bytes literal
+
+ℹ Safe fix
+63 63 |     f'much?'
+64 64 | )
+65 65 | regex.match(
+66    |-    b'reak'
+   66 |+    rb'reak'
+67 67 |     br'eak'
+68 68 | )
+69 69 | regex.search(
 
 RUF039_concat.py:70:8: RUF039 First argument to `regex.search()` is not raw string
    |
@@ -460,3 +480,223 @@ RUF039_concat.py:78:24: RUF039 [*] First argument to `regex.subn()` is not raw s
 79 79 | 
 80 80 | 
 81 81 | regex.template(
+
+RUF039_concat.py:98:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+ 96 | # https://github.com/astral-sh/ruff/issues/16713
+ 97 | re.compile(
+ 98 |     "["
+    |     ^^^ RUF039
+ 99 |     "\U0001F600-\U0001F64F"  # emoticons
+100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    |
+    = help: Replace with raw string
+
+ℹ Safe fix
+95 95 | 
+96 96 | # https://github.com/astral-sh/ruff/issues/16713
+97 97 | re.compile(
+98    |-    "["
+   98 |+    r"["
+99 99 |     "\U0001F600-\U0001F64F"  # emoticons
+100 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+
+RUF039_concat.py:99:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+ 97 | re.compile(
+ 98 |     "["
+ 99 |     "\U0001F600-\U0001F64F"  # emoticons
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+96  96  | # https://github.com/astral-sh/ruff/issues/16713
+97  97  | re.compile(
+98  98  |     "["
+99      |-    "\U0001F600-\U0001F64F"  # emoticons
+    99  |+    r"\U0001F600-\U0001F64F"  # emoticons
+100 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+
+RUF039_concat.py:100:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+ 98 |     "["
+ 99 |     "\U0001F600-\U0001F64F"  # emoticons
+100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+97  97  | re.compile(
+98  98  |     "["
+99  99  |     "\U0001F600-\U0001F64F"  # emoticons
+100     |-    "\U0001F300-\U0001F5FF"  # symbols & pictographs
+    100 |+    r"\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 103 |     "\U00002702-\U000027B0"
+
+RUF039_concat.py:101:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+ 99 |     "\U0001F600-\U0001F64F"  # emoticons
+100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 |     "\U00002702-\U000027B0"
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+98  98  |     "["
+99  99  |     "\U0001F600-\U0001F64F"  # emoticons
+100 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101     |-    "\U0001F680-\U0001F6FF"  # transport & map symbols
+    101 |+    r"\U0001F680-\U0001F6FF"  # transport & map symbols
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 103 |     "\U00002702-\U000027B0"
+104 104 |     "\U000024C2-\U0001F251"
+
+RUF039_concat.py:102:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+103 |     "\U00002702-\U000027B0"
+104 |     "\U000024C2-\U0001F251"
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+99  99  |     "\U0001F600-\U0001F64F"  # emoticons
+100 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102     |-    "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+    102 |+    r"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 103 |     "\U00002702-\U000027B0"
+104 104 |     "\U000024C2-\U0001F251"
+105 105 |     "\u200d"  # zero width joiner
+
+RUF039_concat.py:103:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 |     "\U00002702-\U000027B0"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+104 |     "\U000024C2-\U0001F251"
+105 |     "\u200d"  # zero width joiner
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+100 100 |     "\U0001F300-\U0001F5FF"  # symbols & pictographs
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103     |-    "\U00002702-\U000027B0"
+    103 |+    r"\U00002702-\U000027B0"
+104 104 |     "\U000024C2-\U0001F251"
+105 105 |     "\u200d"  # zero width joiner
+106 106 |     "\u200c"  # zero width non-joiner
+
+RUF039_concat.py:104:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 |     "\U00002702-\U000027B0"
+104 |     "\U000024C2-\U0001F251"
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ RUF039
+105 |     "\u200d"  # zero width joiner
+106 |     "\u200c"  # zero width non-joiner
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+101 101 |     "\U0001F680-\U0001F6FF"  # transport & map symbols
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 103 |     "\U00002702-\U000027B0"
+104     |-    "\U000024C2-\U0001F251"
+    104 |+    r"\U000024C2-\U0001F251"
+105 105 |     "\u200d"  # zero width joiner
+106 106 |     "\u200c"  # zero width non-joiner
+107 107 |     "\\u200c" # must not be escaped in a raw string
+
+RUF039_concat.py:105:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+103 |     "\U00002702-\U000027B0"
+104 |     "\U000024C2-\U0001F251"
+105 |     "\u200d"  # zero width joiner
+    |     ^^^^^^^^ RUF039
+106 |     "\u200c"  # zero width non-joiner
+107 |     "\\u200c" # must not be escaped in a raw string
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+102 102 |     "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+103 103 |     "\U00002702-\U000027B0"
+104 104 |     "\U000024C2-\U0001F251"
+105     |-    "\u200d"  # zero width joiner
+    105 |+    r"\u200d"  # zero width joiner
+106 106 |     "\u200c"  # zero width non-joiner
+107 107 |     "\\u200c" # must not be escaped in a raw string
+108 108 |     "]+",
+
+RUF039_concat.py:106:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+104 |     "\U000024C2-\U0001F251"
+105 |     "\u200d"  # zero width joiner
+106 |     "\u200c"  # zero width non-joiner
+    |     ^^^^^^^^ RUF039
+107 |     "\\u200c" # must not be escaped in a raw string
+108 |     "]+",
+    |
+    = help: Replace with raw string
+
+ℹ Unsafe fix
+103 103 |     "\U00002702-\U000027B0"
+104 104 |     "\U000024C2-\U0001F251"
+105 105 |     "\u200d"  # zero width joiner
+106     |-    "\u200c"  # zero width non-joiner
+    106 |+    r"\u200c"  # zero width non-joiner
+107 107 |     "\\u200c" # must not be escaped in a raw string
+108 108 |     "]+",
+109 109 |     flags=re.UNICODE,
+
+RUF039_concat.py:107:5: RUF039 First argument to `re.compile()` is not raw string
+    |
+105 |     "\u200d"  # zero width joiner
+106 |     "\u200c"  # zero width non-joiner
+107 |     "\\u200c" # must not be escaped in a raw string
+    |     ^^^^^^^^^ RUF039
+108 |     "]+",
+109 |     flags=re.UNICODE,
+    |
+    = help: Replace with raw string
+
+RUF039_concat.py:108:5: RUF039 [*] First argument to `re.compile()` is not raw string
+    |
+106 |     "\u200c"  # zero width non-joiner
+107 |     "\\u200c" # must not be escaped in a raw string
+108 |     "]+",
+    |     ^^^^ RUF039
+109 |     flags=re.UNICODE,
+110 | )
+    |
+    = help: Replace with raw string
+
+ℹ Safe fix
+105 105 |     "\u200d"  # zero width joiner
+106 106 |     "\u200c"  # zero width non-joiner
+107 107 |     "\\u200c" # must not be escaped in a raw string
+108     |-    "]+",
+    108 |+    r"]+",
+109 109 |     flags=re.UNICODE,
+110 110 | )

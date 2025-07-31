@@ -1,5 +1,4 @@
-"""
-Manage shelves of pickled objects.
+"""Manage shelves of pickled objects.
 
 A "shelf" is a persistent, dictionary-like object.  The difference
 with dbm databases is that the values (not the keys!) in a shelf can

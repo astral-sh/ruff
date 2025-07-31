@@ -2422,7 +2422,7 @@ requires-python = ">= 3.11"
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -2734,7 +2734,7 @@ requires-python = ">= 3.11"
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3098,7 +3098,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3478,7 +3478,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3806,7 +3806,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4134,7 +4134,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.9
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4419,7 +4419,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.9
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4757,7 +4757,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 

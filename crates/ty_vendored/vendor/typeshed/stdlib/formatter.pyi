@@ -1,5 +1,4 @@
-"""
-Generic output formatting.
+"""Generic output formatting.
 
 Formatter objects transform an abstract flow of formatting events into
 specific output events on writer objects. Formatters manage several stack
@@ -35,6 +34,7 @@ class NullFormatter:
 
     Implementations should inherit from this class if implementing a writer
     interface but don't need to inherit any implementation.
+
     """
 
     writer: NullWriter | None
@@ -63,6 +63,7 @@ class AbstractFormatter:
     This implementation has demonstrated wide applicability to many writers,
     and may be used directly in most circumstances.  It has been used to
     implement a full-featured World Wide Web browser.
+
     """
 
     writer: NullWriter
@@ -106,6 +107,7 @@ class NullWriter:
     A writer which only provides the interface definition; no actions are
     taken on any methods.  This should be the base class for all writers
     which do not need to inherit any implementation methods.
+
     """
 
     def flush(self) -> None: ...
@@ -126,6 +128,7 @@ class AbstractWriter(NullWriter):
 
     Each method simply announces itself by printing its name and
     arguments on standard output.
+
     """
 
 class DumbWriter(NullWriter):
@@ -134,6 +137,7 @@ class DumbWriter(NullWriter):
     output is simply word-wrapped to the number of columns specified by
     the maxcol parameter.  This class is suitable for reflowing a sequence
     of paragraphs.
+
     """
 
     file: IO[str]

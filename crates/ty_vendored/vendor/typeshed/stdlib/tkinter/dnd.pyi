@@ -1,5 +1,4 @@
-"""
-Drag-and-drop support for Tkinter.
+"""Drag-and-drop support for Tkinter.
 
 This is very preliminary.  I currently only support dnd *within* one
 application, between different windows (or within the same window).
@@ -97,6 +96,7 @@ At any time during a dnd sequence, the application can cancel the
 sequence by calling the cancel() method on the object returned by
 dnd_start().  This will call dnd_leave() if a target is currently
 active; it will never call dnd_commit().
+
 """
 
 from tkinter import Event, Misc, Tk, Widget

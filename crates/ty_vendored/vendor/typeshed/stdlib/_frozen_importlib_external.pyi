@@ -1,10 +1,10 @@
-"""
-Core implementation of path-based import.
+"""Core implementation of path-based import.
 
 This module is NOT meant to be directly imported! It has been designed such
 that it can be bootstrapped into Python as the implementation of import. As
 such it requires the injection of specific modules and attributes in order to
 work. One should use importlib as the public-facing version of this module.
+
 """
 
 import _ast
@@ -51,6 +51,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None, *, opti
     while a False value is equivalent to setting 'optimization' to '1'.
 
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
+
     """
 
 def source_from_cache(path: StrPath) -> str:
@@ -60,6 +61,7 @@ def source_from_cache(path: StrPath) -> str:
     the .py file calculated to correspond to the .pyc file.  If path does
     not conform to PEP 3147/488 format, ValueError will be raised. If
     sys.implementation.cache_tag is None then NotImplementedError is raised.
+
     """
 
 def decode_source(source_bytes: ReadableBuffer) -> str:
@@ -83,6 +85,7 @@ def spec_from_file_location(
     import system.
 
     The loader must take a spec as its only __init__() arg.
+
     """
 
 @deprecated(
@@ -94,7 +97,12 @@ class WindowsRegistryFinder(importlib.abc.MetaPathFinder):
 
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """Find module named in the registry.
+
+            This method is deprecated.  Use find_spec() instead.
+
+            """
 
     @classmethod
     def find_spec(
@@ -114,12 +122,13 @@ class PathFinder(importlib.abc.MetaPathFinder):
         @classmethod
         def invalidate_caches(cls) -> None:
             """Call the invalidate_caches() method on all path entry finders
-            stored in sys.path_importer_cache (where implemented).
+            stored in sys.path_importer_caches (where implemented).
             """
     if sys.version_info >= (3, 10):
         @staticmethod
         def find_distributions(context: DistributionFinder.Context = ...) -> Iterable[PathDistribution]:
-            """Find distributions.
+            """
+            Find distributions.
 
             Return an iterable of all Distribution instances capable of
             loading the metadata for packages matching ``context.name``
@@ -129,7 +138,8 @@ class PathFinder(importlib.abc.MetaPathFinder):
     else:
         @classmethod
         def find_distributions(cls, context: DistributionFinder.Context = ...) -> Iterable[PathDistribution]:
-            """Find distributions.
+            """
+            Find distributions.
 
             Return an iterable of all Distribution instances capable of
             loading the metadata for packages matching ``context.name``
@@ -147,7 +157,13 @@ class PathFinder(importlib.abc.MetaPathFinder):
         """
     if sys.version_info < (3, 12):
         @classmethod
-        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None: ...
+        def find_module(cls, fullname: str, path: Sequence[str] | None = None) -> importlib.abc.Loader | None:
+            """find the module on sys.path or 'path' based on sys.path_hooks and
+            sys.path_importer_cache.
+
+            This method is deprecated.  Use find_spec() instead.
+
+            """
 
 SOURCE_SUFFIXES: list[str]
 DEBUG_BYTECODE_SUFFIXES: list[str]
@@ -160,6 +176,7 @@ class FileFinder(importlib.abc.PathEntryFinder):
 
     Interactions with the file system are cached for performance, being
     refreshed when the directory the finder is handling has been modified.
+
     """
 
     path: str
@@ -179,6 +196,7 @@ class FileFinder(importlib.abc.PathEntryFinder):
 
         If the path called on the closure is not a directory, ImportError is
         raised.
+
         """
 
 class _LoaderBasics:
@@ -243,6 +261,7 @@ class SourceLoader(_LoaderBasics):
 
         Reading of bytecode requires path_stats to be implemented. To write
         bytecode, set_data must also be implemented.
+
         """
 
 class FileLoader:
@@ -267,6 +286,7 @@ class FileLoader:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.
+
         """
     if sys.version_info >= (3, 10):
         def get_resource_reader(self, name: str | None = None) -> importlib.readers.FileReader: ...
@@ -309,6 +329,7 @@ class ExtensionFileLoader(FileLoader, _LoaderBasics, importlib.abc.ExecutionLoad
     """Loader for extension modules.
 
     The constructor is designed to work with FileFinder.
+
     """
 
     def __init__(self, name: str, path: str) -> None: ...
@@ -347,6 +368,7 @@ if sys.version_info >= (3, 11):
             """Load a namespace module.
 
             This method is deprecated.  Use exec_module() instead.
+
             """
 
         def get_resource_reader(self, module: types.ModuleType) -> importlib.readers.NamespaceReader: ...
@@ -357,6 +379,7 @@ if sys.version_info >= (3, 11):
                 """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
+
                 """
 
     _NamespaceLoader = NamespaceLoader
@@ -377,6 +400,7 @@ else:
             """Load a namespace module.
 
             This method is deprecated.  Use exec_module() instead.
+
             """
         if sys.version_info >= (3, 10):
             @staticmethod
@@ -385,6 +409,7 @@ else:
                 """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
+
                 """
 
             def get_resource_reader(self, module: types.ModuleType) -> importlib.readers.NamespaceReader: ...
@@ -395,6 +420,7 @@ else:
                 """Return repr for the module.
 
                 The method is deprecated.  The import machinery does the job itself.
+
                 """
 
 if sys.version_info >= (3, 13):

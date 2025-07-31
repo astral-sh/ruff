@@ -1,5 +1,4 @@
-"""
-Word completion for GNU readline.
+"""Word completion for GNU readline.
 
 The completer completes keywords, built-ins and globals in a selectable
 namespace (which defaults to __main__); when completing NAME.NAME..., it
@@ -27,6 +26,7 @@ Notes:
 
 - When the original stdin is not a tty device, GNU readline is never
   used, and this module (and the readline module) are silently inactive.
+
 """
 
 from typing import Any
@@ -54,6 +54,7 @@ class Completer:
 
         This is called successively with state == 0, 1, 2, ... until it
         returns None.  The completion should begin with 'text'.
+
         """
 
     def attr_matches(self, text: str) -> list[str]:
@@ -66,6 +67,7 @@ class Completer:
 
         WARNING: this can still invoke arbitrary C code, if an object
         with a __getattr__ hook is evaluated.
+
         """
 
     def global_matches(self, text: str) -> list[str]:
@@ -73,4 +75,5 @@ class Completer:
 
         Return a list of all keywords, built-in functions and names currently
         defined in self.namespace that match.
+
         """

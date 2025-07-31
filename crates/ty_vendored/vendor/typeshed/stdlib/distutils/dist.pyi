@@ -1,5 +1,4 @@
-"""
-distutils.dist
+"""distutils.dist
 
 Provides the Distribution class, which represents the module distribution
 being built/installed/distributed.

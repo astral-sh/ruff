@@ -1,5 +1,4 @@
-"""
-Generate Python documentation in HTML or text for interactive use.
+"""Generate Python documentation in HTML or text for interactive use.
 
 At the Python interactive prompt, calling help(thing) on a Python object
 documents the object, and calling help() starts up an interactive

@@ -1,6 +1,4 @@
-"""
-Base classes for server/gateway implementations
-"""
+"""Base classes for server/gateway implementations"""
 
 from _typeshed import OptExcInfo
 from _typeshed.wsgi import ErrorStream, InputStream, StartResponse, WSGIApplication, WSGIEnvironment

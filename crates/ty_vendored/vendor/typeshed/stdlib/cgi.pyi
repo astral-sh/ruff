@@ -1,5 +1,4 @@
-"""
-Support module for CGI (Common Gateway Interface) scripts.
+"""Support module for CGI (Common Gateway Interface) scripts.
 
 This module defines a number of utilities for use by CGI scripts
 written in Python.
@@ -15,7 +14,7 @@ from builtins import list as _list, type as _type
 from collections.abc import Iterable, Iterator, Mapping
 from email.message import Message
 from types import TracebackType
-from typing import IO, Any, Protocol
+from typing import IO, Any, Protocol, type_check_only
 from typing_extensions import Self
 
 __all__ = [
@@ -79,6 +78,7 @@ def parse_multipart(
     is a list of strings.
     """
 
+@type_check_only
 class _Environ(Protocol):
     def __getitem__(self, k: str, /) -> str: ...
     def keys(self) -> Iterable[str]: ...
@@ -87,6 +87,7 @@ def parse_header(line: str) -> tuple[str, dict[str, str]]:
     """Parse a Content-type like header.
 
     Return the main content-type and a dictionary of options.
+
     """
 
 def test(environ: _Environ = ...) -> None:
@@ -94,6 +95,7 @@ def test(environ: _Environ = ...) -> None:
 
     Write minimal HTTP headers and dump all information provided to
     the script in HTML form.
+
     """
 
 def print_environ(environ: _Environ = ...) -> None:
@@ -165,6 +167,7 @@ class FieldStorage:
     a file open for reading and writing.  This makes it possible to
     override the default choice of storing all files in a temporary
     directory and unlinking them as soon as they have been opened.
+
     """
 
     FieldStorageClass: _type | None
@@ -244,6 +247,7 @@ class FieldStorage:
 
         max_num_fields: int. If set, then __init__ throws a ValueError
             if there are more than n fields read by parse_qsl().
+
         """
 
     def __enter__(self) -> Self: ...
@@ -295,6 +299,7 @@ class FieldStorage:
         that is nevertheless automatically deleted when the script
         terminates, try defining a __del__ method in a derived class
         which unlinks the temporary files you have created.
+
         """
 
 def print_exception(

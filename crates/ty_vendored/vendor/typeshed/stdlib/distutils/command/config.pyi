@@ -1,5 +1,4 @@
-"""
-distutils.command.config
+"""distutils.command.config
 
 Implements the Distutils 'config' command, a (mostly) empty command class
 that exists mainly to be sub-classed by specific module distributions and

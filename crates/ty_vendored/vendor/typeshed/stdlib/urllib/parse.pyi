@@ -1,5 +1,4 @@
-"""
-Parse (absolute and relative) URLs.
+"""Parse (absolute and relative) URLs.
 
 urlparse module is based upon the following RFC specifications.
 
@@ -103,7 +102,8 @@ class _NetlocResultMixinStr(_NetlocResultMixinBase[str], _ResultMixinStr): ...
 class _NetlocResultMixinBytes(_NetlocResultMixinBase[bytes], _ResultMixinBytes): ...
 
 class _DefragResultBase(NamedTuple, Generic[AnyStr]):
-    """DefragResult(url, fragment)
+    """
+    DefragResult(url, fragment)
 
     A 2-tuple that contains the url without fragment identifier and the fragment
     identifier as a separate argument.
@@ -113,7 +113,8 @@ class _DefragResultBase(NamedTuple, Generic[AnyStr]):
     fragment: AnyStr
 
 class _SplitResultBase(NamedTuple, Generic[AnyStr]):
-    """SplitResult(scheme, netloc, path, query, fragment)
+    """
+    SplitResult(scheme, netloc, path, query, fragment)
 
     A 5-tuple that contains the different components of a URL. Similar to
     ParseResult, but does not split params.
@@ -126,7 +127,8 @@ class _SplitResultBase(NamedTuple, Generic[AnyStr]):
     fragment: AnyStr
 
 class _ParseResultBase(NamedTuple, Generic[AnyStr]):
-    """ParseResult(scheme, netloc, path, params, query, fragment)
+    """
+    ParseResult(scheme, netloc, path, params, query, fragment)
 
     A 6-tuple that contains components of a parsed URL.
     """
@@ -421,15 +423,51 @@ def urlsplit(url: str, scheme: str = "", allow_fragments: bool = True) -> SplitR
 
 if sys.version_info >= (3, 11):
     @overload
-    def urlsplit(
-        url: bytes | None, scheme: bytes | None | Literal[""] = "", allow_fragments: bool = True
-    ) -> SplitResultBytes: ...
+    def urlsplit(url: bytes | None, scheme: bytes | None | Literal[""] = "", allow_fragments: bool = True) -> SplitResultBytes:
+        """Parse a URL into 5 components:
+        <scheme>://<netloc>/<path>?<query>#<fragment>
+
+        The result is a named 5-tuple with fields corresponding to the
+        above. It is either a SplitResult or SplitResultBytes object,
+        depending on the type of the url parameter.
+
+        The username, password, hostname, and port sub-components of netloc
+        can also be accessed as attributes of the returned object.
+
+        The scheme argument provides the default value of the scheme
+        component when no scheme is found in url.
+
+        If allow_fragments is False, no attempt is made to separate the
+        fragment component from the previous component, which can be either
+        path or query.
+
+        Note that % escapes are not expanded.
+        """
 
 else:
     @overload
     def urlsplit(
         url: bytes | bytearray | None, scheme: bytes | bytearray | None | Literal[""] = "", allow_fragments: bool = True
-    ) -> SplitResultBytes: ...
+    ) -> SplitResultBytes:
+        """Parse a URL into 5 components:
+        <scheme>://<netloc>/<path>?<query>#<fragment>
+
+        The result is a named 5-tuple with fields corresponding to the
+        above. It is either a SplitResult or SplitResultBytes object,
+        depending on the type of the url parameter.
+
+        The username, password, hostname, and port sub-components of netloc
+        can also be accessed as attributes of the returned object.
+
+        The scheme argument provides the default value of the scheme
+        component when no scheme is found in url.
+
+        If allow_fragments is False, no attempt is made to separate the
+        fragment component from the previous component, which can be either
+        path or query.
+
+        Note that % escapes are not expanded.
+        """
 
 # Requires an iterable of length 6
 @overload

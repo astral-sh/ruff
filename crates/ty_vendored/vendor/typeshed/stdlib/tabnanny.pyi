@@ -1,5 +1,4 @@
-"""
-The Tab Nanny despises ambiguous indentation.  She knows no mercy.
+"""The Tab Nanny despises ambiguous indentation.  She knows no mercy.
 
 tabnanny -- Detection of ambiguous indentation
 
@@ -20,7 +19,8 @@ verbose: int
 filename_only: int
 
 class NannyNag(Exception):
-    """Raised by process_tokens() if detecting an ambiguous indent.
+    """
+    Raised by process_tokens() if detecting an ambiguous indent.
     Captured and handled in check().
     """
 

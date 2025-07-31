@@ -1,5 +1,4 @@
-"""
-Fixer for generator.throw(E, V, T).
+"""Fixer for generator.throw(E, V, T).
 
 g.throw(E)       -> g.throw(E)
 g.throw(E, V)    -> g.throw(E(V))

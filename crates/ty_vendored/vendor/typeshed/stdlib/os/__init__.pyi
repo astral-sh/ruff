@@ -1,5 +1,4 @@
-"""
-OS routines for NT or Posix depending on what system we're on.
+"""OS routines for NT or Posix depending on what system we're on.
 
 This exports:
   - all functions from posix or nt, e.g. unlink, stat, etc.
@@ -886,14 +885,20 @@ In the future, this property will contain the last metadata change time."""
         """time of last change in nanoseconds"""
     if sys.platform == "win32":
         @property
-        def st_file_attributes(self) -> int: ...
+        def st_file_attributes(self) -> int:
+            """Windows file attribute bits"""
+
         @property
-        def st_reparse_tag(self) -> int: ...
+        def st_reparse_tag(self) -> int:
+            """Windows reparse tag"""
         if sys.version_info >= (3, 12):
             @property
-            def st_birthtime(self) -> float: ...  # time of file creation in seconds
+            def st_birthtime(self) -> float:  # time of file creation in seconds
+                """time of creation"""
+
             @property
-            def st_birthtime_ns(self) -> int: ...  # time of file creation in nanoseconds
+            def st_birthtime_ns(self) -> int:  # time of file creation in nanoseconds
+                """time of creation in nanoseconds"""
     else:
         @property
         def st_blocks(self) -> int:  # number of blocks allocated for file
@@ -911,12 +916,16 @@ In the future, this property will contain the last metadata change time."""
             # On other Unix systems (such as FreeBSD), the following attributes may be
             # available (but may be only filled out if root tries to use them):
             @property
-            def st_gen(self) -> int: ...  # file generation number
+            def st_gen(self) -> int:  # file generation number
+                """generation number"""
+
             @property
-            def st_birthtime(self) -> float: ...  # time of file creation in seconds
+            def st_birthtime(self) -> float:  # time of file creation in seconds
+                """time of creation"""
     if sys.platform == "darwin":
         @property
-        def st_flags(self) -> int: ...  # user defined flags for file
+        def st_flags(self) -> int:  # user defined flags for file
+            """user defined flags for file"""
     # Attributes documented as sometimes appearing, but deliberately omitted from the stub: `st_creator`, `st_rsize`, `st_type`.
     # See https://github.com/python/typeshed/pull/6560#issuecomment-991253327
 
@@ -935,17 +944,17 @@ class PathLike(ABC, Protocol[AnyStr_co]):  # type: ignore[misc]  # pyright: igno
 def listdir(path: StrPath | None = None) -> list[str]:
     """Return a list containing the names of the files in the directory.
 
-    path can be specified as either str, bytes, or a path-like object.  If path is bytes,
-      the filenames returned will also be bytes; in all other circumstances
-      the filenames returned will be str.
-    If path is None, uses the path='.'.
-    On some platforms, path may also be specified as an open file descriptor;\\
-      the file descriptor must refer to a directory.
-      If this functionality is unavailable, using it raises NotImplementedError.
+path can be specified as either str, bytes, or a path-like object.  If path is bytes,
+  the filenames returned will also be bytes; in all other circumstances
+  the filenames returned will be str.
+If path is None, uses the path='.'.
+On some platforms, path may also be specified as an open file descriptor;\\
+  the file descriptor must refer to a directory.
+  If this functionality is unavailable, using it raises NotImplementedError.
 
-    The list is in arbitrary order.  It does not include the special
-    entries '.' and '..' even if they are present in the directory.
-    """
+The list is in arbitrary order.  It does not include the special
+entries '.' and '..' even if they are present in the directory.
+"""
 
 @overload
 def listdir(path: BytesPath) -> list[bytes]: ...
@@ -1718,7 +1727,7 @@ def chdir(path: FileDescriptorOrPath) -> None:
 
     path may always be specified as a string.
     On some platforms, path may also be specified as an open file descriptor.
-      If this functionality is unavailable, using it raises an exception.
+    If this functionality is unavailable, using it raises an exception.
     """
 
 if sys.platform != "win32":
@@ -1787,30 +1796,30 @@ if sys.platform != "win32":
     def chown(path: FileDescriptorOrPath, uid: int, gid: int, *, dir_fd: int | None = None, follow_symlinks: bool = True) -> None:
         """Change the owner and group id of path to the numeric uid and gid.\\
 
-          path
-            Path to be examined; can be string, bytes, a path-like object, or open-file-descriptor int.
-          dir_fd
-            If not None, it should be a file descriptor open to a directory,
-            and path should be relative; path will then be relative to that
-            directory.
-          follow_symlinks
-            If False, and the last element of the path is a symbolic link,
-            stat will examine the symbolic link itself instead of the file
-            the link points to.
+  path
+    Path to be examined; can be string, bytes, a path-like object, or open-file-descriptor int.
+  dir_fd
+    If not None, it should be a file descriptor open to a directory,
+    and path should be relative; path will then be relative to that
+    directory.
+  follow_symlinks
+    If False, and the last element of the path is a symbolic link,
+    stat will examine the symbolic link itself instead of the file
+    the link points to.
 
-        path may always be specified as a string.
-        On some platforms, path may also be specified as an open file descriptor.
-          If this functionality is unavailable, using it raises an exception.
-        If dir_fd is not None, it should be a file descriptor open to a directory,
-          and path should be relative; path will then be relative to that directory.
-        If follow_symlinks is False, and the last element of the path is a symbolic
-          link, chown will modify the symbolic link itself instead of the file the
-          link points to.
-        It is an error to use dir_fd or follow_symlinks when specifying path as
-          an open file descriptor.
-        dir_fd and follow_symlinks may not be implemented on your platform.
-          If they are unavailable, using them will raise a NotImplementedError.
-        """
+path may always be specified as a string.
+On some platforms, path may also be specified as an open file descriptor.
+  If this functionality is unavailable, using it raises an exception.
+If dir_fd is not None, it should be a file descriptor open to a directory,
+  and path should be relative; path will then be relative to that directory.
+If follow_symlinks is False, and the last element of the path is a symbolic
+  link, chown will modify the symbolic link itself instead of the file the
+  link points to.
+It is an error to use dir_fd or follow_symlinks when specifying path as
+  an open file descriptor.
+dir_fd and follow_symlinks may not be implemented on your platform.
+  If they are unavailable, using them will raise a NotImplementedError.
+"""
 
     def lchown(path: StrOrBytesPath, uid: int, gid: int) -> None:
         """Change the owner and group id of path to the numeric uid and gid.
@@ -1877,6 +1886,7 @@ def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) ->
     will be created if it does not exist. If the target directory already
     exists, raise an OSError if exist_ok is False. Otherwise no exception is
     raised.  This is recursive.
+
     """
 
 if sys.platform != "win32":
@@ -1941,6 +1951,7 @@ def removedirs(name: StrOrBytesPath) -> None:
     segments will be pruned away until either the whole path is
     consumed or an error occurs.  Errors during this latter phase are
     ignored -- they generally mean that a directory was not empty.
+
     """
 
 def rename(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
@@ -1966,6 +1977,7 @@ def renames(old: StrOrBytesPath, new: StrOrBytesPath) -> None:
     Note: this function can fail with the new directory structure made
     if you lack permissions needed to unlink the leaf directory or
     file.
+
     """
 
 def replace(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
@@ -2172,6 +2184,7 @@ def walk(
         print("bytes in", len(files), "non-directory files")
         if '__pycache__' in dirs:
             dirs.remove('__pycache__')  # don't visit __pycache__ directories
+
     """
 
 if sys.platform != "win32":
@@ -2887,7 +2900,8 @@ if sys.version_info >= (3, 13):
     # available. See https://github.com/python/cpython/blob/417c130/Lib/os.py#L1175-L1186.
     if sys.platform != "win32" and sys.platform != "darwin":
         def process_cpu_count() -> int:
-            """Get the number of CPUs of the current process.
+            """
+            Get the number of CPUs of the current process.
 
             Return the number of logical CPUs usable by the calling thread of the
             current process. Return None if indeterminable.

@@ -1,5 +1,4 @@
-"""
-Locale support module.
+"""Locale support module.
 
 The module provides low-level access to the C lib's locale APIs and adds high
 level number formatting APIs as well as a locale aliasing engine to complement
@@ -8,6 +7,7 @@ these.
 The aliasing engine includes support for many commonly used locale names and
 maps them to values suitable for passing to the C lib's setlocale() function. It
 also includes default encodings for all supported locale names.
+
 """
 
 import sys
@@ -160,6 +160,7 @@ def getdefaultlocale(envvars: tuple[_str, ...] = ("LC_ALL", "LC_CTYPE", "LANG", 
     Except for the code 'C', the language code corresponds to RFC
     1766.  code and encoding can be None in case the values cannot
     be determined.
+
     """
 
 def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
@@ -172,6 +173,7 @@ def getlocale(category: int = ...) -> tuple[_str | None, _str | None]:
     Except for the code 'C', the language code corresponds to RFC
     1766.  code and encoding can be None in case the values cannot
     be determined.
+
     """
 
 def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None) -> _str:
@@ -183,6 +185,7 @@ def setlocale(category: int, locale: _str | Iterable[_str | None] | None = None)
     engine.  Locale strings are passed directly to the C lib.
 
     category may be given as one of the LC_* values.
+
     """
 
 def getpreferredencoding(do_setlocale: bool = True) -> _str:
@@ -203,6 +206,7 @@ def normalize(localename: _str) -> _str:
     If the given encoding is not known, the function defaults to
     the default encoding for the locale code just like setlocale()
     does.
+
     """
 
 if sys.version_info < (3, 13):
@@ -211,6 +215,7 @@ if sys.version_info < (3, 13):
 
         The default setting is determined by calling
         getdefaultlocale(). category defaults to LC_ALL.
+
         """
 
 if sys.version_info < (3, 12):

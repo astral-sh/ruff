@@ -1,5 +1,4 @@
-"""
-Temporary files.
+"""Temporary files.
 
 This module provides generic, low- and high-level interfaces for
 creating temporary files and directories.  All of the interfaces
@@ -41,7 +40,7 @@ from _typeshed import (
 from collections.abc import Iterable, Iterator
 from types import GenericAlias, TracebackType
 from typing import IO, Any, AnyStr, Generic, Literal, overload
-from typing_extensions import Self
+from typing_extensions import Self, deprecated
 
 __all__ = [
     "NamedTemporaryFile",
@@ -314,7 +313,9 @@ class _TemporaryFileWrapper(IO[AnyStr]):
     def __exit__(self, exc: type[BaseException] | None, value: BaseException | None, tb: TracebackType | None) -> None: ...
     def __getattr__(self, name: str) -> Any: ...
     def close(self) -> None:
-        """Close the temporary file, possibly deleting it."""
+        """
+        Close the temporary file, possibly deleting it.
+        """
     # These methods don't exist directly on this object, but
     # are delegated to the underlying IO object through __getattr__.
     # We need to add them here so that this class is concrete.
@@ -636,6 +637,7 @@ def mkdtemp(suffix: str | None = None, prefix: str | None = None, dir: StrPath |
 
 @overload
 def mkdtemp(suffix: bytes | None = None, prefix: bytes | None = None, dir: BytesPath | None = None) -> bytes: ...
+@deprecated("Deprecated since Python 2.3. Use `mkstemp()` or `NamedTemporaryFile(delete=False)` instead.")
 def mktemp(suffix: str = "", prefix: str = "tmp", dir: StrPath | None = None) -> str:
     """User-callable function to return a unique temporary file name.  The
     file is not created.

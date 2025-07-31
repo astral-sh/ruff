@@ -1,5 +1,4 @@
-"""
-This module provides socket operations and some related functions.
+"""This module provides socket operations and some related functions.
 On Unix, it supports IP (Internet Protocol) and Unix domain sockets.
 On other systems, it only supports IP. Functions specific for a
 socket are available as methods of the socket object.
@@ -184,7 +183,7 @@ from _typeshed import ReadableBuffer, Unused, WriteableBuffer
 from collections.abc import Iterable
 from enum import IntEnum, IntFlag
 from io import BufferedReader, BufferedRWPair, BufferedWriter, IOBase, RawIOBase, TextIOWrapper
-from typing import Any, Literal, Protocol, SupportsIndex, overload
+from typing import Any, Literal, Protocol, SupportsIndex, overload, type_check_only
 from typing_extensions import Self
 
 __all__ = [
@@ -1346,6 +1345,7 @@ if sys.platform != "win32" and sys.platform != "linux":
 if sys.platform == "win32":
     errorTab: dict[int, str]  # undocumented
 
+@type_check_only
 class _SendableFile(Protocol):
     def read(self, size: int, /) -> bytes: ...
     def seek(self, offset: int, /) -> object: ...

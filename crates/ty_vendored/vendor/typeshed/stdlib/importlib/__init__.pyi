@@ -1,6 +1,4 @@
-"""
-A pure Python implementation of import.
-"""
+"""A pure Python implementation of import."""
 
 import sys
 from importlib._bootstrap import __import__ as __import__
@@ -16,6 +14,7 @@ def import_module(name: str, package: str | None = None) -> ModuleType:
     The 'package' argument is required when performing a relative import. It
     specifies the package to use as the anchor point from which to resolve the
     relative import to an absolute import.
+
     """
 
 if sys.version_info < (3, 12):
@@ -25,6 +24,7 @@ if sys.version_info < (3, 12):
         This is a backward-compatible wrapper around find_spec().
 
         This function is deprecated in favor of importlib.util.find_spec().
+
         """
 
 def invalidate_caches() -> None:
@@ -36,4 +36,5 @@ def reload(module: ModuleType) -> ModuleType:
     """Reload the module and return it.
 
     The module must have been successfully imported before.
+
     """

@@ -1,5 +1,4 @@
-"""
-This module provides access to the garbage collector for reference cycles.
+"""This module provides access to the garbage collector for reference cycles.
 
 enable() -- Enable automatic garbage collection.
 disable() -- Disable automatic garbage collection.

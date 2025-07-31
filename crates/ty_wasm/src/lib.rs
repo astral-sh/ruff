@@ -3,23 +3,27 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
-use ruff_db::source::{line_index, source_text};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
-use ty_ide::signature_help;
-use ty_ide::{MarkupKind, goto_type_definition, hover, inlay_hints};
-use ty_project::ProjectMetadata;
+use ty_ide::{
+    MarkupKind, RangedValue, document_highlights, goto_declaration, goto_definition,
+    goto_references, goto_type_definition, hover, inlay_hints,
+};
+use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
@@ -32,9 +36,30 @@ pub fn version() -> String {
         .to_string()
 }
 
+/// Perform global constructor initialization.
+#[cfg(target_family = "wasm")]
+#[expect(unsafe_code)]
+pub fn before_main() {
+    unsafe extern "C" {
+        fn __wasm_call_ctors();
+    }
+
+    // Salsa uses the `inventory` crate, which registers global constructors that may need to be
+    // called explicitly on WASM. See <https://github.com/dtolnay/inventory/blob/master/src/lib.rs#L105>
+    // for details.
+    unsafe {
+        __wasm_call_ctors();
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub fn before_main() {}
+
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    before_main();
 
     ruff_db::set_program_version(version()).unwrap();
 
@@ -76,7 +101,11 @@ impl Workspace {
         let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
             .map_err(into_error)?;
 
-        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+        let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
+
+        // By default, it will check all files in the project but we only want to check the open
+        // files in the playground.
+        db.set_check_mode(CheckMode::OpenFiles);
 
         Ok(Self {
             db,
@@ -131,28 +160,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: path.into(),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -171,18 +207,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -242,32 +282,100 @@ impl Workspace {
             return Ok(Vec::new());
         };
 
-        let source_range = Range::from_text_range(
-            targets.file_range().range(),
-            &index,
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
             &source,
+            &index,
             self.position_encoding,
-        );
+        ))
+    }
 
-        let links: Vec<_> = targets
+    #[wasm_bindgen(js_name = "gotoDeclaration")]
+    pub fn goto_declaration(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_declaration(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoDefinition")]
+    pub fn goto_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(map_targets_to_links(
+            &self.db,
+            targets,
+            &source,
+            &index,
+            self.position_encoding,
+        ))
+    }
+
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
             .into_iter()
             .map(|target| LocationLink {
                 path: target.file().path(&self.db).to_string(),
                 full_range: Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.full_range()),
+                    target.file_range(),
                     self.position_encoding,
                 ),
                 selection_range: Some(Range::from_file_range(
                     &self.db,
-                    FileRange::new(target.file(), target.focus_range()),
+                    target.file_range(),
                     self.position_encoding,
                 )),
-                origin_selection_range: Some(source_range),
+                origin_selection_range: Some(Range::from_text_range(
+                    ruff_text_size::TextRange::new(offset, offset),
+                    &index,
+                    &source,
+                    self.position_encoding,
+                )),
             })
-            .collect();
-
-        Ok(links)
+            .collect())
     }
 
     #[wasm_bindgen]
@@ -433,16 +541,93 @@ impl Workspace {
                 .and_then(|s| u32::try_from(s).ok()),
         }))
     }
+
+    #[wasm_bindgen(js_name = "documentHighlights")]
+    pub fn document_highlights(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<DocumentHighlight>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| DocumentHighlight {
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                kind: target.kind().into(),
+            })
+            .collect())
+    }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
+
+        Ok(FileHandle {
+            file,
+            path: vendored_path.to_path_buf().into(),
+        })
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
     Error::new(&err.to_string())
 }
 
+fn map_targets_to_links(
+    db: &dyn Db,
+    targets: RangedValue<NavigationTargets>,
+    source: &SourceText,
+    index: &LineIndex,
+    position_encoding: PositionEncoding,
+) -> Vec<LocationLink> {
+    let source_range = Range::from_text_range(
+        targets.file_range().range(),
+        index,
+        source,
+        position_encoding,
+    );
+
+    targets
+        .into_iter()
+        .map(|target| LocationLink {
+            path: target.file().path(db).to_string(),
+            full_range: Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.full_range()),
+                position_encoding,
+            ),
+            selection_range: Some(Range::from_file_range(
+                db,
+                FileRange::new(target.file(), target.focus_range()),
+                position_encoding,
+            )),
+            origin_selection_range: Some(source_range),
+        })
+        .collect()
+}
+
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: FilePath,
     file: File,
 }
 
@@ -824,6 +1009,33 @@ pub struct ParameterInformation {
     pub label: String,
     #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
+}
+
+#[wasm_bindgen]
+pub struct DocumentHighlight {
+    #[wasm_bindgen(readonly)]
+    pub range: Range,
+
+    #[wasm_bindgen(readonly)]
+    pub kind: DocumentHighlightKind,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum DocumentHighlightKind {
+    Text = 1,
+    Read = 2,
+    Write = 3,
+}
+
+impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
+    fn from(kind: ty_ide::ReferenceKind) -> Self {
+        match kind {
+            ty_ide::ReferenceKind::Read => DocumentHighlightKind::Read,
+            ty_ide::ReferenceKind::Write => DocumentHighlightKind::Write,
+            ty_ide::ReferenceKind::Other => DocumentHighlightKind::Text,
+        }
+    }
 }
 
 #[wasm_bindgen]

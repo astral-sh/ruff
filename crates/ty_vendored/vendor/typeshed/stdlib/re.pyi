@@ -1,5 +1,4 @@
-"""
-Support for regular expressions (RE).
+"""Support for regular expressions (RE).
 
 This module provides regular expression matching operations similar to
 those found in Perl.  It supports both 8-bit and Unicode strings; both
@@ -104,6 +103,7 @@ A, L, and U are mutually exclusive.
 
 This module also defines exception 'PatternError', aliased to 'error' for
 backward compatibility.
+
 """
 
 import enum
@@ -435,9 +435,7 @@ if sys.version_info < (3, 13):
     T: Final = RegexFlag.T
     TEMPLATE: Final = RegexFlag.TEMPLATE
 if sys.version_info >= (3, 11):
-    # pytype chokes on `NOFLAG: Final = RegexFlag.NOFLAG` with `LiteralValueError`
-    # mypy chokes on `NOFLAG: Final[Literal[RegexFlag.NOFLAG]]` with `Literal[...] is invalid`
-    NOFLAG = RegexFlag.NOFLAG
+    NOFLAG: Final = RegexFlag.NOFLAG
 _FlagsType: TypeAlias = int | RegexFlag
 
 # Type-wise the compile() overloads are unnecessary, they could also be modeled using
@@ -558,7 +556,9 @@ def subn(
     flags: _FlagsType = 0,
 ) -> tuple[bytes, int]: ...
 def escape(pattern: AnyStr) -> AnyStr:
-    """Escape special characters in a string."""
+    """
+    Escape special characters in a string.
+    """
 
 def purge() -> None:
     """Clear the regular expression caches"""

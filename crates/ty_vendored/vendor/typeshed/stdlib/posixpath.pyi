@@ -1,5 +1,4 @@
-"""
-Common operations on Posix pathnames.
+"""Common operations on Posix pathnames.
 
 Instead of importing this module directly, import os and refer to
 this module as os.path.  The "os.path" name is an alias for this

@@ -1,5 +1,4 @@
-"""
-A ScrolledText widget feels like a text widget but also has a
+"""A ScrolledText widget feels like a text widget but also has a
 vertical scroll bar on its right.  (Later, options may be added to
 add a horizontal bar as well, to make the bars disappear
 automatically when not needed, to move them to the other side of the

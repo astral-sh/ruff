@@ -1,5 +1,4 @@
-"""
-XML-RPC Servers.
+"""XML-RPC Servers.
 
 This module can be used to create simple XML-RPC servers
 by creating a server and either installing functions, a
@@ -197,6 +196,7 @@ class SimpleXMLRPCDispatcher:  # undocumented
             to access your module's global variables and may allow
             intruders to execute arbitrary code on your machine.  Only
             use this option on a secure, closed network.
+
         """
 
     def register_function(self, function: _DispatchProtocol | None = None, name: str | None = None) -> Callable[..., Any]:

@@ -1,6 +1,4 @@
-"""
-Access to Python's configuration information.
-"""
+"""Access to Python's configuration information."""
 
 import sys
 from typing import IO, Any, Literal, overload
@@ -89,6 +87,7 @@ def get_platform() -> str:
        win32 (all others - specifically, sys.platform is returned)
 
     For other non-POSIX platforms, currently just returns 'sys.platform'.
+
     """
 
 if sys.version_info >= (3, 11):

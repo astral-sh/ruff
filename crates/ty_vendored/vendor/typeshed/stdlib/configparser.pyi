@@ -1,5 +1,4 @@
-"""
-Configuration file parser.
+"""Configuration file parser.
 
 A configuration file consists of sections, lead by a "[section]" header,
 and followed by "name: value" entries, with continuations and such in
@@ -495,7 +494,8 @@ class RawConfigParser(_Parser):
         dictionary being read.
         """
     if sys.version_info < (3, 12):
-        def readfp(self, fp: Iterable[str], filename: str | None = None) -> None: ...
+        def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:
+            """Deprecated, use read_file instead."""
     # These get* methods are partially applied (with the same names) in
     # SectionProxy; the stubs should be kept updated together
     @overload
@@ -648,6 +648,7 @@ class SectionProxy(MutableMapping[str, str]):
 
         Unless `fallback` is provided, `None` will be returned if the option
         is not found.
+
         """
 
     @overload
@@ -664,17 +665,17 @@ class SectionProxy(MutableMapping[str, str]):
     # These are partially-applied version of the methods with the same names in
     # RawConfigParser; the stubs should be kept updated together
     @overload
-    def getint(self, option: str, *, raw: bool = ..., vars: _Section | None = ...) -> int | None: ...
+    def getint(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> int | None: ...
     @overload
-    def getint(self, option: str, fallback: _T = ..., *, raw: bool = ..., vars: _Section | None = ...) -> int | _T: ...
+    def getint(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> int | _T: ...
     @overload
-    def getfloat(self, option: str, *, raw: bool = ..., vars: _Section | None = ...) -> float | None: ...
+    def getfloat(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> float | None: ...
     @overload
-    def getfloat(self, option: str, fallback: _T = ..., *, raw: bool = ..., vars: _Section | None = ...) -> float | _T: ...
+    def getfloat(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> float | _T: ...
     @overload
-    def getboolean(self, option: str, *, raw: bool = ..., vars: _Section | None = ...) -> bool | None: ...
+    def getboolean(self, option: str, *, raw: bool = False, vars: _Section | None = None) -> bool | None: ...
     @overload
-    def getboolean(self, option: str, fallback: _T = ..., *, raw: bool = ..., vars: _Section | None = ...) -> bool | _T: ...
+    def getboolean(self, option: str, fallback: _T = ..., *, raw: bool = False, vars: _Section | None = None) -> bool | _T: ...
     # SectionProxy can have arbitrary attributes when custom converters are used
     def __getattr__(self, key: str) -> Callable[..., Any]: ...
 

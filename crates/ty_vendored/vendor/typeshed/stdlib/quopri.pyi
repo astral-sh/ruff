@@ -1,6 +1,4 @@
-"""
-Conversions to/from quoted-printable transport encoding as per RFC 1521.
-"""
+"""Conversions to/from quoted-printable transport encoding as per RFC 1521."""
 
 from _typeshed import ReadableBuffer, SupportsNoArgReadline, SupportsRead, SupportsWrite
 from typing import Protocol

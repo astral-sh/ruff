@@ -1,12 +1,10 @@
-"""
-Support for template string literals (t-strings).
-"""
+"""Support for template string literals (t-strings)."""
 
 from collections.abc import Iterator
 from types import GenericAlias
-from typing import Any, Literal, final
+from typing import Any, Literal, TypeVar, final, overload
 
-__all__ = ["Interpolation", "Template"]
+_T = TypeVar("_T")
 
 @final
 class Template:  # TODO: consider making `Template` generic on `TypeVarTuple`
@@ -19,7 +17,7 @@ class Template:  # TODO: consider making `Template` generic on `TypeVarTuple`
     def __iter__(self) -> Iterator[str | Interpolation]:
         """Implement iter(self)."""
 
-    def __add__(self, other: Template | str) -> Template:
+    def __add__(self, other: Template, /) -> Template:
         """Return self+value."""
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
@@ -45,3 +43,10 @@ class Interpolation:
     ) -> Interpolation: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
+
+@overload
+def convert(obj: _T, /, conversion: None) -> _T:
+    """Convert *obj* using formatted string literal semantics."""
+
+@overload
+def convert(obj: object, /, conversion: Literal["r", "s", "a"]) -> str: ...

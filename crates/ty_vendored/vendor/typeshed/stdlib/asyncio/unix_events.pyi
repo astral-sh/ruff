@@ -1,6 +1,4 @@
-"""
-Selector event loop for Unix with signal handling.
-"""
+"""Selector event loop for Unix with signal handling."""
 
 import sys
 import types
@@ -20,7 +18,7 @@ _Ts = TypeVarTuple("_Ts")
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.platform != "win32":
     if sys.version_info >= (3, 14):
-        __all__ = ("SelectorEventLoop", "_DefaultEventLoopPolicy", "EventLoop")
+        __all__ = ("SelectorEventLoop", "EventLoop")
     elif sys.version_info >= (3, 13):
         # Adds EventLoop
         __all__ = (
@@ -133,6 +131,7 @@ if sys.version_info < (3, 14):
 
                 Return True if the watcher is installed and ready to handle process exit
                 notifications.
+
                 """
 
     else:
@@ -216,6 +215,7 @@ if sys.version_info < (3, 14):
 
                 Return True if the watcher is installed and ready to handle process exit
                 notifications.
+
                 """
 
 if sys.platform != "win32":

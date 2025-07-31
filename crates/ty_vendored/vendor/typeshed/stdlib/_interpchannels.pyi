@@ -1,5 +1,4 @@
-"""
-This module provides primitive operations to manage Python interpreters.
+"""This module provides primitive operations to manage Python interpreters.
 The 'interpreters' module provides a more convenient interface.
 """
 

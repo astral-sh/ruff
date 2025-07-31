@@ -1,6 +1,4 @@
-"""
-Class representing image/* type MIME documents.
-"""
+"""Class representing image/* type MIME documents."""
 
 from collections.abc import Callable
 from email import _ParamsType

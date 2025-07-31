@@ -1,5 +1,6 @@
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
+use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
@@ -27,6 +28,8 @@ pub(crate) enum Ty {
     BytesLiteral(&'static str),
     // An enum literal variant, using `uuid.SafeUUID` as base
     EnumLiteral(&'static str),
+    // A single-member enum literal, using `dataclasses.MISSING`
+    SingleMemberEnumLiteral,
     // BuiltinInstance("str") corresponds to an instance of the builtin `str` class
     BuiltinInstance(&'static str),
     /// Members of the `abc` stdlib module
@@ -112,7 +115,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -145,6 +148,15 @@ impl Ty {
                     .expect_class_literal(),
                 Name::new(name),
             )),
+            Ty::SingleMemberEnumLiteral => {
+                let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
+                    .place
+                    .expect_type();
+                debug_assert!(
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class.class_literal(db).0))
+                );
+                ty
+            }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
@@ -265,6 +277,7 @@ fn arbitrary_core_type(g: &mut Gen, fully_static: bool) -> Ty {
         Ty::EnumLiteral("safe"),
         Ty::EnumLiteral("unsafe"),
         Ty::EnumLiteral("unknown"),
+        Ty::SingleMemberEnumLiteral,
         Ty::KnownClassInstance(KnownClass::Object),
         Ty::KnownClassInstance(KnownClass::Str),
         Ty::KnownClassInstance(KnownClass::Int),

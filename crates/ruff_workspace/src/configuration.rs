@@ -20,7 +20,7 @@ use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
-use ruff_graph::{AnalyzeSettings, Direction};
+use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
@@ -222,9 +222,14 @@ impl Configuration {
             preview: analyze_preview,
             target_version,
             extension: self.extension.clone().unwrap_or_default(),
-            detect_string_imports: analyze
-                .detect_string_imports
-                .unwrap_or(analyze_defaults.detect_string_imports),
+            string_imports: StringImports {
+                enabled: analyze
+                    .detect_string_imports
+                    .unwrap_or(analyze_defaults.string_imports.enabled),
+                min_dots: analyze
+                    .string_imports_min_dots
+                    .unwrap_or(analyze_defaults.string_imports.min_dots),
+            },
             include_dependencies: analyze
                 .include_dependencies
                 .unwrap_or(analyze_defaults.include_dependencies),
@@ -1272,6 +1277,7 @@ pub struct AnalyzeConfiguration {
 
     pub direction: Option<Direction>,
     pub detect_string_imports: Option<bool>,
+    pub string_imports_min_dots: Option<usize>,
     pub include_dependencies: Option<BTreeMap<PathBuf, (PathBuf, Vec<String>)>>,
 }
 
@@ -1290,6 +1296,7 @@ impl AnalyzeConfiguration {
             preview: options.preview.map(PreviewMode::from),
             direction: options.direction,
             detect_string_imports: options.detect_string_imports,
+            string_imports_min_dots: options.string_imports_min_dots,
             include_dependencies: options.include_dependencies.map(|dependencies| {
                 dependencies
                     .into_iter()
@@ -1308,6 +1315,9 @@ impl AnalyzeConfiguration {
             preview: self.preview.or(config.preview),
             direction: self.direction.or(config.direction),
             detect_string_imports: self.detect_string_imports.or(config.detect_string_imports),
+            string_imports_min_dots: self
+                .string_imports_min_dots
+                .or(config.string_imports_min_dots),
             include_dependencies: self.include_dependencies.or(config.include_dependencies),
         }
     }

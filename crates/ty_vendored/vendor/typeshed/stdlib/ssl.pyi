@@ -1,5 +1,4 @@
-"""
-This module provides some more Pythonic support for SSL.
+"""This module provides some more Pythonic support for SSL.
 
 Object types:
 
@@ -188,6 +187,7 @@ class SSLCertVerificationError(SSLError, ValueError):
 CertificateError = SSLCertVerificationError
 
 if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.7. Removed in Python 3.12. Use `SSLContext.wrap_socket()` instead.")
     def wrap_socket(
         sock: socket.socket,
         keyfile: StrOrBytesPath | None = None,
@@ -200,66 +200,7 @@ if sys.version_info < (3, 12):
         suppress_ragged_eofs: bool = True,
         ciphers: str | None = None,
     ) -> SSLSocket: ...
-
-def create_default_context(
-    purpose: Purpose = ...,
-    *,
-    cafile: StrOrBytesPath | None = None,
-    capath: StrOrBytesPath | None = None,
-    cadata: str | ReadableBuffer | None = None,
-) -> SSLContext:
-    """Create a SSLContext object with default settings.
-
-    NOTE: The protocol and settings may change anytime without prior
-          deprecation. The values represent a fair balance between maximum
-          compatibility and security.
-    """
-
-if sys.version_info >= (3, 10):
-    def _create_unverified_context(
-        protocol: int | None = None,
-        *,
-        cert_reqs: int = ...,
-        check_hostname: bool = False,
-        purpose: Purpose = ...,
-        certfile: StrOrBytesPath | None = None,
-        keyfile: StrOrBytesPath | None = None,
-        cafile: StrOrBytesPath | None = None,
-        capath: StrOrBytesPath | None = None,
-        cadata: str | ReadableBuffer | None = None,
-    ) -> SSLContext:
-        """Create a SSLContext object for Python stdlib modules
-
-        All Python stdlib modules shall use this function to create SSLContext
-        objects in order to keep common settings in one place. The configuration
-        is less restrict than create_default_context()'s to increase backward
-        compatibility.
-        """
-
-else:
-    def _create_unverified_context(
-        protocol: int = ...,
-        *,
-        cert_reqs: int = ...,
-        check_hostname: bool = False,
-        purpose: Purpose = ...,
-        certfile: StrOrBytesPath | None = None,
-        keyfile: StrOrBytesPath | None = None,
-        cafile: StrOrBytesPath | None = None,
-        capath: StrOrBytesPath | None = None,
-        cadata: str | ReadableBuffer | None = None,
-    ) -> SSLContext:
-        """Create a SSLContext object for Python stdlib modules
-
-        All Python stdlib modules shall use this function to create SSLContext
-        objects in order to keep common settings in one place. The configuration
-        is less restrict than create_default_context()'s to increase backward
-        compatibility.
-        """
-
-_create_default_https_context: Callable[..., SSLContext]
-
-if sys.version_info < (3, 12):
+    @deprecated("Deprecated since Python 3.7. Removed in Python 3.12.")
     def match_hostname(cert: _PeerCertRetDictType, hostname: str) -> None:
         """Verify that *cert* (in decoded format as returned by
         SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 and RFC 6125
@@ -610,7 +551,7 @@ class SSLSocket(socket.socket):
         of the peers.
         """
     if sys.version_info >= (3, 10):
-        @deprecated("Deprecated in 3.10. Use ALPN instead.")
+        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
         def selected_npn_protocol(self) -> str | None:
             """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one
@@ -693,13 +634,15 @@ class SSLContext(_SSLContext):
     if sys.version_info >= (3, 10):
         security_level: int
     if sys.version_info >= (3, 10):
-        # Using the default (None) for the `protocol` parameter is deprecated,
-        # but there isn't a good way of marking that in the stub unless/until PEP 702 is accepted
-        def __new__(cls, protocol: int | None = None, *args: Any, **kwargs: Any) -> Self: ...
+        @overload
+        def __new__(cls, protocol: int, *args: Any, **kwargs: Any) -> Self: ...
+        @overload
+        @deprecated("Deprecated since Python 3.10. Use a specific version of the SSL protocol.")
+        def __new__(cls, protocol: None = None, *args: Any, **kwargs: Any) -> Self: ...
     else:
         def __new__(cls, protocol: int = ..., *args: Any, **kwargs: Any) -> Self: ...
 
-    def load_default_certs(self, purpose: Purpose = ...) -> None: ...
+    def load_default_certs(self, purpose: Purpose = Purpose.SERVER_AUTH) -> None: ...
     def load_verify_locations(
         self,
         cafile: StrOrBytesPath | None = None,
@@ -726,7 +669,7 @@ class SSLContext(_SSLContext):
     def set_ciphers(self, cipherlist: str, /) -> None: ...
     def set_alpn_protocols(self, alpn_protocols: Iterable[str]) -> None: ...
     if sys.version_info >= (3, 10):
-        @deprecated("Deprecated in 3.10. Use ALPN instead.")
+        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
         def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
     else:
         def set_npn_protocols(self, npn_protocols: Iterable[str]) -> None: ...
@@ -751,6 +694,64 @@ class SSLContext(_SSLContext):
         server_hostname: str | bytes | None = None,
         session: SSLSession | None = None,
     ) -> SSLObject: ...
+
+def create_default_context(
+    purpose: Purpose = Purpose.SERVER_AUTH,
+    *,
+    cafile: StrOrBytesPath | None = None,
+    capath: StrOrBytesPath | None = None,
+    cadata: str | ReadableBuffer | None = None,
+) -> SSLContext:
+    """Create a SSLContext object with default settings.
+
+    NOTE: The protocol and settings may change anytime without prior
+          deprecation. The values represent a fair balance between maximum
+          compatibility and security.
+    """
+
+if sys.version_info >= (3, 10):
+    def _create_unverified_context(
+        protocol: int | None = None,
+        *,
+        cert_reqs: int = ...,
+        check_hostname: bool = False,
+        purpose: Purpose = Purpose.SERVER_AUTH,
+        certfile: StrOrBytesPath | None = None,
+        keyfile: StrOrBytesPath | None = None,
+        cafile: StrOrBytesPath | None = None,
+        capath: StrOrBytesPath | None = None,
+        cadata: str | ReadableBuffer | None = None,
+    ) -> SSLContext:
+        """Create a SSLContext object for Python stdlib modules
+
+        All Python stdlib modules shall use this function to create SSLContext
+        objects in order to keep common settings in one place. The configuration
+        is less restrict than create_default_context()'s to increase backward
+        compatibility.
+        """
+
+else:
+    def _create_unverified_context(
+        protocol: int = ...,
+        *,
+        cert_reqs: int = ...,
+        check_hostname: bool = False,
+        purpose: Purpose = Purpose.SERVER_AUTH,
+        certfile: StrOrBytesPath | None = None,
+        keyfile: StrOrBytesPath | None = None,
+        cafile: StrOrBytesPath | None = None,
+        capath: StrOrBytesPath | None = None,
+        cadata: str | ReadableBuffer | None = None,
+    ) -> SSLContext:
+        """Create a SSLContext object for Python stdlib modules
+
+        All Python stdlib modules shall use this function to create SSLContext
+        objects in order to keep common settings in one place. The configuration
+        is less restrict than create_default_context()'s to increase backward
+        compatibility.
+        """
+
+_create_default_https_context = create_default_context
 
 class SSLObject:
     """This class implements an interface on top of a low-level SSL object as
@@ -817,7 +818,7 @@ class SSLObject:
         of the peers.
         """
     if sys.version_info >= (3, 10):
-        @deprecated("Deprecated in 3.10. Use ALPN instead.")
+        @deprecated("Deprecated since Python 3.10. Use ALPN instead.")
         def selected_npn_protocol(self) -> str | None:
             """Return the currently selected NPN protocol as a string, or ``None``
             if a next protocol was not negotiated or if NPN is not supported by one

@@ -96,7 +96,7 @@ impl Override {
 }
 
 /// Resolves the settings for a given file.
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     let settings = db.project().settings(db);
 
@@ -155,7 +155,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();

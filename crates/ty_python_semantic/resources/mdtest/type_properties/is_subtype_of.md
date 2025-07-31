@@ -96,6 +96,9 @@ class Answer(Enum):
     NO = 0
     YES = 1
 
+class Single(Enum):
+    VALUE = 1
+
 # Boolean literals
 static_assert(is_subtype_of(Literal[True], bool))
 static_assert(is_subtype_of(Literal[True], int))
@@ -125,11 +128,12 @@ static_assert(is_subtype_of(Literal[b"foo"], object))
 static_assert(is_subtype_of(Literal[Answer.YES], Literal[Answer.YES]))
 static_assert(is_subtype_of(Literal[Answer.YES], Answer))
 static_assert(is_subtype_of(Literal[Answer.YES, Answer.NO], Answer))
-# TODO: this should not be an error
-# error: [static-assert-error]
 static_assert(is_subtype_of(Answer, Literal[Answer.YES, Answer.NO]))
 
 static_assert(not is_subtype_of(Literal[Answer.YES], Literal[Answer.NO]))
+
+static_assert(is_subtype_of(Literal[Single.VALUE], Single))
+static_assert(is_subtype_of(Single, Literal[Single.VALUE]))
 ```
 
 ## Heterogeneous tuple types
@@ -551,6 +555,11 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from ty_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, LiteralString
@@ -588,6 +597,30 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], 
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal[""]]], Not[AlwaysFalsy]))
 # error: [static-assert-error]
 static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
+
+class Length2TupleSubclass(tuple[int, str]): ...
+
+static_assert(is_subtype_of(Length2TupleSubclass, AlwaysTruthy))
+
+class EmptyTupleSubclass(tuple[()]): ...
+
+static_assert(is_subtype_of(EmptyTupleSubclass, AlwaysFalsy))
+
+class TupleSubclassWithAtLeastLength2(tuple[int, *tuple[str, ...], bytes]): ...
+
+static_assert(is_subtype_of(TupleSubclassWithAtLeastLength2, AlwaysTruthy))
+
+class UnknownLength(tuple[int, ...]): ...
+
+static_assert(not is_subtype_of(UnknownLength, AlwaysTruthy))
+static_assert(not is_subtype_of(UnknownLength, AlwaysFalsy))
+
+class Invalid(tuple[int, str]):
+    # TODO: we should emit an error here (Liskov violation)
+    def __bool__(self) -> Literal[False]:
+        return False
+
+static_assert(is_subtype_of(Invalid, AlwaysFalsy))
 ```
 
 ### `TypeGuard` and `TypeIs`

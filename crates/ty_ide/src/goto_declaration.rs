@@ -32,6 +32,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
     };
     use ruff_db::files::FileRange;
     use ruff_text_size::Ranged;
@@ -611,7 +612,330 @@ def another_helper():
     }
 
     #[test]
-    fn goto_declaration_builtin_type() {
+    fn goto_declaration_import_as_alias_name() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule.submodule as su<CURSOR>b
+print(sub.helper())
+",
+            )
+            .source(
+                "mymodule/__init__.py",
+                "
+# Main module init
+",
+            )
+            .source(
+                "mymodule/submodule.py",
+                r#"
+FOO = 0
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | ^
+        2 | FOO = 0
+          |
+        info: Source
+         --> main.py:2:30
+          |
+        2 | import mymodule.submodule as sub
+          |                              ^^^
+        3 | print(sub.helper())
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_import_as_alias_name_on_module() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule.submod<CURSOR>ule as sub
+print(sub.helper())
+",
+            )
+            .source(
+                "mymodule/__init__.py",
+                "
+# Main module init
+",
+            )
+            .source(
+                "mymodule/submodule.py",
+                r#"
+FOO = 0
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | ^
+        2 | FOO = 0
+          |
+        info: Source
+         --> main.py:2:17
+          |
+        2 | import mymodule.submodule as sub
+          |                 ^^^^^^^^^
+        3 | print(sub.helper())
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_from_import_symbol_original() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.utils import hel<CURSOR>per as h
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ^^^^^^
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:29
+          |
+        2 | from mypackage.utils import helper as h
+          |                             ^^^^^^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_from_import_symbol_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.utils import helper as h<CURSOR>
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ^^^^^^
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:39
+          |
+        2 | from mypackage.utils import helper as h
+          |                                       ^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_from_import_module() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mypackage.ut<CURSOR>ils import helper as h
+result = h("/a", "/b")
+"#,
+            )
+            .source(
+                "mypackage/__init__.py",
+                r#"
+# Package init
+"#,
+            )
+            .source(
+                "mypackage/utils.py",
+                r#"
+def helper(a, b):
+    return a + "/" + b
+
+def another_helper(path):
+    return "processed"
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> mypackage/utils.py:1:1
+          |
+        1 |
+          | ^
+        2 | def helper(a, b):
+        3 |     return a + "/" + b
+          |
+        info: Source
+         --> main.py:2:16
+          |
+        2 | from mypackage.utils import helper as h
+          |                ^^^^^
+        3 | result = h("/a", "/b")
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_instance_attribute() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self.x: int = 1
+
+            c = C()
+            y = c.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:4:21
+          |
+        2 |             class C:
+        3 |                 def __init__(self):
+        4 |                     self.x: int = 1
+          |                     ^^^^^^
+        5 |
+        6 |             c = C()
+          |
+        info: Source
+         --> main.py:7:17
+          |
+        6 |             c = C()
+        7 |             y = c.x
+          |                 ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_instance_attribute_no_annotation() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self.x = 1
+
+            c = C()
+            y = c.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:4:21
+          |
+        2 |             class C:
+        3 |                 def __init__(self):
+        4 |                     self.x = 1
+          |                     ^^^^^^
+        5 |
+        6 |             c = C()
+          |
+        info: Source
+         --> main.py:7:17
+          |
+        6 |             c = C()
+        7 |             y = c.x
+          |                 ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_method_call_to_definition() {
+        let test = cursor_test(
+            "
+            class C:
+                def foo(self):
+                    return 42
+
+            c = C()
+            res = c.foo<CURSOR>()
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:3:21
+          |
+        2 |             class C:
+        3 |                 def foo(self):
+          |                     ^^^
+        4 |                     return 42
+          |
+        info: Source
+         --> main.py:7:19
+          |
+        6 |             c = C()
+        7 |             res = c.foo()
+          |                   ^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_module_attribute() {
         let test = cursor_test(
             r#"
 x: i<CURSOR>nt = 42
@@ -722,6 +1046,152 @@ def function():
     }
 
     #[test]
+    fn goto_declaration_inherited_attribute() {
+        let test = cursor_test(
+            "
+            class A:
+                x = 10
+
+            class B(A):
+                pass
+
+            b = B()
+            y = b.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:3:17
+          |
+        2 |             class A:
+        3 |                 x = 10
+          |                 ^
+        4 |
+        5 |             class B(A):
+          |
+        info: Source
+         --> main.py:9:17
+          |
+        8 |             b = B()
+        9 |             y = b.x
+          |                 ^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_property_getter_setter() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self._value = 0
+                
+                @property
+                def value(self):
+                    return self._value
+
+            c = C()
+            c.value<CURSOR> = 42
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:7:21
+          |
+        6 |                 @property
+        7 |                 def value(self):
+          |                     ^^^^^
+        8 |                     return self._value
+          |
+        info: Source
+          --> main.py:11:13
+           |
+        10 |             c = C()
+        11 |             c.value = 42
+           |             ^^^^^^^
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_function_doc_attribute() {
+        let test = cursor_test(
+            r#"
+            def my_function():
+                """This is a docstring."""
+                return 42
+
+            doc = my_function.__doc<CURSOR>__
+            "#,
+        );
+
+        // Should navigate to the __doc__ property in the FunctionType class in typeshed
+        let result = test.goto_declaration();
+
+        assert!(
+            !result.contains("No goto target found"),
+            "Should find builtin __doc__ attribute"
+        );
+        assert!(
+            !result.contains("No declarations found"),
+            "Should find builtin __doc__ declarations"
+        );
+
+        // Should navigate to a typeshed file containing the __doc__ attribute
+        assert!(
+            result.contains("types.pyi") || result.contains("builtins.pyi"),
+            "Should navigate to typeshed file with __doc__ definition"
+        );
+        assert!(
+            result.contains("__doc__"),
+            "Should find the __doc__ attribute definition"
+        );
+        assert!(
+            result.contains("info[goto-declaration]: Declaration"),
+            "Should be a goto-declaration result"
+        );
+    }
+
+    #[test]
+    fn goto_declaration_protocol_instance_attribute() {
+        let test = cursor_test(
+            "
+            from typing import Protocol
+
+            class Drawable(Protocol):
+                def draw(self) -> None: ...
+                name: str
+
+            def use_drawable(obj: Drawable):
+                obj.na<CURSOR>me
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:6:17
+          |
+        4 |             class Drawable(Protocol):
+        5 |                 def draw(self) -> None: ...
+        6 |                 name: str
+          |                 ^^^^
+        7 |
+        8 |             def use_drawable(obj: Drawable):
+          |
+        info: Source
+         --> main.py:9:17
+          |
+        8 |             def use_drawable(obj: Drawable):
+        9 |                 obj.name
+          |                 ^^^^^^^^
+          |
+        ");
+    }
+
+    #[test]
     fn goto_declaration_generic_method_class_type() {
         let test = cursor_test(
             r#"
@@ -754,6 +1224,94 @@ class MyClass:
         6 |         return value
           |
         ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_simple() {
+        let test = cursor_test(
+            "
+            def my_function(x, y, z=10):
+                return x + y + z
+
+            result = my_function(1, y<CURSOR>=2, z=3)
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:2:32
+          |
+        2 |             def my_function(x, y, z=10):
+          |                                ^
+        3 |                 return x + y + z
+          |
+        info: Source
+         --> main.py:5:37
+          |
+        3 |                 return x + y + z
+        4 |
+        5 |             result = my_function(1, y=2, z=3)
+          |                                     ^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_keyword_argument_overloaded() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def process(data: str, format: str) -> str: ...
+
+            @overload
+            def process(data: int, format: int) -> int: ...
+
+            def process(data, format):
+                return data
+
+            # Call the overloaded function
+            result = process("hello", format<CURSOR>="json")
+            "#,
+        );
+
+        // Should navigate to the parameter in both matching overloads
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:5:36
+          |
+        4 |             @overload
+        5 |             def process(data: str, format: str) -> str: ...
+          |                                    ^^^^^^
+        6 |
+        7 |             @overload
+          |
+        info: Source
+          --> main.py:14:39
+           |
+        13 |             # Call the overloaded function
+        14 |             result = process("hello", format="json")
+           |                                       ^^^^^^
+           |
+
+        info[goto-declaration]: Declaration
+          --> main.py:8:36
+           |
+         7 |             @overload
+         8 |             def process(data: int, format: int) -> int: ...
+           |                                    ^^^^^^
+         9 |
+        10 |             def process(data, format):
+           |
+        info: Source
+          --> main.py:14:39
+           |
+        13 |             # Call the overloaded function
+        14 |             result = process("hello", format="json")
+           |                                       ^^^^^^
+           |
+        "#);
     }
 
     impl CursorTest {
@@ -792,7 +1350,7 @@ class MyClass:
 
     impl IntoDiagnostic for GotoDeclarationDiagnostic {
         fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            let mut source = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Source");
             source.annotate(Annotation::primary(
                 Span::from(self.source.file()).with_range(self.source.range()),
             ));

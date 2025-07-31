@@ -1,5 +1,4 @@
-"""
-Utilities to get a password and/or the current user name.
+"""Utilities to get a password and/or the current user name.
 
 getpass(prompt[, stream[, echo_char]]) - Prompt for a password, with echo
 turned off and optional keyboard feedback.
@@ -9,6 +8,7 @@ GetPassWarning - This UserWarning is issued when getpass() cannot prevent
                  echoing of the password contents while reading.
 
 On Windows, the msvcrt module will be used.
+
 """
 
 import sys

@@ -1,5 +1,4 @@
-"""
-Abstract Base Classes (ABCs) for numbers, according to PEP 3141.
+"""Abstract Base Classes (ABCs) for numbers, according to PEP 3141.
 
 TODO: Fill out more detailed documentation on the operators.
 """
@@ -300,6 +299,7 @@ class Rational(Real):
         It's important that this conversion use the integer's "true"
         division rather than casting one side to float before dividing
         so that ratios of huge integers convert without overflowing.
+
         """
 
 # See comment at the top of the file

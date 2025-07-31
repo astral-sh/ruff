@@ -1,6 +1,4 @@
-"""
-Thread module emulating a subset of Java's threading model.
-"""
+"""Thread module emulating a subset of Java's threading model."""
 
 import _thread
 import sys
@@ -54,6 +52,7 @@ def active_count() -> int:
 
     The returned count is equal to the length of the list returned by
     enumerate().
+
     """
 
 @deprecated("Use active_count() instead")
@@ -61,6 +60,7 @@ def activeCount() -> int:
     """Return the number of Thread objects currently alive.
 
     This function is deprecated, use active_count() instead.
+
     """
 
 def current_thread() -> Thread:
@@ -68,6 +68,7 @@ def current_thread() -> Thread:
 
     If the caller's thread of control was not created through the threading
     module, a dummy thread object with limited functionality is returned.
+
     """
 
 @deprecated("Use current_thread() instead")
@@ -75,6 +76,7 @@ def currentThread() -> Thread:
     """Return the current Thread object, corresponding to the caller's thread of control.
 
     This function is deprecated, use current_thread() instead.
+
     """
 
 def get_ident() -> int:
@@ -93,6 +95,7 @@ def enumerate() -> list[Thread]:
     The list includes daemonic threads, dummy thread objects created by
     current_thread(), and the main thread. It excludes terminated threads and
     threads that have not yet been started.
+
     """
 
 def main_thread() -> Thread:
@@ -170,6 +173,7 @@ class Thread:
     This class can be safely subclassed in a limited fashion. There are two ways
     to specify the activity: by passing a callable object to the constructor, or
     by overriding the run() method in a subclass.
+
     """
 
     name: str
@@ -180,6 +184,7 @@ class Thread:
         This is a nonzero integer. See the get_ident() function. Thread
         identifiers may be recycled when a thread exits and another thread is
         created. The identifier is available even after the thread has exited.
+
         """
     daemon: bool
     if sys.version_info >= (3, 14):
@@ -221,6 +226,7 @@ class Thread:
             If a subclass overrides the constructor, it must make sure to invoke
             the base class constructor (Thread.__init__()) before doing anything
             else to the thread.
+
             """
     else:
         def __init__(
@@ -249,17 +255,10 @@ class Thread:
             *kwargs* is a dictionary of keyword arguments for the target
             invocation. Defaults to {}.
 
-            *context* is the contextvars.Context value to use for the thread.
-            The default value is None, which means to check
-            sys.flags.thread_inherit_context.  If that flag is true, use a copy
-            of the context of the caller.  If false, use an empty context.  To
-            explicitly start with an empty context, pass a new instance of
-            contextvars.Context().  To explicitly start with a copy of the current
-            context, pass the value from contextvars.copy_context().
-
             If a subclass overrides the constructor, it must make sure to invoke
             the base class constructor (Thread.__init__()) before doing anything
             else to the thread.
+
             """
 
     def start(self) -> None:
@@ -270,6 +269,7 @@ class Thread:
 
         This method will raise a RuntimeError if called more than once on the
         same thread object.
+
         """
 
     def run(self) -> None:
@@ -279,6 +279,7 @@ class Thread:
         invokes the callable object passed to the object's constructor as the
         target argument, if any, with sequential and keyword arguments taken
         from the args and kwargs arguments, respectively.
+
         """
 
     def join(self, timeout: float | None = None) -> None:
@@ -303,6 +304,7 @@ class Thread:
         thread as that would cause a deadlock. It is also an error to join() a
         thread before it has been started and attempts to do so raises the same
         exception.
+
         """
 
     @property
@@ -311,6 +313,7 @@ class Thread:
 
         This is a non-negative integer. See the get_native_id() function.
         This represents the Thread ID as reported by the kernel.
+
         """
 
     def is_alive(self) -> bool:
@@ -319,6 +322,7 @@ class Thread:
         This method returns True just before the run() method starts until just
         after the run() method terminates. See also the module function
         enumerate().
+
         """
 
     @deprecated("Get the daemon attribute instead")
@@ -326,6 +330,7 @@ class Thread:
         """Return whether this thread is a daemon.
 
         This method is deprecated, use the daemon attribute instead.
+
         """
 
     @deprecated("Set the daemon attribute instead")
@@ -333,6 +338,7 @@ class Thread:
         """Set whether this thread is a daemon.
 
         This method is deprecated, use the .daemon property instead.
+
         """
 
     @deprecated("Use the name attribute instead")
@@ -340,6 +346,7 @@ class Thread:
         """Return a string used for identification purposes only.
 
         This method is deprecated, use the name attribute instead.
+
         """
 
     @deprecated("Use the name attribute instead")
@@ -347,6 +354,7 @@ class Thread:
         """Set the name string for this thread.
 
         This method is deprecated, use the name attribute instead.
+
         """
 
 class _DummyThread(Thread):
@@ -364,6 +372,7 @@ class _RLock:
     thread has acquired a reentrant lock, the same thread may acquire it
     again without blocking; the thread must release it once for each time it
     has acquired it.
+
     """
 
     _count: int
@@ -391,6 +400,7 @@ class _RLock:
         value, block for at most the number of seconds specified by timeout
         and as long as the lock cannot be acquired.  Return true if the lock has
         been acquired, false if the timeout has elapsed.
+
         """
 
     def release(self) -> None:
@@ -407,6 +417,7 @@ class _RLock:
         unlocked.
 
         There is no return value.
+
         """
     __enter__ = acquire
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None: ...
@@ -426,6 +437,7 @@ class Condition:
     If the lock argument is given and not None, it must be a Lock or RLock
     object, and it is used as the underlying lock. Otherwise, a new RLock object
     is created and used as the underlying lock.
+
     """
 
     def __init__(self, lock: Lock | _RLock | RLock | None = None) -> None: ...
@@ -433,7 +445,7 @@ class Condition:
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> None: ...
-    def acquire(self, blocking: bool = ..., timeout: float = ...) -> bool: ...
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool: ...
     def release(self) -> None: ...
     def wait(self, timeout: float | None = None) -> bool:
         """Wait until notified or until a timeout occurs.
@@ -456,6 +468,7 @@ class Condition:
         of the RLock class is used, which really unlocks it even when it has
         been recursively acquired several times. Another internal interface is
         then used to restore the recursion level when the lock is reacquired.
+
         """
 
     def wait_for(self, predicate: Callable[[], _T], timeout: float | None = None) -> _T:
@@ -464,6 +477,7 @@ class Condition:
         predicate should be a callable which result will be interpreted as a
         boolean value.  A timeout may be provided giving the maximum time to
         wait.
+
         """
 
     def notify(self, n: int = 1) -> None:
@@ -474,6 +488,7 @@ class Condition:
 
         This method wakes up at most n of the threads waiting for the condition
         variable; it is a no-op if no threads are waiting.
+
         """
 
     def notify_all(self) -> None:
@@ -481,6 +496,7 @@ class Condition:
 
         If the calling thread has not acquired the lock when this method
         is called, a RuntimeError is raised.
+
         """
 
     @deprecated("Use notify_all() instead")
@@ -488,6 +504,7 @@ class Condition:
         """Wake up all threads waiting on this condition.
 
         This method is deprecated, use notify_all() instead.
+
         """
 
 class Semaphore:
@@ -497,6 +514,7 @@ class Semaphore:
     the number of acquire() calls, plus an initial value. The acquire() method
     blocks if necessary until it can return without making the counter
     negative. If not given, value defaults to 1.
+
     """
 
     _value: int
@@ -524,6 +542,7 @@ class Semaphore:
         When invoked with a timeout other than None, it will block for at
         most timeout seconds.  If acquire does not complete successfully in
         that interval, return false.  Return true otherwise.
+
         """
 
     def __enter__(self, blocking: bool = True, timeout: float | None = None) -> bool:
@@ -548,6 +567,7 @@ class Semaphore:
         When invoked with a timeout other than None, it will block for at
         most timeout seconds.  If acquire does not complete successfully in
         that interval, return false.  Return true otherwise.
+
         """
 
     def release(self, n: int = 1) -> None:
@@ -555,6 +575,7 @@ class Semaphore:
 
         When the counter is zero on entry and another thread is waiting for it
         to become larger than zero again, wake up that thread.
+
         """
 
 class BoundedSemaphore(Semaphore):
@@ -571,6 +592,7 @@ class BoundedSemaphore(Semaphore):
     the number of release() calls minus the number of acquire() calls, plus an
     initial value. The acquire() method blocks if necessary until it can return
     without making the counter negative. If not given, value defaults to 1.
+
     """
 
 class Event:
@@ -579,6 +601,7 @@ class Event:
     Events manage a flag that can be set to true with the set() method and reset
     to false with the clear() method. The wait() method blocks until the flag is
     true.  The flag is initially false.
+
     """
 
     def is_set(self) -> bool:
@@ -589,6 +612,7 @@ class Event:
         """Return true if and only if the internal flag is true.
 
         This method is deprecated, use is_set() instead.
+
         """
 
     def set(self) -> None:
@@ -596,6 +620,7 @@ class Event:
 
         All threads waiting for it to become true are awakened. Threads
         that call wait() once the flag is true will not block at all.
+
         """
 
     def clear(self) -> None:
@@ -603,6 +628,7 @@ class Event:
 
         Subsequently, threads calling wait() will block until set() is called to
         set the internal flag to true again.
+
         """
 
     def wait(self, timeout: float | None = None) -> bool:
@@ -618,6 +644,7 @@ class Event:
 
         This method returns the internal flag on exit, so it will always return
         True except if a timeout is given and the operation times out.
+
         """
 
 excepthook = _excepthook
@@ -629,6 +656,7 @@ class Timer(Thread):
     t = Timer(30.0, f, args=None, kwargs=None)
     t.start()
     t.cancel()     # stop the timer's action if it's still waiting
+
     """
 
     args: Iterable[Any]  # undocumented
@@ -653,6 +681,7 @@ class Barrier:
     Useful for synchronizing a fixed number of threads at known synchronization
     points.  Threads block on 'wait()' and are simultaneously awoken once they
     have all made that call.
+
     """
 
     @property
@@ -674,6 +703,7 @@ class Barrier:
         the threads after they have all entered the barrier and just prior to
         releasing them all. If a 'timeout' is provided, it is used as the
         default for all subsequent 'wait()' calls.
+
         """
 
     def wait(self, timeout: float | None = None) -> int:
@@ -683,6 +713,7 @@ class Barrier:
         simultaneously awoken. If an 'action' was provided for the barrier, one
         of the threads will have executed that callback prior to returning.
         Returns an individual index number from 0 to 'parties-1'.
+
         """
 
     def reset(self) -> None:
@@ -690,6 +721,7 @@ class Barrier:
 
         Any threads currently waiting will get the BrokenBarrier exception
         raised.
+
         """
 
     def abort(self) -> None:
@@ -697,6 +729,7 @@ class Barrier:
 
         Useful in case of error.  Any currently waiting threads and threads
         attempting to 'wait()' will have BrokenBarrierError raised.
+
         """
 
 class BrokenBarrierError(RuntimeError): ...

@@ -1,8 +1,8 @@
-"""
-A fast, lightweight IPv4/IPv6 manipulation library in Python.
+"""A fast, lightweight IPv4/IPv6 manipulation library in Python.
 
 This library is used to create/poke/manipulate IPv4 and IPv6 addresses
 and networks.
+
 """
 
 import sys
@@ -34,6 +34,7 @@ def ip_address(address: _RawIPAddress) -> IPv4Address | IPv6Address:
     Raises:
         ValueError: if the *address* passed isn't either a v4 or a v6
           address
+
     """
 
 def ip_network(
@@ -52,6 +53,7 @@ def ip_network(
     Raises:
         ValueError: if the string passed isn't either a v4 or a v6
           address. Or if the network has host bits set.
+
     """
 
 def ip_interface(
@@ -75,6 +77,7 @@ def ip_interface(
         The IPv?Interface classes describe an Address on a particular
         Network, so they're basically a combination of both the Address
         and Network classes.
+
     """
 
 class _IPAddressBase:
@@ -95,6 +98,7 @@ class _IPAddressBase:
         '1.0.0.127.in-addr.arpa'
         >>> ipaddress.ip_address("2001:db8::1").reverse_pointer
         '1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa'
+
         """
     if sys.version_info < (3, 14):
         @property
@@ -213,6 +217,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             TypeError: If self and other are of differing address
               versions, or if other is not a network object.
             ValueError: If other is not completely contained by self.
+
         """
 
     @property
@@ -247,6 +252,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
           Raises:
               TypeError if the IP versions are different.
+
         """
 
     def hosts(self) -> Iterator[_A]:
@@ -254,6 +260,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         This is like __iter__ except it doesn't return the network
         or broadcast addresses.
+
         """
 
     @property
@@ -263,6 +270,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the address is not reserved per
             iana-ipv4-special-registry or iana-ipv6-special-registry.
+
         """
 
     @property
@@ -271,6 +279,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         Returns:
             A boolean, True if the address is reserved per RFC 4291.
+
         """
 
     @property
@@ -280,6 +289,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the address is a loopback address as defined in
             RFC 2373 2.5.3.
+
         """
 
     @property
@@ -289,6 +299,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the address is a multicast address.
             See RFC 2373 2.7 for details.
+
         """
 
     @property
@@ -298,6 +309,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the network is reserved per
             iana-ipv4-special-registry or iana-ipv6-special-registry.
+
         """
 
     @property
@@ -307,6 +319,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if the address is within one of the
             reserved IPv6 Network ranges.
+
         """
 
     @property
@@ -316,6 +329,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
         Returns:
             A boolean, True if this is the unspecified address as defined in
             RFC 2373 2.5.2.
+
         """
 
     @property
@@ -357,6 +371,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             prefixlen_diff and new_prefix are both set or new_prefix
               is a smaller number than the current prefix (smaller
               number means a larger network)
+
         """
 
     def supernet(self, prefixlen_diff: int = 1, new_prefix: int | None = None) -> Self:
@@ -378,6 +393,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
             If prefixlen_diff and new_prefix are both set or new_prefix is a
               larger number than the current prefix (larger number means a
               smaller network)
+
         """
 
     @property
@@ -394,6 +410,7 @@ class _BaseV4:
 
     The following methods are used by IPv4 objects in both single IP
     addresses and networks.
+
     """
 
     if sys.version_info >= (3, 14):
@@ -401,46 +418,16 @@ class _BaseV4:
         max_prefixlen: Final = 32
     else:
         @property
-        def version(self) -> Literal[4]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
-
+        def version(self) -> Literal[4]: ...
         @property
-        def max_prefixlen(self) -> Literal[32]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
+        def max_prefixlen(self) -> Literal[32]: ...
 
 class IPv4Address(_BaseV4, _BaseAddress):
     """Represent and manipulate single IPv4 Addresses."""
 
     def __init__(self, address: object) -> None:
-        """Args:
+        """
+        Args:
             address: A string or integer representing the IP
 
               Additionally, an integer can be passed, so
@@ -451,6 +438,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
 
         Raises:
             AddressValueError: If ipaddress isn't a valid IPv4 address.
+
         """
 
     @property
@@ -475,6 +463,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
 
         Returns:
             A boolean, True if the address is link-local per RFC 3927.
+
         """
 
     @property
@@ -483,6 +472,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
 
         Returns:
             A boolean, True if the address is a loopback per RFC 3330.
+
         """
 
     @property
@@ -492,6 +482,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Returns:
             A boolean, True if the address is multicast.
             See RFC 3171 for details.
+
         """
 
     @property
@@ -518,6 +509,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Returns:
             A boolean, True if the address is within the
             reserved IPv4 Network range.
+
         """
 
     @property
@@ -527,6 +519,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
         Returns:
             A boolean, True if this is the unspecified address as defined in
             RFC 5735 3.
+
         """
 
     @property
@@ -539,6 +532,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
 
             Returns:
                 The IPv4-mapped IPv6 address per RFC 4291.
+
             """
 
 class IPv4Network(_BaseV4, _BaseNetwork[IPv4Address]):
@@ -550,9 +544,10 @@ class IPv4Network(_BaseV4, _BaseNetwork[IPv4Address]):
         .broadcast_address: IPv4Address('192.0.2.32')
         .netmask: IPv4Address('255.255.255.224')
         .prefixlen: 27
+
     """
 
-    def __init__(self, address: object, strict: bool = ...) -> None:
+    def __init__(self, address: object, strict: bool = True) -> None:
         """Instantiate a new IPv4 network object.
 
         Args:
@@ -609,6 +604,7 @@ class _BaseV6:
 
     The following methods are used by IPv6 objects in both single IP
     addresses and networks.
+
     """
 
     if sys.version_info >= (3, 14):
@@ -616,40 +612,9 @@ class _BaseV6:
         max_prefixlen: Final = 128
     else:
         @property
-        def version(self) -> Literal[6]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
-
+        def version(self) -> Literal[6]: ...
         @property
-        def max_prefixlen(self) -> Literal[128]:
-            """int([x]) -> integer
-            int(x, base=10) -> integer
-
-            Convert a number or string to an integer, or return 0 if no arguments
-            are given.  If x is a number, return x.__int__().  For floating-point
-            numbers, this truncates towards zero.
-
-            If x is not a number or if base is given, then x must be a string,
-            bytes, or bytearray instance representing an integer literal in the
-            given base.  The literal can be preceded by '+' or '-' and be surrounded
-            by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-            Base 0 means to interpret the base from the string as an integer literal.
-            >>> int('0b100', base=0)
-            4
-            """
+        def max_prefixlen(self) -> Literal[128]: ...
 
 class IPv6Address(_BaseV6, _BaseAddress):
     """Represent and manipulate single IPv6 Addresses."""
@@ -669,6 +634,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
 
         Raises:
             AddressValueError: If address isn't a valid IPv6 address.
+
         """
 
     @property
@@ -693,6 +659,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
 
         Returns:
             A boolean, True if the address is reserved per RFC 4291.
+
         """
 
     @property
@@ -702,6 +669,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if the address is a loopback address as defined in
             RFC 2373 2.5.3.
+
         """
 
     @property
@@ -711,6 +679,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if the address is a multicast address.
             See RFC 2373 2.7 for details.
+
         """
 
     @property
@@ -737,6 +706,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if the address is within one of the
             reserved IPv6 Network ranges.
+
         """
 
     @property
@@ -746,6 +716,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             A boolean, True if this is the unspecified address as defined in
             RFC 2373 2.5.2.
+
         """
 
     @property
@@ -759,6 +730,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             If the IPv6 address is a v4 mapped address, return the
             IPv4 mapped address. Return None otherwise.
+
         """
 
     @property
@@ -771,6 +743,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
 
         Returns:
             A boolean, True if the address is reserved per RFC 3513 2.5.6.
+
         """
 
     @property
@@ -780,6 +753,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
         Returns:
             The IPv4 6to4-embedded address if present or None if the
             address doesn't appear to contain a 6to4 embedded address.
+
         """
 
     @property
@@ -790,6 +764,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
             Tuple of the (server, client) IPs or None if the address
             doesn't appear to be a teredo address (doesn't start with
             2001::/32)
+
         """
 
     @property
@@ -800,6 +775,7 @@ class IPv6Address(_BaseV6, _BaseAddress):
 
         Returns:
             A string identifying the zone of the address if specified, else None.
+
         """
 
     def __hash__(self) -> int: ...
@@ -814,9 +790,10 @@ class IPv6Network(_BaseV6, _BaseNetwork[IPv6Address]):
         .broadcast_address: IPv6Address('2001:db8::100f')
         .netmask: IPv6Address('ffff:ffff:ffff:ffff:ffff:ffff:ffff:fff0')
         .prefixlen: 124
+
     """
 
-    def __init__(self, address: object, strict: bool = ...) -> None:
+    def __init__(self, address: object, strict: bool = True) -> None:
         """Instantiate a new IPv6 Network object.
 
         Args:
@@ -858,6 +835,7 @@ class IPv6Network(_BaseV6, _BaseNetwork[IPv6Address]):
 
         Returns:
             A boolean, True if the address is reserved per RFC 3513 2.5.6.
+
         """
 
 class IPv6Interface(IPv6Address):
@@ -888,6 +866,7 @@ def v4_int_to_packed(address: int) -> bytes:
     Raises:
         ValueError: If the integer is negative or too large to be an
           IPv4 IP address.
+
     """
 
 def v6_int_to_packed(address: int) -> bytes:
@@ -898,6 +877,7 @@ def v6_int_to_packed(address: int) -> bytes:
 
     Returns:
         The integer address packed as 16 bytes in network (big-endian) order.
+
     """
 
 # Third overload is technically incorrect, but convenient when first and last are return values of ip_address()
@@ -926,6 +906,7 @@ def summarize_address_range(first: IPv4Address, last: IPv4Address) -> Iterator[I
         ValueError:
             If the last object is not greater than the first.
             If the version of the first address is not 4 or 6.
+
     """
 
 @overload
@@ -950,6 +931,7 @@ def collapse_addresses(addresses: Iterable[_N]) -> Iterator[_N]:
 
     Raises:
         TypeError: If passed a list of mixed version objects.
+
     """
 
 @overload
@@ -969,6 +951,7 @@ def get_mixed_type_key(obj: _A) -> tuple[int, _A]:
       obj: either a Network or Address object.
     Returns:
       appropriate key.
+
     """
 
 @overload

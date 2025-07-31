@@ -1,6 +1,4 @@
-"""
-Event loop and event loop policy.
-"""
+"""Event loop and event loop policy."""
 
 import ssl
 import sys
@@ -32,14 +30,11 @@ if sys.version_info < (3, 14):
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 14):
     __all__ = (
-        "_AbstractEventLoopPolicy",
         "AbstractEventLoop",
         "AbstractServer",
         "Handle",
         "TimerHandle",
-        "_get_event_loop_policy",
         "get_event_loop_policy",
-        "_set_event_loop_policy",
         "set_event_loop_policy",
         "get_event_loop",
         "set_event_loop",
@@ -493,9 +488,6 @@ class AbstractEventLoop:
             they all set this flag when being created. This option is not
             supported on Windows.
 
-            keep_alive set to True keeps connections active by enabling the
-            periodic transmission of messages.
-
             ssl_handshake_timeout is the time in seconds that an SSL server
             will wait for completion of the SSL handshake before aborting the
             connection. Default is 60s.
@@ -583,16 +575,9 @@ class AbstractEventLoop:
             they all set this flag when being created. This option is not
             supported on Windows.
 
-            keep_alive set to True keeps connections active by enabling the
-            periodic transmission of messages.
-
             ssl_handshake_timeout is the time in seconds that an SSL server
             will wait for completion of the SSL handshake before aborting the
             connection. Default is 60s.
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for completion of the SSL shutdown procedure
-            before aborting the connection. Default is 30s.
 
             start_serving set to True (default) causes the created server
             to start accepting connections immediately.  When set to False,
@@ -726,9 +711,6 @@ class AbstractEventLoop:
 
             ssl_handshake_timeout is the time in seconds that an SSL server
             will wait for the SSL handshake to complete (defaults to 60s).
-
-            ssl_shutdown_timeout is the time in seconds that an SSL server
-            will wait for the SSL shutdown to finish (defaults to 30s).
 
             start_serving set to True (default) causes the created server
             to start accepting connections immediately.  When set to False,

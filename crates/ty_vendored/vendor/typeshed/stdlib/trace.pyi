@@ -1,5 +1,4 @@
-"""
-program/module to trace Python program or function execution
+"""program/module to trace Python program or function execution
 
 Sample use, command line:
   trace.py -c -f counts --ignore-dir '$prefix' spam.py eggs
@@ -59,7 +58,8 @@ class CoverageResults:
             *,
             ignore_missing_files: bool = False,
         ) -> None:
-            """Write the coverage results.
+            """
+            Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
@@ -72,16 +72,14 @@ class CoverageResults:
             """
     else:
         def write_results(self, show_missing: bool = True, summary: bool = False, coverdir: StrPath | None = None) -> None:
-            """Write the coverage results.
+            """
+            Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
             :param coverdir: If None, the results of each module are placed in its
                              directory, otherwise it is included in the directory
                              specified.
-            :param ignore_missing_files: If True, counts for files that no longer
-                             exist are silently ignored. Otherwise, a missing file
-                             will raise a FileNotFoundError.
             """
 
     def write_results_file(
@@ -121,7 +119,8 @@ class Trace:
         outfile: StrPath | None = None,
         timing: bool = False,
     ) -> None:
-        """@param count true iff it should count number of times each
+        """
+        @param count true iff it should count number of times each
                      line is executed
         @param trace true iff it should print out each line that is
                      being counted

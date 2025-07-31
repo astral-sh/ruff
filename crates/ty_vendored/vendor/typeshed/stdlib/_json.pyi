@@ -1,6 +1,4 @@
-"""
-json speedups
-"""
+"""json speedups"""
 
 from collections.abc import Callable
 from typing import Any, final
@@ -84,7 +82,7 @@ def encode_basestring_ascii(s: str, /) -> str:
     Return an ASCII-only JSON representation of a Python string
     """
 
-def scanstring(string: str, end: int, strict: bool = ...) -> tuple[str, int]:
+def scanstring(string: str, end: int, strict: bool = True) -> tuple[str, int]:
     """scanstring(string, end, strict=True) -> (string, end)
 
     Scan the string s for a JSON string. End is the index of the

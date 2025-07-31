@@ -1,6 +1,4 @@
-"""
-Loading unittests.
-"""
+"""Loading unittests."""
 
 import sys
 import unittest.case
@@ -17,7 +15,8 @@ _SuiteClass: TypeAlias = Callable[[list[unittest.case.TestCase]], unittest.suite
 VALID_MODULE_NAME: Final[Pattern[str]]
 
 class TestLoader:
-    """This class is responsible for loading tests according to various criteria
+    """
+    This class is responsible for loading tests according to various criteria
     and returning them wrapped in a TestSuite
     """
 

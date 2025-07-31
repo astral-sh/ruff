@@ -1,5 +1,4 @@
-"""
-Fixer for exec.
+"""Fixer for exec.
 
 This converts usages of the exec statement into calls to a built-in
 exec() function.

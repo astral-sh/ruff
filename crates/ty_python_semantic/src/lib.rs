@@ -8,7 +8,7 @@ pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{
     KnownModule, Module, SearchPathValidationError, SearchPaths, resolve_module,
-    system_module_search_paths,
+    resolve_real_module, system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
@@ -17,8 +17,10 @@ pub use program::{
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{Completion, CompletionKind, HasType, NameKind, SemanticModel};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-pub use types::definitions_for_name;
-pub use types::ide_support::ResolvedDefinition;
+pub use types::ide_support::{
+    ResolvedDefinition, definitions_for_attribute, definitions_for_imported_symbol,
+    definitions_for_name, map_stub_definition,
+};
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
@@ -32,6 +34,7 @@ mod node_key;
 pub(crate) mod place;
 mod program;
 mod python_platform;
+mod rank;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;

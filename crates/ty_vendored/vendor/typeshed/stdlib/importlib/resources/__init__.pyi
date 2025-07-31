@@ -1,5 +1,4 @@
 """
-
 Read resources contained within a package.
 
 This codebase is shared between importlib.resources in the stdlib
@@ -112,7 +111,8 @@ if sys.version_info >= (3, 11):
     from importlib.resources._common import as_file as as_file
 else:
     def as_file(path: Traversable) -> AbstractContextManager[Path, Literal[False]]:
-        """Given a Traversable object, return that object as a
+        """
+        Given a Traversable object, return that object as a
         path on the local file system in a context manager.
         """
 
@@ -120,7 +120,9 @@ if sys.version_info >= (3, 11):
     from importlib.resources._common import files as files
 else:
     def files(package: Package) -> Traversable:
-        """Get a Traversable resource from a package"""
+        """
+        Get a Traversable resource from a package
+        """
 
 if sys.version_info >= (3, 11):
     from importlib.resources.abc import ResourceReader as ResourceReader

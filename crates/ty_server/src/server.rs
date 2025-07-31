@@ -7,25 +7,30 @@ use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
     HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
-    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    MessageType, SelectionRangeProviderCapability, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
+use ruff_db::system::System;
 use std::num::NonZeroUsize;
-use std::panic::PanicHookInfo;
+use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
+mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use api::publish_settings_diagnostics;
-pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
+pub(crate) use main_loop::{
+    Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
+};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
-pub(crate) struct Server {
+pub struct Server {
     connection: Connection,
     client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
@@ -35,7 +40,12 @@ pub(crate) struct Server {
 }
 
 impl Server {
-    pub(crate) fn new(worker_threads: NonZeroUsize, connection: Connection) -> crate::Result<Self> {
+    pub fn new(
+        worker_threads: NonZeroUsize,
+        connection: Connection,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        initialize_logging: bool,
+    ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
         let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
@@ -71,10 +81,12 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        crate::logging::init_logging(
-            global_options.tracing.log_level.unwrap_or_default(),
-            global_options.tracing.log_file.as_deref(),
-        );
+        if initialize_logging {
+            crate::logging::init_logging(
+                global_options.tracing.log_level.unwrap_or_default(),
+                global_options.tracing.log_file.as_deref(),
+            );
+        }
 
         tracing::debug!("Version: {version}");
 
@@ -102,10 +114,14 @@ impl Server {
                     .collect()
             })
             .or_else(|| {
-                let current_dir = std::env::current_dir().ok()?;
+                let current_dir = native_system
+                    .current_directory()
+                    .as_std_path()
+                    .to_path_buf();
                 tracing::warn!(
                     "No workspace(s) were provided during initialization. \
-                    Using the current working directory as a default workspace: {}",
+                    Using the current working directory from the fallback system as a \
+                    default workspace: {}",
                     current_dir.display()
                 );
                 let uri = Url::from_file_path(current_dir).ok()?;
@@ -143,12 +159,13 @@ impl Server {
                 position_encoding,
                 global_options,
                 workspaces,
+                native_system,
             )?,
             client_capabilities,
         })
     }
 
-    pub(crate) fn run(mut self) -> crate::Result<()> {
+    pub fn run(mut self) -> crate::Result<()> {
         let client = Client::new(
             self.main_loop_sender.clone(),
             self.connection.sender.clone(),
@@ -184,7 +201,9 @@ impl Server {
                 inter_file_dependencies: true,
                 // TODO: Dynamically register for workspace diagnostics.
                 workspace_diagnostics: diagnostic_mode.is_workspace(),
-                ..Default::default()
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(diagnostic_mode.is_workspace()),
+                },
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
@@ -196,6 +215,8 @@ impl Server {
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             definition_provider: Some(lsp_types::OneOf::Left(true)),
             declaration_provider: Some(DeclarationCapability::Simple(true)),
+            references_provider: Some(lsp_types::OneOf::Left(true)),
+            document_highlight_provider: Some(lsp_types::OneOf::Left(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             signature_help_provider: Some(SignatureHelpOptions {
                 trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
@@ -226,6 +247,9 @@ impl Server {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()
             }),
+            selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+            document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+            workspace_symbol_provider: Some(lsp_types::OneOf::Left(true)),
             ..Default::default()
         }
     }

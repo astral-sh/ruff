@@ -1,6 +1,4 @@
-"""
-Disassembler of Python byte code into mnemonics.
-"""
+"""Disassembler of Python byte code into mnemonics."""
 
 import sys
 import types
@@ -122,7 +120,13 @@ class Instruction(_Instruction):
     """
 
     if sys.version_info < (3, 13):
-        def _disassemble(self, lineno_width: int = 3, mark_as_current: bool = False, offset_width: int = 4) -> str: ...
+        def _disassemble(self, lineno_width: int = 3, mark_as_current: bool = False, offset_width: int = 4) -> str:
+            """Format instruction details for inclusion in disassembly output
+
+            *lineno_width* sets the width of the line number field (0 omits it)
+            *mark_as_current* inserts a '-->' marker arrow as part of the line
+            *offset_width* sets the width of the instruction offset field
+            """
     if sys.version_info >= (3, 13):
         @property
         def oparg(self) -> int:
@@ -251,6 +255,7 @@ def findlabels(code: _HaveCodeType) -> list[int]:
     """Detect all offsets in a byte code which are jump targets.
 
     Return the list of offsets.
+
     """
 
 def findlinestarts(code: _HaveCodeType) -> Iterator[tuple[int, int]]:

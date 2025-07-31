@@ -1,5 +1,4 @@
-"""
-Simple implementation of the Level 1 DOM.
+"""Simple implementation of the Level 1 DOM.
 
 Namespaces and other minor Level 2 features are also supported.
 
@@ -677,6 +676,7 @@ class ElementInfo:
     This implementation is not expected to be used in practice; DOM
     builders should provide implementations which do the right thing
     using information available to it.
+
     """
 
     tagName: str

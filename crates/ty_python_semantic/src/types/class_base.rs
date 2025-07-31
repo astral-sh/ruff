@@ -163,7 +163,10 @@ impl<'db> ClassBase<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
-                KnownInstanceType::TypeAliasType(_) | KnownInstanceType::TypeVar(_) => None,
+                KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_) => None,
             },
 
             Type::SpecialForm(special_form) => match special_form {

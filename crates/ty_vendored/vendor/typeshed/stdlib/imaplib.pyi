@@ -1,5 +1,4 @@
-"""
-IMAP4 client.
+"""IMAP4 client.
 
 Based on RFC 2060.
 

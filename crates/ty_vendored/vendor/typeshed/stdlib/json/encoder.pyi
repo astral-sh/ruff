@@ -1,6 +1,4 @@
-"""
-Implementation of JSONEncoder
-"""
+"""Implementation of JSONEncoder"""
 
 from collections.abc import Callable, Iterator
 from re import Pattern
@@ -57,6 +55,7 @@ class JSONEncoder:
     ``.default()`` method with another method that returns a serializable
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
+
     """
 
     item_separator: str
@@ -117,6 +116,7 @@ class JSONEncoder:
         If specified, default is a function that gets called for objects
         that can't otherwise be serialized.  It should return a JSON encodable
         version of the object or raise a ``TypeError``.
+
         """
 
     def default(self, o: Any) -> Any:
@@ -136,6 +136,7 @@ class JSONEncoder:
                     return list(iterable)
                 # Let the base class default method raise the TypeError
                 return super().default(o)
+
         """
 
     def encode(self, o: Any) -> str:
@@ -144,6 +145,7 @@ class JSONEncoder:
         >>> from json.encoder import JSONEncoder
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
+
         """
 
     def iterencode(self, o: Any, _one_shot: bool = False) -> Iterator[str]:
@@ -154,4 +156,5 @@ class JSONEncoder:
 
             for chunk in JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)
+
         """

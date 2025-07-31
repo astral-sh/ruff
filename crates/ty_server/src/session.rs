@@ -1,24 +1,27 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
-
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::Message;
+use lsp_types::notification::{Exit, Notification};
+use lsp_types::request::{Request, Shutdown};
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use std::collections::{BTreeMap, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
-pub(crate) use self::options::{AllOptions, ClientOptions, DiagnosticMode};
+pub(crate) use self::options::AllOptions;
+pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::publish_settings_diagnostics;
@@ -37,6 +40,9 @@ mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
+    /// A native system to use with the [`LSPSystem`].
+    native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+
     /// Used to retrieve information about open documents and settings.
     ///
     /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
@@ -76,7 +82,6 @@ pub(crate) struct Session {
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
-    pub(crate) db: ProjectDatabase,
     /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
@@ -91,6 +96,14 @@ pub(crate) struct ProjectState {
     /// for so that we can clear the diagnostics for all of them before we go
     /// to update any of them.
     pub(crate) untracked_files_with_pushed_diagnostics: Vec<Url>,
+
+    // Note: This field should be last to ensure the `db` gets dropped last.
+    // The db drop order matters because we call `Arc::into_inner` on some Arc's
+    // and we use Salsa's cancellation to guarantee that there's only a single reference to the `Arc`.
+    // However, this requires that the db drops last.
+    // This shouldn't matter here because the db's stored in the session are the
+    // only reference we want to hold on, but better be safe than sorry ;).
+    pub(crate) db: ProjectDatabase,
 }
 
 impl Session {
@@ -99,15 +112,17 @@ impl Session {
         position_encoding: PositionEncoding,
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options.into_settings())?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
         Ok(Self {
+            native_system,
             position_encoding,
             workspaces,
             deferred_messages: VecDeque::new(),
@@ -155,6 +170,9 @@ impl Session {
         } else {
             match &message {
                 Message::Request(request) => {
+                    if request.method == Shutdown::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` request until all workspaces are initialized",
                         request.method
@@ -165,6 +183,9 @@ impl Session {
                     return Some(message);
                 }
                 Message::Notification(notification) => {
+                    if notification.method == Exit::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` notification until all workspaces are initialized",
                         notification.method
@@ -218,9 +239,12 @@ impl Session {
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
-            AnySystemPath::System(system_path) => self
-                .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.default_project.get(self.index.as_ref())),
+            AnySystemPath::System(system_path) => {
+                self.project_state_for_path(system_path).unwrap_or_else(|| {
+                    self.default_project
+                        .get(self.index.as_ref(), &self.native_system)
+                })
+            }
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 // TODO: Currently, ty only supports single workspace but we need to figure out
                 // which project should this virtual path belong to when there are multiple
@@ -247,7 +271,10 @@ impl Session {
                 .range_mut(..=system_path.to_path_buf())
                 .next_back()
                 .map(|(_, project)| project)
-                .unwrap_or_else(|| self.default_project.get_mut(self.index.as_ref())),
+                .unwrap_or_else(|| {
+                    self.default_project
+                        .get_mut(self.index.as_ref(), &self.native_system)
+                }),
             AnySystemPath::SystemVirtual(_virtual_path) => {
                 // TODO: Currently, ty only supports single workspace but we need to figure out
                 // which project should this virtual path belong to when there are multiple
@@ -318,7 +345,6 @@ impl Session {
         client: &Client,
     ) {
         assert!(!self.workspaces.all_initialized());
-
         for (url, options) in workspace_settings {
             tracing::debug!("Initializing workspace `{url}`");
 
@@ -330,7 +356,10 @@ impl Session {
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
-            let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
+            let system = LSPSystem::new(
+                self.index.as_ref().unwrap().clone(),
+                self.native_system.clone(),
+            );
 
             let project = ProjectMetadata::discover(&root, &system)
                 .context("Failed to discover project configuration")
@@ -347,7 +376,10 @@ impl Session {
                 });
 
             let (root, db) = match project {
-                Ok(db) => (root, db),
+                Ok(mut db) => {
+                    db.set_check_mode(workspace.settings.diagnostic_mode().into_check_mode());
+                    (root, db)
+                }
                 Err(err) => {
                     tracing::error!(
                         "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
@@ -426,6 +458,7 @@ impl Session {
                 .collect(),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
+            resolved_client_capabilities: self.resolved_client_capabilities,
         }
     }
 
@@ -613,9 +646,20 @@ impl DocumentSnapshot {
 
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
-    projects: Vec<ProjectDatabase>,
     index: Arc<Index>,
     position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
+
+    /// IMPORTANT: It's important that the databases come last, or at least,
+    /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
+    /// and that relies on Salsa's cancellation to guarantee that there's now only a
+    /// single reference to it (e.g. see [`Session::index_mut`]).
+    ///
+    /// Making this field come last guarantees that the db's `Drop` handler is
+    /// dropped after all other fields, which ensures that
+    /// Salsa's cancellation blocks until all fields are dropped (and not only
+    /// waits for the db to be dropped while we still hold on to the `Index`).
+    projects: Vec<ProjectDatabase>,
 }
 
 impl SessionSnapshot {
@@ -629,6 +673,10 @@ impl SessionSnapshot {
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 }
 
@@ -745,26 +793,39 @@ impl DefaultProject {
         DefaultProject(std::sync::OnceLock::new())
     }
 
-    pub(crate) fn get(&self, index: Option<&Arc<Index>>) -> &ProjectState {
+    pub(crate) fn get(
+        &self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &ProjectState {
         self.0.get_or_init(|| {
-            tracing::info!("Initialize default project");
+            tracing::info!("Initializing the default project");
 
-            let system = LSPSystem::new(index.unwrap().clone());
+            let index = index.unwrap();
+            let system = LSPSystem::new(index.clone(), fallback_system.clone());
             let metadata = ProjectMetadata::from_options(
                 Options::default(),
                 system.current_directory().to_path_buf(),
                 None,
             )
             .unwrap();
+
+            let mut db = ProjectDatabase::new(metadata, system).unwrap();
+            db.set_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
+
             ProjectState {
-                db: ProjectDatabase::new(metadata, system).unwrap(),
+                db,
                 untracked_files_with_pushed_diagnostics: Vec::new(),
             }
         })
     }
 
-    pub(crate) fn get_mut(&mut self, index: Option<&Arc<Index>>) -> &mut ProjectState {
-        let _ = self.get(index);
+    pub(crate) fn get_mut(
+        &mut self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &mut ProjectState {
+        let _ = self.get(index, fallback_system);
 
         // SAFETY: The `OnceLock` is guaranteed to be initialized at this point because
         // we called `get` above, which initializes it if it wasn't already.

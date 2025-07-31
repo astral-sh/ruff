@@ -1,6 +1,4 @@
-"""
-Base class for MIME specializations.
-"""
+"""Base class for MIME specializations."""
 
 import email.message
 from email import _ParamsType

@@ -1,12 +1,13 @@
-"""
-This module provides primitive operations to manage Python interpreters.
+"""This module provides primitive operations to manage Python interpreters.
 The 'interpreters' module provides a more convenient interface.
 """
 
 import types
 from collections.abc import Callable
-from typing import Any, Final, Literal, SupportsIndex
+from typing import Any, Final, Literal, SupportsIndex, TypeVar
 from typing_extensions import TypeAlias
+
+_R = TypeVar("_R")
 
 _Configs: TypeAlias = Literal["default", "isolated", "legacy", "empty", ""]
 _SharedDict: TypeAlias = dict[str, Any]  # many objects can be shared
@@ -89,7 +90,7 @@ def get_config(id: SupportsIndex, *, restrict: bool = False) -> types.SimpleName
     Return a representation of the config used to initialize the interpreter.
     """
 
-def whence(id: SupportsIndex) -> int:
+def whence(id: SupportsIndex) -> _Whence:
     """whence(id) -> int
 
     Return an identifier for where the interpreter was created.
@@ -121,12 +122,12 @@ def exec(
 
 def call(
     id: SupportsIndex,
-    callable: Callable[..., object],
+    callable: Callable[..., _R],
     args: tuple[object, ...] | None = None,
     kwargs: dict[str, object] | None = None,
     *,
     restrict: bool = False,
-) -> object:
+) -> tuple[_R, types.SimpleNamespace]:
     """call(id, callable, args=None, kwargs=None, *, restrict=False)
 
     Call the provided object in the identified interpreter.
@@ -183,6 +184,7 @@ def capture_exception(exc: BaseException | None = None) -> types.SimpleNamespace
     The returned snapshot is the same as what _interpreters.exec() returns.
     """
 
+_Whence: TypeAlias = Literal[0, 1, 2, 3, 4, 5]
 WHENCE_UNKNOWN: Final = 0
 WHENCE_RUNTIME: Final = 1
 WHENCE_LEGACY_CAPI: Final = 2

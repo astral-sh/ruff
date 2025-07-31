@@ -1,5 +1,4 @@
-"""
-Functions that read and write gzipped files.
+"""Functions that read and write gzipped files.
 
 The user of the file doesn't have to worry about the compression,
 but random access is not allowed.
@@ -9,7 +8,7 @@ import sys
 import zlib
 from _typeshed import ReadableBuffer, SizedBuffer, StrOrBytesPath, WriteableBuffer
 from io import FileIO, TextIOWrapper
-from typing import Final, Literal, Protocol, overload
+from typing import Final, Literal, Protocol, overload, type_check_only
 from typing_extensions import TypeAlias
 
 if sys.version_info >= (3, 14):
@@ -32,6 +31,7 @@ FEXTRA: Final[int]  # actually Literal[4] # undocumented
 FNAME: Final[int]  # actually Literal[8] # undocumented
 FCOMMENT: Final[int]  # actually Literal[16] # undocumented
 
+@type_check_only
 class _ReadableFileobj(Protocol):
     def read(self, n: int, /) -> bytes: ...
     def seek(self, n: int, /) -> object: ...
@@ -40,6 +40,7 @@ class _ReadableFileobj(Protocol):
     # mode: str
     # def fileno() -> int: ...
 
+@type_check_only
 class _WritableFileobj(Protocol):
     def write(self, b: bytes, /) -> object: ...
     def flush(self) -> object: ...
@@ -73,6 +74,7 @@ def open(
     For text mode, a GzipFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error handling
     behavior, and line ending(s).
+
     """
 
 @overload
@@ -125,6 +127,7 @@ class GzipFile(BaseStream):
 
     This class only supports opening files in binary mode. If you need to open a
     compressed file in text mode, use the gzip.open() function.
+
     """
 
     myfileobj: FileIO | None
@@ -172,6 +175,7 @@ class GzipFile(BaseStream):
         is in Unix format, i.e., seconds since 00:00:00 UTC, January 1, 1970.
         If mtime is omitted or None, the current time is used. Use mtime = 0
         to generate a compressed stream that does not depend on creation time.
+
         """
 
     @overload

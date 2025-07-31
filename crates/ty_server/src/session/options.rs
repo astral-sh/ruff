@@ -2,7 +2,8 @@ use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use ty_project::CheckMode;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -47,10 +48,10 @@ struct WorkspaceOptions {
 }
 
 /// This is a direct representation of the settings schema sent by the client.
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ClientOptions {
+pub struct ClientOptions {
     /// Settings under the `python.*` namespace in VS Code that are useful for the ty language
     /// server.
     python: Option<Python>,
@@ -61,10 +62,10 @@ pub(crate) struct ClientOptions {
 }
 
 /// Diagnostic mode for the language server.
-#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
-pub(crate) enum DiagnosticMode {
+pub enum DiagnosticMode {
     /// Check only currently open files.
     #[default]
     OpenFilesOnly,
@@ -75,6 +76,13 @@ pub(crate) enum DiagnosticMode {
 impl DiagnosticMode {
     pub(crate) fn is_workspace(self) -> bool {
         matches!(self, DiagnosticMode::Workspace)
+    }
+
+    pub(crate) fn into_check_mode(self) -> CheckMode {
+        match self {
+            DiagnosticMode::OpenFilesOnly => CheckMode::OpenFiles,
+            DiagnosticMode::Workspace => CheckMode::AllFiles,
+        }
     }
 }
 
@@ -132,27 +140,34 @@ impl ClientOptions {
             overrides,
         }
     }
+
+    /// Create a new `ClientOptions` with the specified diagnostic mode
+    #[must_use]
+    pub fn with_diagnostic_mode(mut self, mode: DiagnosticMode) -> Self {
+        self.diagnostic_mode = Some(mode);
+        self
+    }
 }
 
 // TODO(dhruvmanila): We need to mirror the "python.*" namespace on the server side but ideally it
 // would be useful to instead use `workspace/configuration` instead. This would be then used to get
 // all settings and not just the ones in "python.*".
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Python {
     ty: Option<Ty>,
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct PythonExtension {
     active_environment: Option<ActiveEnvironment>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
@@ -161,7 +176,7 @@ pub(crate) struct ActiveEnvironment {
     pub(crate) version: Option<EnvironmentVersion>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnvironmentVersion {
@@ -173,7 +188,7 @@ pub(crate) struct EnvironmentVersion {
     pub(crate) sys_version: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
@@ -185,7 +200,7 @@ pub(crate) struct PythonEnvironment {
     pub(crate) name: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
@@ -194,7 +209,7 @@ pub(crate) struct PythonExecutable {
     pub(crate) sys_prefix: SystemPathBuf,
 }
 
-#[derive(Clone, Debug, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[serde(rename_all = "camelCase")]
 struct Ty {

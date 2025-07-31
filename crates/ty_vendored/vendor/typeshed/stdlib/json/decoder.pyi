@@ -1,6 +1,4 @@
-"""
-Implementation of JSONDecoder
-"""
+"""Implementation of JSONDecoder"""
 
 from collections.abc import Callable
 from typing import Any
@@ -15,6 +13,7 @@ class JSONDecodeError(ValueError):
     pos: The start index of doc where parsing failed
     lineno: The line corresponding to pos
     colno: The column corresponding to pos
+
     """
 
     msg: str
@@ -51,6 +50,7 @@ class JSONDecoder:
 
     It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as
     their corresponding ``float`` values, which is outside the JSON spec.
+
     """
 
     object_hook: Callable[[dict[str, Any]], Any]
@@ -105,6 +105,7 @@ class JSONDecoder:
     def decode(self, s: str, _w: Callable[..., Any] = ...) -> Any:  # _w is undocumented
         """Return the Python representation of ``s`` (a ``str`` instance
         containing a JSON document).
+
         """
 
     def raw_decode(self, s: str, idx: int = 0) -> tuple[Any, int]:
@@ -114,4 +115,5 @@ class JSONDecoder:
 
         This can be used to decode a JSON document from a string that may
         have extraneous data at the end.
+
         """

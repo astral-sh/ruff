@@ -1,6 +1,4 @@
-"""
-Context Variables
-"""
+"""Context Variables"""
 
 import sys
 from collections.abc import Callable, Iterator, Mapping

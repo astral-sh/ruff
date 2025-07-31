@@ -1,6 +1,4 @@
-"""
-create and manipulate C data types in Python
-"""
+"""create and manipulate C data types in Python"""
 
 import sys
 from _ctypes import (
@@ -15,6 +13,7 @@ from _ctypes import (
     _CData as _CData,
     _CDataType as _CDataType,
     _CField as _CField,
+    _CTypeBaseType,
     _Pointer as _Pointer,
     _PointerLike as _PointerLike,
     _SimpleCData as _SimpleCData,
@@ -233,7 +232,7 @@ def create_unicode_buffer(init: int | str, size: int | None = None) -> Array[c_w
     """
 
 @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
-def SetPointerType(pointer: type[_Pointer[Any]], cls: Any) -> None: ...
+def SetPointerType(pointer: type[_Pointer[Any]], cls: _CTypeBaseType) -> None: ...
 def ARRAY(typ: _CT, len: int) -> Array[_CT]: ...  # Soft Deprecated, no plans to remove
 
 if sys.platform == "win32":

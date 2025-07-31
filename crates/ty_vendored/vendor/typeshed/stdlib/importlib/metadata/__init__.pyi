@@ -36,7 +36,8 @@ if sys.version_info >= (3, 10):
 if sys.version_info >= (3, 10):
     from importlib.metadata._meta import PackageMetadata as PackageMetadata, SimplePath
     def packages_distributions() -> Mapping[str, list[str]]:
-        """Return a mapping of top-level packages to their
+        """
+        Return a mapping of top-level packages to their
         distributions.
 
         >>> import collections.abc
@@ -53,13 +54,15 @@ class PackageNotFoundError(ModuleNotFoundError):
     """The package was not found."""
 
     @property
-    def name(self) -> str: ...  # type: ignore[override]
+    def name(self) -> str:  # type: ignore[override]
+        """module name"""
 
 if sys.version_info >= (3, 13):
     _EntryPointBase = object
 elif sys.version_info >= (3, 11):
     class DeprecatedTuple:
-        """Provide subscript item access for backward compatibility.
+        """
+        Provide subscript item access for backward compatibility.
 
         >>> recwarn = getfixture('recwarn')
         >>> ep = EntryPoint(name='name', value='value', group='group')
@@ -129,7 +132,8 @@ class EntryPoint(_EntryPointBase):
             attr: str = ...,
             extras: list[str] = ...,
         ) -> bool:  # undocumented
-            """EntryPoint matches the given parameters.
+            """
+            EntryPoint matches the given parameters.
 
             >>> ep = EntryPoint(group='foo', name='bar', value='bing:bong [extra1, extra2]')
             >>> ep.matches(group='foo')
@@ -153,14 +157,21 @@ class EntryPoint(_EntryPointBase):
     if sys.version_info >= (3, 11):
         def __lt__(self, other: object) -> bool: ...
     if sys.version_info < (3, 12):
-        def __iter__(self) -> Iterator[Any]: ...  # result of iter((str, Self)), really
+        def __iter__(self) -> Iterator[Any]:  # result of iter((str, Self)), really
+            """
+            Supply iter so one may construct dicts of EntryPoints by name.
+            """
 
 if sys.version_info >= (3, 12):
     class EntryPoints(tuple[EntryPoint, ...]):
-        """An immutable collection of selectable EntryPoint objects."""
+        """
+        An immutable collection of selectable EntryPoint objects.
+        """
 
         def __getitem__(self, name: str) -> EntryPoint:  # type: ignore[override]
-            """Get the EntryPoint in self matching name."""
+            """
+            Get the EntryPoint in self matching name.
+            """
 
         def select(
             self,
@@ -172,21 +183,27 @@ if sys.version_info >= (3, 12):
             attr: str = ...,
             extras: list[str] = ...,
         ) -> EntryPoints:
-            """Select entry points from self that match the
+            """
+            Select entry points from self that match the
             given parameters (typically group and/or name).
             """
 
         @property
         def names(self) -> set[str]:
-            """Return the set of all names of all entry points."""
+            """
+            Return the set of all names of all entry points.
+            """
 
         @property
         def groups(self) -> set[str]:
-            """Return the set of all groups of all entry points."""
+            """
+            Return the set of all groups of all entry points.
+            """
 
 elif sys.version_info >= (3, 10):
     class DeprecatedList(list[_T]):
-        """Allow an otherwise immutable object to implement mutability
+        """
+        Allow an otherwise immutable object to implement mutability
         for compatibility.
 
         >>> recwarn = getfixture('recwarn')
@@ -217,11 +234,15 @@ elif sys.version_info >= (3, 10):
         """
 
     class EntryPoints(DeprecatedList[EntryPoint]):  # use as list is deprecated since 3.10
-        """An immutable collection of selectable EntryPoint objects."""
+        """
+        An immutable collection of selectable EntryPoint objects.
+        """
 
         # int argument is deprecated since 3.10
         def __getitem__(self, name: int | str) -> EntryPoint:  # type: ignore[override]
-            """Get the EntryPoint in self matching name."""
+            """
+            Get the EntryPoint in self matching name.
+            """
 
         def select(
             self,
@@ -233,17 +254,21 @@ elif sys.version_info >= (3, 10):
             attr: str = ...,
             extras: list[str] = ...,
         ) -> EntryPoints:
-            """Select entry points from self that match the
+            """
+            Select entry points from self that match the
             given parameters (typically group and/or name).
             """
 
         @property
         def names(self) -> set[str]:
-            """Return the set of all names of all entry points."""
+            """
+            Return the set of all names of all entry points.
+            """
 
         @property
         def groups(self) -> set[str]:
-            """Return the set of all groups of all entry points.
+            """
+            Return the set of all groups of all entry points.
 
             For coverage while SelectableGroups is present.
             >>> EntryPoints().groups
@@ -252,7 +277,8 @@ elif sys.version_info >= (3, 10):
 
 if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
     class Deprecated(Generic[_KT, _VT]):
-        """Compatibility add-in for mapping to indicate that
+        """
+        Compatibility add-in for mapping to indicate that
         mapping behavior is deprecated.
 
         >>> recwarn = getfixture('recwarn')
@@ -286,7 +312,8 @@ if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
         def values(self) -> dict_values[_KT, _VT]: ...
 
     class SelectableGroups(Deprecated[str, EntryPoints], dict[str, EntryPoints]):  # use as dict is deprecated since 3.10
-        """A backward- and forward-compatible result from
+        """
+        A backward- and forward-compatible result from
         entry_points that fully implements the dict interface.
         """
 
@@ -296,7 +323,8 @@ if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
         def groups(self) -> set[str]: ...
         @property
         def names(self) -> set[str]:
-            """for coverage:
+            """
+            for coverage:
             >>> SelectableGroups().names
             set()
             """
@@ -339,7 +367,8 @@ else:
     _distribution_parent = object
 
 class Distribution(_distribution_parent):
-    """An abstract Python distribution package.
+    """
+    An abstract Python distribution package.
 
     Custom providers may derive from this class and define
     the abstract methods to provide a concrete implementation
@@ -373,7 +402,8 @@ class Distribution(_distribution_parent):
 
     @abc.abstractmethod
     def locate_file(self, path: StrPath) -> _SimplePath:
-        """Given a path to a file in this distribution, return a SimplePath
+        """
+        Given a path to a file in this distribution, return a SimplePath
         to it.
         """
 
@@ -429,7 +459,8 @@ class Distribution(_distribution_parent):
 
         @property
         def entry_points(self) -> EntryPoints:
-            """Return EntryPoints for this distribution.
+            """
+            Return EntryPoints for this distribution.
 
             Custom providers may provide the ``entry_points.txt`` file
             or override this property.
@@ -440,20 +471,11 @@ class Distribution(_distribution_parent):
             """Return the parsed metadata for this Distribution.
 
             The returned object will have keys that name the various bits of
-            metadata per the
-            `Core metadata specifications <https://packaging.python.org/en/latest/specifications/core-metadata/#core-metadata>`_.
-
-            Custom providers may provide the METADATA file or override this
-            property.
+            metadata.  See PEP 566 for details.
             """
 
         @property
-        def entry_points(self) -> list[EntryPoint]:
-            """Return EntryPoints for this distribution.
-
-            Custom providers may provide the ``entry_points.txt`` file
-            or override this property.
-            """
+        def entry_points(self) -> list[EntryPoint]: ...
 
     @property
     def version(self) -> str:
@@ -487,14 +509,16 @@ class Distribution(_distribution_parent):
         def origin(self) -> types.SimpleNamespace: ...
 
 class DistributionFinder(MetaPathFinder):
-    """A MetaPathFinder capable of discovering installed distributions.
+    """
+    A MetaPathFinder capable of discovering installed distributions.
 
     Custom providers should implement this interface in order to
     supply metadata.
     """
 
     class Context:
-        """Keyword arguments presented by the caller to
+        """
+        Keyword arguments presented by the caller to
         ``distributions()`` or ``Distribution.discover()``
         to narrow the scope of a search for distributions
         in all DistributionFinders.
@@ -519,7 +543,8 @@ class DistributionFinder(MetaPathFinder):
         def __init__(self, *, name: str | None = ..., path: list[str] = ..., **kwargs: Any) -> None: ...
         @property
         def path(self) -> list[str]:
-            """The sequence of directory path that a distribution finder
+            """
+            The sequence of directory path that a distribution finder
             should search.
 
             Typically refers to Python installed package paths such as
@@ -528,7 +553,8 @@ class DistributionFinder(MetaPathFinder):
 
     @abc.abstractmethod
     def find_distributions(self, context: DistributionFinder.Context = ...) -> Iterable[Distribution]:
-        """Find distributions.
+        """
+        Find distributions.
 
         Return an iterable of all Distribution instances capable of
         loading the metadata for packages matching the ``context``,
@@ -538,7 +564,8 @@ class DistributionFinder(MetaPathFinder):
 class MetadataPathFinder(DistributionFinder):
     @classmethod
     def find_distributions(cls, context: DistributionFinder.Context = ...) -> Iterable[PathDistribution]:
-        """Find distributions.
+        """
+        Find distributions.
 
         Return an iterable of all Distribution instances capable of
         loading the metadata for packages matching ``context.name``
@@ -547,16 +574,10 @@ class MetadataPathFinder(DistributionFinder):
         """
     if sys.version_info >= (3, 11):
         @classmethod
-        def invalidate_caches(cls) -> None:
-            """An optional method for clearing the finder's cache, if any.
-            This method is used by importlib.invalidate_caches().
-            """
+        def invalidate_caches(cls) -> None: ...
     elif sys.version_info >= (3, 10):
         # Yes, this is an instance method that has a parameter named "cls"
-        def invalidate_caches(cls) -> None:
-            """An optional method for clearing the finder's cache, if any.
-            This method is used by importlib.invalidate_caches().
-            """
+        def invalidate_caches(cls) -> None: ...
 
 class PathDistribution(Distribution):
     _path: _SimplePath
@@ -686,7 +707,8 @@ def files(distribution_name: str) -> list[PackagePath] | None:
     """
 
 def requires(distribution_name: str) -> list[str] | None:
-    """Return a list of requirements for the named package.
+    """
+    Return a list of requirements for the named package.
 
     :return: An iterable of requirements, suitable for
         packaging.requirement.Requirement.

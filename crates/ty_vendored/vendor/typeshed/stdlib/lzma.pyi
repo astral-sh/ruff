@@ -1,5 +1,4 @@
-"""
-Interface to the liblzma compression library.
+"""Interface to the liblzma compression library.
 
 This module provides a class for reading and writing compressed files,
 classes for incremental (de)compression, and convenience functions for
@@ -252,6 +251,7 @@ def open(
     For text mode, an LZMAFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error
     handling behavior, and line ending(s).
+
     """
 
 @overload

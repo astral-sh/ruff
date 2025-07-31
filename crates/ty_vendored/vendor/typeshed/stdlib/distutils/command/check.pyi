@@ -1,5 +1,4 @@
-"""
-distutils.command.check
+"""distutils.command.check
 
 Implements the Distutils 'check' command.
 """

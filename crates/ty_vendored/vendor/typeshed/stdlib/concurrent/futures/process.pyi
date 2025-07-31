@@ -1,5 +1,4 @@
-"""
-Implements ProcessPoolExecutor.
+"""Implements ProcessPoolExecutor.
 
 The following diagram and text describe the data-flow through the system:
 
@@ -152,6 +151,7 @@ def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> l
     iterable passed to map.
 
     This function is run in a separate process.
+
     """
 
 if sys.version_info >= (3, 11):
@@ -248,13 +248,15 @@ _system_limited: bool | None
 
 def _check_system_limits() -> None: ...
 def _chain_from_iterable_of_lists(iterable: Iterable[MutableSequence[Any]]) -> Any:
-    """Specialized implementation of itertools.chain.from_iterable.
+    """
+    Specialized implementation of itertools.chain.from_iterable.
     Each item in *iterable* should be a list.  This function is
     careful not to keep references to yielded objects.
     """
 
 class BrokenProcessPool(BrokenExecutor):
-    """Raised when a process in a ProcessPoolExecutor terminated abruptly
+    """
+    Raised when a process in a ProcessPoolExecutor terminated abruptly
     while a future was in the running state.
     """
 
@@ -339,17 +341,10 @@ class ProcessPoolExecutor(Executor):
                 max_workers: The maximum number of processes that can be used to
                     execute the given calls. If None or not given then as many
                     worker processes will be created as the machine has processors.
-                mp_context: A multiprocessing context to launch the workers created
-                    using the multiprocessing.get_context('start method') API. This
+                mp_context: A multiprocessing context to launch the workers. This
                     object should provide SimpleQueue, Queue and Process.
                 initializer: A callable used to initialize worker processes.
                 initargs: A tuple of arguments to pass to the initializer.
-                max_tasks_per_child: The maximum number of tasks a worker process
-                    can complete before it will exit and be replaced with a fresh
-                    worker process. The default of None means worker process will
-                    live as long as the executor. Requires a non-'fork' mp_context
-                    start method. When given, we default to using 'spawn' if no
-                    mp_context is supplied.
             """
 
         @overload

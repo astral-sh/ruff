@@ -1,5 +1,4 @@
-"""
-Fixer that changes filter(F, X) into list(filter(F, X)).
+"""Fixer that changes filter(F, X) into list(filter(F, X)).
 
 We avoid the transformation if the filter() call is directly contained
 in iter(<>), list(<>), tuple(<>), sorted(<>), ...join(<>), or

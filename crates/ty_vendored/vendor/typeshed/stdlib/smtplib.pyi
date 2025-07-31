@@ -1,5 +1,4 @@
-"""
-SMTP/ESMTP client class.
+"""SMTP/ESMTP client class.
 
 This should follow RFC 821 (SMTP), RFC 1869 (ESMTP), RFC 2554 (SMTP
 Authentication) and RFC 2487 (Secure SMTP over TLS).
@@ -226,6 +225,7 @@ class SMTP:
         port) for the socket to bind to as its source address before
         connecting. If the host is '' and port is 0, the OS default behavior
         will be used.
+
         """
 
     def __enter__(self) -> Self: ...
@@ -237,6 +237,7 @@ class SMTP:
 
         A non-false value results in debug messages for connection and for all
         messages sent to and received from the server.
+
         """
 
     def connect(self, host: str = "localhost", port: int = 0, source_address: _SourceAddress | None = None) -> _Reply:
@@ -248,6 +249,7 @@ class SMTP:
 
         Note: This method is automatically invoked by __init__, if a host is
         specified during instantiation.
+
         """
 
     def send(self, s: ReadableBuffer | str) -> None:
@@ -433,7 +435,7 @@ class SMTP:
             method tries ESMTP EHLO first.
 
             If the server supports TLS, this will encrypt the rest of the SMTP
-            session. If you provide the context parameter,
+            session. If you provide the keyfile and certfile parameters,
             the identity of the SMTP server and client can be checked. This,
             however, depends on whether the socket module really checks the
             certificates.
@@ -454,65 +456,66 @@ class SMTP:
     ) -> _SendErrs:
         """This command performs an entire mail transaction.
 
-        The arguments are:
-            - from_addr    : The address sending this mail.
-            - to_addrs     : A list of addresses to send this mail to.  A bare
-                             string will be treated as a list with 1 address.
-            - msg          : The message to send.
-            - mail_options : List of ESMTP options (such as 8bitmime) for the
-                             mail command.
-            - rcpt_options : List of ESMTP options (such as DSN commands) for
-                             all the rcpt commands.
+The arguments are:
+    - from_addr    : The address sending this mail.
+    - to_addrs     : A list of addresses to send this mail to.  A bare
+                     string will be treated as a list with 1 address.
+    - msg          : The message to send.
+    - mail_options : List of ESMTP options (such as 8bitmime) for the
+                     mail command.
+    - rcpt_options : List of ESMTP options (such as DSN commands) for
+                     all the rcpt commands.
 
-        msg may be a string containing characters in the ASCII range, or a byte
-        string.  A string is encoded to bytes using the ascii codec, and lone
-        \\r and \\n characters are converted to \\r\\n characters.
+msg may be a string containing characters in the ASCII range, or a byte
+string.  A string is encoded to bytes using the ascii codec, and lone
+\\r and \\n characters are converted to \\r\\n characters.
 
-        If there has been no previous EHLO or HELO command this session, this
-        method tries ESMTP EHLO first.  If the server does ESMTP, message size
-        and each of the specified options will be passed to it.  If EHLO
-        fails, HELO will be tried and ESMTP options suppressed.
+If there has been no previous EHLO or HELO command this session, this
+method tries ESMTP EHLO first.  If the server does ESMTP, message size
+and each of the specified options will be passed to it.  If EHLO
+fails, HELO will be tried and ESMTP options suppressed.
 
-        This method will return normally if the mail is accepted for at least
-        one recipient.  It returns a dictionary, with one entry for each
-        recipient that was refused.  Each entry contains a tuple of the SMTP
-        error code and the accompanying error message sent by the server.
+This method will return normally if the mail is accepted for at least
+one recipient.  It returns a dictionary, with one entry for each
+recipient that was refused.  Each entry contains a tuple of the SMTP
+error code and the accompanying error message sent by the server.
 
-        This method may raise the following exceptions:
+This method may raise the following exceptions:
 
-         SMTPHeloError          The server didn't reply properly to
-                                the helo greeting.
-         SMTPRecipientsRefused  The server rejected ALL recipients
-                                (no mail was sent).
-         SMTPSenderRefused      The server didn't accept the from_addr.
-         SMTPDataError          The server replied with an unexpected
-                                error code (other than a refusal of
-                                a recipient).
-         SMTPNotSupportedError  The mail_options parameter includes 'SMTPUTF8'
-                                but the SMTPUTF8 extension is not supported by
-                                the server.
+ SMTPHeloError          The server didn't reply properly to
+                        the helo greeting.
+ SMTPRecipientsRefused  The server rejected ALL recipients
+                        (no mail was sent).
+ SMTPSenderRefused      The server didn't accept the from_addr.
+ SMTPDataError          The server replied with an unexpected
+                        error code (other than a refusal of
+                        a recipient).
+ SMTPNotSupportedError  The mail_options parameter includes 'SMTPUTF8'
+                        but the SMTPUTF8 extension is not supported by
+                        the server.
 
-        Note: the connection will be open even after an exception is raised.
+Note: the connection will be open even after an exception is raised.
 
-        Example:
+Example:
 
-         >>> import smtplib
-         >>> s=smtplib.SMTP("localhost")
-         >>> tolist=["one@one.org","two@two.org","three@three.org","four@four.org"]
-         >>> msg = '''\\
-         ... From: Me@my.org
-         ... Subject: testin'...
-         ...
-         ... This is a test '''
-         >>> s.sendmail("me@my.org",tolist,msg)
-         { "three@three.org" : ( 550 ,"User unknown" ) }
-         >>> s.quit()
+ >>> import smtplib
+ >>> s=smtplib.SMTP("localhost")
+ >>> tolist=["one@one.org","two@two.org","three@three.org","four@four.org"]
+ >>> msg = '''\\
+ ... From: Me@my.org
+ ... Subject: testin'...
+ ...
+ ... This is a test '''
+ >>> s.sendmail("me@my.org",tolist,msg)
+ { "three@three.org" : ( 550 ,"User unknown" ) }
+ >>> s.quit()
 
-        In the above example, the message was accepted for delivery to three
-        of the four addresses, and one was rejected, with the error code
-        550.  If all addresses are accepted, then the method will return an
-        empty dictionary.
-        """
+In the above example, the message was accepted for delivery to three
+of the four addresses, and one was rejected, with the error code
+550.  If all addresses are accepted, then the method will return an
+empty dictionary.
+
+"""
 
     def send_message(
         self,
@@ -539,6 +542,7 @@ class SMTP:
         If the server does not support SMTPUTF8, an SMTPNotSupported error is
         raised.  Otherwise the generator is called without modifying the
         policy.
+
         """
 
     def close(self) -> None:
@@ -555,6 +559,7 @@ class SMTP_SSL(SMTP):
     (465) is used.  local_hostname and source_address have the same meaning
     as they do in the SMTP class.  context also optional, can contain a
     SSLContext.
+
     """
 
     keyfile: str | None

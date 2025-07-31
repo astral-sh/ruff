@@ -1,6 +1,4 @@
-"""
-Shared OS X support functions.
-"""
+"""Shared OS X support functions."""
 
 from collections.abc import Iterable, Sequence
 from typing import Final, TypeVar
@@ -58,7 +56,8 @@ def _check_for_unavailable_sdk(_config_vars: dict[str, str]) -> dict[str, str]: 
     """Remove references to any SDKs not available"""
 
 def compiler_fixup(compiler_so: Iterable[str], cc_args: Sequence[str]) -> list[str]:
-    """This function will strip '-isysroot PATH' and '-arch ARCH' from the
+    """
+    This function will strip '-isysroot PATH' and '-arch ARCH' from the
     compile flags if the user has specified one them in extra_compile_flags.
 
     This is needed because '-arch ARCH' adds another architecture to the

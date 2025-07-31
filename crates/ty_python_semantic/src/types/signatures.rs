@@ -13,12 +13,12 @@
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
-use smallvec::{SmallVec, smallvec};
+use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -34,7 +34,7 @@ pub struct CallableSignature<'db> {
 impl<'db> CallableSignature<'db> {
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
-            overloads: smallvec![signature],
+            overloads: smallvec_inline![signature],
         }
     }
 
@@ -320,18 +320,22 @@ impl<'db> Signature<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
+        is_generator: bool,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
-            if function_node.is_async {
-                todo_type!("generic types.CoroutineType")
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
+
+            if function_node.is_async && !is_generator {
+                KnownClass::CoroutineType
+                    .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
             } else {
-                definition_expression_type(db, definition, returns.as_ref())
+                plain_return_ty
             }
         });
         let legacy_generic_context =
-            GenericContext::from_function_params(db, &parameters, return_ty);
+            GenericContext::from_function_params(db, definition, &parameters, return_ty);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!
@@ -383,7 +387,9 @@ impl<'db> Signature<'db> {
             inherited_generic_context: self
                 .inherited_generic_context
                 .map(|ctx| ctx.normalized_impl(db, visitor)),
-            definition: self.definition,
+            // Discard the definition when normalizing, so that two equivalent signatures
+            // with different `Definition`s share the same Salsa ID when normalized
+            definition: None,
             parameters: self
                 .parameters
                 .iter()

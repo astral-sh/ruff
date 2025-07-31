@@ -1,6 +1,4 @@
-"""
-Extract, format and print information about Python stack traces.
-"""
+"""Extract, format and print information about Python stack traces."""
 
 import sys
 from _typeshed import SupportsWrite, Unused
@@ -143,7 +141,8 @@ def print_stack(f: FrameType | None = None, limit: int | None = None, file: Supp
     """
 
 def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSummary:
-    """Return a StackSummary object representing a list of
+    """
+    Return a StackSummary object representing a list of
     pre-processed entries from traceback.
 
     This is useful for alternate formatting of stack traces.  If
@@ -236,6 +235,7 @@ else:
 
         The message indicating which exception occurred is always the last
         string in the list.
+
         """
 
 def format_exc(limit: int | None = None, chain: bool = True) -> str:
@@ -486,10 +486,6 @@ class TracebackException:
             display detailed information about where the syntax error occurred.
             Following the message, generator also yields
             all the exception's ``__notes__``.
-
-            When *show_group* is ``True``, and the exception is an instance of
-            :exc:`BaseExceptionGroup`, the nested exceptions are included as
-            well, recursively, with indentation relative to their nesting depth.
             """
     if sys.version_info >= (3, 11):
         def print(self, *, file: SupportsWrite[str] | None = None, chain: bool = True) -> None:
@@ -604,7 +600,8 @@ class StackSummary(list[FrameSummary]):
 
     @classmethod
     def from_list(cls, a_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> StackSummary:
-        """Create a StackSummary object from a supplied list of
+        """
+        Create a StackSummary object from a supplied list of
         FrameSummary objects or old-style list of tuples.
         """
     if sys.version_info >= (3, 11):

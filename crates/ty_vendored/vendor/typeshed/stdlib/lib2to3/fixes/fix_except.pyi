@@ -1,5 +1,4 @@
-"""
-Fixer for except statements with named exceptions.
+"""Fixer for except statements with named exceptions.
 
 The following cases will be converted:
 

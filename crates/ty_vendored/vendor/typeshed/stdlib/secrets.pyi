@@ -1,9 +1,9 @@
-"""
-Generate cryptographically strong pseudo-random numbers suitable for
+"""Generate cryptographically strong pseudo-random numbers suitable for
 managing secrets such as account authentication, tokens, and similar.
 
 See PEP 506 for more information.
 https://peps.python.org/pep-0506/
+
 """
 
 from _typeshed import SupportsLenAndGetItem
@@ -32,6 +32,7 @@ def token_bytes(nbytes: int | None = None) -> bytes:
 
     >>> token_bytes(16)  #doctest:+SKIP
     b'\\xebr\\x17D*t\\xae\\xd4\\xe3S\\xb6\\xe2\\xebP1\\x8b'
+
     """
 
 def token_hex(nbytes: int | None = None) -> str:
@@ -43,6 +44,7 @@ def token_hex(nbytes: int | None = None) -> str:
 
     >>> token_hex(16)  #doctest:+SKIP
     'f9bf78b9a18ce6d46a0cd2b0b86df9da'
+
     """
 
 def token_urlsafe(nbytes: int | None = None) -> str:
@@ -53,4 +55,5 @@ def token_urlsafe(nbytes: int | None = None) -> str:
 
     >>> token_urlsafe(16)  #doctest:+SKIP
     'Drmhze6EPcv0fN_81Bj-nA'
+
     """

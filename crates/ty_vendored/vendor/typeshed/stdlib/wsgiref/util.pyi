@@ -1,6 +1,4 @@
-"""
-Miscellaneous WSGI-related Utilities
-"""
+"""Miscellaneous WSGI-related Utilities"""
 
 import sys
 from _typeshed.wsgi import WSGIEnvironment

@@ -7,7 +7,7 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
-use crate::semantic_index::place::FileScopeId;
+use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};
@@ -67,8 +67,8 @@ impl<'db> SemanticModel<'db> {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
-        let ty = Type::module_literal(self.db, self.file, &module);
-        let builtin = module.is_known(KnownModule::Builtins);
+        let ty = Type::module_literal(self.db, self.file, module);
+        let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
         for crate::types::Member { name, ty } in crate::types::all_members(self.db, ty) {
@@ -84,9 +84,9 @@ impl<'db> SemanticModel<'db> {
             let Some(submodule) = resolve_module(self.db, &submodule_name) else {
                 continue;
             };
-            let ty = Type::module_literal(self.db, self.file, &submodule);
+            let ty = Type::module_literal(self.db, self.file, submodule);
             completions.push(Completion {
-                name: submodule_basename,
+                name: submodule_basename.clone(),
                 ty,
                 builtin,
             });

@@ -1,6 +1,4 @@
-"""
-Abstract Base Classes (ABCs) according to PEP 3119.
-"""
+"""Abstract Base Classes (ABCs) according to PEP 3119."""
 
 import _typeshed
 import sys
@@ -83,6 +81,7 @@ class abstractclassmethod(classmethod[_T, _P, _R_co]):
             @abstractmethod
             def my_abstract_classmethod(cls, ...):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]
@@ -99,6 +98,7 @@ class abstractstaticmethod(staticmethod[_P, _R_co]):
             @abstractmethod
             def my_abstract_staticmethod(...):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]
@@ -115,6 +115,7 @@ class abstractproperty(property):
             @abstractmethod
             def my_abstract_property(self):
                 ...
+
     """
 
     __isabstractmethod__: Literal[True]

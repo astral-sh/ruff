@@ -1,6 +1,4 @@
-"""
-Execute computations asynchronously using threads or processes.
-"""
+"""Execute computations asynchronously using threads or processes."""
 
 import sys
 
@@ -23,7 +21,7 @@ from .thread import ThreadPoolExecutor as ThreadPoolExecutor
 if sys.version_info >= (3, 14):
     from .interpreter import InterpreterPoolExecutor as InterpreterPoolExecutor
 
-    __all__ = (
+    __all__ = [
         "FIRST_COMPLETED",
         "FIRST_EXCEPTION",
         "ALL_COMPLETED",
@@ -38,7 +36,7 @@ if sys.version_info >= (3, 14):
         "ProcessPoolExecutor",
         "ThreadPoolExecutor",
         "InterpreterPoolExecutor",
-    )
+    ]
 
 elif sys.version_info >= (3, 13):
     __all__ = (
