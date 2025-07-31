@@ -90,7 +90,7 @@ exit_code: 1
           }
         }
       },
-      "message": "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
+      "message": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
     }
   ],
   "severity": "WARNING",
