@@ -655,6 +655,16 @@ impl<'db> Specialization<'db> {
             }
         }
 
+        match (self.tuple_inner(db), other.tuple_inner(db)) {
+            (Some(_), None) | (None, Some(_)) => return false,
+            (None, None) => {}
+            (Some(self_tuple), Some(other_tuple)) => {
+                if !self_tuple.is_equivalent_to(db, other_tuple) {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 
@@ -853,22 +863,25 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_tuple = formal_tuple.tuple(self.db);
-                let actual_tuple = actual_tuple.tuple(self.db);
-                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
-                    return Ok(());
-                };
-                let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                for (formal_element, actual_element) in
-                    formal_tuple.all_elements().zip(actual_tuple.all_elements())
-                {
-                    self.infer(*formal_element, *actual_element)?;
+            (
+                Type::NominalInstance(NominalInstanceType { class: class1, .. }),
+                Type::NominalInstance(NominalInstanceType { class: class2, .. })
+            ) if class1.tuple_spec(self.db).is_some() => {
+                if let (Some(formal_tuple), Some(actual_tuple)) = (class1.tuple_spec(self.db), class2.tuple_spec(self.db)) {
+                    let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+                        return Ok(());
+                    };
+                    let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    for (formal_element, actual_element) in
+                        formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                    {
+                        self.infer(*formal_element, *actual_element)?;
+                    }
                 }
             }
 
