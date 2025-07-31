@@ -2370,7 +2370,6 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.is_bound(db),
 
             Type::Dynamic(_)
-            | Type::Tuple(..)
             | Type::Never
             | Type::Union(..)
             | Type::Intersection(..)
