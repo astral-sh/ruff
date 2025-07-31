@@ -215,22 +215,19 @@ impl DisplaySet<'_> {
             self.format_label(line_offset, &annotation.label, stylesheet, buffer)
         } else {
             // TODO(brent) All of this complicated checking of `hide_severity` should be reverted
-            // once we have real severities in Ruff. This code is trying to account for three
+            // once we have real severities in Ruff. This code is trying to account for two
             // different cases:
             //
-            // - main diagnostic message for a lint diagnostic
-            // - main diagnostic message for a syntax error diagnostic
+            // - main diagnostic message
             // - subdiagnostic message
             //
-            // In the first case, signaled by `hide_severity = true` and a non-empty ID, we want to
-            // print the ID (the noqa code for ruff, e.g. F401) without brackets. In the second
-            // case, signaled by `hide_severity = true` and an ID of `Some("")`, Ruff currently adds
-            // a `SyntaxError: ` prefix to all of its syntax error messages, so we want to avoid
-            // printing any ID or severity in front of this. Finally, for subdiagnostics, we
-            // actually want to print the severity (usually `help`) regardless of the
-            // `hide_severity` setting. This is signaled by an ID of `None`.
+            // In the first case, signaled by `hide_severity = true`, we want to print the ID (the
+            // noqa code for a ruff lint diagnostic, e.g. `F401`, or `invalid-syntax` for a syntax
+            // error) without brackets. Instead, for subdiagnostics, we actually want to print the
+            // severity (usually `help`) regardless of the `hide_severity` setting. This is signaled
+            // by an ID of `None`.
             //
-            // With real severities these should be reported like in ty:
+            // With real severities these should be reported more like in ty:
             //
             // ```
             // error[F401]: `math` imported but unused
@@ -241,14 +238,16 @@ impl DisplaySet<'_> {
             //
             // ```
             // F401 `math` imported but unused
-            // SyntaxError: Cannot use `match` statement on Python 3.9...
+            // invalid-syntax: Cannot use `match` statement on Python 3.9...
             // ```
+            //
+            // Note that the `invalid-syntax` colon is added manually in `ruff_db`, not here. We
+            // could eventually add a colon to Ruff lint diagnostics (`F401:`) and then make the
+            // colon below unconditional again.
             let annotation_type = annotation_type_str(&annotation.annotation_type);
             if let Some(id) = annotation.id {
                 if hide_severity {
-                    if !id.is_empty() {
-                        buffer.append(line_offset, &format!("{id} "), *color);
-                    }
+                    buffer.append(line_offset, &format!("{id} "), *color);
                 } else {
                     buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
                 }
