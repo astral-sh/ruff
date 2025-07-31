@@ -490,13 +490,16 @@ impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
 impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
-    fn py_slice(
-        &'db self,
+    fn py_slice<'self_>(
+        &'self_ self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = &'self_ Self::Item>, StepSizeZeroError>
+    where
+        'db: 'self_,
+    {
         self.0.py_slice(db, start, stop, step)
     }
 }

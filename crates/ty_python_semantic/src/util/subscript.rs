@@ -110,25 +110,30 @@ pub(crate) struct StepSizeZeroError;
 pub(crate) trait PySlice<'db> {
     type Item: 'db;
 
-    fn py_slice(
-        &'db self,
+    fn py_slice<'self_>(
+        &'self_ self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError>;
+    ) -> Result<impl Iterator<Item = &'self_ Self::Item>, StepSizeZeroError>
+    where
+        'db: 'self_;
 }
 
 impl<'db, T: 'db> PySlice<'db> for [T] {
     type Item = T;
 
-    fn py_slice(
-        &'db self,
+    fn py_slice<'self_>(
+        &'self_ self,
         _db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = &'self_ Self::Item>, StepSizeZeroError>
+    where
+        'db: 'self_,
+    {
         let step_int = step_int.unwrap_or(1);
         if step_int == 0 {
             return Err(StepSizeZeroError);
