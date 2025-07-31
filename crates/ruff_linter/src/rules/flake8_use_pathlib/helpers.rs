@@ -20,18 +20,33 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
     })
 }
 
-/// Check if the given segments represent a pathlib Path subclass or `PackagePath`.
-pub(crate) fn is_pure_path_subclass(segments: &[&str]) -> bool {
-    let is_pathlib = matches!(
-        segments,
-        [
-            "pathlib",
-            "Path" | "PurePath" | "PosixPath" | "PurePosixPath" | "WindowsPath" | "PureWindowsPath"
-        ]
-    );
-    let is_packagepath = matches!(segments, ["importlib", "metadata", "PackagePath"]);
+/// Check if the given segments represent a pathlib Path subclass or `PackagePath` with preview mode support.
+/// In stable mode, only checks for `Path` and `PurePath`. In preview mode, also checks for
+/// `PosixPath`, `PurePosixPath`, `WindowsPath`, `PureWindowsPath`, and `PackagePath`.
+pub(crate) fn is_pure_path_subclass_with_preview(
+    checker: &crate::checkers::ast::Checker,
+    segments: &[&str],
+) -> bool {
+    let is_core_pathlib = matches!(segments, ["pathlib", "Path" | "PurePath"]);
 
-    is_pathlib || is_packagepath
+    if is_core_pathlib {
+        return true;
+    }
+
+    if checker.settings().preview.is_enabled() {
+        let is_expanded_pathlib = matches!(
+            segments,
+            [
+                "pathlib",
+                "PosixPath" | "PurePosixPath" | "WindowsPath" | "PureWindowsPath"
+            ]
+        );
+        let is_packagepath = matches!(segments, ["importlib", "metadata", "PackagePath"]);
+
+        return is_expanded_pathlib || is_packagepath;
+    }
+
+    false
 }
 
 /// We check functions that take only 1 argument,  this does not apply to functions

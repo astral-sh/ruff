@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+assertion_line: 144
 ---
 PTH201.py:6:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
   |
@@ -325,3 +326,98 @@ PTH201.py:55:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 58 58 |     "frag"  # Comment
 59 59 |     'ment'
 60 60 | )
+
+PTH201.py:74:15: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+72 | from importlib.metadata import PackagePath
+73 |
+74 | _ = PosixPath(".")
+   |               ^^^ PTH201
+75 | _ = PurePosixPath(".")
+76 | _ = WindowsPath(".")
+   |
+   = help: Remove the current directory argument
+
+ℹ Safe fix
+71 71 | 
+72 72 | from importlib.metadata import PackagePath
+73 73 | 
+74    |-_ = PosixPath(".")
+   74 |+_ = PosixPath()
+75 75 | _ = PurePosixPath(".")
+76 76 | _ = WindowsPath(".")
+77 77 | _ = PureWindowsPath(".")
+
+PTH201.py:75:19: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+74 | _ = PosixPath(".")
+75 | _ = PurePosixPath(".")
+   |                   ^^^ PTH201
+76 | _ = WindowsPath(".")
+77 | _ = PureWindowsPath(".")
+   |
+   = help: Remove the current directory argument
+
+ℹ Safe fix
+72 72 | from importlib.metadata import PackagePath
+73 73 | 
+74 74 | _ = PosixPath(".")
+75    |-_ = PurePosixPath(".")
+   75 |+_ = PurePosixPath()
+76 76 | _ = WindowsPath(".")
+77 77 | _ = PureWindowsPath(".")
+78 78 | _ = PackagePath(".")
+
+PTH201.py:76:17: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+74 | _ = PosixPath(".")
+75 | _ = PurePosixPath(".")
+76 | _ = WindowsPath(".")
+   |                 ^^^ PTH201
+77 | _ = PureWindowsPath(".")
+78 | _ = PackagePath(".")
+   |
+   = help: Remove the current directory argument
+
+ℹ Safe fix
+73 73 | 
+74 74 | _ = PosixPath(".")
+75 75 | _ = PurePosixPath(".")
+76    |-_ = WindowsPath(".")
+   76 |+_ = WindowsPath()
+77 77 | _ = PureWindowsPath(".")
+78 78 | _ = PackagePath(".")
+
+PTH201.py:77:21: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+75 | _ = PurePosixPath(".")
+76 | _ = WindowsPath(".")
+77 | _ = PureWindowsPath(".")
+   |                     ^^^ PTH201
+78 | _ = PackagePath(".")
+   |
+   = help: Remove the current directory argument
+
+ℹ Safe fix
+74 74 | _ = PosixPath(".")
+75 75 | _ = PurePosixPath(".")
+76 76 | _ = WindowsPath(".")
+77    |-_ = PureWindowsPath(".")
+   77 |+_ = PureWindowsPath()
+78 78 | _ = PackagePath(".")
+
+PTH201.py:78:17: PTH201 [*] Do not pass the current directory explicitly to `Path`
+   |
+76 | _ = WindowsPath(".")
+77 | _ = PureWindowsPath(".")
+78 | _ = PackagePath(".")
+   |                 ^^^ PTH201
+   |
+   = help: Remove the current directory argument
+
+ℹ Safe fix
+75 75 | _ = PurePosixPath(".")
+76 76 | _ = WindowsPath(".")
+77 77 | _ = PureWindowsPath(".")
+78    |-_ = PackagePath(".")
+   78 |+_ = PackagePath()
