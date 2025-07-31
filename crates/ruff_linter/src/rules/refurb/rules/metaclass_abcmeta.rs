@@ -24,6 +24,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// import abc
 ///
+///
 /// class C(metaclass=abc.ABCMeta):
 ///     pass
 /// ```
@@ -31,6 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// Use instead:
 /// ```python
 /// import abc
+///
 ///
 /// class C(abc.ABC):
 ///     pass
