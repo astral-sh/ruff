@@ -1669,13 +1669,16 @@ impl Flake8ImportConventionsOptions {
             );
         }
 
-        let normalized_aliases: FxHashMap<String, String> = aliases
-            .into_iter()
-            .map(|(module, alias)| {
-                let normalized_alias = alias.nfkc().collect::<String>();
-                (module, normalized_alias)
-            })
-            .collect();
+        let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        for (module, alias) in aliases {
+            let normalized_alias = alias.nfkc().collect::<String>();
+            if normalized_alias == "__debug__" {
+                anyhow::bail!(
+                    "Invalid alias for module '{module}': alias normalizes to '__debug__', which is not allowed."
+                );
+            }
+            normalized_aliases.insert(module, normalized_alias);
+        }
 
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
