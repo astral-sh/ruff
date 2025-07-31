@@ -22,12 +22,13 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{Db, watch};
+use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -275,7 +276,8 @@ impl MainLoop {
                     rayon::spawn(move || {
                         match salsa::Cancelled::catch(|| {
                             let mut reporter = IndicatifReporter::from(self.printer);
-                            db.check_with_reporter(&mut reporter)
+                            db.check_with_reporter(&mut reporter);
+                            reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -394,8 +396,12 @@ impl MainLoop {
     }
 }
 
+struct IndicatifReporter {
+    collector: CollectReporter,
+    state: IndicatifReporterState,
+}
 /// A progress reporter for `ty check`.
-enum IndicatifReporter {
+enum IndicatifReporterState {
     /// A constructed reporter that is not yet ready, contains the target for the progress bar.
     Pending(indicatif::ProgressDrawTarget),
     /// A reporter that is ready, containing a progress bar to report to.
@@ -408,18 +414,25 @@ enum IndicatifReporter {
 
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
-        Self::Pending(printer.progress_target())
+        Self {
+            collector: CollectReporter::default(),
+            state: IndicatifReporterState::Pending(printer.progress_target()),
+        }
     }
 }
 
 impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
+        self.collector.set_files(files);
+
         let target = match std::mem::replace(
-            self,
-            IndicatifReporter::Pending(indicatif::ProgressDrawTarget::hidden()),
+            &mut self.state,
+            IndicatifReporterState::Pending(indicatif::ProgressDrawTarget::hidden()),
         ) {
-            Self::Pending(target) => target,
-            Self::Initialized(_) => panic!("The progress reporter should only be initialized once"),
+            IndicatifReporterState::Pending(target) => target,
+            IndicatifReporterState::Initialized(_) => {
+                panic!("The progress reporter should only be initialized once")
+            }
         };
 
         let bar = indicatif::ProgressBar::with_draw_target(Some(files as u64), target);
@@ -431,18 +444,23 @@ impl ty_project::ProgressReporter for IndicatifReporter {
             .progress_chars("--"),
         );
         bar.set_message("Checking");
-        *self = Self::Initialized(bar);
+        self.state = IndicatifReporterState::Initialized(bar);
     }
 
-    fn report_file(&self, _file: &ruff_db::files::File) {
-        match self {
-            IndicatifReporter::Initialized(progress_bar) => {
+    fn report_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        self.collector.report_file(db, file, diagnostics);
+        match &self.state {
+            IndicatifReporterState::Initialized(progress_bar) => {
                 progress_bar.inc(1);
             }
-            IndicatifReporter::Pending(_) => {
+            IndicatifReporterState::Pending(_) => {
                 panic!("`report_file` called before `set_files`")
             }
         }
+    }
+
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.collector.report_diagnostics(db, diagnostics);
     }
 }
 
