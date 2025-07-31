@@ -8719,12 +8719,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Err(CallDunderError::CallError(call_error_kind, bindings)) => {
                 match call_error_kind {
                     CallErrorKind::NotCallable => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, value_node)
-                        {
+                        if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                             builder.into_diagnostic(format_args!(
                                 "Method `__getitem__` of type `{}` \
-                                    is not callable on object of type `{}`",
+                                is not callable on object of type `{}`",
                                 bindings.callable_type().display(db),
                                 value_ty.display(db),
                             ));
@@ -8732,26 +8730,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     CallErrorKind::BindingError => {
                         if let Some(builder) =
-                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                         {
                             builder.into_diagnostic(format_args!(
-                                        "Method `__getitem__` of type `{}` cannot be called with argument of \
-                                        type `{}` on object of type `{}`",
-                                        bindings.callable_type().display(self.db()),
-                                        slice_ty.display(self.db()),
-                                        value_ty.display(self.db()),
-                                    ));
+                                "Method `__getitem__` of type `{}` cannot be called with argument of \
+                                type `{}` on object of type `{}`",
+                                bindings.callable_type().display(db),
+                                slice_ty.display(db),
+                                value_ty.display(db),
+                            ));
                         }
                     }
                     CallErrorKind::PossiblyNotCallable => {
-                        if let Some(builder) =
-                            self.context.report_lint(&CALL_NON_CALLABLE, value_node)
-                        {
+                        if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
                             builder.into_diagnostic(format_args!(
-                                    "Method `__getitem__` of type `{}` is possibly not callable on object of type `{}`",
-                                    bindings.callable_type().display(self.db()),
-                                        value_ty.display(self.db()),
-                                    ));
+                                "Method `__getitem__` of type `{}` is possibly not callable on object of type `{}`",
+                                bindings.callable_type().display(db),
+                                value_ty.display(db),
+                            ));
                         }
                     }
                 }
