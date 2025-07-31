@@ -7,9 +7,12 @@ use serde_json::{Map, Value};
 
 use ruff_linter::{RuleSelector, line_width::LineLength, rule_selector::ParseError};
 
-use crate::session::{
-    Client,
-    settings::{ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration},
+use crate::{
+    format::FormatBackend,
+    session::{
+        Client,
+        settings::{ClientSettings, EditorSettings, GlobalClientSettings, ResolvedConfiguration},
+    },
 };
 
 pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
@@ -124,6 +127,7 @@ impl ClientOptions {
             configuration,
             lint_preview: lint.preview,
             format_preview: format.preview,
+            format_backend: format.backend,
             select: lint.select.and_then(|select| {
                 Self::resolve_rules(
                     &select,
@@ -283,11 +287,13 @@ impl Combine for LintOptions {
 #[serde(rename_all = "camelCase")]
 struct FormatOptions {
     preview: Option<bool>,
+    backend: Option<FormatBackend>,
 }
 
 impl Combine for FormatOptions {
     fn combine_with(&mut self, other: Self) {
         self.preview.combine_with(other.preview);
+        self.backend.combine_with(other.backend);
     }
 }
 
@@ -443,6 +449,12 @@ pub(crate) trait Combine {
     fn combine_with(&mut self, other: Self);
 }
 
+impl Combine for FormatBackend {
+    fn combine_with(&mut self, other: Self) {
+        *self = other;
+    }
+}
+
 impl<T> Combine for Option<T>
 where
     T: Combine,
@@ -584,6 +596,7 @@ mod tests {
                     format: Some(
                         FormatOptions {
                             preview: None,
+                            backend: None,
                         },
                     ),
                     code_action: Some(
@@ -640,6 +653,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                backend: None,
                             },
                         ),
                         code_action: Some(
@@ -704,6 +718,7 @@ mod tests {
                         format: Some(
                             FormatOptions {
                                 preview: None,
+                                backend: None,
                             },
                         ),
                         code_action: Some(
@@ -782,6 +797,7 @@ mod tests {
                     configuration: None,
                     lint_preview: Some(true),
                     format_preview: None,
+                    format_backend: None,
                     select: Some(vec![
                         RuleSelector::Linter(Linter::Pyflakes),
                         RuleSelector::Linter(Linter::Isort)
@@ -819,6 +835,7 @@ mod tests {
                     configuration: None,
                     lint_preview: Some(false),
                     format_preview: None,
+                    format_backend: None,
                     select: Some(vec![
                         RuleSelector::Linter(Linter::Pyflakes),
                         RuleSelector::Linter(Linter::Isort)
@@ -919,6 +936,7 @@ mod tests {
                     configuration: None,
                     lint_preview: None,
                     format_preview: None,
+                    format_backend: None,
                     select: None,
                     extend_select: None,
                     ignore: Some(vec![RuleSelector::from_str("RUF001").unwrap()]),

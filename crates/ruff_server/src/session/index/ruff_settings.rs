@@ -401,6 +401,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             configuration,
             format_preview,
             lint_preview,
+            format_backend: _,
             select,
             extend_select,
             ignore,

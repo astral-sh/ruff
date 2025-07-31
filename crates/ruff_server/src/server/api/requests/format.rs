@@ -33,6 +33,10 @@ impl super::BackgroundDocumentRequestHandler for Format {
 pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
     let query = snapshot.query();
+    let backend = snapshot
+        .client_settings()
+        .editor_settings()
+        .format_backend();
 
     match snapshot.query() {
         DocumentQuery::Notebook { notebook, .. } => {
@@ -41,7 +45,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
                 .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
             {
                 if let Some(changes) =
-                    format_text_document(text_document, query, snapshot.encoding(), true)?
+                    format_text_document(text_document, query, snapshot.encoding(), true, backend)?
                 {
                     fixes.insert(url, changes);
                 }
@@ -49,7 +53,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes>
         }
         DocumentQuery::Text { document, .. } => {
             if let Some(changes) =
-                format_text_document(document, query, snapshot.encoding(), false)?
+                format_text_document(document, query, snapshot.encoding(), false, backend)?
             {
                 fixes.insert(snapshot.query().make_key().into_url(), changes);
             }
@@ -68,11 +72,16 @@ pub(super) fn format_document(snapshot: &DocumentSnapshot) -> Result<super::Form
         .context("Failed to get text document for the format request")
         .unwrap();
     let query = snapshot.query();
+    let backend = snapshot
+        .client_settings()
+        .editor_settings()
+        .format_backend();
     format_text_document(
         text_document,
         query,
         snapshot.encoding(),
         query.as_notebook().is_some(),
+        backend,
     )
 }
 
@@ -81,6 +90,7 @@ fn format_text_document(
     query: &DocumentQuery,
     encoding: PositionEncoding,
     is_notebook: bool,
+    backend: crate::format::FormatBackend,
 ) -> Result<super::FormatResponse> {
     let settings = query.settings();
     let file_path = query.virtual_file_path();
@@ -101,6 +111,7 @@ fn format_text_document(
         query.source_type(),
         &settings.formatter,
         &file_path,
+        backend,
     )
     .with_failure_code(lsp_server::ErrorCode::InternalError)?;
     let Some(mut formatted) = formatted else {
