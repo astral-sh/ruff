@@ -69,6 +69,12 @@ impl<'a> ConciseRenderer<'a> {
                         "{code} ",
                         code = fmt_styled(code, stylesheet.secondary_code)
                     )?;
+                } else {
+                    write!(
+                        f,
+                        "{id}: ",
+                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                    )?;
                 }
                 if self.config.show_fix_status {
                     if let Some(fix) = diag.fix() {

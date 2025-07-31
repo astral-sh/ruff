@@ -248,11 +248,15 @@ impl<'a> ResolvedDiagnostic<'a> {
             .collect();
 
         let (id, message) = if config.hide_severity {
-            let id = Some(
-                diag.secondary_code()
-                    .map(|code| code.to_string())
-                    .unwrap_or_default(),
-            );
+            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
+            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
+            // the formatting of syntax errors for now. This should also be kept consistent with the
+            // concise formatting.
+            let id = Some(diag.secondary_code().map_or_else(
+                || format!("{id}:", id = diag.inner.id),
+                |code| code.to_string(),
+            ));
             let message = &diag.inner.message;
             let message = if diag
                 .fix()
