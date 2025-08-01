@@ -117,9 +117,9 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    ExplicitTypeVarKind, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
@@ -3377,7 +3377,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
-            TypeVarKind::Pep695,
+            TypeVarKind::Explicit(ExplicitTypeVarKind::Pep695),
         )));
         self.add_declaration_with_binding(
             node.into(),

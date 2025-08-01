@@ -23,9 +23,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    DeprecatedInstance, DynamicType, ExplicitTypeVarKind, KnownInstanceType, TypeAliasType,
+    TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -4106,7 +4106,7 @@ impl KnownClass {
                         bound_or_constraint,
                         variance,
                         *default,
-                        TypeVarKind::Legacy,
+                        TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy),
                     ),
                 )));
             }
