@@ -281,24 +281,6 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
-
-    pub(crate) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &mut PairVisitor<'db>,
-    ) -> bool {
-        self.tuple(db)
-            .is_disjoint_from_impl(db, other.tuple(db), visitor)
-    }
-
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.tuple(db).is_single_valued(db)
-    }
-
-    pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
-        self.tuple(db).truthiness()
-    }
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
@@ -347,10 +329,6 @@ impl<T> FixedLengthTuple<T> {
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> usize {
         self.0.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 
     pub(crate) fn push(&mut self, element: T) {
@@ -1013,10 +991,6 @@ impl<T> Tuple<T> {
         }
     }
 
-    pub(crate) const fn is_variadic(&self) -> bool {
-        matches!(self, Tuple::Variable(_))
-    }
-
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> TupleLength {
         match self {
@@ -1033,13 +1007,6 @@ impl<T> Tuple<T> {
             (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
             // The tuple type is Ambiguous if its inhabitants could be of any length
             _ => Truthiness::Ambiguous,
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Tuple::Fixed(tuple) => tuple.is_empty(),
-            Tuple::Variable(_) => false,
         }
     }
 

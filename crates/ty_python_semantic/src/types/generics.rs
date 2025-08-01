@@ -641,6 +641,9 @@ impl<'db> Specialization<'db> {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, typevars);
         }
+        if let Some(t) = self.tuple_inner(db) {
+            t.find_legacy_typevars(db, typevars);
+        }
     }
 }
 

@@ -3517,6 +3517,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::InitVar
+            | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleFallback => false,
         }
     }
