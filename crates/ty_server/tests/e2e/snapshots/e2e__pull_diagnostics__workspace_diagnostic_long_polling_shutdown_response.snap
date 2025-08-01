@@ -1,0 +1,9 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: workspace_response
+---
+Report(
+    WorkspaceDiagnosticReport {
+        items: [],
+    },
+)
