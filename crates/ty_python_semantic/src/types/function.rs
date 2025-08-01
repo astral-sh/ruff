@@ -76,9 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, all_members, walk_type_mapping,
+    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
+    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -901,7 +901,12 @@ fn is_instance_truthiness<'db>(
         if let Type::NominalInstance(instance) = ty {
             if instance
                 .class
-                .is_subclass_of(db, ClassType::NonGeneric(class))
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|c| match c {
+                    ClassType::Generic(c) => c.origin(db) == class,
+                    ClassType::NonGeneric(c) => c == class,
+                })
             {
                 return true;
             }
