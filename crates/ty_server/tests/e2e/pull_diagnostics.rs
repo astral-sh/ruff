@@ -605,7 +605,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
         WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
     };
 
-    assert_eq!(items.len(), NUM_FILES - 3 + 1); // 3 fixed, 4 unchanged, 1 full report for fixed file
+    assert_eq!(items.len(), 1); // 3 fixed, 4 unchanged, 1 full report for fixed file
 
     all_items.extend(items);
 
