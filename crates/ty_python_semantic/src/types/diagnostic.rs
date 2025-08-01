@@ -2283,7 +2283,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
             from `typing.Protocol` or `typing_extensions.Protocol`",
     );
     // See TODO in `report_bad_argument_to_get_protocol_members` above
-    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html");
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
