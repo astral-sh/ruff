@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
-snapshot_kind: text
 ---
-PT025.py:9:1: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+  --> PT025.py:9:1
    |
  9 | @pytest.mark.usefixtures("a")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT025
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 10 | @pytest.fixture()
 11 | def my_fixture():  # Error before
    |
-   = help: Remove `pytest.mark.usefixtures`
+help: Remove `pytest.mark.usefixtures`
 
 ℹ Safe fix
 6  6  |     pass
@@ -20,15 +20,16 @@ PT025.py:9:1: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
 11 10 | def my_fixture():  # Error before
 12 11 |     return 0
 
-PT025.py:16:1: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+  --> PT025.py:16:1
    |
 15 | @pytest.fixture()
 16 | @pytest.mark.usefixtures("a")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT025
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 17 | def my_fixture():  # Error after
 18 |     return 0
    |
-   = help: Remove `pytest.mark.usefixtures`
+help: Remove `pytest.mark.usefixtures`
 
 ℹ Safe fix
 13 13 | 

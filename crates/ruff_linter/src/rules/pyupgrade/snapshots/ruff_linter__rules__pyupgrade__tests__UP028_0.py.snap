@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+ --> UP028_0.py:2:5
   |
 1 |   def f():
 2 | /     for x in y:
 3 | |         yield x
-  | |_______________^ UP028
+  | |_______________^
   |
-  = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 1 1 | def f():
@@ -19,14 +20,15 @@ UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 5 4 | 
 6 5 | def g():
 
-UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+ --> UP028_0.py:7:5
   |
 6 |   def g():
 7 | /     for x, y in z:
 8 | |         yield (x, y)
-  | |____________________^ UP028
+  | |____________________^
   |
-  = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 4 4 | 
@@ -39,14 +41,15 @@ UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 10 9 | 
 11 10 | def h():
 
-UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:12:5
    |
 11 |   def h():
 12 | /     for x in [1, 2, 3]:
 13 | |         yield x
-   | |_______________^ UP028
+   | |_______________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 9  9  | 
@@ -59,14 +62,15 @@ UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 15 14 | 
 16 15 | def i():
 
-UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:17:5
    |
 16 |   def i():
 17 | /     for x in {x for x in y}:
 18 | |         yield x
-   | |_______________^ UP028
+   | |_______________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 14 14 | 
@@ -79,14 +83,15 @@ UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 20 19 | 
 21 20 | def j():
 
-UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:22:5
    |
 21 |   def j():
 22 | /     for x in (1, 2, 3):
 23 | |         yield x
-   | |_______________^ UP028
+   | |_______________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 19 19 | 
@@ -99,14 +104,15 @@ UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 25 24 | 
 26 25 | def k():
 
-UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:27:5
    |
 26 |   def k():
 27 | /     for x, y in {3: "x", 6: "y"}:
 28 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 24 24 | 
@@ -119,7 +125,8 @@ UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 30 29 | 
 31 30 | def f():  # Comment one\n'
 
-UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:33:5
    |
 31 |   def f():  # Comment one\n'
 32 |       # Comment two\n'
@@ -130,10 +137,10 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 37 | |     }:  # Comment seven\n'
 38 | |         # Comment eight\n'
 39 | |         yield x, y  # Comment nine\n'
-   | |__________________^ UP028
+   | |__________________^
 40 |           # Comment ten',
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 30 30 | 
@@ -152,14 +159,15 @@ UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 41 39 | 
 42 40 | 
 
-UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:44:5
    |
 43 |   def f():
 44 | /     for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
 45 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 41 41 | 
@@ -172,16 +180,17 @@ UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 47 46 | 
 48 47 | def f():
 
-UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:49:5
    |
 48 |   def f():
 49 | /     for x, y in z():
 50 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^
 51 |
 52 |   def f():
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 46 46 | 
@@ -194,18 +203,19 @@ UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 52 51 | def f():
 53 52 |     def func():
 
-UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:55:9
    |
 53 |       def func():
 54 |           # This comment is preserved\n'
 55 | /         for x, y in z():  # Comment one\n'
 56 | |             # Comment two\n'
 57 | |             yield x, y  # Comment three\n'
-   | |______________________^ UP028
+   | |______________________^
 58 |               # Comment four\n'
 59 |   # Comment\n'
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 52 52 | def f():
@@ -219,15 +229,16 @@ UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
 59 57 | # Comment\n'
 60 58 | def g():
 
-UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:67:5
    |
 65 |       for x in y:
 66 |           yield x
 67 | /     for z in x:
 68 | |         yield z
-   | |_______________^ UP028
+   | |_______________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 64 64 | def f():
@@ -240,15 +251,16 @@ UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 70 69 | 
 71 70 | def f():
 
-UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:72:5
    |
 71 |   def f():
 72 | /     for x, y in z():
 73 | |         yield x, y
-   | |__________________^ UP028
+   | |__________________^
 74 |       x = 1
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 69 69 | 
@@ -261,7 +273,8 @@ UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 75 74 | 
 76 75 | 
 
-UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+  --> UP028_0.py:79:5
    |
 77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
 78 |   def _serve_method(fn):
@@ -270,9 +283,9 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 81 | |             .markup(highlight=args.region)
 82 | |     ):
 83 | |         yield h
-   | |_______________^ UP028
+   | |_______________^
    |
-   = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 76 76 | 
@@ -289,17 +302,18 @@ UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 85 84 | 
 86 85 | # UP028: The later loop variable is not a reference to the earlier loop variable
 
-UP028_0.py:97:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:97:5
     |
  95 |   # UP028: The exception binding is not a reference to the loop variable
  96 |   def f():
  97 | /     for x in (1, 2, 3):
  98 | |         yield x
-    | |_______________^ UP028
+    | |_______________^
  99 |       # Shadowing with an `except`
 100 |       try:
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 94 94 | 
@@ -312,17 +326,18 @@ UP028_0.py:97:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 100 99 |     try:
 101 100 |         pass
 
-UP028_0.py:108:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:108:5
     |
 106 |   # UP028: The context binding is not a reference to the loop variable
 107 |   def f():
 108 | /     for x in (1, 2, 3):
 109 | |         yield x
-    | |_______________^ UP028
+    | |_______________^
 110 |       # Shadowing with `with`
 111 |       with contextlib.nullcontext() as x:
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 105 105 | 
@@ -335,17 +350,18 @@ UP028_0.py:108:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 111 110 |     with contextlib.nullcontext() as x:
 112 111 |         pass
 
-UP028_0.py:118:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:118:5
     |
 116 |   # UP028: The type annotation binding is not a reference to the loop variable
 117 |   def f():
 118 | /     for x in (1, 2, 3):
 119 | |         yield x
-    | |_______________^ UP028
+    | |_______________^
 120 |       # Shadowing with a type annotation
 121 |       x: int
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 115 115 | 
@@ -358,17 +374,18 @@ UP028_0.py:118:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 121 120 |     x: int
 122 121 | 
 
-UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:134:5
     |
 132 |   # UP028: The exception bindings are not a reference to the loop variable
 133 |   def f():
 134 | /     for x in (1, 2, 3):
 135 | |         yield x
-    | |_______________^ UP028
+    | |_______________^
 136 |       # Shadowing with multiple `except` blocks
 137 |       try:
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 131 131 | 
@@ -381,15 +398,16 @@ UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 137 136 |     try:
 138 137 |         pass
 
-UP028_0.py:170:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028 [*] Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:170:5
     |
 168 |   # https://github.com/astral-sh/ruff/issues/15540
 169 |   def f():
 170 | /     for a in 1,:
 171 | |         yield a
-    | |_______________^ UP028
+    | |_______________^
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
 ℹ Unsafe fix
 167 167 | 
@@ -402,24 +420,26 @@ UP028_0.py:170:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
 173 172 | 
 174 173 | SOME_GLOBAL = None
 
-UP028_0.py:179:5: UP028 Replace `yield` over `for` loop with `yield from`
+UP028 Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:179:5
     |
 177 |       global SOME_GLOBAL
 178 |
 179 | /     for SOME_GLOBAL in iterable:
 180 | |         yield SOME_GLOBAL
-    | |_________________________^ UP028
+    | |_________________________^
 181 |
 182 |       some_non_local = None
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`
 
-UP028_0.py:187:9: UP028 Replace `yield` over `for` loop with `yield from`
+UP028 Replace `yield` over `for` loop with `yield from`
+   --> UP028_0.py:187:9
     |
 185 |           nonlocal some_non_local
 186 |
 187 | /         for some_non_local in iterable:
 188 | |             yield some_non_local
-    | |________________________________^ UP028
+    | |________________________________^
     |
-    = help: Replace with `yield from`
+help: Replace with `yield from`

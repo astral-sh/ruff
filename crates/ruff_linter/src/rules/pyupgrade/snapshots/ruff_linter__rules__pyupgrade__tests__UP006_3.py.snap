@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-UP006_3.py:7:11: UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
+UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation
+ --> UP006_3.py:7:11
   |
 7 | def f(x: "typing.DefaultDict[str, str]") -> None:
-  |           ^^^^^^^^^^^^^^^^^^ UP006
+  |           ^^^^^^^^^^^^^^^^^^
 8 |     ...
   |
-  = help: Replace with `collections.defaultdict`
+help: Replace with `collections.defaultdict`
 
 ℹ Safe fix
 4 4 |     from collections import defaultdict

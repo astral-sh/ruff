@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:129:5: D200 [*] One-line docstring should fit on one line
+D200 [*] One-line docstring should fit on one line
+   --> D.py:129:5
     |
 127 |   @expect('D212: Multi-line docstring summary should start at the first line')
 128 |   def asdlkfasd():
 129 | /     """
 130 | |     Wrong.
 131 | |     """
-    | |_______^ D200
+    | |_______^
     |
-    = help: Reformat to one line
+help: Reformat to one line
 
 ℹ Unsafe fix
 126 126 |         '(found 3)')
@@ -24,16 +25,17 @@ D.py:129:5: D200 [*] One-line docstring should fit on one line
 133 131 | 
 134 132 | @expect('D201: No blank lines allowed before function docstring (found 1)')
 
-D.py:597:5: D200 [*] One-line docstring should fit on one line
+D200 [*] One-line docstring should fit on one line
+   --> D.py:597:5
     |
 595 |   @expect('D212: Multi-line docstring summary should start at the first line')
 596 |   def one_liner():
 597 | /     """
 598 | |
 599 | |     Wrong."""
-    | |_____________^ D200
+    | |_____________^
     |
-    = help: Reformat to one line
+help: Reformat to one line
 
 ℹ Unsafe fix
 594 594 |         '(found 3)')
@@ -47,16 +49,17 @@ D.py:597:5: D200 [*] One-line docstring should fit on one line
 601 599 | 
 602 600 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-D.py:606:5: D200 [*] One-line docstring should fit on one line
+D200 [*] One-line docstring should fit on one line
+   --> D.py:606:5
     |
 604 |   @expect('D212: Multi-line docstring summary should start at the first line')
 605 |   def one_liner():
 606 | /     r"""Wrong.
 607 | |
 608 | |     """
-    | |_______^ D200
+    | |_______^
     |
-    = help: Reformat to one line
+help: Reformat to one line
 
 ℹ Unsafe fix
 603 603 |         '(found 3)')
@@ -70,35 +73,38 @@ D.py:606:5: D200 [*] One-line docstring should fit on one line
 610 608 | 
 611 609 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-D.py:615:5: D200 One-line docstring should fit on one line
+D200 One-line docstring should fit on one line
+   --> D.py:615:5
     |
 613 |   @expect('D212: Multi-line docstring summary should start at the first line')
 614 |   def one_liner():
 615 | /     """Wrong."
 616 | |
 617 | |     """
-    | |_______^ D200
+    | |_______^
     |
-    = help: Reformat to one line
+help: Reformat to one line
 
-D.py:624:5: D200 One-line docstring should fit on one line
+D200 One-line docstring should fit on one line
+   --> D.py:624:5
     |
 622 |   @expect('D212: Multi-line docstring summary should start at the first line')
 623 |   def one_liner():
 624 | /     """
 625 | |
 626 | |     "Wrong."""
-    | |______________^ D200
+    | |______________^
     |
-    = help: Reformat to one line
+help: Reformat to one line
 
-D.py:645:5: D200 One-line docstring should fit on one line
+D200 One-line docstring should fit on one line
+   --> D.py:645:5
     |
 644 |   def single_line_docstring_with_an_escaped_backslash():
 645 | /     "\
 646 | |     "
-    | |_____^ D200
+    | |_____^
 647 |
 648 |   class StatementOnSameLineAsDocstring:
     |
-    = help: Reformat to one line
+help: Reformat to one line

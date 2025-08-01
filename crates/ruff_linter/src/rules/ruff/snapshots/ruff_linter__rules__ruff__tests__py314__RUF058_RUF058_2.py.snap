@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF058_2.py:5:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+ --> RUF058_2.py:5:1
   |
 4 | # Errors in Python 3.14+
 5 | starmap(func, zip(a, b, c, strict=True))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 6 | starmap(func, zip(a, b, c, strict=False))
 7 | starmap(func, zip(a, b, c, strict=strict))
   |
-  = help: Use `map` instead
+help: Use `map` instead
 
 ℹ Safe fix
 2 2 | import itertools
@@ -21,15 +22,16 @@ RUF058_2.py:5:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 7 7 | starmap(func, zip(a, b, c, strict=strict))
 8 8 | 
 
-RUF058_2.py:6:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+ --> RUF058_2.py:6:1
   |
 4 | # Errors in Python 3.14+
 5 | starmap(func, zip(a, b, c, strict=True))
 6 | starmap(func, zip(a, b, c, strict=False))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | starmap(func, zip(a, b, c, strict=strict))
   |
-  = help: Use `map` instead
+help: Use `map` instead
 
 ℹ Safe fix
 3 3 | 
@@ -41,14 +43,15 @@ RUF058_2.py:6:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
 8 8 | 
 9 9 | 
 
-RUF058_2.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+ --> RUF058_2.py:7:1
   |
 5 | starmap(func, zip(a, b, c, strict=True))
 6 | starmap(func, zip(a, b, c, strict=False))
 7 | starmap(func, zip(a, b, c, strict=strict))
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF058
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
-  = help: Use `map` instead
+help: Use `map` instead
 
 ℹ Safe fix
 4 4 | # Errors in Python 3.14+

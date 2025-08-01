@@ -1,18 +1,19 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+ --> docstring_singles.py:5:1
   |
 3 |   '''
 4 |
 5 | / '''
 6 | | this is not a docstring
 7 | | '''
-  | |___^ Q001
+  | |___^
 8 |
 9 |   l = []
   |
-  = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 2 2 | Single quotes multiline module docstring
@@ -27,7 +28,8 @@ docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quote
 9 9 | l = []
 10 10 | 
 
-docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+  --> docstring_singles.py:11:21
    |
  9 |   l = []
 10 |
@@ -35,11 +37,11 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
    |  _____________________^
 12 | |     class params \t not a docstring
 13 | | ''')):
-   | |___^ Q001
+   | |___^
 14 |       '''
 15 |       Single quotes multiline class docstring
    |
-   = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 8  8  | 
@@ -54,18 +56,19 @@ docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quo
 15 15 |     Single quotes multiline class docstring
 16 16 |     '''
 
-docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+  --> docstring_singles.py:18:5
    |
 16 |       '''
 17 |
 18 | /     '''
 19 | |     this is not a docstring
 20 | |     '''
-   | |_______^ Q001
+   | |_______^
 21 |
 22 |       # The colon in the list indexing below is an edge case for the docstring scanner
    |
-   = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 15 15 |     Single quotes multiline class docstring
@@ -80,17 +83,18 @@ docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quot
 22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
 23 23 |     def f(self, bar='''
 
-docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+  --> docstring_singles.py:23:21
    |
 22 |       # The colon in the list indexing below is an edge case for the docstring scanner
 23 |       def f(self, bar='''
    |  _____________________^
 24 | |         definitely not a docstring''',
-   | |_____________________________________^ Q001
+   | |_____________________________________^
 25 |           val=l[Cls():3]):
 26 |           '''
    |
-   = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 20 20 |     '''
@@ -104,18 +108,19 @@ docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quo
 26 26 |         '''
 27 27 |         Single quotes multiline function docstring
 
-docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+  --> docstring_singles.py:32:9
    |
 30 |           some_expression = 'hello world'
 31 |
 32 | /         '''
 33 | |         this is not a docstring
 34 | |         '''
-   | |___________^ Q001
+   | |___________^
 35 |
 36 |           if l:
    |
-   = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 29 29 | 
@@ -130,16 +135,17 @@ docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quot
 36 36 |         if l:
 37 37 |             '''
 
-docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
+Q001 [*] Single quote multiline found but double quotes preferred
+  --> docstring_singles.py:37:13
    |
 36 |           if l:
 37 | /             '''
 38 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
 39 | |             '''
-   | |_______________^ Q001
+   | |_______________^
 40 |               pass
    |
-   = help: Replace single multiline quotes with double quotes
+help: Replace single multiline quotes with double quotes
 
 ℹ Safe fix
 34 34 |         '''

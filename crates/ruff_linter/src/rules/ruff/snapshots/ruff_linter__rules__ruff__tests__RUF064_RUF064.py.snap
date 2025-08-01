@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF064.py:6:17: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+ --> RUF064.py:6:17
   |
 4 | from pathlib import Path
 5 |
 6 | os.chmod("foo", 444)  # Error
-  |                 ^^^ RUF064
+  |                 ^^^
 7 | os.chmod("foo", 0o444)  # OK
 8 | os.chmod("foo", 7777)  # Error
   |
-  = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 3 3 | import os
@@ -22,47 +23,51 @@ RUF064.py:6:17: RUF064 [*] Non-octal mode
 8 8 | os.chmod("foo", 7777)  # Error
 9 9 | os.chmod("foo", 10000)  # Error
 
-RUF064.py:8:17: RUF064 Non-octal mode
+RUF064 Non-octal mode
+  --> RUF064.py:8:17
    |
  6 | os.chmod("foo", 444)  # Error
  7 | os.chmod("foo", 0o444)  # OK
  8 | os.chmod("foo", 7777)  # Error
-   |                 ^^^^ RUF064
+   |                 ^^^^
  9 | os.chmod("foo", 10000)  # Error
 10 | os.chmod("foo", 99999)  # Error
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
-RUF064.py:9:17: RUF064 Non-octal mode
+RUF064 Non-octal mode
+  --> RUF064.py:9:17
    |
  7 | os.chmod("foo", 0o444)  # OK
  8 | os.chmod("foo", 7777)  # Error
  9 | os.chmod("foo", 10000)  # Error
-   |                 ^^^^^ RUF064
+   |                 ^^^^^
 10 | os.chmod("foo", 99999)  # Error
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
-RUF064.py:10:17: RUF064 Non-octal mode
+RUF064 Non-octal mode
+  --> RUF064.py:10:17
    |
  8 | os.chmod("foo", 7777)  # Error
  9 | os.chmod("foo", 10000)  # Error
 10 | os.chmod("foo", 99999)  # Error
-   |                 ^^^^^ RUF064
+   |                 ^^^^^
 11 |
 12 | os.umask(777)  # Error
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
-RUF064.py:12:10: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:12:10
    |
 10 | os.chmod("foo", 99999)  # Error
 11 |
 12 | os.umask(777)  # Error
-   |          ^^^ RUF064
+   |          ^^^
 13 | os.umask(0o777)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 9  9  | os.chmod("foo", 10000)  # Error
@@ -74,15 +79,16 @@ RUF064.py:12:10: RUF064 [*] Non-octal mode
 14 14 | 
 15 15 | os.fchmod(0, 400)  # Error
 
-RUF064.py:15:14: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:15:14
    |
 13 | os.umask(0o777)  # OK
 14 |
 15 | os.fchmod(0, 400)  # Error
-   |              ^^^ RUF064
+   |              ^^^
 16 | os.fchmod(0, 0o400)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 12 12 | os.umask(777)  # Error
@@ -94,15 +100,16 @@ RUF064.py:15:14: RUF064 [*] Non-octal mode
 17 17 | 
 18 18 | os.lchmod("foo", 755)  # Error
 
-RUF064.py:18:18: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:18:18
    |
 16 | os.fchmod(0, 0o400)  # OK
 17 |
 18 | os.lchmod("foo", 755)  # Error
-   |                  ^^^ RUF064
+   |                  ^^^
 19 | os.lchmod("foo", 0o755)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 15 15 | os.fchmod(0, 400)  # Error
@@ -114,15 +121,16 @@ RUF064.py:18:18: RUF064 [*] Non-octal mode
 20 20 | 
 21 21 | os.mkdir("foo", 600)  # Error
 
-RUF064.py:21:17: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:21:17
    |
 19 | os.lchmod("foo", 0o755)  # OK
 20 |
 21 | os.mkdir("foo", 600)  # Error
-   |                 ^^^ RUF064
+   |                 ^^^
 22 | os.mkdir("foo", 0o600)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 18 18 | os.lchmod("foo", 755)  # Error
@@ -134,15 +142,16 @@ RUF064.py:21:17: RUF064 [*] Non-octal mode
 23 23 | 
 24 24 | os.makedirs("foo", 644)  # Error
 
-RUF064.py:24:20: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:24:20
    |
 22 | os.mkdir("foo", 0o600)  # OK
 23 |
 24 | os.makedirs("foo", 644)  # Error
-   |                    ^^^ RUF064
+   |                    ^^^
 25 | os.makedirs("foo", 0o644)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 21 21 | os.mkdir("foo", 600)  # Error
@@ -154,15 +163,16 @@ RUF064.py:24:20: RUF064 [*] Non-octal mode
 26 26 | 
 27 27 | os.mkfifo("foo", 640)  # Error
 
-RUF064.py:27:18: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:27:18
    |
 25 | os.makedirs("foo", 0o644)  # OK
 26 |
 27 | os.mkfifo("foo", 640)  # Error
-   |                  ^^^ RUF064
+   |                  ^^^
 28 | os.mkfifo("foo", 0o640)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 24 24 | os.makedirs("foo", 644)  # Error
@@ -174,15 +184,16 @@ RUF064.py:27:18: RUF064 [*] Non-octal mode
 29 29 | 
 30 30 | os.mknod("foo", 660)  # Error
 
-RUF064.py:30:17: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:30:17
    |
 28 | os.mkfifo("foo", 0o640)  # OK
 29 |
 30 | os.mknod("foo", 660)  # Error
-   |                 ^^^ RUF064
+   |                 ^^^
 31 | os.mknod("foo", 0o660)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 27 27 | os.mkfifo("foo", 640)  # Error
@@ -194,15 +205,16 @@ RUF064.py:30:17: RUF064 [*] Non-octal mode
 32 32 | 
 33 33 | os.open("foo", os.O_CREAT, 644)  # Error
 
-RUF064.py:33:28: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:33:28
    |
 31 | os.mknod("foo", 0o660)  # OK
 32 |
 33 | os.open("foo", os.O_CREAT, 644)  # Error
-   |                            ^^^ RUF064
+   |                            ^^^
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 30 30 | os.mknod("foo", 660)  # Error
@@ -214,15 +226,16 @@ RUF064.py:33:28: RUF064 [*] Non-octal mode
 35 35 | 
 36 36 | Path("bar").chmod(755)  # Error
 
-RUF064.py:36:19: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:36:19
    |
 34 | os.open("foo", os.O_CREAT, 0o644)  # OK
 35 |
 36 | Path("bar").chmod(755)  # Error
-   |                   ^^^ RUF064
+   |                   ^^^
 37 | Path("bar").chmod(0o755)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 33 33 | os.open("foo", os.O_CREAT, 644)  # Error
@@ -234,14 +247,15 @@ RUF064.py:36:19: RUF064 [*] Non-octal mode
 38 38 | 
 39 39 | path = Path("bar")
 
-RUF064.py:40:12: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:40:12
    |
 39 | path = Path("bar")
 40 | path.chmod(755)  # Error
-   |            ^^^ RUF064
+   |            ^^^
 41 | path.chmod(0o755)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 37 37 | Path("bar").chmod(0o755)  # OK
@@ -253,15 +267,16 @@ RUF064.py:40:12: RUF064 [*] Non-octal mode
 42 42 | 
 43 43 | dbm.open("db", "r", 600)  # Error
 
-RUF064.py:43:21: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:43:21
    |
 41 | path.chmod(0o755)  # OK
 42 |
 43 | dbm.open("db", "r", 600)  # Error
-   |                     ^^^ RUF064
+   |                     ^^^
 44 | dbm.open("db", "r", 0o600)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 40 40 | path.chmod(755)  # Error
@@ -273,15 +288,16 @@ RUF064.py:43:21: RUF064 [*] Non-octal mode
 45 45 | 
 46 46 | dbm.gnu.open("db", "r", 600)  # Error
 
-RUF064.py:46:25: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:46:25
    |
 44 | dbm.open("db", "r", 0o600)  # OK
 45 |
 46 | dbm.gnu.open("db", "r", 600)  # Error
-   |                         ^^^ RUF064
+   |                         ^^^
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 43 43 | dbm.open("db", "r", 600)  # Error
@@ -293,15 +309,16 @@ RUF064.py:46:25: RUF064 [*] Non-octal mode
 48 48 | 
 49 49 | dbm.ndbm.open("db", "r", 600)  # Error
 
-RUF064.py:49:26: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:49:26
    |
 47 | dbm.gnu.open("db", "r", 0o600)  # OK
 48 |
 49 | dbm.ndbm.open("db", "r", 600)  # Error
-   |                          ^^^ RUF064
+   |                          ^^^
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 46 46 | dbm.gnu.open("db", "r", 600)  # Error
@@ -313,15 +330,16 @@ RUF064.py:49:26: RUF064 [*] Non-octal mode
 51 51 | 
 52 52 | os.fchmod(0, 256)  # 0o400
 
-RUF064.py:52:14: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:52:14
    |
 50 | dbm.ndbm.open("db", "r", 0o600)  # OK
 51 |
 52 | os.fchmod(0, 256)  # 0o400
-   |              ^^^ RUF064
+   |              ^^^
 53 | os.fchmod(0, 493)  # 0o755
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 49 49 | dbm.ndbm.open("db", "r", 600)  # Error
@@ -331,13 +349,14 @@ RUF064.py:52:14: RUF064 [*] Non-octal mode
    52 |+os.fchmod(0, 0o400)  # 0o400
 53 53 | os.fchmod(0, 493)  # 0o755
 
-RUF064.py:53:14: RUF064 [*] Non-octal mode
+RUF064 [*] Non-octal mode
+  --> RUF064.py:53:14
    |
 52 | os.fchmod(0, 256)  # 0o400
 53 | os.fchmod(0, 493)  # 0o755
-   |              ^^^ RUF064
+   |              ^^^
    |
-   = help: Replace with octal literal
+help: Replace with octal literal
 
 ℹ Unsafe fix
 50 50 | dbm.ndbm.open("db", "r", 0o600)  # OK

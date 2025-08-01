@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH201.py:6:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+ --> PTH201.py:6:10
   |
 5 | # match
 6 | _ = Path(".")
-  |          ^^^ PTH201
+  |          ^^^
 7 | _ = pth(".")
 8 | _ = PurePath(".")
   |
-  = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 3 3 | 
@@ -21,16 +22,17 @@ PTH201.py:6:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 8 8 | _ = PurePath(".")
 9 9 | _ = Path("")
 
-PTH201.py:7:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+ --> PTH201.py:7:9
   |
 5 | # match
 6 | _ = Path(".")
 7 | _ = pth(".")
-  |         ^^^ PTH201
+  |         ^^^
 8 | _ = PurePath(".")
 9 | _ = Path("")
   |
-  = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 4 4 | 
@@ -42,15 +44,16 @@ PTH201.py:7:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
 9 9 | _ = Path("")
 10 10 | 
 
-PTH201.py:8:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+ --> PTH201.py:8:14
   |
 6 | _ = Path(".")
 7 | _ = pth(".")
 8 | _ = PurePath(".")
-  |              ^^^ PTH201
+  |              ^^^
 9 | _ = Path("")
   |
-  = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 5 5 | # match
@@ -62,16 +65,17 @@ PTH201.py:8:14: PTH201 [*] Do not pass the current directory explicitly to `Path
 10 10 | 
 11 11 | Path('', )
 
-PTH201.py:9:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:9:10
    |
  7 | _ = pth(".")
  8 | _ = PurePath(".")
  9 | _ = Path("")
-   |          ^^ PTH201
+   |          ^^
 10 |
 11 | Path('', )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 6  6  | _ = Path(".")
@@ -83,16 +87,17 @@ PTH201.py:9:10: PTH201 [*] Do not pass the current directory explicitly to `Path
 11 11 | Path('', )
 12 12 | 
 
-PTH201.py:11:6: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:11:6
    |
  9 | _ = Path("")
 10 |
 11 | Path('', )
-   |      ^^ PTH201
+   |      ^^
 12 |
 13 | Path(
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 8  8  | _ = PurePath(".")
@@ -104,14 +109,15 @@ PTH201.py:11:6: PTH201 [*] Do not pass the current directory explicitly to `Path
 13 13 | Path(
 14 14 |     '',
 
-PTH201.py:14:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:14:5
    |
 13 | Path(
 14 |     '',
-   |     ^^ PTH201
+   |     ^^
 15 | )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 10 10 | 
@@ -125,14 +131,15 @@ PTH201.py:14:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 17 15 | Path(  # Comment before argument
 18 16 |     '',
 
-PTH201.py:18:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:18:5
    |
 17 | Path(  # Comment before argument
 18 |     '',
-   |     ^^ PTH201
+   |     ^^
 19 | )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 14 14 |     '',
@@ -146,14 +153,15 @@ PTH201.py:18:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 21 19 | Path(
 22 20 |     '',  # EOL comment
 
-PTH201.py:22:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:22:5
    |
 21 | Path(
 22 |     '',  # EOL comment
-   |     ^^ PTH201
+   |     ^^
 23 | )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 18 18 |     '',
@@ -167,15 +175,16 @@ PTH201.py:22:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 25 23 | Path(
 26 24 |     ''  # Comment in the middle of implicitly concatenated string
 
-PTH201.py:26:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:26:5
    |
 25 |   Path(
 26 | /     ''  # Comment in the middle of implicitly concatenated string
 27 | |     ".",
-   | |_______^ PTH201
+   | |_______^
 28 |   )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 22 22 |     '',  # EOL comment
@@ -190,15 +199,16 @@ PTH201.py:26:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 30 27 | Path(
 31 28 |     ''  # Comment before comma
 
-PTH201.py:31:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:31:5
    |
 30 | Path(
 31 |     ''  # Comment before comma
-   |     ^^ PTH201
+   |     ^^
 32 |     ,
 33 | )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 27 27 |     ".",
@@ -213,14 +223,15 @@ PTH201.py:31:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 35 32 | Path(
 36 33 |     '',
 
-PTH201.py:36:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:36:5
    |
 35 | Path(
 36 |     '',
-   |     ^^ PTH201
+   |     ^^
 37 | ) / "bare"
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Safe fix
 33 33 | )
@@ -234,14 +245,15 @@ PTH201.py:36:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 39 39 | Path(  # Comment before argument
 40 40 |     '',
 
-PTH201.py:40:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:40:5
    |
 39 | Path(  # Comment before argument
 40 |     '',
-   |     ^^ PTH201
+   |     ^^
 41 | ) / ("parenthesized")
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 37 37 | ) / "bare"
@@ -255,14 +267,15 @@ PTH201.py:40:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 43 43 | Path(
 44 44 |     '',  # EOL comment
 
-PTH201.py:44:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:44:5
    |
 43 | Path(
 44 |     '',  # EOL comment
-   |     ^^ PTH201
+   |     ^^
 45 | ) / ( ("double parenthesized"  )   )
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 41 41 | ) / ("parenthesized")
@@ -276,16 +289,17 @@ PTH201.py:44:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 47 47 | (  Path(
 48 48 |     ''  # Comment in the middle of implicitly concatenated string
 
-PTH201.py:48:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:48:5
    |
 47 |   (  Path(
 48 | /     ''  # Comment in the middle of implicitly concatenated string
 49 | |     ".",
-   | |_______^ PTH201
+   | |_______^
 50 |   ) )/ (("parenthesized path call")
 51 |         # Comment between closing parentheses
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 44 44 |     '',  # EOL comment
@@ -303,15 +317,16 @@ PTH201.py:48:5: PTH201 [*] Do not pass the current directory explicitly to `Path
 53 52 | 
 54 53 | Path(
 
-PTH201.py:55:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201 [*] Do not pass the current directory explicitly to `Path`
+  --> PTH201.py:55:5
    |
 54 | Path(
 55 |     ''  # Comment before comma
-   |     ^^ PTH201
+   |     ^^
 56 |     ,
 57 | ) / "multiple" / (
    |
-   = help: Remove the current directory argument
+help: Remove the current directory argument
 
 ℹ Unsafe fix
 52 52 | )

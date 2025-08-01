@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT023.py:51:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:51:1
    |
 51 | @pytest.mark.foo()
-   | ^^^^^^^^^^^^^^^^^^ PT023
+   | ^^^^^^^^^^^^^^^^^^
 52 | def test_something():
 53 |     pass
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 48 48 | # With parentheses
@@ -20,14 +21,15 @@ PT023.py:51:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 53 53 |     pass
 54 54 | 
 
-PT023.py:56:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:56:1
    |
 56 | @pytest.mark.foo()
-   | ^^^^^^^^^^^^^^^^^^ PT023
+   | ^^^^^^^^^^^^^^^^^^
 57 | class TestClass:
 58 |     def test_something():
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 53 53 |     pass
@@ -39,15 +41,16 @@ PT023.py:56:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 58 58 |     def test_something():
 59 59 |         pass
 
-PT023.py:63:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:63:5
    |
 62 | class TestClass:
 63 |     @pytest.mark.foo()
-   |     ^^^^^^^^^^^^^^^^^^ PT023
+   |     ^^^^^^^^^^^^^^^^^^
 64 |     def test_something():
 65 |         pass
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 60 60 | 
@@ -59,15 +62,16 @@ PT023.py:63:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 65 65 |         pass
 66 66 | 
 
-PT023.py:69:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:69:5
    |
 68 | class TestClass:
 69 |     @pytest.mark.foo()
-   |     ^^^^^^^^^^^^^^^^^^ PT023
+   |     ^^^^^^^^^^^^^^^^^^
 70 |     class TestNestedClass:
 71 |         def test_something():
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 66 66 | 
@@ -79,16 +83,17 @@ PT023.py:69:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 71 71 |         def test_something():
 72 72 |             pass
 
-PT023.py:77:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:77:9
    |
 75 | class TestClass:
 76 |     class TestNestedClass:
 77 |         @pytest.mark.foo()
-   |         ^^^^^^^^^^^^^^^^^^ PT023
+   |         ^^^^^^^^^^^^^^^^^^
 78 |         def test_something():
 79 |             pass
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 74 74 | 
@@ -100,7 +105,8 @@ PT023.py:77:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 79 79 |             pass
 80 80 | 
 
-PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
+PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
+  --> PT023.py:82:1
    |
 81 |   # https://github.com/astral-sh/ruff/issues/18770
 82 | / @pytest.mark.parametrize(
@@ -111,10 +117,10 @@ PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.param
 87 | |     #     (3, 4),
 88 | |     # ),
 89 | | )
-   | |_^ PT023
+   | |_^
 90 |   def test_bar(param1, param2): ...
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Unsafe fix
 79 79 |             pass
@@ -133,14 +139,15 @@ PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.param
 91 84 | 
 92 85 | 
 
-PT023.py:93:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+  --> PT023.py:93:1
    |
 93 | @(pytest.mark.foo())
-   | ^^^^^^^^^^^^^^^^^^^^ PT023
+   | ^^^^^^^^^^^^^^^^^^^^
 94 | def test_outer_paren_mark_function():
 95 |     pass
    |
-   = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 90 90 | def test_bar(param1, param2): ...
@@ -152,15 +159,16 @@ PT023.py:93:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
 95 95 |     pass
 96 96 | 
 
-PT023.py:99:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   --> PT023.py:99:5
     |
  98 | class TestClass:
  99 |     @(pytest.mark.foo())
-    |     ^^^^^^^^^^^^^^^^^^^^ PT023
+    |     ^^^^^^^^^^^^^^^^^^^^
 100 |     def test_method_outer_paren():
 101 |         pass
     |
-    = help: Remove parentheses
+help: Remove parentheses
 
 ℹ Safe fix
 96  96  | 

@@ -1,8 +1,11 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-undefined_name.ipynb:cell 3:1:7: F821 Undefined name `undefined`
+F821 Undefined name `undefined`
+ --> undefined_name.ipynb:3:7
   |
-1 | print(undefined)
-  |       ^^^^^^^^^ F821
+1 | colors = 6
+2 | print(colors)
+3 | print(undefined)
+  |       ^^^^^^^^^
   |
