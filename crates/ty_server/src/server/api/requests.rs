@@ -33,3 +33,5 @@ pub(super) use shutdown::ShutdownHandler;
 pub(super) use signature_help::SignatureHelpRequestHandler;
 pub(super) use workspace_diagnostic::WorkspaceDiagnosticRequestHandler;
 pub(super) use workspace_symbols::WorkspaceSymbolRequestHandler;
+
+pub use workspace_diagnostic::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};

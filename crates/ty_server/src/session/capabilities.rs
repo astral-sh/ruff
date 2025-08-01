@@ -18,6 +18,7 @@ bitflags::bitflags! {
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
+        const TEST_SERVER = 1 << 12;
     }
 }
 
@@ -80,6 +81,10 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports work done progress.
     pub(crate) const fn supports_work_done_progress(self) -> bool {
         self.contains(Self::WORK_DONE_PROGRESS)
+    }
+
+    pub(crate) const fn is_test_server(self) -> bool {
+        self.contains(Self::TEST_SERVER)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -204,6 +209,15 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::WORK_DONE_PROGRESS;
+        }
+
+        if client_capabilities
+            .experimental
+            .as_ref()
+            .and_then(|experimental| experimental.get("ty_test_server"))
+            .is_some()
+        {
+            flags |= Self::TEST_SERVER;
         }
 
         flags

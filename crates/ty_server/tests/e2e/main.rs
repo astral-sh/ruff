@@ -491,20 +491,25 @@ impl TestServer {
     fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
         match message {
             Message::Request(request) => {
+                tracing::debug!("Received server request {}", &request.method);
                 self.requests.push_back(request);
             }
-            Message::Response(response) => match self.responses.entry(response.id.clone()) {
-                Entry::Occupied(existing) => {
-                    return Err(TestServerError::DuplicateResponse(
-                        response.id,
-                        Box::new(existing.get().clone()),
-                    ));
+            Message::Response(response) => {
+                tracing::debug!("Received server response for request {}", &response.id);
+                match self.responses.entry(response.id.clone()) {
+                    Entry::Occupied(existing) => {
+                        return Err(TestServerError::DuplicateResponse(
+                            response.id,
+                            Box::new(existing.get().clone()),
+                        ));
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(response);
+                    }
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert(response);
-                }
-            },
+            }
             Message::Notification(notification) => {
+                tracing::debug!("Received notification {}", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
@@ -756,6 +761,9 @@ impl TestServerBuilder {
                 configuration: Some(true),
                 ..Default::default()
             }),
+            experimental: Some(json!({
+                "ty_test_server": true
+            })),
             ..Default::default()
         };
 

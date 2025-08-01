@@ -101,17 +101,16 @@ impl Client {
     where
         N: lsp_types::notification::Notification,
     {
-        let method = N::METHOD.to_string();
-
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(
-                    method, params,
+                    N::METHOD.to_string(),
+                    params,
                 )))
         {
             tracing::error!(
-                "Failed to send notification `{}` because the client sender is closed: {err}",
-                N::METHOD
+                "Failed to send notification `{method}` because the client sender is closed: {err}",
+                method = N::METHOD,
             );
         }
     }
