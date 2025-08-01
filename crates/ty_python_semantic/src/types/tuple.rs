@@ -299,10 +299,6 @@ impl<'db> TupleType<'db> {
             .is_disjoint_from_impl(db, other.tuple(db), visitor)
     }
 
-    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.tuple(db).is_single_valued(db)
-    }
-
     pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
         self.tuple(db).truthiness()
     }
@@ -487,10 +483,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             && (self.0.iter())
                 .zip(&other.0)
                 .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
-    }
-
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.0.iter().all(|ty| ty.is_single_valued(db))
     }
 }
 
@@ -1220,13 +1212,6 @@ impl<'db> Tuple<Type<'db>> {
         // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
         // both.
         false
-    }
-
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Tuple::Fixed(tuple) => tuple.is_single_valued(db),
-            Tuple::Variable(_) => false,
-        }
     }
 }
 
