@@ -819,6 +819,13 @@ impl Annotation {
         self.tags.push(tag);
     }
 
+    /// Set whether or not this annotation is file-level.
+    ///
+    /// File-level annotations are only rendered with their file name and range, if available. This
+    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
+    /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
+    /// documentation.
     pub fn set_file_level(&mut self, yes: bool) {
         self.is_file_level = yes;
     }
