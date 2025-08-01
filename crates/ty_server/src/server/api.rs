@@ -189,15 +189,10 @@ fn background_request_task<R: traits::BackgroundRequestHandler>(
 where
     <<R as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
-    tracing::debug!("Running background request task for method: {}", R::METHOD);
     let retry = R::RETRY_ON_CANCELLATION.then(|| req.clone());
     let (id, params) = cast_request::<R>(req)?;
 
     Ok(Task::background(schedule, move |session: &Session| {
-        tracing::debug!(
-            "Running background request task for method on background thread: {}",
-            R::METHOD
-        );
         let cancellation_token = session
             .request_queue()
             .incoming()
@@ -214,7 +209,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::debug!(
+                tracing::trace!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );

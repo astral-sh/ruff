@@ -40,8 +40,6 @@ mod settings;
 
 /// The global state for the LSP
 pub(crate) struct Session {
-    revision: u64,
-
     /// A native system to use with the [`LSPSystem`].
     native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
 
@@ -84,6 +82,14 @@ pub(crate) struct Session {
 
     deferred_messages: VecDeque<Message>,
 
+    /// A revision counter. It gets incremented on every change to `Session` that
+    /// could result in different workspace diagnostics.
+    revision: u64,
+
+    /// A pending workspace diagnostics request because there were no diagnostics
+    /// or no changes when when the request ran last time.
+    /// We'll re-run the request after every change to `Session` (see `revision)
+    /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
 }
 
@@ -176,6 +182,12 @@ impl Session {
         self.suspended_workspace_diagnostics_request.take()
     }
 
+    /// Resumes (retries) the workspace diagnostic request if there
+    /// were any changes to the [`Session`] (the revision got bumped)
+    /// since the workspace diagnostic request ran last time.
+    ///
+    /// The workspace diagnostic requests is ignored if the request
+    /// was cancelled in the meantime.
     pub(crate) fn resume_suspended_workspace_diagnostic_request(&mut self, client: &Client) {
         self.suspended_workspace_diagnostics_request = self
             .suspended_workspace_diagnostics_request
@@ -904,10 +916,26 @@ impl DefaultProject {
     }
 }
 
+/// A workspace diagnostic request that didn't yield any changes or diagnostic
+/// when it ran the last time.
 #[derive(Debug)]
 pub(crate) struct SuspendedWorkspaceDiagnosticRequest {
+    /// The LSP request id
     pub(crate) id: RequestId,
+
+    /// The params passed to the `workspace/diagnostic` request.
     pub(crate) params: serde_json::Value,
+
+    /// The session's revision when the request ran the last time.
+    ///
+    /// This is to prevent races between:
+    /// * The background thread completes
+    /// * A did change notification coming in
+    /// * storing this struct on `Session`
+    ///
+    /// The revision helps us detect that a did change notification
+    /// happened in the meantime, so that we can reschedule the
+    /// workspace diagnostic request immediately.
     pub(crate) revision: u64,
 }
 

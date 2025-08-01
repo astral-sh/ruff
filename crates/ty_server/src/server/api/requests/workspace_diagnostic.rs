@@ -26,6 +26,70 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 use ty_project::{Db, ProgressReporter};
 
+/// Handler for [Workspace diagnostics](workspace-diagnostics)
+///
+/// Workspace diagnostics are special in many ways compared to other request handlers.
+/// This is mostly due to the fact that computing them is expensive. Because of that,
+/// the LSP supports multiple optimizations of which we all make use:
+///
+/// ## Partial results
+///
+/// Many clients support partial results. They allow a server
+/// to send multiple responses (in the form of `$/progress `notifications) for
+/// the same request. We use partial results to stream the results for
+/// changed files. This has the obvious benefit is that users
+/// don't need to wait for the entire check to complete before they see any diagnostics.
+/// The other benefit of "chunking" the work also helps client to incrementally
+/// update (and repaint) the diagnostics instead of all at once.
+/// We did see lags in VS code for projects with 10k+ diagnostics before implementing
+/// this improvement.
+///
+/// ## Result IDs
+///
+/// The server can compute a result id for every file which the client
+/// sends back in the next pull or workspace diagnostic request. The way we use
+/// the result id is that we compute a fingerprint of the file's diagnostics (a hash)
+/// and compare it with the result id sent by the server. We know that
+/// the diagnostics for a file are unchanged (the client still has the most recent review)
+/// if the ids compare equal.
+///
+/// Result IDs are also useful to identify files for which ty no longer emits
+/// any diagnostics. For example, file A contained a syntax error that has now been fixed
+/// by the user. The client will send us a result id for file A but we won't match it with
+/// any new diagnostics because all errors in the file were fixed. The fact that we can't
+/// match up the result ID tells us that we need to clear the diagnostics on the client
+/// side by sending an empty diagnostic report (report without any diagnostics). We'll set the
+/// result id to `None` so that the client stops sending us a result id for this file.
+///
+/// Sending unchanged instead of the full diagnostics for files that haven't changed
+/// helps reduce the data that's sent from the server to the client and it also enables long-polling
+/// (see the next section).
+///
+/// ## Long polling
+///
+/// As of today (1st of August 2025), VS code's LSP client automatically schedules a
+/// workspace diagnostic request every two seconds because it doesn't know *when* to pull
+/// for new workspace diagnostics (it doesn't know what actions invalidate the diagnostics).
+/// However, running the workspace diagnostics every two seconds is wasting a lot of CPU cycles (and battery life as a result)
+/// if the user's only browsing the project (it requires ty to iterate over all files).
+/// That's why we implement long polling (as recommended in the LSP) for workspace diagnostics.
+///
+/// The basic idea of long-polling is that the server doesn't respond if there are no diagnostics
+/// or all diagnostics are unchanged. Instead, the server keeps the response open (it doesn't reply)
+/// and only responses when the diagnostics change. This puts the server in full control of when
+/// to recheck a workspace and a client can simply wait for the response to come in.
+///
+/// One challenge with long polling for ty's server architecture is that we can't just keep
+/// the background thread running because holding on to the [`ProjectDatabase]` references
+/// prevents notifications from acquiring the exclusive db lock (or the long polling background thread
+/// panics if a notification tries to do so). What we do instead is that this request handler
+/// doesn't send a response if there are no diagnostics or all are unchanged and it
+/// sets a ["snapshot"](SuspendedWorkspaceDiagnosticRequest) of the workspace diagnostic request on the [`Session`].
+/// The second part to this is in the notification request handling. ty retries the
+/// suspended workspace diagnostic request (if any) after every notification if the notification
+/// changed the [`Session`]'s state.
+///
+/// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
 impl RequestHandler for WorkspaceDiagnosticRequestHandler {
