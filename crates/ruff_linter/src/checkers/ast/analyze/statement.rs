@@ -31,6 +31,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
             }
+            if checker.is_rule_enabled(Rule::GlobalOrNonlocalInBranch) {
+                for name in names {
+                    ruff::rules::global_in_branch(checker, name);
+                }
+            }
         }
         Stmt::Nonlocal(
             nonlocal @ ast::StmtNonlocal {
@@ -49,6 +54,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
+            }
+            if checker.is_rule_enabled(Rule::GlobalOrNonlocalInBranch) {
+                for name in names {
+                    ruff::rules::nonlocal_in_branch(checker, name);
+                }
             }
         }
         Stmt::Break(_) => {
