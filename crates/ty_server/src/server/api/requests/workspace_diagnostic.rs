@@ -259,7 +259,12 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             self.report_progress();
         }
 
-        let mut response = self.response.lock().unwrap();
+        // Another thread might have panicked at this point because of a salsa cancellation which
+        // poisoned the result. If the response is poisoned, just don't report and wait for our thread
+        // to unwind with a salsa cancellation next.
+        let Ok(mut response) = self.response.lock() else {
+            return;
+        };
 
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
