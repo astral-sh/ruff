@@ -9113,21 +9113,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
 
-        // TODO: Remove because record_place_load is used instead
-        // let all_definitely_bound = match self.region {
-        //     InferenceRegion::Expression(expression) => {
-        //         let mut visitor = BoundSymbolsVisitor {
-        //             builder: &self,
-        //             all_definitely_bound: true,
-        //         };
-        //         let node = expression.node_ref(self.db(), self.module());
-        //         visitor.visit_expr(node);
-        //         let b = visitor.all_definitely_bound;
-        //         b
-        //     }
-        //     _ => false,
-        // };
-
         let Self {
             context,
             mut expressions,
@@ -10968,54 +10953,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
-    }
-}
-
-/// NOTE: Another way, what if we visit all the exprs and check if it's bound.
-/// Visitor to check if all symbols within an expression are definitely bound.
-struct BoundSymbolsVisitor<'a, 'db, 'ast> {
-    builder: &'a TypeInferenceBuilder<'db, 'ast>,
-    all_definitely_bound: bool,
-}
-
-impl<'a, 'db, 'ast> Visitor<'ast> for BoundSymbolsVisitor<'a, 'db, 'ast> {
-    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
-        // Short-circuit the traversal if we've already found an unbound symbol.
-        if !self.all_definitely_bound {
-            return;
-        }
-
-        match expr {
-            ast::Expr::Attribute(attr) if attr.ctx == ast::ExprContext::Load => {
-                if attr.attr.id().as_str() == "version_info" {
-                    return walk_expr(self, expr);
-                }
-            }
-            ast::Expr::Name(name) if name.ctx == ast::ExprContext::Load => {}
-            _ => return walk_expr(self, expr),
-        };
-
-        let place_expr = match PlaceExpr::try_from_expr(expr) {
-            Some(place_expr) => place_expr,
-            None => {
-                return walk_expr(self, expr);
-            }
-        };
-
-        let place = self
-            .builder
-            .infer_place_load(PlaceExprRef::from(&place_expr), ast::ExprRef::from(expr))
-            .0
-            .place;
-
-        if !matches!(place, Place::Type(_, Boundness::Bound)) {
-            dbg!(place);
-            eprintln!("{expr:?} was not bound");
-            self.all_definitely_bound = false;
-            return;
-        }
-
-        walk_expr(self, expr);
     }
 }
 
