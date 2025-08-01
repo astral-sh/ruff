@@ -319,30 +319,6 @@ impl LintRegistryBuilder {
         }
     }
 
-    #[track_caller]
-    pub fn register_alias(&mut self, from: LintName, to: &'static LintMetadata) {
-        let target = match self.by_name.get(to.name.as_str()) {
-            Some(LintEntry::Lint(target) | LintEntry::Removed(target)) => target,
-            Some(LintEntry::Alias(target)) => {
-                panic!(
-                    "lint alias {from} -> {to:?} points to another alias {target:?}",
-                    target = target.name()
-                )
-            }
-            None => panic!(
-                "lint alias {from} -> {to} points to non-registered lint",
-                to = to.name
-            ),
-        };
-
-        assert_eq!(
-            self.by_name
-                .insert(from.as_str(), LintEntry::Alias(*target)),
-            None,
-            "duplicate lint registration for '{from}'",
-        );
-    }
-
     pub fn build(self) -> LintRegistry {
         LintRegistry {
             lints: self.lints,
@@ -362,13 +338,6 @@ impl LintRegistry {
     pub fn get(&self, code: &str) -> Result<LintId, GetLintError> {
         match self.by_name.get(code) {
             Some(LintEntry::Lint(metadata)) => Ok(*metadata),
-            Some(LintEntry::Alias(lint)) => {
-                if lint.status.is_removed() {
-                    Err(GetLintError::Removed(lint.name()))
-                } else {
-                    Ok(*lint)
-                }
-            }
             Some(LintEntry::Removed(lint)) => Err(GetLintError::Removed(lint.name())),
             None => {
                 if let Some(without_prefix) = DiagnosticId::strip_category(code) {
@@ -388,19 +357,6 @@ impl LintRegistry {
     /// Returns all registered, non-removed lints.
     pub fn lints(&self) -> &[LintId] {
         &self.lints
-    }
-
-    /// Returns an iterator over all known aliases and to their target lints.
-    ///
-    /// This iterator includes aliases that point to removed lints.
-    pub fn aliases(&self) -> impl Iterator<Item = (LintName, LintId)> + '_ {
-        self.by_name.iter().filter_map(|(key, value)| {
-            if let LintEntry::Alias(alias) = value {
-                Some((LintName::of(key), *alias))
-            } else {
-                None
-            }
-        })
     }
 
     /// Iterates over all removed lints.
@@ -440,7 +396,6 @@ pub enum LintEntry {
     Lint(LintId),
     /// A lint rule that has been removed.
     Removed(LintId),
-    Alias(LintId),
 }
 
 impl LintEntry {
@@ -448,7 +403,6 @@ impl LintEntry {
         match self {
             LintEntry::Lint(id) => id,
             LintEntry::Removed(id) => id,
-            LintEntry::Alias(id) => id,
         }
     }
 }
@@ -500,18 +454,6 @@ impl RuleSelection {
             .collect();
 
         RuleSelection { lints }
-    }
-
-    /// Returns an iterator over all enabled lints.
-    pub fn enabled(&self) -> impl Iterator<Item = LintId> + '_ {
-        self.lints.keys().copied()
-    }
-
-    /// Returns an iterator over all enabled lints and their severity.
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (LintId, Severity)> + '_ {
-        self.lints
-            .iter()
-            .map(|(&lint, &(severity, _))| (lint, severity))
     }
 
     /// Returns the configured severity for the lint with the given id or `None` if the lint is disabled.
