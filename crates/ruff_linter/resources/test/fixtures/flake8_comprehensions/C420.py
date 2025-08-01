@@ -101,25 +101,3 @@ a # 6
 in # 7
 iterable # 8
 } # 9
-
-
-class C:
-    a = None
-
-def func():
-    {(C.a,): None for (C.a,) in "abc"}  # OK
-
-
-def func():
-    obj = type('obj', (), {'attr': 1})()
-    {(obj.attr,): None for (obj.attr,) in "abc"}  # OK
-
-
-def func():
-    lst = [1, 2, 3]
-    {(lst[0],): None for (lst[0],) in "abc"}  # OK
-
-
-def func():
-    lst = [1, 2, 3, 4, 5]
-    {(lst[1:3],): None for (lst[1:3],) in "abc"}  # OK

@@ -97,7 +97,7 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
     }
 
     // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
-    // (attributes, subscripts, or slices) at the top level.
+    // (attributes, subscripts, or slices).
     if contains_side_effecting_sub_expression(&generator.target) {
         return;
     }
