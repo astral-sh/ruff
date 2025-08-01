@@ -69,6 +69,7 @@ setprofile() -- set the global profiling function
 setrecursionlimit() -- set the max recursion depth for the interpreter
 settrace() -- set the global debug tracing function
 """
+
 import sys
 from _typeshed import MaybeNone, OptExcInfo, ProfileFunction, StrOrBytesPath, TraceFunction, structseq
 from _typeshed.importlib import MetaPathFinderProtocol, PathEntryFinderProtocol
@@ -175,8 +176,9 @@ flags: _flags
 class _flags(_UninstantiableStructseq, tuple[int, ...]):
     """sys.flags
 
-Flags provided through command line arguments or environment vars.
-"""
+    Flags provided through command line arguments or environment vars.
+    """
+
     # `safe_path` was added in py311
     if sys.version_info >= (3, 11):
         __match_args__: Final = (
@@ -222,74 +224,71 @@ Flags provided through command line arguments or environment vars.
 
     @property
     def debug(self) -> int:
-        """-d
-"""
+        """-d"""
+
     @property
     def inspect(self) -> int:
-        """-i
-"""
+        """-i"""
+
     @property
     def interactive(self) -> int:
-        """-i
-"""
+        """-i"""
+
     @property
     def optimize(self) -> int:
-        """-O or -OO
-"""
+        """-O or -OO"""
+
     @property
     def dont_write_bytecode(self) -> int:
-        """-B
-"""
+        """-B"""
+
     @property
     def no_user_site(self) -> int:
-        """-s
-"""
+        """-s"""
+
     @property
     def no_site(self) -> int:
-        """-S
-"""
+        """-S"""
+
     @property
     def ignore_environment(self) -> int:
-        """-E
-"""
+        """-E"""
+
     @property
     def verbose(self) -> int:
-        """-v
-"""
+        """-v"""
+
     @property
     def bytes_warning(self) -> int:
-        """-b
-"""
+        """-b"""
+
     @property
     def quiet(self) -> int:
-        """-q
-"""
+        """-q"""
+
     @property
     def hash_randomization(self) -> int:
-        """-R
-"""
+        """-R"""
+
     @property
     def isolated(self) -> int:
-        """-I
-"""
+        """-I"""
+
     @property
     def dev_mode(self) -> bool:
-        """-X dev
-"""
+        """-X dev"""
+
     @property
     def utf8_mode(self) -> int:
-        """-X utf8
-"""
+        """-X utf8"""
     if sys.version_info >= (3, 10):
         @property
         def warn_default_encoding(self) -> int:
-            """-X warn_default_encoding
-"""
+            """-X warn_default_encoding"""
     if sys.version_info >= (3, 11):
         @property
         def safe_path(self) -> bool:
-            """-P
-"""
+            """-P"""
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -297,8 +296,7 @@ Flags provided through command line arguments or environment vars.
     # and present in all versions of 3.11 and later.
     @property
     def int_max_str_digits(self) -> int:
-        """-X int_max_str_digits
-"""
+        """-X int_max_str_digits"""
 
 float_info: _float_info
 
@@ -308,10 +306,11 @@ float_info: _float_info
 class _float_info(structseq[float], tuple[float, int, int, float, int, int, int, int, float, int, int]):
     """sys.float_info
 
-A named tuple holding information about the float type. It contains low level
-information about the precision and internal representation. Please study
-your system's :file:`float.h` for more information.
-"""
+    A named tuple holding information about the float type. It contains low level
+    information about the precision and internal representation. Please study
+    your system's :file:`float.h` for more information.
+    """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = (
             "max",
@@ -329,48 +328,47 @@ your system's :file:`float.h` for more information.
 
     @property
     def max(self) -> float:  # DBL_MAX
-        """DBL_MAX -- maximum representable finite float
-"""
+        """DBL_MAX -- maximum representable finite float"""
+
     @property
     def max_exp(self) -> int:  # DBL_MAX_EXP
-        """DBL_MAX_EXP -- maximum int e such that radix**(e-1) is representable
-"""
+        """DBL_MAX_EXP -- maximum int e such that radix**(e-1) is representable"""
+
     @property
     def max_10_exp(self) -> int:  # DBL_MAX_10_EXP
-        """DBL_MAX_10_EXP -- maximum int e such that 10**e is representable
-"""
+        """DBL_MAX_10_EXP -- maximum int e such that 10**e is representable"""
+
     @property
     def min(self) -> float:  # DBL_MIN
-        """DBL_MIN -- Minimum positive normalized float
-"""
+        """DBL_MIN -- Minimum positive normalized float"""
+
     @property
     def min_exp(self) -> int:  # DBL_MIN_EXP
-        """DBL_MIN_EXP -- minimum int e such that radix**(e-1) is a normalized float
-"""
+        """DBL_MIN_EXP -- minimum int e such that radix**(e-1) is a normalized float"""
+
     @property
     def min_10_exp(self) -> int:  # DBL_MIN_10_EXP
-        """DBL_MIN_10_EXP -- minimum int e such that 10**e is a normalized float
-"""
+        """DBL_MIN_10_EXP -- minimum int e such that 10**e is a normalized float"""
+
     @property
     def dig(self) -> int:  # DBL_DIG
-        """DBL_DIG -- maximum number of decimal digits that can be faithfully represented in a float
-"""
+        """DBL_DIG -- maximum number of decimal digits that can be faithfully represented in a float"""
+
     @property
     def mant_dig(self) -> int:  # DBL_MANT_DIG
-        """DBL_MANT_DIG -- mantissa digits
-"""
+        """DBL_MANT_DIG -- mantissa digits"""
+
     @property
     def epsilon(self) -> float:  # DBL_EPSILON
-        """DBL_EPSILON -- Difference between 1 and the next representable float
-"""
+        """DBL_EPSILON -- Difference between 1 and the next representable float"""
+
     @property
     def radix(self) -> int:  # FLT_RADIX
-        """FLT_RADIX -- radix of exponent
-"""
+        """FLT_RADIX -- radix of exponent"""
+
     @property
     def rounds(self) -> int:  # FLT_ROUNDS
-        """FLT_ROUNDS -- rounding mode used for arithmetic operations
-"""
+        """FLT_ROUNDS -- rounding mode used for arithmetic operations"""
 
 hash_info: _hash_info
 
@@ -380,48 +378,48 @@ hash_info: _hash_info
 class _hash_info(structseq[Any | int], tuple[int, int, int, int, int, str, int, int, int]):
     """hash_info
 
-A named tuple providing parameters used for computing
-hashes. The attributes are read only.
-"""
+    A named tuple providing parameters used for computing
+    hashes. The attributes are read only.
+    """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("width", "modulus", "inf", "nan", "imag", "algorithm", "hash_bits", "seed_bits", "cutoff")
 
     @property
     def width(self) -> int:
-        """width of the type used for hashing, in bits
-"""
+        """width of the type used for hashing, in bits"""
+
     @property
     def modulus(self) -> int:
-        """prime number giving the modulus on which the hash function is based
-"""
+        """prime number giving the modulus on which the hash function is based"""
+
     @property
     def inf(self) -> int:
-        """value to be used for hash of a positive infinity
-"""
+        """value to be used for hash of a positive infinity"""
+
     @property
     def nan(self) -> int:
-        """value to be used for hash of a nan
-"""
+        """value to be used for hash of a nan"""
+
     @property
     def imag(self) -> int:
-        """multiplier used for the imaginary part of a complex number
-"""
+        """multiplier used for the imaginary part of a complex number"""
+
     @property
     def algorithm(self) -> str:
-        """name of the algorithm for hashing of str, bytes and memoryviews
-"""
+        """name of the algorithm for hashing of str, bytes and memoryviews"""
+
     @property
     def hash_bits(self) -> int:
-        """internal output size of hash algorithm
-"""
+        """internal output size of hash algorithm"""
+
     @property
     def seed_bits(self) -> int:
-        """seed size of hash algorithm
-"""
+        """seed size of hash algorithm"""
+
     @property
     def cutoff(self) -> int:  # undocumented
-        """small string optimization cutoff
-"""
+        """small string optimization cutoff"""
 
 implementation: _implementation
 
@@ -446,28 +444,28 @@ int_info: _int_info
 class _int_info(structseq[int], tuple[int, int, int, int]):
     """sys.int_info
 
-A named tuple that holds information about Python's
-internal representation of integers.  The attributes are read only.
-"""
+    A named tuple that holds information about Python's
+    internal representation of integers.  The attributes are read only.
+    """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("bits_per_digit", "sizeof_digit", "default_max_str_digits", "str_digits_check_threshold")
 
     @property
     def bits_per_digit(self) -> int:
-        """size of a digit in bits
-"""
+        """size of a digit in bits"""
+
     @property
     def sizeof_digit(self) -> int:
-        """size in bytes of the C type used to represent a digit
-"""
+        """size in bytes of the C type used to represent a digit"""
+
     @property
     def default_max_str_digits(self) -> int:
-        """maximum string conversion digits limitation
-"""
+        """maximum string conversion digits limitation"""
+
     @property
     def str_digits_check_threshold(self) -> int:
-        """minimum positive value for int_max_str_digits
-"""
+        """minimum positive value for int_max_str_digits"""
 
 _ThreadInfoName: TypeAlias = Literal["nt", "pthread", "pthread-stubs", "solaris"]
 _ThreadInfoLock: TypeAlias = Literal["semaphore", "mutex+cond"] | None
@@ -478,23 +476,23 @@ _ThreadInfoLock: TypeAlias = Literal["semaphore", "mutex+cond"] | None
 class _thread_info(_UninstantiableStructseq, tuple[_ThreadInfoName, _ThreadInfoLock, str | None]):
     """sys.thread_info
 
-A named tuple holding information about the thread implementation.
-"""
+    A named tuple holding information about the thread implementation.
+    """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("name", "lock", "version")
 
     @property
     def name(self) -> _ThreadInfoName:
-        """name of the thread implementation
-"""
+        """name of the thread implementation"""
+
     @property
     def lock(self) -> _ThreadInfoLock:
-        """name of the lock implementation
-"""
+        """name of the lock implementation"""
+
     @property
     def version(self) -> str | None:
-        """name and version of the thread library
-"""
+        """name and version of the thread library"""
 
 thread_info: _thread_info
 _ReleaseLevel: TypeAlias = Literal["alpha", "beta", "candidate", "final"]
@@ -505,181 +503,187 @@ _ReleaseLevel: TypeAlias = Literal["alpha", "beta", "candidate", "final"]
 class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel, int]):
     """sys.version_info
 
-Version information as a named tuple.
-"""
+    Version information as a named tuple.
+    """
+
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("major", "minor", "micro", "releaselevel", "serial")
 
     @property
     def major(self) -> int:
-        """Major release number
-"""
+        """Major release number"""
+
     @property
     def minor(self) -> int:
-        """Minor release number
-"""
+        """Minor release number"""
+
     @property
     def micro(self) -> int:
-        """Patch release number
-"""
+        """Patch release number"""
+
     @property
     def releaselevel(self) -> _ReleaseLevel:
-        """'alpha', 'beta', 'candidate', or 'final'
-"""
+        """'alpha', 'beta', 'candidate', or 'final'"""
+
     @property
     def serial(self) -> int:
-        """Serial release number
-"""
+        """Serial release number"""
 
 version_info: _version_info
 
 def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
     """Call func(*args), while tracing is enabled.
 
-The tracing state is saved, and restored afterwards.  This is intended
-to be called from a debugger from a checkpoint, to recursively debug
-some other code.
-"""
+    The tracing state is saved, and restored afterwards.  This is intended
+    to be called from a debugger from a checkpoint, to recursively debug
+    some other code.
+    """
 
 if sys.version_info >= (3, 13):
     @deprecated("Deprecated in Python 3.13; use _clear_internal_caches() instead.")
     def _clear_type_cache() -> None:
-        """Clear the internal type lookup cache.
-"""
+        """Clear the internal type lookup cache."""
 
 else:
     def _clear_type_cache() -> None:
-        """Clear the internal type lookup cache.
-"""
+        """Clear the internal type lookup cache."""
 
 def _current_frames() -> dict[int, FrameType]:
     """Return a dict mapping each thread's thread id to its current stack frame.
 
-This function should be used for specialized purposes only.
-"""
+    This function should be used for specialized purposes only.
+    """
+
 def _getframe(depth: int = 0, /) -> FrameType:
     """Return a frame object from the call stack.
 
-If optional integer depth is given, return the frame object that many
-calls below the top of the stack.  If that is deeper than the call
-stack, ValueError is raised.  The default for depth is zero, returning
-the frame at the top of the call stack.
+    If optional integer depth is given, return the frame object that many
+    calls below the top of the stack.  If that is deeper than the call
+    stack, ValueError is raised.  The default for depth is zero, returning
+    the frame at the top of the call stack.
 
-This function should be used for internal and specialized purposes
-only.
-"""
+    This function should be used for internal and specialized purposes
+    only.
+    """
 
 if sys.version_info >= (3, 12):
     def _getframemodulename(depth: int = 0) -> str | None:
         """Return the name of the module for a calling frame.
 
-The default depth returns the module containing the call to this API.
-A more typical use in a library will pass a depth of 1 to get the user's
-module rather than the library module.
+        The default depth returns the module containing the call to this API.
+        A more typical use in a library will pass a depth of 1 to get the user's
+        module rather than the library module.
 
-If no frame, module, or name can be found, returns None.
-"""
+        If no frame, module, or name can be found, returns None.
+        """
 
 def _debugmallocstats() -> None:
     """Print summary info to stderr about the state of pymalloc's structures.
 
-In Py_DEBUG mode, also perform some expensive internal consistency
-checks.
-"""
+    In Py_DEBUG mode, also perform some expensive internal consistency
+    checks.
+    """
+
 def __displayhook__(object: object, /) -> None:
-    """Print an object to sys.stdout and also save it in builtins._
-"""
+    """Print an object to sys.stdout and also save it in builtins._"""
+
 def __excepthook__(exctype: type[BaseException], value: BaseException, traceback: TracebackType | None, /) -> None:
-    """Handle an exception by displaying it with a traceback on sys.stderr.
-"""
+    """Handle an exception by displaying it with a traceback on sys.stderr."""
+
 def exc_info() -> OptExcInfo:
     """Return current exception information: (type, value, traceback).
 
-Return information about the most recent exception caught by an except
-clause in the current stack frame or in an older stack frame.
-"""
+    Return information about the most recent exception caught by an except
+    clause in the current stack frame or in an older stack frame.
+    """
 
 if sys.version_info >= (3, 11):
     def exception() -> BaseException | None:
         """Return the current exception.
 
-Return the most recent exception caught by an except clause
-in the current stack frame or in an older stack frame, or None
-if no such exception exists.
-"""
+        Return the most recent exception caught by an except clause
+        in the current stack frame or in an older stack frame, or None
+        if no such exception exists.
+        """
 
 def exit(status: _ExitCode = None, /) -> NoReturn:
     """Exit the interpreter by raising SystemExit(status).
 
-If the status is omitted or None, it defaults to zero (i.e., success).
-If the status is an integer, it will be used as the system exit status.
-If it is another kind of object, it will be printed and the system
-exit status will be one (i.e., failure).
-"""
+    If the status is omitted or None, it defaults to zero (i.e., success).
+    If the status is an integer, it will be used as the system exit status.
+    If it is another kind of object, it will be printed and the system
+    exit status will be one (i.e., failure).
+    """
+
 def getallocatedblocks() -> int:
-    """Return the number of memory blocks currently allocated.
-"""
+    """Return the number of memory blocks currently allocated."""
+
 def getdefaultencoding() -> str:
-    """Return the current default encoding used by the Unicode implementation.
-"""
+    """Return the current default encoding used by the Unicode implementation."""
 
 if sys.platform != "win32":
     def getdlopenflags() -> int:
         """Return the current value of the flags that are used for dlopen calls.
 
-The flag constants are defined in the os module.
-"""
+        The flag constants are defined in the os module.
+        """
 
 def getfilesystemencoding() -> str:
-    """Return the encoding used to convert Unicode filenames to OS filenames.
-"""
+    """Return the encoding used to convert Unicode filenames to OS filenames."""
+
 def getfilesystemencodeerrors() -> str:
-    """Return the error mode used Unicode to OS filename conversion.
-"""
+    """Return the error mode used Unicode to OS filename conversion."""
+
 def getrefcount(object: Any, /) -> int:
     """Return the reference count of object.
 
-The count returned is generally one higher than you might expect,
-because it includes the (temporary) reference as an argument to
-getrefcount().
-"""
+    The count returned is generally one higher than you might expect,
+    because it includes the (temporary) reference as an argument to
+    getrefcount().
+    """
+
 def getrecursionlimit() -> int:
     """Return the current value of the recursion limit.
 
-The recursion limit is the maximum depth of the Python interpreter
-stack.  This limit prevents infinite recursion from causing an overflow
-of the C stack and crashing Python.
-"""
+    The recursion limit is the maximum depth of the Python interpreter
+    stack.  This limit prevents infinite recursion from causing an overflow
+    of the C stack and crashing Python.
+    """
+
 def getsizeof(obj: object, default: int = ...) -> int:
     """getsizeof(object [, default]) -> int
 
-Return the size of object in bytes.
-"""
+    Return the size of object in bytes.
+    """
+
 def getswitchinterval() -> float:
-    """Return the current thread switch interval; see sys.setswitchinterval().
-"""
+    """Return the current thread switch interval; see sys.setswitchinterval()."""
+
 def getprofile() -> ProfileFunction | None:
     """Return the profiling function set with sys.setprofile.
 
-See the profiler chapter in the library manual.
-"""
+    See the profiler chapter in the library manual.
+    """
+
 def setprofile(function: ProfileFunction | None, /) -> None:
     """Set the profiling function.
 
-It will be called on each function call and return.  See the profiler
-chapter in the library manual.
-"""
+    It will be called on each function call and return.  See the profiler
+    chapter in the library manual.
+    """
+
 def gettrace() -> TraceFunction | None:
     """Return the global debug tracing function set with sys.settrace.
 
-See the debugger chapter in the library manual.
-"""
+    See the debugger chapter in the library manual.
+    """
+
 def settrace(function: TraceFunction | None, /) -> None:
     """Set the global debug tracing function.
 
-It will be called on each function call.  See the debugger chapter
-in the library manual.
-"""
+    It will be called on each function call.  See the debugger chapter
+    in the library manual.
+    """
 
 if sys.platform == "win32":
     # A tuple of length 5, even though it has more than 5 attributes.
@@ -709,42 +713,40 @@ if sys.platform == "win32":
     def getwindowsversion() -> _WinVersion:
         """Return info about the running version of Windows as a named tuple.
 
-The members are named: major, minor, build, platform, service_pack,
-service_pack_major, service_pack_minor, suite_mask, product_type and
-platform_version. For backward compatibility, only the first 5 items
-are available by indexing. All elements are numbers, except
-service_pack and platform_type which are strings, and platform_version
-which is a 3-tuple. Platform is always 2. Product_type may be 1 for a
-workstation, 2 for a domain controller, 3 for a server.
-Platform_version is a 3-tuple containing a version number that is
-intended for identifying the OS rather than feature detection.
-"""
+        The members are named: major, minor, build, platform, service_pack,
+        service_pack_major, service_pack_minor, suite_mask, product_type and
+        platform_version. For backward compatibility, only the first 5 items
+        are available by indexing. All elements are numbers, except
+        service_pack and platform_type which are strings, and platform_version
+        which is a 3-tuple. Platform is always 2. Product_type may be 1 for a
+        workstation, 2 for a domain controller, 3 for a server.
+        Platform_version is a 3-tuple containing a version number that is
+        intended for identifying the OS rather than feature detection.
+        """
 
 def intern(string: str, /) -> str:
     """``Intern'' the given string.
 
-This enters the string in the (global) table of interned strings whose
-purpose is to speed up dictionary lookups. Return the string itself or
-the previously interned string object with the same value.
-"""
+    This enters the string in the (global) table of interned strings whose
+    purpose is to speed up dictionary lookups. Return the string itself or
+    the previously interned string object with the same value.
+    """
 
 if sys.version_info >= (3, 13):
     def _is_gil_enabled() -> bool:
-        """Return True if the GIL is currently enabled and False otherwise.
-"""
+        """Return True if the GIL is currently enabled and False otherwise."""
+
     def _clear_internal_caches() -> None:
-        """Clear all internal performance-related caches.
-"""
+        """Clear all internal performance-related caches."""
+
     def _is_interned(string: str, /) -> bool:
-        """Return True if the given string is "interned".
-"""
+        """Return True if the given string is "interned"."""
 
 def is_finalizing() -> bool:
-    """Return True if Python is exiting.
-"""
+    """Return True if Python is exiting."""
+
 def breakpointhook(*args: Any, **kwargs: Any) -> Any:
-    """This hook function is called by built-in breakpoint().
-"""
+    """This hook function is called by built-in breakpoint()."""
 
 __breakpointhook__ = breakpointhook  # Contains the original value of breakpointhook
 
@@ -752,32 +754,34 @@ if sys.platform != "win32":
     def setdlopenflags(flags: int, /) -> None:
         """Set the flags used by the interpreter for dlopen calls.
 
-This is used, for example, when the interpreter loads extension
-modules. Among other things, this will enable a lazy resolving of
-symbols when importing a module, if called as sys.setdlopenflags(0).
-To share symbols across extension modules, call as
-sys.setdlopenflags(os.RTLD_GLOBAL).  Symbolic names for the flag
-modules can be found in the os module (RTLD_xxx constants, e.g.
-os.RTLD_LAZY).
-"""
+        This is used, for example, when the interpreter loads extension
+        modules. Among other things, this will enable a lazy resolving of
+        symbols when importing a module, if called as sys.setdlopenflags(0).
+        To share symbols across extension modules, call as
+        sys.setdlopenflags(os.RTLD_GLOBAL).  Symbolic names for the flag
+        modules can be found in the os module (RTLD_xxx constants, e.g.
+        os.RTLD_LAZY).
+        """
 
 def setrecursionlimit(limit: int, /) -> None:
     """Set the maximum depth of the Python interpreter stack to n.
 
-This limit prevents infinite recursion from causing an overflow of the C
-stack and crashing Python.  The highest possible limit is platform-
-dependent.
-"""
+    This limit prevents infinite recursion from causing an overflow of the C
+    stack and crashing Python.  The highest possible limit is platform-
+    dependent.
+    """
+
 def setswitchinterval(interval: float, /) -> None:
     """Set the ideal thread switching delay inside the Python interpreter.
 
-The actual frequency of switching threads can be lower if the
-interpreter executes long sequences of uninterruptible code
-(this is implementation-specific and workload-dependent).
+    The actual frequency of switching threads can be lower if the
+    interpreter executes long sequences of uninterruptible code
+    (this is implementation-specific and workload-dependent).
 
-The parameter must represent the desired switching delay in seconds
-A typical value is 0.005 (5 milliseconds).
-"""
+    The parameter must represent the desired switching delay in seconds
+    A typical value is 0.005 (5 milliseconds).
+    """
+
 def gettotalrefcount() -> int: ...  # Debug builds only
 
 # Doesn't exist at runtime, but exported in the stubs so pytest etc. can annotate their code more easily.
@@ -794,20 +798,20 @@ unraisablehook: Callable[[UnraisableHookArgs], Any]
 def __unraisablehook__(unraisable: UnraisableHookArgs, /) -> Any:
     """Handle an unraisable exception.
 
-The unraisable argument has the following attributes:
+    The unraisable argument has the following attributes:
 
-* exc_type: Exception type.
-* exc_value: Exception value, can be None.
-* exc_traceback: Exception traceback, can be None.
-* err_msg: Error message, can be None.
-* object: Object causing the exception, can be None.
-"""
+    * exc_type: Exception type.
+    * exc_value: Exception value, can be None.
+    * exc_traceback: Exception traceback, can be None.
+    * err_msg: Error message, can be None.
+    * object: Object causing the exception, can be None.
+    """
+
 def addaudithook(hook: Callable[[str, tuple[Any, ...]], Any]) -> None:
-    """Adds a new audit hook callback.
-"""
+    """Adds a new audit hook callback."""
+
 def audit(event: str, /, *args: Any) -> None:
-    """Passes the event to any audit hooks that are attached.
-"""
+    """Passes the event to any audit hooks that are attached."""
 
 _AsyncgenHook: TypeAlias = Callable[[AsyncGenerator[Any, Any]], None] | None
 
@@ -826,13 +830,14 @@ class _asyncgen_hooks(structseq[_AsyncgenHook], tuple[_AsyncgenHook, _AsyncgenHo
 def get_asyncgen_hooks() -> _asyncgen_hooks:
     """Return the installed asynchronous generators hooks.
 
-This returns a namedtuple of the form (firstiter, finalizer).
-"""
+    This returns a namedtuple of the form (firstiter, finalizer).
+    """
+
 def set_asyncgen_hooks(firstiter: _AsyncgenHook = ..., finalizer: _AsyncgenHook = ...) -> None:
     """set_asyncgen_hooks([firstiter] [, finalizer])
 
-Set a finalizer for async generators objects.
-"""
+    Set a finalizer for async generators objects.
+    """
 
 if sys.platform == "win32":
     if sys.version_info >= (3, 13):
@@ -843,97 +848,91 @@ if sys.platform == "win32":
         def _enablelegacywindowsfsencoding() -> None:
             """Changes the default filesystem encoding to mbcs:replace.
 
-This is done for consistency with earlier versions of Python. See PEP
-529 for more information.
+            This is done for consistency with earlier versions of Python. See PEP
+            529 for more information.
 
-This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
-environment variable before launching Python.
-"""
+            This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
+            environment variable before launching Python.
+            """
     else:
         def _enablelegacywindowsfsencoding() -> None:
             """Changes the default filesystem encoding to mbcs:replace.
 
-This is done for consistency with earlier versions of Python. See PEP
-529 for more information.
+            This is done for consistency with earlier versions of Python. See PEP
+            529 for more information.
 
-This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
-environment variable before launching Python.
-"""
+            This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
+            environment variable before launching Python.
+            """
 
 def get_coroutine_origin_tracking_depth() -> int:
-    """Check status of origin tracking for coroutine objects in this thread.
-"""
+    """Check status of origin tracking for coroutine objects in this thread."""
+
 def set_coroutine_origin_tracking_depth(depth: int) -> None:
     """Enable or disable origin tracking for coroutine objects in this thread.
 
-Coroutine objects will track 'depth' frames of traceback information
-about where they came from, available in their cr_origin attribute.
+    Coroutine objects will track 'depth' frames of traceback information
+    about where they came from, available in their cr_origin attribute.
 
-Set a depth of 0 to disable.
-"""
+    Set a depth of 0 to disable.
+    """
 
 # The following two functions were added in 3.11.0, 3.10.7, and 3.9.14,
 # as part of the response to CVE-2020-10735
 def set_int_max_str_digits(maxdigits: int) -> None:
-    """Set the maximum string digits limit for non-binary int<->str conversions.
-"""
+    """Set the maximum string digits limit for non-binary int<->str conversions."""
+
 def get_int_max_str_digits() -> int:
-    """Return the maximum string digits limit for non-binary int<->str conversions.
-"""
+    """Return the maximum string digits limit for non-binary int<->str conversions."""
 
 if sys.version_info >= (3, 12):
     if sys.version_info >= (3, 13):
         def getunicodeinternedsize(*, _only_immortal: bool = False) -> int:
-            """Return the number of elements of the unicode interned dictionary
-"""
+            """Return the number of elements of the unicode interned dictionary"""
     else:
         def getunicodeinternedsize() -> int:
-            """Return the number of elements of the unicode interned dictionary
-"""
+            """Return the number of elements of the unicode interned dictionary"""
 
     def deactivate_stack_trampoline() -> None:
         """Deactivate the current stack profiler trampoline backend.
 
-If no stack profiler is activated, this function has no effect.
-"""
+        If no stack profiler is activated, this function has no effect.
+        """
+
     def is_stack_trampoline_active() -> bool:
-        """Return *True* if a stack profiler trampoline is active.
-"""
+        """Return *True* if a stack profiler trampoline is active."""
     # It always exists, but raises on non-linux platforms:
     if sys.platform == "linux":
         def activate_stack_trampoline(backend: str, /) -> None:
-            """Activate stack profiler trampoline *backend*.
-"""
+            """Activate stack profiler trampoline *backend*."""
     else:
         def activate_stack_trampoline(backend: str, /) -> NoReturn:
-            """Activate stack profiler trampoline *backend*.
-"""
-
+            """Activate stack profiler trampoline *backend*."""
     from . import _monitoring
 
     monitoring = _monitoring
 
 if sys.version_info >= (3, 14):
     def is_remote_debug_enabled() -> bool:
-        """Return True if remote debugging is enabled, False otherwise.
-"""
+        """Return True if remote debugging is enabled, False otherwise."""
+
     def remote_exec(pid: int, script: StrOrBytesPath) -> None:
         """Executes a file containing Python code in a given remote Python process.
 
-This function returns immediately, and the code will be executed by the
-target process's main thread at the next available opportunity, similarly
-to how signals are handled. There is no interface to determine when the
-code has been executed. The caller is responsible for making sure that
-the file still exists whenever the remote process tries to read it and that
-it hasn't been overwritten.
+        This function returns immediately, and the code will be executed by the
+        target process's main thread at the next available opportunity, similarly
+        to how signals are handled. There is no interface to determine when the
+        code has been executed. The caller is responsible for making sure that
+        the file still exists whenever the remote process tries to read it and that
+        it hasn't been overwritten.
 
-The remote process must be running a CPython interpreter of the same major
-and minor version as the local process. If either the local or remote
-interpreter is pre-release (alpha, beta, or release candidate) then the
-local and remote interpreters must be the same exact version.
+        The remote process must be running a CPython interpreter of the same major
+        and minor version as the local process. If either the local or remote
+        interpreter is pre-release (alpha, beta, or release candidate) then the
+        local and remote interpreters must be the same exact version.
 
-Args:
-     pid (int): The process ID of the target Python process.
-     script (str|bytes): The path to a file containing
-         the Python code to be executed.
-"""
+        Args:
+             pid (int): The process ID of the target Python process.
+             script (str|bytes): The path to a file containing
+                 the Python code to be executed.
+        """

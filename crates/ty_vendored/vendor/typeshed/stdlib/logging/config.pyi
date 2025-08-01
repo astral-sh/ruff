@@ -7,6 +7,7 @@ Copyright (C) 2001-2022 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
+
 import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
@@ -73,8 +74,7 @@ class _DictConfigArgs(TypedDict, total=False):
 # Also accept a TypedDict type, to allow callers to use TypedDict
 # types, and for somewhat stricter type checking of dict literals.
 def dictConfig(config: _DictConfigArgs | dict[str, Any]) -> None:
-    """Configure logging using a dictionary.
-"""
+    """Configure logging using a dictionary."""
 
 if sys.version_info >= (3, 10):
     def fileConfig(
@@ -84,13 +84,13 @@ if sys.version_info >= (3, 10):
         encoding: str | None = None,
     ) -> None:
         """
-Read the logging configuration from a ConfigParser-format file.
+        Read the logging configuration from a ConfigParser-format file.
 
-This can be called several times from an application, allowing an end user
-the ability to select from various pre-canned configurations (if the
-developer provides a mechanism to present the choices and load the chosen
-configuration).
-"""
+        This can be called several times from an application, allowing an end user
+        the ability to select from various pre-canned configurations (if the
+        developer provides a mechanism to present the choices and load the chosen
+        configuration).
+        """
 
 else:
     def fileConfig(
@@ -99,55 +99,56 @@ else:
         disable_existing_loggers: bool = True,
     ) -> None:
         """
-    Read the logging configuration from a ConfigParser-format file.
+        Read the logging configuration from a ConfigParser-format file.
 
-    This can be called several times from an application, allowing an end user
-    the ability to select from various pre-canned configurations (if the
-    developer provides a mechanism to present the choices and load the chosen
-    configuration).
-    """
+        This can be called several times from an application, allowing an end user
+        the ability to select from various pre-canned configurations (if the
+        developer provides a mechanism to present the choices and load the chosen
+        configuration).
+        """
 
 def valid_ident(s: str) -> Literal[True]: ...  # undocumented
 def listen(port: int = 9030, verify: Callable[[bytes], bytes | None] | None = None) -> Thread:
     """
-Start up a socket server on the specified port, and listen for new
-configurations.
+    Start up a socket server on the specified port, and listen for new
+    configurations.
 
-These will be sent as a file suitable for processing by fileConfig().
-Returns a Thread object on which you can call start() to start the server,
-and which you can join() when appropriate. To stop the server, call
-stopListening().
+    These will be sent as a file suitable for processing by fileConfig().
+    Returns a Thread object on which you can call start() to start the server,
+    and which you can join() when appropriate. To stop the server, call
+    stopListening().
 
-Use the ``verify`` argument to verify any bytes received across the wire
-from a client. If specified, it should be a callable which receives a
-single argument - the bytes of configuration data received across the
-network - and it should return either ``None``, to indicate that the
-passed in bytes could not be verified and should be discarded, or a
-byte string which is then passed to the configuration machinery as
-normal. Note that you can return transformed bytes, e.g. by decrypting
-the bytes passed in.
-"""
+    Use the ``verify`` argument to verify any bytes received across the wire
+    from a client. If specified, it should be a callable which receives a
+    single argument - the bytes of configuration data received across the
+    network - and it should return either ``None``, to indicate that the
+    passed in bytes could not be verified and should be discarded, or a
+    byte string which is then passed to the configuration machinery as
+    normal. Note that you can return transformed bytes, e.g. by decrypting
+    the bytes passed in.
+    """
+
 def stopListening() -> None:
     """
-Stop the listening server which was created with a call to listen().
-"""
+    Stop the listening server which was created with a call to listen().
+    """
 
 class ConvertingMixin:  # undocumented
-    """For ConvertingXXX's, this mixin class provides common functions
-"""
+    """For ConvertingXXX's, this mixin class provides common functions"""
+
     def convert_with_key(self, key: Any, value: Any, replace: bool = True) -> Any: ...
     def convert(self, value: Any) -> Any: ...
 
 class ConvertingDict(dict[Hashable, Any], ConvertingMixin):  # undocumented
-    """A converting dictionary wrapper.
-"""
+    """A converting dictionary wrapper."""
+
     def __getitem__(self, key: Hashable) -> Any: ...
     def get(self, key: Hashable, default: Any = None) -> Any: ...
     def pop(self, key: Hashable, default: Any = None) -> Any: ...
 
 class ConvertingList(list[Any], ConvertingMixin):  # undocumented
-    """A converting list wrapper.
-"""
+    """A converting list wrapper."""
+
     @overload
     def __getitem__(self, key: SupportsIndex) -> Any: ...
     @overload
@@ -155,8 +156,8 @@ class ConvertingList(list[Any], ConvertingMixin):  # undocumented
     def pop(self, idx: SupportsIndex = -1) -> Any: ...
 
 class ConvertingTuple(tuple[Any, ...], ConvertingMixin):  # undocumented
-    """A converting tuple wrapper.
-"""
+    """A converting tuple wrapper."""
+
     @overload
     def __getitem__(self, key: SupportsIndex) -> Any: ...
     @overload
@@ -164,8 +165,9 @@ class ConvertingTuple(tuple[Any, ...], ConvertingMixin):  # undocumented
 
 class BaseConfigurator:  # undocumented
     """
-The configurator base class which defines some useful defaults.
-"""
+    The configurator base class which defines some useful defaults.
+    """
+
     CONVERT_PATTERN: Pattern[str]
     WORD_PATTERN: Pattern[str]
     DOT_PATTERN: Pattern[str]
@@ -177,62 +179,64 @@ The configurator base class which defines some useful defaults.
     def __init__(self, config: _DictConfigArgs | dict[str, Any]) -> None: ...
     def resolve(self, s: str) -> Any:
         """
-Resolve strings to objects using standard import and attribute
-syntax.
-"""
+        Resolve strings to objects using standard import and attribute
+        syntax.
+        """
+
     def ext_convert(self, value: str) -> Any:
-        """Default converter for the ext:// protocol.
-"""
+        """Default converter for the ext:// protocol."""
+
     def cfg_convert(self, value: str) -> Any:
-        """Default converter for the cfg:// protocol.
-"""
+        """Default converter for the cfg:// protocol."""
+
     def convert(self, value: Any) -> Any:
         """
-Convert values to an appropriate type. dicts, lists and tuples are
-replaced by their converting alternatives. Strings are checked to
-see if they have a conversion format and are converted if they do.
-"""
+        Convert values to an appropriate type. dicts, lists and tuples are
+        replaced by their converting alternatives. Strings are checked to
+        see if they have a conversion format and are converted if they do.
+        """
+
     def configure_custom(self, config: dict[str, Any]) -> Any:
-        """Configure an object with a user-supplied factory.
-"""
+        """Configure an object with a user-supplied factory."""
+
     def as_tuple(self, value: list[Any] | tuple[Any, ...]) -> tuple[Any, ...]:
-        """Utility function which converts lists to tuples.
-"""
+        """Utility function which converts lists to tuples."""
 
 class DictConfigurator(BaseConfigurator):
     """
-Configure logging using a dictionary-like object to describe the
-configuration.
-"""
+    Configure logging using a dictionary-like object to describe the
+    configuration.
+    """
+
     def configure(self) -> None:  # undocumented
-        """Do the configuration.
-"""
+        """Do the configuration."""
+
     def configure_formatter(self, config: _FormatterConfiguration) -> Formatter | Any:  # undocumented
-        """Configure a formatter from a dictionary.
-"""
+        """Configure a formatter from a dictionary."""
+
     def configure_filter(self, config: _FilterConfiguration) -> Filter | Any:  # undocumented
-        """Configure a filter from a dictionary.
-"""
+        """Configure a filter from a dictionary."""
+
     def add_filters(self, filterer: Filterer, filters: Iterable[_FilterType]) -> None:  # undocumented
-        """Add filters to a filterer from a list of names.
-"""
+        """Add filters to a filterer from a list of names."""
+
     def configure_handler(self, config: _HandlerConfiguration) -> Handler | Any:  # undocumented
-        """Configure a handler from a dictionary.
-"""
+        """Configure a handler from a dictionary."""
+
     def add_handlers(self, logger: Logger, handlers: Iterable[str]) -> None:  # undocumented
-        """Add handlers to a logger from a list of names.
-"""
+        """Add handlers to a logger from a list of names."""
+
     def common_logger_config(
         self, logger: Logger, config: _LoggerConfiguration, incremental: bool = False
     ) -> None:  # undocumented
         """
-Perform configuration which is common to root and non-root loggers.
-"""
+        Perform configuration which is common to root and non-root loggers.
+        """
+
     def configure_logger(self, name: str, config: _LoggerConfiguration, incremental: bool = False) -> None:  # undocumented
-        """Configure a non-root logger from a dictionary.
-"""
+        """Configure a non-root logger from a dictionary."""
+
     def configure_root(self, config: _LoggerConfiguration, incremental: bool = False) -> None:  # undocumented
-        """Configure a root logger from a dictionary.
-"""
+        """Configure a root logger from a dictionary."""
 
 dictConfigClass = DictConfigurator

@@ -1,5 +1,5 @@
-"""Read from and write to tar format archives.
-"""
+"""Read from and write to tar format archives."""
+
 import bz2
 import io
 import sys
@@ -118,8 +118,8 @@ class ExFileObject(io.BufferedReader):  # undocumented
     def __init__(self, tarfile: TarFile, tarinfo: TarInfo) -> None: ...
 
 class TarFile:
-    """The TarFile Class provides an interface to tar archives.
-    """
+    """The TarFile Class provides an interface to tar archives."""
+
     OPEN_METH: ClassVar[Mapping[str, str]]
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
@@ -156,13 +156,13 @@ class TarFile:
             stream: bool = False,
         ) -> None:
             """Open an (uncompressed) tar archive 'name'. 'mode' is either 'r' to
-read from an existing archive, 'a' to append data to an existing
-file or 'w' to create a new file overwriting an existing one. 'mode'
-defaults to 'r'.
-If 'fileobj' is given, it is used for reading or writing data. If it
-can be determined, 'mode' is overridden by 'fileobj's mode.
-'fileobj' is not closed, when TarFile is closed.
-"""
+            read from an existing archive, 'a' to append data to an existing
+            file or 'w' to create a new file overwriting an existing one. 'mode'
+            defaults to 'r'.
+            If 'fileobj' is given, it is used for reading or writing data. If it
+            can be determined, 'mode' is overridden by 'fileobj's mode.
+            'fileobj' is not closed, when TarFile is closed.
+            """
     else:
         def __init__(
             self,
@@ -181,21 +181,21 @@ can be determined, 'mode' is overridden by 'fileobj's mode.
             copybufsize: int | None = None,  # undocumented
         ) -> None:
             """Open an (uncompressed) tar archive `name'. `mode' is either 'r' to
-           read from an existing archive, 'a' to append data to an existing
-           file or 'w' to create a new file overwriting an existing one. `mode'
-           defaults to 'r'.
-           If `fileobj' is given, it is used for reading or writing data. If it
-           can be determined, `mode' is overridden by `fileobj's mode.
-           `fileobj' is not closed, when TarFile is closed.
-        """
+            read from an existing archive, 'a' to append data to an existing
+            file or 'w' to create a new file overwriting an existing one. `mode'
+            defaults to 'r'.
+            If `fileobj' is given, it is used for reading or writing data. If it
+            can be determined, `mode' is overridden by `fileobj's mode.
+            `fileobj' is not closed, when TarFile is closed.
+            """
 
     def __enter__(self) -> Self: ...
     def __exit__(
         self, type: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> None: ...
     def __iter__(self) -> Iterator[TarInfo]:
-        """Provide an iterator object.
-        """
+        """Provide an iterator object."""
+
     @overload
     @classmethod
     def open(
@@ -216,45 +216,45 @@ can be determined, 'mode' is overridden by 'fileobj's mode.
         errorlevel: int | None = ...,
     ) -> Self:
         """Open a tar archive for reading, writing or appending. Return
-an appropriate TarFile class.
+        an appropriate TarFile class.
 
-mode:
-'r' or 'r:*' open for reading with transparent compression
-'r:'         open for reading exclusively uncompressed
-'r:gz'       open for reading with gzip compression
-'r:bz2'      open for reading with bzip2 compression
-'r:xz'       open for reading with lzma compression
-'r:zst'      open for reading with zstd compression
-'a' or 'a:'  open for appending, creating the file if necessary
-'w' or 'w:'  open for writing without compression
-'w:gz'       open for writing with gzip compression
-'w:bz2'      open for writing with bzip2 compression
-'w:xz'       open for writing with lzma compression
-'w:zst'      open for writing with zstd compression
+        mode:
+        'r' or 'r:*' open for reading with transparent compression
+        'r:'         open for reading exclusively uncompressed
+        'r:gz'       open for reading with gzip compression
+        'r:bz2'      open for reading with bzip2 compression
+        'r:xz'       open for reading with lzma compression
+        'r:zst'      open for reading with zstd compression
+        'a' or 'a:'  open for appending, creating the file if necessary
+        'w' or 'w:'  open for writing without compression
+        'w:gz'       open for writing with gzip compression
+        'w:bz2'      open for writing with bzip2 compression
+        'w:xz'       open for writing with lzma compression
+        'w:zst'      open for writing with zstd compression
 
-'x' or 'x:'  create a tarfile exclusively without compression, raise
-             an exception if the file is already created
-'x:gz'       create a gzip compressed tarfile, raise an exception
-             if the file is already created
-'x:bz2'      create a bzip2 compressed tarfile, raise an exception
-             if the file is already created
-'x:xz'       create an lzma compressed tarfile, raise an exception
-             if the file is already created
-'x:zst'      create a zstd compressed tarfile, raise an exception
-             if the file is already created
+        'x' or 'x:'  create a tarfile exclusively without compression, raise
+                     an exception if the file is already created
+        'x:gz'       create a gzip compressed tarfile, raise an exception
+                     if the file is already created
+        'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+                     if the file is already created
+        'x:xz'       create an lzma compressed tarfile, raise an exception
+                     if the file is already created
+        'x:zst'      create a zstd compressed tarfile, raise an exception
+                     if the file is already created
 
-'r|*'        open a stream of tar blocks with transparent compression
-'r|'         open an uncompressed stream of tar blocks for reading
-'r|gz'       open a gzip compressed stream of tar blocks
-'r|bz2'      open a bzip2 compressed stream of tar blocks
-'r|xz'       open an lzma compressed stream of tar blocks
-'r|zst'      open a zstd compressed stream of tar blocks
-'w|'         open an uncompressed stream for writing
-'w|gz'       open a gzip compressed stream for writing
-'w|bz2'      open a bzip2 compressed stream for writing
-'w|xz'       open an lzma compressed stream for writing
-'w|zst'      open a zstd compressed stream for writing
-"""
+        'r|*'        open a stream of tar blocks with transparent compression
+        'r|'         open an uncompressed stream of tar blocks for reading
+        'r|gz'       open a gzip compressed stream of tar blocks
+        'r|bz2'      open a bzip2 compressed stream of tar blocks
+        'r|xz'       open an lzma compressed stream of tar blocks
+        'r|zst'      open a zstd compressed stream of tar blocks
+        'w|'         open an uncompressed stream for writing
+        'w|gz'       open a gzip compressed stream for writing
+        'w|bz2'      open a bzip2 compressed stream for writing
+        'w|xz'       open an lzma compressed stream for writing
+        'w|zst'      open a zstd compressed stream for writing
+        """
     if sys.version_info >= (3, 14):
         @overload
         @classmethod
@@ -279,45 +279,45 @@ mode:
             zstd_dict: ZstdDict | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
-an appropriate TarFile class.
+            an appropriate TarFile class.
 
-mode:
-'r' or 'r:*' open for reading with transparent compression
-'r:'         open for reading exclusively uncompressed
-'r:gz'       open for reading with gzip compression
-'r:bz2'      open for reading with bzip2 compression
-'r:xz'       open for reading with lzma compression
-'r:zst'      open for reading with zstd compression
-'a' or 'a:'  open for appending, creating the file if necessary
-'w' or 'w:'  open for writing without compression
-'w:gz'       open for writing with gzip compression
-'w:bz2'      open for writing with bzip2 compression
-'w:xz'       open for writing with lzma compression
-'w:zst'      open for writing with zstd compression
+            mode:
+            'r' or 'r:*' open for reading with transparent compression
+            'r:'         open for reading exclusively uncompressed
+            'r:gz'       open for reading with gzip compression
+            'r:bz2'      open for reading with bzip2 compression
+            'r:xz'       open for reading with lzma compression
+            'r:zst'      open for reading with zstd compression
+            'a' or 'a:'  open for appending, creating the file if necessary
+            'w' or 'w:'  open for writing without compression
+            'w:gz'       open for writing with gzip compression
+            'w:bz2'      open for writing with bzip2 compression
+            'w:xz'       open for writing with lzma compression
+            'w:zst'      open for writing with zstd compression
 
-'x' or 'x:'  create a tarfile exclusively without compression, raise
-             an exception if the file is already created
-'x:gz'       create a gzip compressed tarfile, raise an exception
-             if the file is already created
-'x:bz2'      create a bzip2 compressed tarfile, raise an exception
-             if the file is already created
-'x:xz'       create an lzma compressed tarfile, raise an exception
-             if the file is already created
-'x:zst'      create a zstd compressed tarfile, raise an exception
-             if the file is already created
+            'x' or 'x:'  create a tarfile exclusively without compression, raise
+                         an exception if the file is already created
+            'x:gz'       create a gzip compressed tarfile, raise an exception
+                         if the file is already created
+            'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+                         if the file is already created
+            'x:xz'       create an lzma compressed tarfile, raise an exception
+                         if the file is already created
+            'x:zst'      create a zstd compressed tarfile, raise an exception
+                         if the file is already created
 
-'r|*'        open a stream of tar blocks with transparent compression
-'r|'         open an uncompressed stream of tar blocks for reading
-'r|gz'       open a gzip compressed stream of tar blocks
-'r|bz2'      open a bzip2 compressed stream of tar blocks
-'r|xz'       open an lzma compressed stream of tar blocks
-'r|zst'      open a zstd compressed stream of tar blocks
-'w|'         open an uncompressed stream for writing
-'w|gz'       open a gzip compressed stream for writing
-'w|bz2'      open a bzip2 compressed stream for writing
-'w|xz'       open an lzma compressed stream for writing
-'w|zst'      open a zstd compressed stream for writing
-"""
+            'r|*'        open a stream of tar blocks with transparent compression
+            'r|'         open an uncompressed stream of tar blocks for reading
+            'r|gz'       open a gzip compressed stream of tar blocks
+            'r|bz2'      open a bzip2 compressed stream of tar blocks
+            'r|xz'       open an lzma compressed stream of tar blocks
+            'r|zst'      open a zstd compressed stream of tar blocks
+            'w|'         open an uncompressed stream for writing
+            'w|gz'       open a gzip compressed stream for writing
+            'w|bz2'      open a bzip2 compressed stream for writing
+            'w|xz'       open an lzma compressed stream for writing
+            'w|zst'      open a zstd compressed stream for writing
+            """
 
     @overload
     @classmethod
@@ -460,45 +460,46 @@ mode:
             zstd_dict: ZstdDict | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
-an appropriate TarFile class.
+            an appropriate TarFile class.
 
-mode:
-'r' or 'r:*' open for reading with transparent compression
-'r:'         open for reading exclusively uncompressed
-'r:gz'       open for reading with gzip compression
-'r:bz2'      open for reading with bzip2 compression
-'r:xz'       open for reading with lzma compression
-'r:zst'      open for reading with zstd compression
-'a' or 'a:'  open for appending, creating the file if necessary
-'w' or 'w:'  open for writing without compression
-'w:gz'       open for writing with gzip compression
-'w:bz2'      open for writing with bzip2 compression
-'w:xz'       open for writing with lzma compression
-'w:zst'      open for writing with zstd compression
+            mode:
+            'r' or 'r:*' open for reading with transparent compression
+            'r:'         open for reading exclusively uncompressed
+            'r:gz'       open for reading with gzip compression
+            'r:bz2'      open for reading with bzip2 compression
+            'r:xz'       open for reading with lzma compression
+            'r:zst'      open for reading with zstd compression
+            'a' or 'a:'  open for appending, creating the file if necessary
+            'w' or 'w:'  open for writing without compression
+            'w:gz'       open for writing with gzip compression
+            'w:bz2'      open for writing with bzip2 compression
+            'w:xz'       open for writing with lzma compression
+            'w:zst'      open for writing with zstd compression
 
-'x' or 'x:'  create a tarfile exclusively without compression, raise
-             an exception if the file is already created
-'x:gz'       create a gzip compressed tarfile, raise an exception
-             if the file is already created
-'x:bz2'      create a bzip2 compressed tarfile, raise an exception
-             if the file is already created
-'x:xz'       create an lzma compressed tarfile, raise an exception
-             if the file is already created
-'x:zst'      create a zstd compressed tarfile, raise an exception
-             if the file is already created
+            'x' or 'x:'  create a tarfile exclusively without compression, raise
+                         an exception if the file is already created
+            'x:gz'       create a gzip compressed tarfile, raise an exception
+                         if the file is already created
+            'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+                         if the file is already created
+            'x:xz'       create an lzma compressed tarfile, raise an exception
+                         if the file is already created
+            'x:zst'      create a zstd compressed tarfile, raise an exception
+                         if the file is already created
 
-'r|*'        open a stream of tar blocks with transparent compression
-'r|'         open an uncompressed stream of tar blocks for reading
-'r|gz'       open a gzip compressed stream of tar blocks
-'r|bz2'      open a bzip2 compressed stream of tar blocks
-'r|xz'       open an lzma compressed stream of tar blocks
-'r|zst'      open a zstd compressed stream of tar blocks
-'w|'         open an uncompressed stream for writing
-'w|gz'       open a gzip compressed stream for writing
-'w|bz2'      open a bzip2 compressed stream for writing
-'w|xz'       open an lzma compressed stream for writing
-'w|zst'      open a zstd compressed stream for writing
-"""
+            'r|*'        open a stream of tar blocks with transparent compression
+            'r|'         open an uncompressed stream of tar blocks for reading
+            'r|gz'       open a gzip compressed stream of tar blocks
+            'r|bz2'      open a bzip2 compressed stream of tar blocks
+            'r|xz'       open an lzma compressed stream of tar blocks
+            'r|zst'      open a zstd compressed stream of tar blocks
+            'w|'         open an uncompressed stream for writing
+            'w|gz'       open a gzip compressed stream for writing
+            'w|bz2'      open a bzip2 compressed stream for writing
+            'w|xz'       open an lzma compressed stream for writing
+            'w|zst'      open a zstd compressed stream for writing
+            """
+
         @overload
         @classmethod
         def open(
@@ -654,8 +655,8 @@ mode:
         debug: int | None = ...,
         errorlevel: int | None = ...,
     ) -> Self:
-        """Open uncompressed tar archive name for reading or writing.
-        """
+        """Open uncompressed tar archive name for reading or writing."""
+
     @overload
     @classmethod
     def gzopen(
@@ -675,8 +676,9 @@ mode:
         errorlevel: int | None = ...,
     ) -> Self:
         """Open gzip compressed tar archive name for reading or writing.
-Appending is not allowed.
-"""
+        Appending is not allowed.
+        """
+
     @overload
     @classmethod
     def gzopen(
@@ -714,8 +716,9 @@ Appending is not allowed.
         errorlevel: int | None = ...,
     ) -> Self:
         """Open bzip2 compressed tar archive name for reading or writing.
-Appending is not allowed.
-"""
+        Appending is not allowed.
+        """
+
     @overload
     @classmethod
     def bz2open(
@@ -752,8 +755,8 @@ Appending is not allowed.
         errorlevel: int | None = ...,
     ) -> Self:
         """Open lzma compressed tar archive name for reading or writing.
-Appending is not allowed.
-"""
+        Appending is not allowed.
+        """
     if sys.version_info >= (3, 14):
         @overload
         @classmethod
@@ -776,8 +779,9 @@ Appending is not allowed.
             errorlevel: int | None = ...,
         ) -> Self:
             """Open zstd compressed tar archive name for reading or writing.
-Appending is not allowed.
-"""
+            Appending is not allowed.
+            """
+
         @overload
         @classmethod
         def zstopen(
@@ -801,29 +805,33 @@ Appending is not allowed.
 
     def getmember(self, name: str) -> TarInfo:
         """Return a TarInfo object for member 'name'. If 'name' can not be
-found in the archive, KeyError is raised. If a member occurs more
-than once in the archive, its last occurrence is assumed to be the
-most up-to-date version.
-"""
+        found in the archive, KeyError is raised. If a member occurs more
+        than once in the archive, its last occurrence is assumed to be the
+        most up-to-date version.
+        """
+
     def getmembers(self) -> _list[TarInfo]:
         """Return the members of the archive as a list of TarInfo objects. The
-list has the same order as the members in the archive.
-"""
+        list has the same order as the members in the archive.
+        """
+
     def getnames(self) -> _list[str]:
         """Return the members of the archive as a list of their names. It has
-the same order as the list returned by getmembers().
-"""
+        the same order as the list returned by getmembers().
+        """
+
     def list(self, verbose: bool = True, *, members: Iterable[TarInfo] | None = None) -> None:
         """Print a table of contents to sys.stdout. If 'verbose' is False, only
-the names of the members are printed. If it is True, an 'ls -l'-like
-output is produced. 'members' is optional and must be a subset of the
-list returned by getmembers().
-"""
+        the names of the members are printed. If it is True, an 'ls -l'-like
+        output is produced. 'members' is optional and must be a subset of the
+        list returned by getmembers().
+        """
+
     def next(self) -> TarInfo | None:
         """Return the next member of the archive as a TarInfo object, when
-TarFile is opened for reading. Return None if there is no more
-available.
-"""
+        TarFile is opened for reading. Return None if there is no more
+        available.
+        """
     # Calling this method without `filter` is deprecated, but it may be set either on the class or in an
     # individual call, so we can't mark it as @deprecated here.
     def extractall(
@@ -835,17 +843,17 @@ available.
         filter: _TarfileFilter | None = ...,
     ) -> None:
         """Extract all members from the archive to the current working
-directory and set owner, modification time and permissions on
-directories afterwards. 'path' specifies a different directory
-to extract to. 'members' is optional and must be a subset of the
-list returned by getmembers(). If 'numeric_owner' is True, only
-the numbers for user/group names are used and not the names.
+        directory and set owner, modification time and permissions on
+        directories afterwards. 'path' specifies a different directory
+        to extract to. 'members' is optional and must be a subset of the
+        list returned by getmembers(). If 'numeric_owner' is True, only
+        the numbers for user/group names are used and not the names.
 
-The 'filter' function will be called on each member just
-before extraction.
-It can return a changed TarInfo or None to skip the member.
-String names of common filters are accepted.
-"""
+        The 'filter' function will be called on each member just
+        before extraction.
+        It can return a changed TarInfo or None to skip the member.
+        String names of common filters are accepted.
+        """
     # Same situation as for `extractall`.
     def extract(
         self,
@@ -857,17 +865,18 @@ String names of common filters are accepted.
         filter: _TarfileFilter | None = ...,
     ) -> None:
         """Extract a member from the archive to the current working directory,
-using its full name. Its file information is extracted as accurately
-as possible. 'member' may be a filename or a TarInfo object. You can
-specify a different directory using 'path'. File attributes (owner,
-mtime, mode) are set unless 'set_attrs' is False. If 'numeric_owner'
-is True, only the numbers for user/group names are used and not
-the names.
+        using its full name. Its file information is extracted as accurately
+        as possible. 'member' may be a filename or a TarInfo object. You can
+        specify a different directory using 'path'. File attributes (owner,
+        mtime, mode) are set unless 'set_attrs' is False. If 'numeric_owner'
+        is True, only the numbers for user/group names are used and not
+        the names.
 
-The 'filter' function will be called before extraction.
-It can return a changed TarInfo or None to skip the member.
-String names of common filters are accepted.
-"""
+        The 'filter' function will be called before extraction.
+        It can return a changed TarInfo or None to skip the member.
+        String names of common filters are accepted.
+        """
+
     def _extract_member(
         self,
         tarinfo: TarInfo,
@@ -879,61 +888,67 @@ String names of common filters are accepted.
         extraction_root: str | None = None,
     ) -> None:  # undocumented
         """Extract the filtered TarInfo object tarinfo to a physical
-file called targetpath.
+        file called targetpath.
 
-filter_function is only used when extracting a *different*
-member (e.g. as fallback to creating a symlink)
-"""
+        filter_function is only used when extracting a *different*
+        member (e.g. as fallback to creating a symlink)
+        """
+
     def extractfile(self, member: str | TarInfo) -> IO[bytes] | None:
         """Extract a member from the archive as a file object. 'member' may be
-a filename or a TarInfo object. If 'member' is a regular file or
-a link, an io.BufferedReader object is returned. For all other
-existing members, None is returned. If 'member' does not appear
-in the archive, KeyError is raised.
-"""
+        a filename or a TarInfo object. If 'member' is a regular file or
+        a link, an io.BufferedReader object is returned. For all other
+        existing members, None is returned. If 'member' does not appear
+        in the archive, KeyError is raised.
+        """
+
     def makedir(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a directory called targetpath.
-        """
+        """Make a directory called targetpath."""
+
     def makefile(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a file called targetpath.
-        """
+        """Make a file called targetpath."""
+
     def makeunknown(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a file from a TarInfo object with an unknown type
-at targetpath.
-"""
+        at targetpath.
+        """
+
     def makefifo(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a fifo called targetpath.
-        """
+        """Make a fifo called targetpath."""
+
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Make a character or block device called targetpath.
-        """
+        """Make a character or block device called targetpath."""
+
     def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a (symbolic) link called targetpath. If it cannot be created
-          (platform limitation), we try to make a copy of the referenced file
-          instead of a link.
+        (platform limitation), we try to make a copy of the referenced file
+        instead of a link.
         """
+
     def makelink_with_filter(
         self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
     ) -> None:  # undocumented
         """Make a (symbolic) link called targetpath. If it cannot be created
-(platform limitation), we try to make a copy of the referenced file
-instead of a link.
+        (platform limitation), we try to make a copy of the referenced file
+        instead of a link.
 
-filter_function is only used when extracting a *different*
-member (e.g. as fallback to creating a link).
-"""
+        filter_function is only used when extracting a *different*
+        member (e.g. as fallback to creating a link).
+        """
+
     def chown(self, tarinfo: TarInfo, targetpath: StrOrBytesPath, numeric_owner: bool) -> None:  # undocumented
         """Set owner of targetpath according to tarinfo. If numeric_owner
-is True, use .gid/.uid instead of .gname/.uname. If numeric_owner
-is False, fall back to .gid/.uid when the search based on name
-fails.
-"""
+        is True, use .gid/.uid instead of .gname/.uname. If numeric_owner
+        is False, fall back to .gid/.uid when the search based on name
+        fails.
+        """
+
     def chmod(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Set file permissions of targetpath according to tarinfo.
-        """
+        """Set file permissions of targetpath according to tarinfo."""
+
     def utime(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
-        """Set modification time of targetpath according to tarinfo.
-        """
+        """Set modification time of targetpath according to tarinfo."""
+
     def add(
         self,
         name: StrPath,
@@ -943,63 +958,65 @@ fails.
         filter: Callable[[TarInfo], TarInfo | None] | None = None,
     ) -> None:
         """Add the file 'name' to the archive. 'name' may be any type of file
-(directory, fifo, symbolic link, etc.). If given, 'arcname'
-specifies an alternative name for the file in the archive.
-Directories are added recursively by default. This can be avoided by
-setting 'recursive' to False. 'filter' is a function
-that expects a TarInfo object argument and returns the changed
-TarInfo object, if it returns None the TarInfo object will be
-excluded from the archive.
-"""
+        (directory, fifo, symbolic link, etc.). If given, 'arcname'
+        specifies an alternative name for the file in the archive.
+        Directories are added recursively by default. This can be avoided by
+        setting 'recursive' to False. 'filter' is a function
+        that expects a TarInfo object argument and returns the changed
+        TarInfo object, if it returns None the TarInfo object will be
+        excluded from the archive.
+        """
+
     def addfile(self, tarinfo: TarInfo, fileobj: SupportsRead[bytes] | None = None) -> None:
         """Add the TarInfo object 'tarinfo' to the archive. If 'tarinfo' represents
-a non zero-size regular file, the 'fileobj' argument should be a binary file,
-and tarinfo.size bytes are read from it and added to the archive.
-You can create TarInfo objects directly, or by using gettarinfo().
-"""
+        a non zero-size regular file, the 'fileobj' argument should be a binary file,
+        and tarinfo.size bytes are read from it and added to the archive.
+        You can create TarInfo objects directly, or by using gettarinfo().
+        """
+
     def gettarinfo(
         self, name: StrOrBytesPath | None = None, arcname: str | None = None, fileobj: IO[bytes] | None = None
     ) -> TarInfo:
         """Create a TarInfo object from the result of os.stat or equivalent
-on an existing file. The file is either named by 'name', or
-specified as a file object 'fileobj' with a file descriptor. If
-given, 'arcname' specifies an alternative name for the file in the
-archive, otherwise, the name is taken from the 'name' attribute of
-'fileobj', or the 'name' argument. The name should be a text
-string.
-"""
+        on an existing file. The file is either named by 'name', or
+        specified as a file object 'fileobj' with a file descriptor. If
+        given, 'arcname' specifies an alternative name for the file in the
+        archive, otherwise, the name is taken from the 'name' attribute of
+        'fileobj', or the 'name' argument. The name should be a text
+        string.
+        """
+
     def close(self) -> None:
         """Close the TarFile. In write-mode, two finishing zero blocks are
-appended to the archive.
-"""
+        appended to the archive.
+        """
 
 open = TarFile.open
 
 def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
-are able to handle, else return False.
+    are able to handle, else return False.
 
-'name' should be a string, file, or file-like object.
-"""
+    'name' should be a string, file, or file-like object.
+    """
 
 class TarError(Exception):
-    """Base exception.
-"""
+    """Base exception."""
+
 class ReadError(TarError):
-    """Exception for unreadable tar archives.
-"""
+    """Exception for unreadable tar archives."""
+
 class CompressionError(TarError):
-    """Exception for unavailable compression methods.
-"""
+    """Exception for unavailable compression methods."""
+
 class StreamError(TarError):
-    """Exception for unsupported operations on stream-like TarFiles.
-"""
+    """Exception for unsupported operations on stream-like TarFiles."""
+
 class ExtractError(TarError):
-    """General exception for extract errors.
-"""
+    """General exception for extract errors."""
+
 class HeaderError(TarError):
-    """Base exception for header errors.
-"""
+    """Base exception for header errors."""
 
 class FilterError(TarError):
     # This attribute is only set directly on the subclasses, but the documentation guarantees
@@ -1030,11 +1047,12 @@ def data_filter(member: TarInfo, dest_path: str) -> TarInfo: ...
 
 class TarInfo:
     """Informational class which holds the details about an
-archive member given by a tar header block.
-TarInfo objects are returned by TarFile.getmember(),
-TarFile.getmembers() and TarFile.gettarinfo() and are
-usually created internally.
-"""
+    archive member given by a tar header block.
+    TarInfo objects are returned by TarFile.getmember(),
+    TarFile.getmembers() and TarFile.gettarinfo() and are
+    usually created internally.
+    """
+
     name: str
     path: str
     size: int
@@ -1055,8 +1073,8 @@ usually created internally.
     pax_headers: Mapping[str, str]
     def __init__(self, name: str = "") -> None:
         """Construct a TarInfo object. name is the optional name
-of the member.
-"""
+        of the member.
+        """
     if sys.version_info >= (3, 13):
         @property
         @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.16")
@@ -1069,17 +1087,18 @@ of the member.
 
     @classmethod
     def frombuf(cls, buf: bytes | bytearray, encoding: str, errors: str) -> Self:
-        """Construct a TarInfo object from a 512 byte bytes object.
-        """
+        """Construct a TarInfo object from a 512 byte bytes object."""
+
     @classmethod
     def fromtarfile(cls, tarfile: TarFile) -> Self:
         """Return the next TarInfo object from TarFile object
-tarfile.
-"""
+        tarfile.
+        """
+
     @property
     def linkpath(self) -> str:
-        """In pax headers, "linkname" is called "linkpath".
-"""
+        """In pax headers, "linkname" is called "linkpath"."""
+
     @linkpath.setter
     def linkpath(self, linkname: str) -> None: ...
     def replace(
@@ -1095,58 +1114,54 @@ tarfile.
         gname: str = ...,
         deep: bool = True,
     ) -> Self:
-        """Return a deep copy of self with the given attributes replaced.
-        """
+        """Return a deep copy of self with the given attributes replaced."""
+
     def get_info(self) -> Mapping[str, str | int | bytes | Mapping[str, str]]:
-        """Return the TarInfo's attributes as a dictionary.
-        """
+        """Return the TarInfo's attributes as a dictionary."""
+
     def tobuf(self, format: _TarFormat | None = 2, encoding: str | None = "utf-8", errors: str = "surrogateescape") -> bytes:
-        """Return a tar header as a string of 512 byte blocks.
-        """
-    def create_ustar_header(
-        self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str
-    ) -> bytes:
-        """Return the object as a ustar header block.
-        """
-    def create_gnu_header(
-        self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str
-    ) -> bytes:
-        """Return the object as a GNU header block sequence.
-        """
+        """Return a tar header as a string of 512 byte blocks."""
+
+    def create_ustar_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str) -> bytes:
+        """Return the object as a ustar header block."""
+
+    def create_gnu_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str, errors: str) -> bytes:
+        """Return the object as a GNU header block sequence."""
+
     def create_pax_header(self, info: Mapping[str, str | int | bytes | Mapping[str, str]], encoding: str) -> bytes:
         """Return the object as a ustar header block. If it cannot be
-represented this way, prepend a pax extended header sequence
-with supplement information.
-"""
+        represented this way, prepend a pax extended header sequence
+        with supplement information.
+        """
+
     @classmethod
     def create_pax_global_header(cls, pax_headers: Mapping[str, str]) -> bytes:
-        """Return the object as a pax global header block sequence.
-        """
+        """Return the object as a pax global header block sequence."""
+
     def isfile(self) -> bool:
-        """Return True if the Tarinfo object is a regular file.
-"""
+        """Return True if the Tarinfo object is a regular file."""
+
     def isreg(self) -> bool:
-        """Return True if the Tarinfo object is a regular file.
-"""
+        """Return True if the Tarinfo object is a regular file."""
+
     def issparse(self) -> bool: ...
     def isdir(self) -> bool:
-        """Return True if it is a directory.
-"""
+        """Return True if it is a directory."""
+
     def issym(self) -> bool:
-        """Return True if it is a symbolic link.
-"""
+        """Return True if it is a symbolic link."""
+
     def islnk(self) -> bool:
-        """Return True if it is a hard link.
-"""
+        """Return True if it is a hard link."""
+
     def ischr(self) -> bool:
-        """Return True if it is a character device.
-"""
+        """Return True if it is a character device."""
+
     def isblk(self) -> bool:
-        """Return True if it is a block device.
-"""
+        """Return True if it is a block device."""
+
     def isfifo(self) -> bool:
-        """Return True if it is a FIFO.
-"""
+        """Return True if it is a FIFO."""
+
     def isdev(self) -> bool:
-        """Return True if it is one of character device, block device or FIFO.
-"""
+        """Return True if it is one of character device, block device or FIFO."""

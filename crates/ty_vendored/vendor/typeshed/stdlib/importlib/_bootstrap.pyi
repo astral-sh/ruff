@@ -6,5 +6,6 @@ such it requires the injection of specific modules and attributes in order to
 work. One should use importlib as the public-facing version of this module.
 
 """
+
 from _frozen_importlib import *
 from _frozen_importlib import __import__ as __import__, _init_module_attrs as _init_module_attrs

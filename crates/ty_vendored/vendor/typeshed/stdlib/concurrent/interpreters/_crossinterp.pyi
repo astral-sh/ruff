@@ -1,5 +1,5 @@
-"""Common code between queues and channels.
-"""
+"""Common code between queues and channels."""
+
 import sys
 from collections.abc import Callable
 from typing import Final, NewType
@@ -9,8 +9,8 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
     from _interpqueues import _UnboundOp
 
     class ItemInterpreterDestroyed(Exception):
-        """Raised when trying to get an item whose interpreter was destroyed.
-"""
+        """Raised when trying to get an item whose interpreter was destroyed."""
+
     # Actually a descriptor that behaves similarly to classmethod but prevents
     # access from instances.
     classonly = classmethod
@@ -18,17 +18,18 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
     class UnboundItem:
         """Represents a cross-interpreter item no longer bound to an interpreter.
 
-An item is unbound when the interpreter that added it to the
-cross-interpreter container is destroyed.
-"""
+        An item is unbound when the interpreter that added it to the
+        cross-interpreter container is destroyed.
+        """
+
         def __new__(cls) -> Never: ...
         @classonly
         def singleton(cls, kind: str, module: str, name: str = "UNBOUND") -> Self:
             """A non-data descriptor that makes a value only visible on the class.
 
-This is like the "classmethod" builtin, but does not show up on
-instances of the class.  It may be used as a decorator.
-"""
+            This is like the "classmethod" builtin, but does not show up on
+            instances of the class.  It may be used as a decorator.
+            """
 
     # Sentinel types and alias that don't exist at runtime.
     _UnboundErrorType = NewType("_UnboundErrorType", object)
