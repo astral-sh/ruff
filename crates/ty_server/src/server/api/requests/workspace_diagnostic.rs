@@ -84,7 +84,7 @@ use ty_project::{Db, ProgressReporter};
 /// prevents notifications from acquiring the exclusive db lock (or the long polling background thread
 /// panics if a notification tries to do so). What we do instead is that this request handler
 /// doesn't send a response if there are no diagnostics or all are unchanged and it
-/// sets a ["snapshot"](SuspendedWorkspaceDiagnosticRequest) of the workspace diagnostic request on the [`Session`].
+/// sets a "[snapshot](SuspendedWorkspaceDiagnosticRequest)" of the workspace diagnostic request on the [`Session`].
 /// The second part to this is in the notification request handling. ty retries the
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
