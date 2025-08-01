@@ -118,20 +118,22 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
                 checker.locator().slice(call.arguments.args[2].range()),
             )
         } else {
-            call.arguments
-                .args
-                .iter()
-                .skip(1)
-                .map(|expr| checker.locator().slice(expr.range()).to_string())
-                .chain(call.arguments.keywords.iter().filter_map(|kw| {
-                    kw.arg.as_ref().and_then(|arg| {
-                        (arg != "name")
-                            .then(|| format!("{arg}={}", checker.locator().slice(kw.value.range())))
-                    })
-                }))
-                .chain(std::iter::once("parents=True".to_string()))
-                .collect::<Vec<_>>()
-                .join(", ")
+            itertools::join(
+                call.arguments
+                    .args
+                    .iter()
+                    .skip(1)
+                    .map(|expr| checker.locator().slice(expr.range()).to_string())
+                    .chain(call.arguments.keywords.iter().filter_map(|kw| {
+                        kw.arg.as_ref().and_then(|arg| {
+                            (arg != "name").then(|| {
+                                format!("{arg}={}", checker.locator().slice(kw.value.range()))
+                            })
+                        })
+                    }))
+                    .chain(std::iter::once("parents=True".to_string())),
+                ", ",
+            )
         };
 
         let replacement = if is_pathlib_path_call(checker, name) {
