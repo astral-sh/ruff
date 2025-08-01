@@ -6070,7 +6070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            if !matches!(
+            let has_special_cased_constructor = matches!(
                 class.known(self.db()),
                 Some(
                     KnownClass::Bool
@@ -6084,20 +6084,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
-            )
-
-            // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-            // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-            // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-            // in `ClassType::own_class_member()`).
-            && (callable_type.is_generic_alias() || !class.is_known(self.db(), KnownClass::Tuple))
+            ) || (class.is_known(self.db(), KnownClass::Tuple)
+                && (callable_type.is_class_literal()
+                    || callable_type
+                        .into_subclass_of()
+                        .and_then(|subclass_of| subclass_of.subclass_of().into_class())
+                        .is_some_and(ClassType::is_not_generic)));
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
-            && KnownClass::Enum
-                .to_class_literal(self.db())
-                .to_class_type(self.db())
-                .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
+            if !has_special_cased_constructor
+                && KnownClass::Enum
+                    .to_class_literal(self.db())
+                    .to_class_type(self.db())
+                    .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);

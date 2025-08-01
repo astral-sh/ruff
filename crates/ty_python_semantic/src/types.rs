@@ -759,8 +759,13 @@ impl<'db> Type<'db> {
                 *self
             }
 
-            Type::NominalInstance(nominal_instance_type) => {
-                Type::NominalInstance(nominal_instance_type.materialize(db, variance))
+            Type::NominalInstance(instance) => {
+                // TODO: why is special casing `tuple` itself necessary here...?
+                if let Some(tuple) = instance.class.own_tuple_spec(db) {
+                    Type::tuple(db, TupleType::new(db, tuple.materialize(db, variance)))
+                } else {
+                    Type::NominalInstance(instance.materialize(db, variance))
+                }
             }
             Type::GenericAlias(generic_alias) => {
                 Type::GenericAlias(generic_alias.materialize(db, variance))
@@ -816,6 +821,13 @@ impl<'db> Type<'db> {
 
     pub const fn is_subclass_of(&self) -> bool {
         matches!(self, Type::SubclassOf(..))
+    }
+
+    const fn into_subclass_of(self) -> Option<SubclassOfType<'db>> {
+        match self {
+            Self::SubclassOf(subclass_of) => Some(subclass_of),
+            _ => None,
+        }
     }
 
     pub const fn is_class_literal(&self) -> bool {
