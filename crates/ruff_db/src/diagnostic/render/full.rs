@@ -300,31 +300,28 @@ print()
         1 | # cell 1
         2 | import os
           |        ^^
-        3 | # cell 2
-        4 | import math
           |
         help: Remove unused import: `os`
 
         error[unused-import]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
           |
-        2 | import os
-        3 | # cell 2
-        4 | import math
+        1 | # cell 2
+        2 | import math
           |        ^^^^
-        5 |
-        6 | print('hello world')
+        3 |
+        4 | print('hello world')
           |
         help: Remove unused import: `math`
 
         error[unused-variable]: Local variable `x` is assigned to but never used
-          --> notebook.ipynb:cell 3:4:5
-           |
-         8 | def foo():
-         9 |     print()
-        10 |     x = 1
-           |     ^
-           |
+         --> notebook.ipynb:cell 3:4:5
+          |
+        2 | def foo():
+        3 |     print()
+        4 |     x = 1
+          |     ^
+          |
         help: Remove assignment to unused variable `x`
         ");
     }
