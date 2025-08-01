@@ -676,6 +676,7 @@ missing_maxsplit_arg.py:182:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`
     182 |+"1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
 183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 184 184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+185 185 | 
 
 missing_maxsplit_arg.py:184:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
@@ -692,3 +693,173 @@ missing_maxsplit_arg.py:184:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`
 183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 184     |-"1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     184 |+"1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+185 185 | 
+186 186 | 
+187 187 | ## Test unpacked list literal args (starred expressions)
+
+missing_maxsplit_arg.py:189:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+    |
+187 | ## Test unpacked list literal args (starred expressions)
+188 | # Errors
+189 | "1,2,3".split(",", *[-1])[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+190 | "1,2,3".split(",", *[1])[0]
+191 | "1,2,3".rsplit(",", *[-1])[-1]
+    |
+    = help: Pass `maxsplit=1` into `str.split()`
+
+ℹ Unsafe fix
+186 186 | 
+187 187 | ## Test unpacked list literal args (starred expressions)
+188 188 | # Errors
+189     |-"1,2,3".split(",", *[-1])[0]
+    189 |+"1,2,3".split(",", *[-1], maxsplit=1)[0]
+190 190 | "1,2,3".split(",", *[1])[0]
+191 191 | "1,2,3".rsplit(",", *[-1])[-1]
+192 192 | "1,2,3".rsplit(",", *[1])[-1]
+
+missing_maxsplit_arg.py:190:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+    |
+188 | # Errors
+189 | "1,2,3".split(",", *[-1])[0]
+190 | "1,2,3".split(",", *[1])[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+191 | "1,2,3".rsplit(",", *[-1])[-1]
+192 | "1,2,3".rsplit(",", *[1])[-1]
+    |
+    = help: Pass `maxsplit=1` into `str.split()`
+
+ℹ Unsafe fix
+187 187 | ## Test unpacked list literal args (starred expressions)
+188 188 | # Errors
+189 189 | "1,2,3".split(",", *[-1])[0]
+190     |-"1,2,3".split(",", *[1])[0]
+    190 |+"1,2,3".split(",", *[1], maxsplit=1)[0]
+191 191 | "1,2,3".rsplit(",", *[-1])[-1]
+192 192 | "1,2,3".rsplit(",", *[1])[-1]
+193 193 | 
+
+missing_maxsplit_arg.py:191:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+    |
+189 | "1,2,3".split(",", *[-1])[0]
+190 | "1,2,3".split(",", *[1])[0]
+191 | "1,2,3".rsplit(",", *[-1])[-1]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+192 | "1,2,3".rsplit(",", *[1])[-1]
+    |
+    = help: Pass `maxsplit=1` into `str.rsplit()`
+
+ℹ Unsafe fix
+188 188 | # Errors
+189 189 | "1,2,3".split(",", *[-1])[0]
+190 190 | "1,2,3".split(",", *[1])[0]
+191     |-"1,2,3".rsplit(",", *[-1])[-1]
+    191 |+"1,2,3".rsplit(",", *[-1], maxsplit=1)[-1]
+192 192 | "1,2,3".rsplit(",", *[1])[-1]
+193 193 | 
+194 194 | ## Test unpacked list variable args
+
+missing_maxsplit_arg.py:192:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+    |
+190 | "1,2,3".split(",", *[1])[0]
+191 | "1,2,3".rsplit(",", *[-1])[-1]
+192 | "1,2,3".rsplit(",", *[1])[-1]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+193 |
+194 | ## Test unpacked list variable args
+    |
+    = help: Pass `maxsplit=1` into `str.rsplit()`
+
+ℹ Unsafe fix
+189 189 | "1,2,3".split(",", *[-1])[0]
+190 190 | "1,2,3".split(",", *[1])[0]
+191 191 | "1,2,3".rsplit(",", *[-1])[-1]
+192     |-"1,2,3".rsplit(",", *[1])[-1]
+    192 |+"1,2,3".rsplit(",", *[1], maxsplit=1)[-1]
+193 193 | 
+194 194 | ## Test unpacked list variable args
+195 195 | # Errors
+
+missing_maxsplit_arg.py:197:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+    |
+195 | # Errors
+196 | args_list = [-1]
+197 | "1,2,3".split(",", *args_list)[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+198 | args_list = [1]
+199 | "1,2,3".split(",", *args_list)[0]
+    |
+    = help: Pass `maxsplit=1` into `str.split()`
+
+ℹ Unsafe fix
+194 194 | ## Test unpacked list variable args
+195 195 | # Errors
+196 196 | args_list = [-1]
+197     |-"1,2,3".split(",", *args_list)[0]
+    197 |+"1,2,3".split(",", *args_list, maxsplit=1)[0]
+198 198 | args_list = [1]
+199 199 | "1,2,3".split(",", *args_list)[0]
+200 200 | args_list = [-1]
+
+missing_maxsplit_arg.py:199:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+    |
+197 | "1,2,3".split(",", *args_list)[0]
+198 | args_list = [1]
+199 | "1,2,3".split(",", *args_list)[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+200 | args_list = [-1]
+201 | "1,2,3".rsplit(",", *args_list)[-1]
+    |
+    = help: Pass `maxsplit=1` into `str.split()`
+
+ℹ Unsafe fix
+196 196 | args_list = [-1]
+197 197 | "1,2,3".split(",", *args_list)[0]
+198 198 | args_list = [1]
+199     |-"1,2,3".split(",", *args_list)[0]
+    199 |+"1,2,3".split(",", *args_list, maxsplit=1)[0]
+200 200 | args_list = [-1]
+201 201 | "1,2,3".rsplit(",", *args_list)[-1]
+202 202 | args_list = [1]
+
+missing_maxsplit_arg.py:201:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+    |
+199 | "1,2,3".split(",", *args_list)[0]
+200 | args_list = [-1]
+201 | "1,2,3".rsplit(",", *args_list)[-1]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+202 | args_list = [1]
+203 | "1,2,3".rsplit(",", *args_list)[-1]
+    |
+    = help: Pass `maxsplit=1` into `str.rsplit()`
+
+ℹ Unsafe fix
+198 198 | args_list = [1]
+199 199 | "1,2,3".split(",", *args_list)[0]
+200 200 | args_list = [-1]
+201     |-"1,2,3".rsplit(",", *args_list)[-1]
+    201 |+"1,2,3".rsplit(",", *args_list, maxsplit=1)[-1]
+202 202 | args_list = [1]
+203 203 | "1,2,3".rsplit(",", *args_list)[-1]
+204 204 | 
+
+missing_maxsplit_arg.py:203:1: PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+    |
+201 | "1,2,3".rsplit(",", *args_list)[-1]
+202 | args_list = [1]
+203 | "1,2,3".rsplit(",", *args_list)[-1]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+204 |
+205 | ## Test mixed unpacked args and kwargs
+    |
+    = help: Pass `maxsplit=1` into `str.rsplit()`
+
+ℹ Unsafe fix
+200 200 | args_list = [-1]
+201 201 | "1,2,3".rsplit(",", *args_list)[-1]
+202 202 | args_list = [1]
+203     |-"1,2,3".rsplit(",", *args_list)[-1]
+    203 |+"1,2,3".rsplit(",", *args_list, maxsplit=1)[-1]
+204 204 | 
+205 205 | ## Test mixed unpacked args and kwargs
+206 206 | # Errors

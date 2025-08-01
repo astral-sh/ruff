@@ -38,8 +38,8 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `**kwargs`, as
-/// adding a `maxsplit` keyword to such a call may lead to a duplicate keyword argument error.
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs`, as
+/// adding a `maxsplit` keyword to such a call may lead to a duplicate keyword argument error or too many arguments error.
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingMaxsplitArg {
     actual_split_type: String,
@@ -201,11 +201,12 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     diagnostic.set_fix(Fix::applicable_edits(
         maxsplit_argument_edit,
         split_type_edit,
-        // If keyword.arg is `None` (i.e. if the function call contains `**kwargs`), mark the fix as unsafe
-        if arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
+        // If there are starred expressions (*args) or keyword arguments with None arg (**kwargs), mark the fix as unsafe
+        if arguments.args.iter().any(Expr::is_starred_expr)
+            || arguments
+                .keywords
+                .iter()
+                .any(|keyword| keyword.arg.is_none())
         {
             Applicability::Unsafe
         } else {

@@ -182,3 +182,27 @@ kwargs_with_maxsplit = {"maxsplit": 1}
 "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
 "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+
+
+## Test unpacked list literal args (starred expressions)
+# Errors
+"1,2,3".split(",", *[-1])[0]
+"1,2,3".split(",", *[1])[0]
+"1,2,3".rsplit(",", *[-1])[-1]
+"1,2,3".rsplit(",", *[1])[-1]
+
+## Test unpacked list variable args
+# Errors
+args_list = [-1]
+"1,2,3".split(",", *args_list)[0]
+args_list = [1]
+"1,2,3".split(",", *args_list)[0]
+args_list = [-1]
+"1,2,3".rsplit(",", *args_list)[-1]
+args_list = [1]
+"1,2,3".rsplit(",", *args_list)[-1]
+
+## Test mixed unpacked args and kwargs
+# Errors
+"1,2,3".split(",", *[-1], **{"maxsplit": 1})[0]
+"1,2,3".split(",", *[1], **{"maxsplit": 1})[0]
