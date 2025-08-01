@@ -343,3 +343,6 @@ EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assi
    91 |+    raise RuntimeError(
    92 |+        msg
    93 |+    )
+91 94 | 
+92 95 | 
+93 96 | def raise_typing_cast_exception():
