@@ -88,7 +88,7 @@ pub(crate) struct Session {
 
     /// A pending workspace diagnostics request because there were no diagnostics
     /// or no changes when when the request ran last time.
-    /// We'll re-run the request after every change to `Session` (see `revision)
+    /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
 }
