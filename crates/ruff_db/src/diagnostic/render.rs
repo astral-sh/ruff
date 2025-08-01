@@ -244,7 +244,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &diagnostic_source, ann)
+                ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
             .collect();
 
@@ -291,7 +291,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &diagnostic_source, ann)
+                ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
             .collect();
         ResolvedDiagnostic {
@@ -388,6 +388,7 @@ struct ResolvedAnnotation<'a> {
     message: Option<&'a str>,
     is_primary: bool,
     is_file_level: bool,
+    notebook_index: Option<NotebookIndex>,
 }
 
 impl<'a> ResolvedAnnotation<'a> {
@@ -400,6 +401,7 @@ impl<'a> ResolvedAnnotation<'a> {
         path: &'a str,
         diagnostic_source: &DiagnosticSource,
         ann: &'a Annotation,
+        resolver: &'a dyn FileResolver,
     ) -> Option<ResolvedAnnotation<'a>> {
         let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
@@ -425,6 +427,7 @@ impl<'a> ResolvedAnnotation<'a> {
                 (range, line_start, line_end)
             }
         };
+
         Some(ResolvedAnnotation {
             path,
             diagnostic_source: diagnostic_source.clone(),
@@ -434,6 +437,7 @@ impl<'a> ResolvedAnnotation<'a> {
             message: ann.get_message(),
             is_primary: ann.is_primary,
             is_file_level: ann.is_file_level,
+            notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
 }
@@ -566,6 +570,11 @@ struct RenderableSnippet<'r> {
     /// Whether this snippet contains at least one primary
     /// annotation.
     has_primary: bool,
+    /// The cell index in a Jupyter notebook, if this snippet refers to a notebook.
+    ///
+    /// This is used for rendering annotations with offsets like `cell 1:2:3` instead of simple row
+    /// and column numbers.
+    cell_index: Option<usize>,
 }
 
 impl<'r> RenderableSnippet<'r> {
@@ -593,19 +602,43 @@ impl<'r> RenderableSnippet<'r> {
             "creating a renderable snippet requires a non-zero number of annotations",
         );
         let diagnostic_source = &anns[0].diagnostic_source;
+        let notebook_index = anns[0].notebook_index.as_ref();
         let source = diagnostic_source.as_source_code();
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
-        let line_start = context_before(
-            &source,
-            context,
-            anns.iter().map(|ann| ann.line_start).min().unwrap(),
-        );
-        let line_end = context_after(
-            &source,
-            context,
-            anns.iter().map(|ann| ann.line_end).max().unwrap(),
-        );
+        let content_start_index = anns.iter().map(|ann| ann.line_start).min().unwrap();
+        let mut line_start = context_before(&source, context, content_start_index);
+
+        let start = source.line_column(anns[0].range.start());
+        let cell_index = notebook_index
+            .map(|notebook_index| notebook_index.cell(start.line).unwrap_or_default().get());
+
+        // If we're working with a Jupyter Notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(index) = notebook_index {
+            let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
+            while line_start < content_start_index {
+                if index.cell(line_start).unwrap_or(OneIndexed::MIN) == content_start_cell {
+                    break;
+                }
+                line_start = line_start.saturating_add(1);
+            }
+        }
+
+        let content_end_index = anns.iter().map(|ann| ann.line_end).max().unwrap();
+        let mut line_end = context_after(&source, context, content_end_index);
+
+        // If we're working with a Jupyter Notebook, skip the lines which are
+        // outside of the cell containing the diagnostic.
+        if let Some(index) = notebook_index {
+            let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
+            while line_end > content_end_index {
+                if index.cell(line_end).unwrap_or(OneIndexed::MIN) == content_end_cell {
+                    break;
+                }
+                line_end = line_end.saturating_sub(1);
+            }
+        }
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
@@ -623,11 +656,18 @@ impl<'r> RenderableSnippet<'r> {
             annotations,
         } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
 
+        let line_start = notebook_index.map_or(line_start, |notebook_index| {
+            notebook_index
+                .cell_row(line_start)
+                .unwrap_or(OneIndexed::MIN)
+        });
+
         RenderableSnippet {
             snippet,
             line_start,
             annotations,
             has_primary,
+            cell_index,
         }
     }
 
@@ -641,6 +681,7 @@ impl<'r> RenderableSnippet<'r> {
                     .iter()
                     .map(RenderableAnnotation::to_annotate),
             )
+            .cell_index(self.cell_index)
     }
 }
 

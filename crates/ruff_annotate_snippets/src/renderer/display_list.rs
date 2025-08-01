@@ -298,11 +298,22 @@ impl DisplaySet<'_> {
                 let lineno_color = stylesheet.line_no();
                 buffer.puts(line_offset, lineno_width, header_sigil, *lineno_color);
                 buffer.puts(line_offset, lineno_width + 4, path, stylesheet.none);
-                if let Some((col, row)) = pos {
-                    buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
-                    buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                match pos {
+                    Some(Position::RowCol(row, col)) => {
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
+                    }
+                    Some(Position::Cell(cell, row, col)) => {
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
+                    }
+                    None => {}
                 }
                 Ok(())
             }
@@ -883,6 +894,12 @@ impl DisplaySourceAnnotation<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) enum Position {
+    RowCol(usize, usize),
+    Cell(usize, usize, usize),
+}
+
 /// Raw line - a line which does not have the `lineno` part and is not considered
 /// a part of the snippet.
 #[derive(Debug, PartialEq)]
@@ -891,7 +908,7 @@ pub(crate) enum DisplayRawLine<'a> {
     /// slice in the project structure.
     Origin {
         path: &'a str,
-        pos: Option<(usize, usize)>,
+        pos: Option<Position>,
         header_type: DisplayHeaderType,
     },
 
@@ -1191,12 +1208,14 @@ fn format_snippet<'m>(
             "Non-empty file-level snippet that won't be rendered: {:?}",
             snippet.source
         );
-        let header = format_header(origin, main_range, &[], is_first);
+        let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
         return DisplaySet {
             display_lines: header.map_or_else(Vec::new, |header| vec![header]),
             margin: Margin::new(0, 0, 0, 0, term_width, 0),
         };
     }
+
+    let cell_index = snippet.cell_index;
 
     let mut body = format_body(
         snippet,
@@ -1206,7 +1225,13 @@ fn format_snippet<'m>(
         anonymized_line_numbers,
         cut_indicator,
     );
-    let header = format_header(origin, main_range, &body.display_lines, is_first);
+    let header = format_header(
+        origin,
+        main_range,
+        &body.display_lines,
+        is_first,
+        cell_index,
+    );
 
     if let Some(header) = header {
         body.display_lines.insert(0, header);
@@ -1226,6 +1251,7 @@ fn format_header<'a>(
     main_range: Option<usize>,
     body: &[DisplayLine<'_>],
     is_first: bool,
+    cell_index: Option<usize>,
 ) -> Option<DisplayLine<'a>> {
     let display_header = if is_first {
         DisplayHeaderType::Initial
@@ -1260,9 +1286,15 @@ fn format_header<'a>(
             }
         }
 
+        let pos = if let Some(cell) = cell_index {
+            Position::Cell(cell, line_offset, col)
+        } else {
+            Position::RowCol(line_offset, col)
+        };
+
         return Some(DisplayLine::Raw(DisplayRawLine::Origin {
             path,
-            pos: Some((line_offset, col)),
+            pos: Some(pos),
             header_type: display_header,
         }));
     }

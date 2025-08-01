@@ -75,6 +75,10 @@ pub struct Snippet<'a> {
     pub(crate) annotations: Vec<Annotation<'a>>,
 
     pub(crate) fold: bool,
+
+    /// The optional cell index in a Jupyter notebook, used for reporting source locations along
+    /// with the ranges on `annotations`.
+    pub(crate) cell_index: Option<usize>,
 }
 
 impl<'a> Snippet<'a> {
@@ -85,6 +89,7 @@ impl<'a> Snippet<'a> {
             source,
             annotations: vec![],
             fold: false,
+            cell_index: None,
         }
     }
 
@@ -111,6 +116,12 @@ impl<'a> Snippet<'a> {
     /// Hide lines without [`Annotation`]s
     pub fn fold(mut self, fold: bool) -> Self {
         self.fold = fold;
+        self
+    }
+
+    /// Attach a Jupyter notebook cell index.
+    pub fn cell_index(mut self, index: Option<usize>) -> Self {
+        self.cell_index = index;
         self
     }
 }
