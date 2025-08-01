@@ -5,7 +5,6 @@ use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use rustc_hash::{FxBuildHasher, FxHashSet};
-use std::fs;
 use std::path::PathBuf;
 use thiserror::Error;
 
