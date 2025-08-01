@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
-    StringLiteralValue, UnaryOp, str::TripleQuotes,
+    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringFlags, StringLiteral,
+    StringLiteralFlags, StringLiteralValue, UnaryOp, str::TripleQuotes,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -121,21 +121,23 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
         elts: elts
             .iter()
             .map(|elt| {
+                let element_flags = if flags.prefix().is_raw() {
+                    if elt.contains('"') || elt.contains('\'') {
+                        StringLiteralFlags::empty()
+                            .with_quote_style(flags.quote_style())
+                            .with_triple_quotes(TripleQuotes::No)
+                    } else {
+                        flags.with_triple_quotes(TripleQuotes::No)
+                    }
+                } else {
+                    flags.with_triple_quotes(TripleQuotes::No)
+                };
+
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-                    // intentionally omit the triple quote flag, if set, to avoid strange
-                    // replacements like
-                    //
-                    // ```python
-                    // """
-                    // itemA
-                    // itemB
-                    // itemC
-                    // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
-                    // ```
-                    flags: flags.with_triple_quotes(TripleQuotes::No),
+                    flags: element_flags,
                 })
             })
             .collect(),
