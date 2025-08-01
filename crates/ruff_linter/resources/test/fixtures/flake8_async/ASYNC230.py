@@ -59,6 +59,23 @@ async def func() -> None:
     p1.open()  # ASYNC230
 
 
+async def func() -> None:
+    p = Path("foo").read_text()  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").read_bytes()  # ASYNC230
+
+async def func() -> None:
+    p = Path("foo").write_text("content")  # ASYNC230
+
+
+async def func() -> None:
+    p = Path("foo").write_bytes(b"content")  # ASYNC230
+
+async def func() -> None:
+    p = Path("foo").touch()  # ASYNC230
+
 # Non-violation cases for pathlib:
 
 
