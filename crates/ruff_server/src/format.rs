@@ -245,6 +245,7 @@ impl UvFormatCommand {
 
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
 
         command
     }
@@ -260,25 +261,31 @@ impl UvFormatCommand {
             self.build_command(path, range_with_index.map(|(r, idx)| (r, idx, source)));
         let mut child = command.spawn().context("Failed to spawn uv")?;
 
-        let mut stdin = child.stdin.take().context("Failed to get stdin")?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .context("Failed to get stdin from format subprocess")?;
         stdin
             .write_all(source.as_bytes())
             .context("Failed to write to stdin")?;
         drop(stdin);
 
-        let output = child.wait_with_output().context("Failed to get output")?;
+        let result = child
+            .wait_with_output()
+            .context("Failed to get output from format subprocess")?;
 
-        // TODO(zanieb): We should find a way to special case syntax/parse errors as we do with the
-        // internal implementation.
-
-        // TODO(zanieb): We should consider returning this case to the caller somehow
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::warn!("uvx ruff format failed: {}", stderr);
-            return Ok(None);
+        if !result.status.success() {
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            // We don't propagate format errors due to invalid syntax
+            if stderr.contains("Failed to parse") {
+                tracing::warn!("Unable to format document: {}", stderr);
+                return Ok(None);
+            }
+            anyhow::bail!("Failed to format document: {}", stderr);
         }
 
-        let formatted = String::from_utf8(output.stdout).context("Invalid UTF-8 in output")?;
+        let formatted = String::from_utf8(result.stdout)
+            .context("Failed to parse stdout from format subprocess as utf-8")?;
 
         if formatted == source {
             Ok(None)
