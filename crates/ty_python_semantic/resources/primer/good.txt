@@ -69,7 +69,6 @@ openlibrary
 operator
 optuna
 paasta
-pandas-stubs
 paroxython
 parso
 pegen

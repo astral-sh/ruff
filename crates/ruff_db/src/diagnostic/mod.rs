@@ -21,7 +21,7 @@ mod stylesheet;
 /// characteristics in the inputs given to the tool. Typically, but not always,
 /// a characteristic is a deficiency. An example of a characteristic that is
 /// _not_ a deficiency is the `reveal_type` diagnostic for our type checker.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct Diagnostic {
     /// The actual diagnostic.
     ///
@@ -479,7 +479,7 @@ impl Diagnostic {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct DiagnosticInner {
     id: DiagnosticId,
     severity: Severity,
@@ -555,7 +555,7 @@ impl Eq for RenderingSortKey<'_> {}
 /// Currently, the order in which sub-diagnostics are rendered relative to one
 /// another (for a single parent diagnostic) is the order in which they were
 /// attached to the diagnostic.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct SubDiagnostic {
     /// Like with `Diagnostic`, we box the `SubDiagnostic` to make it
     /// pointer-sized.
@@ -659,7 +659,7 @@ impl SubDiagnostic {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
@@ -687,7 +687,7 @@ struct SubDiagnosticInner {
 ///
 /// Messages attached to annotations should also be as brief and specific as
 /// possible. Long messages could negative impact the quality of rendering.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct Annotation {
     /// The span of this annotation, corresponding to some subsequence of the
     /// user's input that we want to highlight.
@@ -807,7 +807,7 @@ impl Annotation {
 ///
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
-#[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -1016,7 +1016,7 @@ impl std::fmt::Display for DiagnosticId {
 ///
 /// This enum presents a unified interface to these two types for the sake of creating [`Span`]s and
 /// emitting diagnostics from both ty and ruff.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum UnifiedFile {
     Ty(File),
     Ruff(SourceFile),
@@ -1080,7 +1080,7 @@ impl DiagnosticSource {
 /// It consists of a `File` and an optional range into that file. When the
 /// range isn't present, it semantically implies that the diagnostic refers to
 /// the entire file. For example, when the file should be executable but isn't.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct Span {
     file: UnifiedFile,
     range: Option<TextRange>,
@@ -1158,7 +1158,7 @@ impl From<crate::files::FileRange> for Span {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub enum Severity {
     Info,
     Warning,
@@ -1193,7 +1193,7 @@ impl Severity {
 /// This type only exists to add an additional `Help` severity that isn't present in `Severity` or
 /// used for main diagnostics. If we want to add `Severity::Help` in the future, this type could be
 /// deleted and the two combined again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub enum SubDiagnosticSeverity {
     Help,
     Info,
@@ -1428,7 +1428,7 @@ impl std::fmt::Display for ConciseMessage<'_> {
 /// In most cases, callers shouldn't need to use this. Instead, there is
 /// a blanket trait implementation for `IntoDiagnosticMessage` for
 /// anything that implements `std::fmt::Display`.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {

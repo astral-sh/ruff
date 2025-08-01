@@ -9,6 +9,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
@@ -19,7 +20,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
@@ -27,7 +28,7 @@ use crate::types::{
     infer_definition_types,
 };
 use crate::{
-    Db, FxOrderSet, KnownModule, Program,
+    Db, FxIndexMap, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,
@@ -574,7 +575,24 @@ impl<'db> ClassType<'db> {
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        fn synthesize_getitem_overload_signature<'db>(
+            index_annotation: Type<'db>,
+            return_annotation: Type<'db>,
+        ) -> Signature<'db> {
+            let self_parameter = Parameter::positional_only(Some(Name::new_static("self")));
+            let index_parameter = Parameter::positional_only(Some(Name::new_static("index")))
+                .with_annotated_type(index_annotation);
+            let parameters = Parameters::new([self_parameter, index_parameter]);
+            Signature::new(parameters, Some(return_annotation))
+        }
+
         let (class_literal, specialization) = self.class_literal(db);
+
+        let fallback_member_lookup = || {
+            class_literal
+                .own_class_member(db, specialization, name)
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        };
 
         let synthesize_simple_tuple_method = |return_type| {
             let parameters =
@@ -604,6 +622,162 @@ impl<'db> ClassType<'db> {
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_simple_tuple_method(return_type)
+            }
+
+            "__getitem__" if class_literal.is_tuple(db) => {
+                specialization
+                    .map(|spec| {
+                        let tuple = spec.tuple(db);
+
+                        let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
+                            FxIndexMap::default();
+
+                        match tuple {
+                            // E.g. for `tuple[int, str]`, we will generate the following overloads:
+                            //
+                            //    __getitem__(self, index: Literal[0, -2], /) -> int
+                            //    __getitem__(self, index: Literal[1, -1], /) -> str
+                            //
+                            TupleSpec::Fixed(fixed_length_tuple) => {
+                                let tuple_length = fixed_length_tuple.len();
+
+                                for (index, ty) in fixed_length_tuple.elements().enumerate() {
+                                    let entry = element_type_to_indices.entry(*ty).or_default();
+                                    if let Ok(index) = i64::try_from(index) {
+                                        entry.push(index);
+                                    }
+                                    if let Ok(index) = i64::try_from(tuple_length - index) {
+                                        entry.push(0 - index);
+                                    }
+                                }
+                            }
+
+                            // E.g. for `tuple[str, *tuple[float, ...], bytes, range]`, we will generate the following overloads:
+                            //
+                            //    __getitem__(self, index: Literal[0], /) -> str
+                            //    __getitem__(self, index: Literal[1], /) -> float | bytes
+                            //    __getitem__(self, index: Literal[2], /) -> float | bytes | range
+                            //    __getitem__(self, index: Literal[-1], /) -> range
+                            //    __getitem__(self, index: Literal[-2], /) -> bytes
+                            //    __getitem__(self, index: Literal[-3], /) -> float | str
+                            //
+                            TupleSpec::Variable(variable_length_tuple) => {
+                                for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
+                                    if let Ok(index) = i64::try_from(index) {
+                                        element_type_to_indices.entry(*ty).or_default().push(index);
+                                    }
+
+                                    let one_based_index = index + 1;
+
+                                    if let Ok(i) = i64::try_from(
+                                        variable_length_tuple.suffix.len() + one_based_index,
+                                    ) {
+                                        let overload_return = UnionType::from_elements(
+                                            db,
+                                            std::iter::once(variable_length_tuple.variable).chain(
+                                                variable_length_tuple
+                                                    .prefix
+                                                    .iter()
+                                                    .rev()
+                                                    .take(one_based_index)
+                                                    .copied(),
+                                            ),
+                                        );
+                                        element_type_to_indices
+                                            .entry(overload_return)
+                                            .or_default()
+                                            .push(0 - i);
+                                    }
+                                }
+
+                                for (index, ty) in
+                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                {
+                                    if let Some(index) =
+                                        index.checked_add(1).and_then(|i| i64::try_from(i).ok())
+                                    {
+                                        element_type_to_indices
+                                            .entry(*ty)
+                                            .or_default()
+                                            .push(0 - index);
+                                    }
+
+                                    if let Ok(i) =
+                                        i64::try_from(variable_length_tuple.prefix.len() + index)
+                                    {
+                                        let overload_return = UnionType::from_elements(
+                                            db,
+                                            std::iter::once(variable_length_tuple.variable).chain(
+                                                variable_length_tuple
+                                                    .suffix
+                                                    .iter()
+                                                    .take(index + 1)
+                                                    .copied(),
+                                            ),
+                                        );
+                                        element_type_to_indices
+                                            .entry(overload_return)
+                                            .or_default()
+                                            .push(i);
+                                    }
+                                }
+                            }
+                        }
+
+                        let all_elements_unioned =
+                            UnionType::from_elements(db, tuple.all_elements());
+
+                        let mut overload_signatures =
+                            Vec::with_capacity(element_type_to_indices.len().saturating_add(2));
+
+                        overload_signatures.extend(element_type_to_indices.into_iter().filter_map(
+                            |(return_type, mut indices)| {
+                                if return_type.is_equivalent_to(db, all_elements_unioned) {
+                                    return None;
+                                }
+
+                                // Sorting isn't strictly required, but leads to nicer `reveal_type` output
+                                indices.sort_unstable();
+
+                                let index_annotation = UnionType::from_elements(
+                                    db,
+                                    indices.into_iter().map(Type::IntLiteral),
+                                );
+
+                                Some(synthesize_getitem_overload_signature(
+                                    index_annotation,
+                                    return_type,
+                                ))
+                            },
+                        ));
+
+                        // Fallback overloads: for `tuple[int, str]`, we will generate the following overloads:
+                        //
+                        //    __getitem__(self, index: int, /) -> int | str
+                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[int | str, ...]
+                        //
+                        // and for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
+                        //
+                        //    __getitem__(self, index: int, /) -> str | float | bytes
+                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
+                        //
+                        overload_signatures.push(synthesize_getitem_overload_signature(
+                            KnownClass::SupportsIndex.to_instance(db),
+                            all_elements_unioned,
+                        ));
+
+                        overload_signatures.push(synthesize_getitem_overload_signature(
+                            KnownClass::Slice.to_instance(db),
+                            TupleType::homogeneous(db, all_elements_unioned),
+                        ));
+
+                        let getitem_signature =
+                            CallableSignature::from_overloads(overload_signatures);
+                        let getitem_type =
+                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        Place::bound(getitem_type).into()
+                    })
+                    .unwrap_or_else(fallback_member_lookup)
             }
 
             // ```py
@@ -672,9 +846,7 @@ impl<'db> ClassType<'db> {
                 Place::bound(synthesized_dunder).into()
             }
 
-            _ => class_literal
-                .own_class_member(db, specialization, name)
-                .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+            _ => fallback_member_lookup(),
         }
     }
 
@@ -979,7 +1151,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let parsed = parsed_module(db, scope.file(db)).load(db);
@@ -1089,7 +1261,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1179,7 +1351,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -1228,7 +1400,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1308,7 +1480,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=try_metaclass_cycle_recover,
         cycle_initial=try_metaclass_cycle_initial,
-        heap_size=get_size2::GetSize::get_heap_size,
+        heap_size=get_size2::heap_size,
     )]
     pub(super) fn try_metaclass(
         self,
@@ -2420,7 +2592,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -2628,10 +2800,13 @@ pub enum KnownClass {
     UnionType,
     GeneratorType,
     AsyncGeneratorType,
+    CoroutineType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
     Any,
+    Awaitable,
+    Generator,
     Deprecated,
     StdlibAlias,
     SpecialForm,
@@ -2703,7 +2878,8 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
-            | Self::MethodWrapperType => Truthiness::AlwaysTrue,
+            | Self::MethodWrapperType
+            | Self::CoroutineType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
@@ -2754,6 +2930,8 @@ impl KnownClass {
             | Self::NotImplementedType
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::Field
             | Self::KwOnly
@@ -2819,12 +2997,15 @@ impl KnownClass {
             | Self::InitVar
             | Self::VersionInfo
             | Self::Bool
-            | Self::NoneType => false,
+            | Self::NoneType
+            | Self::CoroutineType => false,
 
             // Anything with a *runtime* MRO (N.B. sometimes different from the MRO that typeshed gives!)
             // with length >2, or anything that is implemented in pure Python, is not a solid base.
             Self::ABCMeta
             | Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::Enum
             | Self::EnumType
             | Self::Auto
@@ -2873,6 +3054,8 @@ impl KnownClass {
             | KnownClass::ExceptionGroup
             | KnownClass::Staticmethod
             | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
@@ -2890,6 +3073,7 @@ impl KnownClass {
             | KnownClass::UnionType
             | KnownClass::GeneratorType
             | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
             | KnownClass::NoneType
             | KnownClass::Any
             | KnownClass::StdlibAlias
@@ -2935,7 +3119,11 @@ impl KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Iterable | Self::Iterator => true,
+            Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Awaitable
+            | Self::Generator => true,
 
             Self::Any
             | Self::Bool
@@ -2964,6 +3152,7 @@ impl KnownClass {
             | Self::GenericAlias
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::ModuleType
             | Self::FunctionType
             | Self::MethodType
@@ -3029,6 +3218,8 @@ impl KnownClass {
             Self::ExceptionGroup => "ExceptionGroup",
             Self::Staticmethod => "staticmethod",
             Self::Classmethod => "classmethod",
+            Self::Awaitable => "Awaitable",
+            Self::Generator => "Generator",
             Self::Deprecated => "deprecated",
             Self::GenericAlias => "GenericAlias",
             Self::ModuleType => "ModuleType",
@@ -3039,6 +3230,7 @@ impl KnownClass {
             Self::WrapperDescriptorType => "WrapperDescriptorType",
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
+            Self::CoroutineType => "CoroutineType",
             Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
@@ -3299,11 +3491,14 @@ impl KnownClass {
             | Self::MethodType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Any
+            | Self::Awaitable
+            | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
             | Self::NamedTuple
@@ -3384,12 +3579,15 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
@@ -3461,6 +3659,7 @@ impl KnownClass {
             | Self::WrapperDescriptorType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::SpecialForm
             | Self::ChainMap
             | Self::Counter
@@ -3475,6 +3674,8 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Staticmethod
             | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
             | Self::Deprecated
             | Self::TypeVar
             | Self::ParamSpec
@@ -3531,12 +3732,15 @@ impl KnownClass {
             "ExceptionGroup" => Self::ExceptionGroup,
             "staticmethod" => Self::Staticmethod,
             "classmethod" => Self::Classmethod,
+            "Awaitable" => Self::Awaitable,
+            "Generator" => Self::Generator,
             "deprecated" => Self::Deprecated,
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
             "GeneratorType" => Self::GeneratorType,
             "AsyncGeneratorType" => Self::AsyncGeneratorType,
+            "CoroutineType" => Self::CoroutineType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
             "UnionType" => Self::UnionType,
@@ -3641,11 +3845,14 @@ impl KnownClass {
             | Self::UnionType
             | Self::GeneratorType
             | Self::AsyncGeneratorType
+            | Self::CoroutineType
             | Self::WrapperDescriptorType
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => module == self.canonical_module(db),
+            | Self::NamedTupleFallback
+            | Self::Awaitable
+            | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeVar
@@ -4025,14 +4232,14 @@ pub(crate) struct SliceLiteral {
     pub(crate) step: Option<i32>,
 }
 
-impl<'db> Type<'db> {
-    /// If this type represents a valid slice literal, returns a [`SliceLiteral`] describing it.
+impl<'db> ClassType<'db> {
+    /// If this class is a specialization of `slice`, returns a [`SliceLiteral`] describing it.
     /// Otherwise returns `None`.
     ///
-    /// The type must be a specialization of the `slice` builtin type, where the specialized
-    /// typevars are statically known integers or `None`.
+    /// The specialization must be one in which the typevars are solved as being statically known
+    /// integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self.into_nominal_instance()?.class else {
+        let ClassType::Generic(alias) = self else {
             return None;
         };
         if !alias.origin(db).is_known(db, KnownClass::Slice) {

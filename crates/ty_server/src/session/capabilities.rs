@@ -17,6 +17,7 @@ bitflags::bitflags! {
         const SIGNATURE_LABEL_OFFSET_SUPPORT = 1 << 8;
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
+        const WORK_DONE_PROGRESS = 1 << 11;
     }
 }
 
@@ -74,6 +75,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports hierarchical document symbols.
     pub(crate) const fn supports_hierarchical_document_symbols(self) -> bool {
         self.contains(Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports work done progress.
+    pub(crate) const fn supports_work_done_progress(self) -> bool {
+        self.contains(Self::WORK_DONE_PROGRESS)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -189,6 +195,15 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
+        }
+
+        if client_capabilities
+            .window
+            .as_ref()
+            .and_then(|window| window.work_done_progress)
+            .unwrap_or_default()
+        {
+            flags |= Self::WORK_DONE_PROGRESS;
         }
 
         flags

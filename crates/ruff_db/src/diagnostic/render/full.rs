@@ -177,4 +177,25 @@ print()
 
         Ok(())
     }
+
+    /// Ensure that the header column matches the column in the user's input, even if we've replaced
+    /// tabs with spaces for rendering purposes.
+    #[test]
+    fn tab_replacement() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "def foo():\n\treturn 1");
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env.err().primary("example.py", "2:1", "2:9", "").build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:2:2
+          |
+        1 | def foo():
+        2 |     return 1
+          |     ^^^^^^^^
+          |
+        ");
+    }
 }

@@ -100,11 +100,31 @@ impl<'db> UnpackValue<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+pub(crate) enum EvaluationMode {
+    Sync,
+    Async,
+}
+
+impl EvaluationMode {
+    pub(crate) const fn from_is_async(is_async: bool) -> Self {
+        if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
+    }
+
+    pub(crate) const fn is_async(self) -> bool {
+        matches!(self, EvaluationMode::Async)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
 pub(crate) enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
-    Iterable,
+    Iterable { mode: EvaluationMode },
     /// An context manager expression like the one in a `with` statement.
-    ContextManager,
+    ContextManager { mode: EvaluationMode },
     /// An expression that is being assigned to a target.
     Assign,
 }

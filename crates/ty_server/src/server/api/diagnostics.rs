@@ -1,3 +1,5 @@
+use std::hash::{DefaultHasher, Hash as _, Hasher as _};
+
 use lsp_types::notification::PublishDiagnostics;
 use lsp_types::{
     CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
@@ -15,17 +17,77 @@ use crate::document::{DocumentKey, FileRangeExt, ToRangeExt};
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{PositionEncoding, Session};
+use crate::{DocumentQuery, PositionEncoding, Session};
+
+pub(super) struct Diagnostics<'a> {
+    items: Vec<ruff_db::diagnostic::Diagnostic>,
+    encoding: PositionEncoding,
+    document: &'a DocumentQuery,
+}
+
+impl Diagnostics<'_> {
+    pub(super) fn result_id_from_hash(diagnostics: &[ruff_db::diagnostic::Diagnostic]) -> String {
+        // Generate result ID based on raw diagnostic content only
+        let mut hasher = DefaultHasher::new();
+
+        // Hash the length first to ensure different numbers of diagnostics produce different hashes
+        diagnostics.hash(&mut hasher);
+
+        format!("{:x}", hasher.finish())
+    }
+
+    pub(super) fn result_id(&self) -> String {
+        Self::result_id_from_hash(&self.items)
+    }
+
+    pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
+        if let Some(notebook) = self.document.as_notebook() {
+            let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
+
+            // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
+            // without diagnostics still get updated.
+            for cell_url in notebook.cell_urls() {
+                cell_diagnostics.entry(cell_url.clone()).or_default();
+            }
+
+            for (cell_index, diagnostic) in self.items.iter().map(|diagnostic| {
+                (
+                    // TODO: Use the cell index instead using `SourceKind`
+                    usize::default(),
+                    to_lsp_diagnostic(db, diagnostic, self.encoding),
+                )
+            }) {
+                let Some(cell_uri) = notebook.cell_uri_by_index(cell_index) else {
+                    tracing::warn!("Unable to find notebook cell at index {cell_index}");
+                    continue;
+                };
+                cell_diagnostics
+                    .entry(cell_uri.clone())
+                    .or_default()
+                    .push(diagnostic);
+            }
+
+            LspDiagnostics::NotebookDocument(cell_diagnostics)
+        } else {
+            LspDiagnostics::TextDocument(
+                self.items
+                    .iter()
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.encoding))
+                    .collect(),
+            )
+        }
+    }
+}
 
 /// Represents the diagnostics for a text document or a notebook document.
-pub(super) enum Diagnostics {
+pub(super) enum LspDiagnostics {
     TextDocument(Vec<Diagnostic>),
 
     /// A map of cell URLs to the diagnostics for that cell.
     NotebookDocument(FxHashMap<Url, Vec<Diagnostic>>),
 }
 
-impl Diagnostics {
+impl LspDiagnostics {
     /// Returns the diagnostics for a text document.
     ///
     /// # Panics
@@ -33,8 +95,8 @@ impl Diagnostics {
     /// Panics if the diagnostics are for a notebook document.
     pub(super) fn expect_text_document(self) -> Vec<Diagnostic> {
         match self {
-            Diagnostics::TextDocument(diagnostics) => diagnostics,
-            Diagnostics::NotebookDocument(_) => {
+            LspDiagnostics::TextDocument(diagnostics) => diagnostics,
+            LspDiagnostics::NotebookDocument(_) => {
                 panic!("Expected a text document diagnostics, but got notebook diagnostics")
             }
         }
@@ -99,11 +161,11 @@ pub(super) fn publish_diagnostics(session: &Session, key: &DocumentKey, client: 
         });
     };
 
-    match diagnostics {
-        Diagnostics::TextDocument(diagnostics) => {
+    match diagnostics.to_lsp_diagnostics(db) {
+        LspDiagnostics::TextDocument(diagnostics) => {
             publish_diagnostics_notification(url, diagnostics);
         }
-        Diagnostics::NotebookDocument(cell_diagnostics) => {
+        LspDiagnostics::NotebookDocument(cell_diagnostics) => {
             for (cell_url, diagnostics) in cell_diagnostics {
                 publish_diagnostics_notification(cell_url, diagnostics);
             }
@@ -187,10 +249,10 @@ pub(crate) fn publish_settings_diagnostics(
     }
 }
 
-pub(super) fn compute_diagnostics(
+pub(super) fn compute_diagnostics<'a>(
     db: &ProjectDatabase,
-    snapshot: &DocumentSnapshot,
-) -> Option<Diagnostics> {
+    snapshot: &'a DocumentSnapshot,
+) -> Option<Diagnostics<'a>> {
     let document = match snapshot.document() {
         Ok(document) => document,
         Err(err) => {
@@ -206,41 +268,11 @@ pub(super) fn compute_diagnostics(
 
     let diagnostics = db.check_file(file);
 
-    if let Some(notebook) = document.as_notebook() {
-        let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
-
-        // Populates all relevant URLs with an empty diagnostic list. This ensures that documents
-        // without diagnostics still get updated.
-        for cell_url in notebook.cell_urls() {
-            cell_diagnostics.entry(cell_url.clone()).or_default();
-        }
-
-        for (cell_index, diagnostic) in diagnostics.iter().map(|diagnostic| {
-            (
-                // TODO: Use the cell index instead using `SourceKind`
-                usize::default(),
-                to_lsp_diagnostic(db, diagnostic, snapshot.encoding()),
-            )
-        }) {
-            let Some(cell_uri) = notebook.cell_uri_by_index(cell_index) else {
-                tracing::warn!("Unable to find notebook cell at index {cell_index}");
-                continue;
-            };
-            cell_diagnostics
-                .entry(cell_uri.clone())
-                .or_default()
-                .push(diagnostic);
-        }
-
-        Some(Diagnostics::NotebookDocument(cell_diagnostics))
-    } else {
-        Some(Diagnostics::TextDocument(
-            diagnostics
-                .iter()
-                .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, snapshot.encoding()))
-                .collect(),
-        ))
-    }
+    Some(Diagnostics {
+        items: diagnostics,
+        encoding: snapshot.encoding(),
+        document,
+    })
 }
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP

@@ -585,8 +585,7 @@ impl<'r> RenderableSnippet<'r> {
         let EscapedSourceCode {
             text: snippet,
             annotations,
-        } = replace_whitespace_and_unprintable(snippet, annotations)
-            .fix_up_empty_spans_after_line_terminator();
+        } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
 
         RenderableSnippet {
             snippet,
@@ -828,13 +827,18 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
-/// Given some source code and annotation ranges, this routine replaces tabs
-/// with ASCII whitespace, and unprintable characters with printable
-/// representations of them.
+/// Given some source code and annotation ranges, this routine replaces
+/// unprintable characters with printable representations of them.
 ///
 /// The source code and annotations returned are updated to reflect changes made
 /// to the source code (if any).
-fn replace_whitespace_and_unprintable<'r>(
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable<'r>(
     source: &'r str,
     mut annotations: Vec<RenderableAnnotation<'r>>,
 ) -> EscapedSourceCode<'r> {
@@ -866,48 +870,17 @@ fn replace_whitespace_and_unprintable<'r>(
         }
     };
 
-    const TAB_SIZE: usize = 4;
-    let mut width = 0;
-    let mut column = 0;
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        let old_width = width;
-        match c {
-            '\n' | '\r' => {
-                width = 0;
-                column = 0;
-            }
-            '\t' => {
-                let tab_offset = TAB_SIZE - (column % TAB_SIZE);
-                width += tab_offset;
-                column += tab_offset;
+        if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
 
-                let tab_width =
-                    u32::try_from(width - old_width).expect("small width because of tab size");
-                result.push_str(&source[last_end..index]);
+            let len = printable.text_len().to_u32();
+            update_ranges(result.text_len().to_usize(), len);
 
-                update_ranges(result.text_len().to_usize(), tab_width);
-
-                for _ in 0..tab_width {
-                    result.push(' ');
-                }
-                last_end = index + 1;
-            }
-            _ => {
-                width += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
-                column += 1;
-
-                if let Some(printable) = unprintable_replacement(c) {
-                    result.push_str(&source[last_end..index]);
-
-                    let len = printable.text_len().to_u32();
-                    update_ranges(result.text_len().to_usize(), len);
-
-                    result.push(printable);
-                    last_end = index + 1;
-                }
-            }
+            result.push(printable);
+            last_end = index + 1;
         }
     }
 
