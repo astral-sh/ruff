@@ -9,6 +9,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
@@ -27,7 +28,7 @@ use crate::types::{
     infer_definition_types,
 };
 use crate::{
-    Db, FxIndexMap, FxOrderSet, KnownModule, Program,
+    Db, FxIndexMap, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,

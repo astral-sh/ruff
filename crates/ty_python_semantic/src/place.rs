@@ -1,7 +1,7 @@
 use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::file_to_module;
+use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
@@ -13,7 +13,7 @@ use crate::types::{
     DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
     UnionType, binding_type, declaration_type, todo_type,
 };
-use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
+use crate::{Db, FxOrderSet, Program, resolve_module};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,

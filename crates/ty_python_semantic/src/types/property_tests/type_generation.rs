@@ -6,7 +6,7 @@ use crate::types::{
     BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
     Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, KnownModule};
+use crate::{Db, module_resolver::KnownModule};
 use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
