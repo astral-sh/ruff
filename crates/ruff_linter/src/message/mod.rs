@@ -43,14 +43,8 @@ pub fn create_syntax_error_diagnostic(
     range: impl Ranged,
 ) -> Diagnostic {
     let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
-    let range = range.range();
-    let span = span.into().with_range(range);
-    let mut annotation = Annotation::primary(span);
-    // The `0..0` range is used to highlight file-level diagnostics.
-    if range == TextRange::default() {
-        annotation.set_file_level(true);
-    }
-    diag.annotate(annotation);
+    let span = span.into().with_range(range.range());
+    diag.annotate(Annotation::primary(span));
     diag
 }
 
