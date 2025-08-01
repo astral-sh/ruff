@@ -921,8 +921,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsPathAbspath),
         (Flake8UsePathlib, "101") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsChmod),
-        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMkdir),
-        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::violations::OsMakedirs),
+        (Flake8UsePathlib, "102") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMkdir),
+        (Flake8UsePathlib, "103") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsMakedirs),
         (Flake8UsePathlib, "104") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRename),
         (Flake8UsePathlib, "105") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsReplace),
         (Flake8UsePathlib, "106") => (RuleGroup::Stable, rules::flake8_use_pathlib::rules::OsRmdir),
