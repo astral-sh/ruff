@@ -253,16 +253,17 @@ impl DisplaySet<'_> {
             if let Some(id) = annotation.id {
                 if hide_severity {
                     buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
-                    if annotation.is_fixable {
-                        buffer.append(line_offset, "[", stylesheet.none);
-                        buffer.append(line_offset, "*", stylesheet.help);
-                        buffer.append(line_offset, "] ", stylesheet.none);
-                    }
                 } else {
                     buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
                 }
             } else {
                 buffer.append(line_offset, annotation_type, *color);
+            }
+
+            if annotation.is_fixable {
+                buffer.append(line_offset, "[", stylesheet.none);
+                buffer.append(line_offset, "*", stylesheet.help);
+                buffer.append(line_offset, "] ", stylesheet.none);
             }
 
             if !is_annotation_empty(annotation) {
