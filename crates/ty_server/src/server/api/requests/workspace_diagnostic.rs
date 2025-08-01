@@ -12,17 +12,15 @@ use crate::system::{AnySystemPath, file_to_url};
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken,
-    UnchangedDocumentDiagnosticReport, Url, WorkspaceDiagnosticParams, WorkspaceDiagnosticReport,
-    WorkspaceDiagnosticReportPartialResult, WorkspaceDiagnosticReportResult,
-    WorkspaceDocumentDiagnosticReport, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport, notification::Notification,
+    FullDocumentDiagnosticReport, PreviousResultId, ProgressToken, Url, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, notification::Notification,
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 use ty_project::{Db, ProgressReporter};
@@ -146,7 +144,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     ) {
         // if streaming: it's a partial result if we did send any changes to the client but a regular report otherwise.
         // for non-streaming, it's always a full report.
-        // We can simply test if all items are unchanged
         let result = Self::run(&snapshot, client, params.clone());
 
         // Test if this is a no-op result, in which case we should long-poll the request and
@@ -159,12 +156,8 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         // * If this is a full report, then check if all items are unchanged (or empty), the same as for
         //   the non-streaming case.
         if let Ok(WorkspaceDiagnosticReportResult::Report(full)) = &result {
-            let all_unchanged = full
-                .items
-                .iter()
-                .all(|item| matches!(item, WorkspaceDocumentDiagnosticReport::Unchanged(_)));
-
-            if all_unchanged {
+            // We only send full reports. Any ite suggests that some diagnostics changed.
+            if full.items.is_empty() {
                 tracing::debug!(
                     "Suspending workspace diagnostic request, all diagnostics are unchanged or the project has no diagnostics"
                 );
@@ -271,7 +264,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
-        let mut by_file: BTreeMap<File, Vec<Diagnostic>> = BTreeMap::new();
+        let mut by_file: FxHashMap<File, Vec<Diagnostic>> = FxHashMap::default();
 
         for diagnostic in diagnostics {
             if let Some(file) = diagnostic.primary_span().map(|span| span.expect_ty_file()) {
@@ -322,7 +315,6 @@ impl<'a> ResponseWriter<'a> {
                 is_test: snapshot.resolved_client_capabilities().is_test_server(),
                 last_flush: Instant::now(),
                 changed: Vec::new(),
-                unchanged: Vec::with_capacity(previous_result_ids.len()),
             })
         } else {
             ReportingMode::Bulk(Vec::new())
@@ -367,16 +359,9 @@ impl<'a> ResponseWriter<'a> {
 
         let report = match result_id {
             Some(new_id) if previous_result_id.is_some_and(|(_, id)| id == new_id) => {
-                // Diagnostics haven't changed, return unchanged report
-                WorkspaceDocumentDiagnosticReport::Unchanged(
-                    WorkspaceUnchangedDocumentDiagnosticReport {
-                        uri: url,
-                        version,
-                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
-                        },
-                    },
-                )
+                // Diagnostics haven't changed. Similar to roslyn, we don't bother sending unchanged reports
+                // as the client already has the most recent diagnostics.
+                return;
             }
             new_id => {
                 // Convert diagnostics to LSP format
@@ -386,27 +371,27 @@ impl<'a> ResponseWriter<'a> {
                     .collect::<Vec<_>>();
 
                 // Diagnostics have changed or this is the first request, return full report
-                WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
+                WorkspaceFullDocumentDiagnosticReport {
                     uri: url,
                     version,
                     full_document_diagnostic_report: FullDocumentDiagnosticReport {
                         result_id: new_id,
                         items: lsp_diagnostics,
                     },
-                })
+                }
             }
         };
 
         self.write_report(report);
     }
 
-    fn write_report(&mut self, report: WorkspaceDocumentDiagnosticReport) {
+    fn write_report(&mut self, report: WorkspaceFullDocumentDiagnosticReport) {
         match &mut self.mode {
             ReportingMode::Streaming(streaming) => {
                 streaming.write_report(report);
             }
             ReportingMode::Bulk(all) => {
-                all.push(report);
+                all.push(WorkspaceDocumentDiagnosticReport::Full(report));
             }
         }
     }
@@ -439,14 +424,7 @@ impl<'a> ResponseWriter<'a> {
 
             let report = match new_result_id {
                 Some(new_id) if new_id == previous_result_id => {
-                    WorkspaceDocumentDiagnosticReport::Unchanged(
-                        WorkspaceUnchangedDocumentDiagnosticReport {
-                            uri: previous_url,
-                            version,
-                            unchanged_document_diagnostic_report:
-                                UnchangedDocumentDiagnosticReport { result_id: new_id },
-                        },
-                    )
+                    continue;
                 }
                 new_id => {
                     WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
@@ -469,11 +447,6 @@ impl<'a> ResponseWriter<'a> {
                     std::mem::take(&mut streaming.changed)
                         .into_iter()
                         .map(WorkspaceDocumentDiagnosticReport::Full),
-                );
-                items.extend(
-                    std::mem::take(&mut streaming.unchanged)
-                        .into_iter()
-                        .map(WorkspaceDocumentDiagnosticReport::Unchanged),
                 );
             }
             ReportingMode::Bulk(all) => {
@@ -523,21 +496,11 @@ struct Streaming {
     /// requests for large projects (can slow down the entire
     /// analysis).
     changed: Vec<WorkspaceFullDocumentDiagnosticReport>,
-    /// All the unchanged reports. Don't stream them,
-    /// since nothing has changed.
-    unchanged: Vec<WorkspaceUnchangedDocumentDiagnosticReport>,
 }
 
 impl Streaming {
-    fn write_report(&mut self, report: WorkspaceDocumentDiagnosticReport) {
-        match report {
-            WorkspaceDocumentDiagnosticReport::Full(full) => {
-                self.changed.push(full);
-            }
-            WorkspaceDocumentDiagnosticReport::Unchanged(unchanged) => {
-                self.unchanged.push(unchanged);
-            }
-        }
+    fn write_report(&mut self, report: WorkspaceFullDocumentDiagnosticReport) {
+        self.changed.push(report);
     }
 
     fn maybe_flush(&mut self) {
