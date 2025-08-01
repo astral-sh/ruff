@@ -53,7 +53,6 @@ jinja
 koda-validate
 kopf
 kornia
-manticore
 materialize
 meson
 mitmproxy
@@ -98,6 +97,7 @@ rotki
 schema_salad
 schemathesis
 scikit-learn
+scipy
 scrapy
 sockeye
 speedrun.com_global_scoreboard_webapp
