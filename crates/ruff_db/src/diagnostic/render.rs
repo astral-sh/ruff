@@ -227,6 +227,7 @@ struct ResolvedDiagnostic<'a> {
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
+    is_fixable: bool,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -247,30 +248,18 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
 
-        let (id, message) = if config.hide_severity {
+        let id = if config.hide_severity {
             // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
             // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
-            let id = Some(diag.secondary_code().map_or_else(
+            Some(diag.secondary_code().map_or_else(
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
-            ));
-            let message = &diag.inner.message;
-            let message = if diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability))
-            {
-                format!("[*] {}", message.as_str())
-            } else {
-                message.as_str().to_string()
-            };
-            (id, message)
+            ))
         } else {
-            let id = Some(diag.inner.id.to_string());
-            let message = diag.inner.message.as_str().to_string();
-            (id, message)
+            Some(diag.inner.id.to_string())
         };
 
         let level = if config.hide_severity {
@@ -282,8 +271,11 @@ impl<'a> ResolvedDiagnostic<'a> {
         ResolvedDiagnostic {
             level,
             id,
-            message,
+            message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: diag
+                .fix()
+                .is_some_and(|fix| fix.applies(config.fix_applicability)),
         }
     }
 
@@ -307,6 +299,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: false,
         }
     }
 
@@ -374,6 +367,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
+            is_fixable: self.is_fixable,
         }
     }
 }
@@ -472,6 +466,10 @@ struct RenderableDiagnostic<'r> {
     /// should be from the same file, and none of the snippets inside of a
     /// collection should overlap with one another or be directly adjacent.
     snippets_by_input: Vec<RenderableSnippets<'r>>,
+    /// Whether or not the diagnostic is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the diagnostic ID.
+    is_fixable: bool,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -484,7 +482,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message);
+        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
         if let Some(id) = self.id {
             message = message.id(id);
         }

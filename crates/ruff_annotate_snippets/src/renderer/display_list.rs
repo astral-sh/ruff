@@ -253,6 +253,11 @@ impl DisplaySet<'_> {
             if let Some(id) = annotation.id {
                 if hide_severity {
                     buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
+                    if annotation.is_fixable {
+                        buffer.append(line_offset, "[", stylesheet.none);
+                        buffer.append(line_offset, "*", stylesheet.help);
+                        buffer.append(line_offset, "] ", stylesheet.none);
+                    }
                 } else {
                     buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
                 }
@@ -811,6 +816,7 @@ pub(crate) struct Annotation<'a> {
     pub(crate) annotation_type: DisplayAnnotationType,
     pub(crate) id: Option<&'a str>,
     pub(crate) label: Vec<DisplayTextFragment<'a>>,
+    pub(crate) is_fixable: bool,
 }
 
 /// A single line used in `DisplayList`.
@@ -1065,11 +1071,12 @@ fn format_message<'m>(
         title,
         footer,
         snippets,
+        is_fixable,
     } = message;
 
     let mut sets = vec![];
     let body = if !snippets.is_empty() || primary {
-        vec![format_title(level, id, title)]
+        vec![format_title(level, id, title, is_fixable)]
     } else {
         format_footer(level, id, title)
     };
@@ -1110,12 +1117,18 @@ fn format_message<'m>(
     sets
 }
 
-fn format_title<'a>(level: crate::Level, id: Option<&'a str>, label: &'a str) -> DisplayLine<'a> {
+fn format_title<'a>(
+    level: crate::Level,
+    id: Option<&'a str>,
+    label: &'a str,
+    is_fixable: bool,
+) -> DisplayLine<'a> {
     DisplayLine::Raw(DisplayRawLine::Annotation {
         annotation: Annotation {
             annotation_type: DisplayAnnotationType::from(level),
             id,
             label: format_label(Some(label), Some(DisplayTextStyle::Emphasis)),
+            is_fixable,
         },
         source_aligned: false,
         continuation: false,
@@ -1134,6 +1147,7 @@ fn format_footer<'a>(
                 annotation_type: DisplayAnnotationType::from(level),
                 id,
                 label: format_label(Some(line), None),
+                is_fixable: false,
             },
             source_aligned: true,
             continuation: i != 0,
@@ -1522,6 +1536,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1561,6 +1576,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: vec![],
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1630,6 +1646,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
