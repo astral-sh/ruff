@@ -83,8 +83,23 @@ The values are 'cert_file_env', 'cert_file', 'cert_dir_env', 'cert_dir'.
 
 if sys.platform == "win32":
     _EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
-    def enum_certificates(store_name: str) -> _EnumRetType: ...
-    def enum_crls(store_name: str) -> _EnumRetType: ...
+    def enum_certificates(store_name: str) -> _EnumRetType:
+        """Retrieve certificates from Windows' cert store.
+
+store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
+more cert storages, too.  The function returns a list of (bytes,
+encoding_type, trust) tuples.  The encoding_type flag can be interpreted
+with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
+a set of OIDs or the boolean True.
+"""
+    def enum_crls(store_name: str) -> _EnumRetType:
+        """Retrieve CRLs from Windows' cert store.
+
+store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
+more cert storages, too.  The function returns a list of (bytes,
+encoding_type) tuples.  The encoding_type flag can be interpreted with
+X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.
+"""
 
 def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
     """Lookup NID, short name, long name and OID of an ASN1_OBJECT.
