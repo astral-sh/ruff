@@ -2584,7 +2584,7 @@ watermelon
         }
 
         /// Like `span`, but only attaches a file path.
-        fn path(&self, path: &str) -> Span {
+        pub(super) fn path(&self, path: &str) -> Span {
             let file = system_path_to_file(&self.db, path).unwrap();
             Span::from(file)
         }

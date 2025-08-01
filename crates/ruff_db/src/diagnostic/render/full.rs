@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use ruff_diagnostics::Applicability;
+    use ruff_text_size::TextRange;
 
     use crate::diagnostic::{
         Annotation, DiagnosticFormat, Severity,
@@ -270,11 +271,11 @@ print()
     #[test]
     fn file_level() {
         let mut env = TestEnvironment::new();
-        env.add("example.py", "\n");
+        env.add("example.py", "");
         env.format(DiagnosticFormat::Full);
 
         let mut diagnostic = env.err().build();
-        let span = env.span("example.py", "1", "1");
+        let span = env.path("example.py").with_range(TextRange::default());
         let mut annotation = Annotation::primary(span);
         annotation.set_file_level(true);
         diagnostic.annotate(annotation);
