@@ -59,7 +59,7 @@ use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
@@ -762,8 +762,13 @@ impl<'db> Type<'db> {
                 *self
             }
 
-            Type::NominalInstance(nominal_instance_type) => {
-                Type::NominalInstance(nominal_instance_type.materialize(db, variance))
+            Type::NominalInstance(instance) => {
+                // TODO: why is special casing `tuple` itself necessary here...?
+                if let Some(tuple) = instance.class.own_tuple_spec(db) {
+                    Type::tuple(db, TupleType::new(db, tuple.materialize(db, variance)))
+                } else {
+                    Type::NominalInstance(instance.materialize(db, variance))
+                }
             }
             Type::GenericAlias(generic_alias) => {
                 Type::GenericAlias(generic_alias.materialize(db, variance))
