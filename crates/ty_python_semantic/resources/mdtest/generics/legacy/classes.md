@@ -329,6 +329,24 @@ class D(C[V, int]):
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+### Generic class inherits `__init__` from generic base class
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(Generic[T, U]):
+    def __init__(self, t: T, u: U) -> None: ...
+
+class D(C[T, U]):
+    pass
+
+reveal_type(C(1, "str"))  # revealed: C[int, str]
+reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
 ### `__init__` is itself generic
 
 ```py
