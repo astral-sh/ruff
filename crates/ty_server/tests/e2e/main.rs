@@ -56,7 +56,7 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
-    InitializeResult, InitializedParams, PartialResultParams, PreviousResultId,
+    InitializeResult, InitializedParams, NumberOrString, PartialResultParams, PreviousResultId,
     PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Url,
     VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
@@ -234,7 +234,7 @@ impl TestServer {
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<InitializeResult>(init_request_id)?);
+        self.initialize_response = Some(self.await_response::<InitializeResult>(&init_request_id)?);
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
@@ -364,9 +364,9 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
+    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: &RequestId) -> Result<T> {
         loop {
-            if let Some(response) = self.responses.remove(&id) {
+            if let Some(response) = self.responses.remove(id) {
                 match response {
                     Response {
                         error: None,
@@ -383,7 +383,11 @@ impl TestServer {
                         return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, Box::new(response)).into());
+                        return Err(TestServerError::InvalidResponse(
+                            id.clone(),
+                            Box::new(response),
+                        )
+                        .into());
                     }
                 }
             }
@@ -541,6 +545,16 @@ impl TestServer {
         panic!("Server dropped client receiver while still running");
     }
 
+    pub(crate) fn cancel(&mut self, request_id: &RequestId) {
+        let id_string = request_id.to_string();
+        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+            id: match id_string.parse() {
+                Ok(id) => NumberOrString::Number(id),
+                Err(_) => NumberOrString::String(id_string),
+            },
+        });
+    }
+
     /// Handle workspace configuration requests from the server.
     ///
     /// Use the [`get_request`] method to wait for the server to send this request.
@@ -662,7 +676,7 @@ impl TestServer {
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
-        self.await_response::<DocumentDiagnosticReportResult>(id)
+        self.await_response::<DocumentDiagnosticReportResult>(&id)
     }
 
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
@@ -682,7 +696,7 @@ impl TestServer {
         };
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
-        self.await_response::<WorkspaceDiagnosticReportResult>(id)
+        self.await_response::<WorkspaceDiagnosticReportResult>(&id)
     }
 }
 
@@ -711,7 +725,7 @@ impl Drop for TestServer {
         // it dropped the client connection.
         let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<()>(shutdown_id) {
+            match self.await_response::<()>(&shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
                     None
