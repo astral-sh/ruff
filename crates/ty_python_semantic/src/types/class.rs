@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
@@ -23,9 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    DeprecatedInstance, DynamicType, KnownInstanceType, NominalInstanceType, TypeAliasType,
+    TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance,
+    TypeVarKind, declaration_type, infer_definition_types,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -268,6 +269,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) const fn is_not_generic(self) -> bool {
+        matches!(self, Self::NonGeneric(..))
+    }
+
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1012,6 +1017,66 @@ impl<'db> ClassType<'db> {
                     )
                 }
             }
+        }
+    }
+
+    /// If this class is `tuple`, a specialization of `tuple` (`tuple[int, str]`, etc.),
+    /// *or a subclass of `tuple`, or a subclass of a specialization of `tuple`*,
+    /// return its tuple specification.
+    pub(super) fn tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+        // Avoid an expensive MRO traversal for common stdlib classes.
+        if self
+            .known(db)
+            .is_some_and(|known_class| !known_class.is_tuple_subclass())
+        {
+            return None;
+        }
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .find_map(|class| class.own_tuple_spec(db))
+    }
+
+    /// If this class is `tuple` or a specialization of `tuple` (`tuple[int, str]`, etc.),
+    /// return its tuple specification.
+    ///
+    /// You usually don't want to use this method directly, because you usually want to consider
+    /// any subclass of a certain tuple type in the same way as that tuple type itself.
+    /// Use [`ClassType::tuple_spec`] instead.
+    pub(super) fn own_tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+        let (class_literal, specialization) = self.class_literal(db);
+        match class_literal.known(db)? {
+            KnownClass::Tuple => Some(
+                specialization
+                    .map(|spec| Cow::Borrowed(spec.tuple(db)))
+                    .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
+            ),
+            KnownClass::VersionInfo => {
+                let python_version = Program::get(db).python_version(db);
+                let int_instance_ty = KnownClass::Int.to_instance(db);
+
+                // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+                let release_level_ty = {
+                    let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                        .iter()
+                        .map(|level| Type::string_literal(db, level))
+                        .collect();
+
+                    // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+                    // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+                    // into other types where necessary. Here, however, we know that there are no duplicates
+                    // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+                    Type::Union(UnionType::new(db, elements))
+                };
+
+                Some(Cow::Owned(TupleSpec::from_elements([
+                    Type::IntLiteral(python_version.major.into()),
+                    Type::IntLiteral(python_version.minor.into()),
+                    int_instance_ty,
+                    release_level_ty,
+                    int_instance_ty,
+                ])))
+            }
+            _ => None,
         }
     }
 }
@@ -3105,6 +3170,81 @@ impl KnownClass {
         }
     }
 
+    pub(crate) const fn is_tuple_subclass(self) -> bool {
+        match self {
+            KnownClass::Tuple | KnownClass::VersionInfo => true,
+
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::Any
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NamedTuple
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::InitVar
+            | KnownClass::NamedTupleFallback => false,
+        }
+    }
+
     /// Return `true` if this class is a protocol class.
     ///
     /// In an ideal world, perhaps we wouldn't hardcode this knowledge here;
@@ -4332,16 +4472,14 @@ impl SlotsKind {
 
         match slots_ty {
             // __slots__ = ("a", "b")
-            Type::Tuple(tuple) => {
-                let tuple = tuple.tuple(db);
-                if tuple.is_variadic() {
-                    Self::Dynamic
-                } else if tuple.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::NotEmpty
-                }
-            }
+            Type::NominalInstance(NominalInstanceType { class, .. }) => match class
+                .tuple_spec(db)
+                .and_then(|spec| spec.len().into_fixed_length())
+            {
+                Some(0) => Self::Empty,
+                Some(_) => Self::NotEmpty,
+                None => Self::Dynamic,
+            },
 
             // __slots__ = "abc"  # Same as `("abc",)`
             Type::StringLiteral(_) => Self::NotEmpty,
