@@ -502,10 +502,12 @@ impl<'db> Signature<'db> {
                     ParameterKind::PositionalOrKeyword {
                         name: self_name,
                         default_type: self_default,
+                        ..
                     },
                     ParameterKind::PositionalOrKeyword {
                         name: other_name,
                         default_type: other_default,
+                        ..
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -516,10 +518,12 @@ impl<'db> Signature<'db> {
                     ParameterKind::KeywordOnly {
                         name: self_name,
                         default_type: self_default,
+                        ..
                     },
                     ParameterKind::KeywordOnly {
                         name: other_name,
                         default_type: other_default,
+                        ..
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -723,10 +727,12 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOrKeyword {
                                 name: self_name,
                                 default_type: self_default,
+                                ..
                             },
                             ParameterKind::PositionalOrKeyword {
                                 name: other_name,
                                 default_type: other_default,
+                                ..
                             },
                         ) => {
                             if self_name != other_name {
@@ -864,10 +870,12 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordOnly {
                     name: other_name,
                     default_type: other_default,
+                    ..
                 }
                 | ParameterKind::PositionalOrKeyword {
                     name: other_name,
                     default_type: other_default,
+                    ..
                 } => {
                     if let Some(self_parameter) = self_keywords.remove(other_name) {
                         match self_parameter.kind() {
@@ -1101,63 +1109,53 @@ impl<'db> Parameters<'db> {
             range: _,
             node_index: _,
         } = parameters;
+        let annotated_type = |param: &ast::Parameter| {
+            param
+                .annotation()
+                .map(|annotation| definition_expression_type(db, definition, annotation))
+        };
         let default_type = |param: &ast::ParameterWithDefault| {
             param
                 .default()
                 .map(|default| definition_expression_type(db, definition, default))
         };
-        let positional_only = posonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
-                },
-            )
+        let positional_only = posonlyargs.iter().map(|arg| Parameter {
+            kind: ParameterKind::PositionalOnly {
+                name: Some(arg.parameter.name.id.clone()),
+                annotated_type: annotated_type(&arg.parameter),
+                default_type: default_type(arg),
+            },
+            form: ParameterForm::Value,
         });
-        let positional_or_keyword = args.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
+        let positional_or_keyword = args.iter().map(|arg| Parameter {
+            kind: ParameterKind::PositionalOrKeyword {
+                name: arg.parameter.name.id.clone(),
+                annotated_type: annotated_type(&arg.parameter),
+                default_type: default_type(arg),
+            },
+            form: ParameterForm::Value,
         });
-        let variadic = vararg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                arg,
-                ParameterKind::Variadic {
-                    name: arg.name.id.clone(),
-                },
-            )
+        let variadic = vararg.as_ref().map(|arg| Parameter {
+            kind: ParameterKind::Variadic {
+                name: arg.name.id.clone(),
+                annotated_type: annotated_type(arg),
+            },
+            form: ParameterForm::Value,
         });
-        let keyword_only = kwonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::KeywordOnly {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
+        let keyword_only = kwonlyargs.iter().map(|arg| Parameter {
+            kind: ParameterKind::KeywordOnly {
+                name: arg.parameter.name.id.clone(),
+                annotated_type: annotated_type(&arg.parameter),
+                default_type: default_type(arg),
+            },
+            form: ParameterForm::Value,
         });
-        let keywords = kwarg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                arg,
-                ParameterKind::KeywordVariadic {
-                    name: arg.name.id.clone(),
-                },
-            )
+        let keywords = kwarg.as_ref().map(|arg| Parameter {
+            kind: ParameterKind::KeywordVariadic {
+                name: arg.name.id.clone(),
+                annotated_type: annotated_type(arg),
+            },
+            form: ParameterForm::Value,
         });
         Self::new(
             positional_only
@@ -1261,9 +1259,6 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameter<'db> {
-    /// Annotated type of the parameter.
-    annotated_type: Option<Type<'db>>,
-
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
 }
@@ -1271,9 +1266,9 @@ pub(crate) struct Parameter<'db> {
 impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
-            annotated_type: None,
             kind: ParameterKind::PositionalOnly {
                 name,
+                annotated_type: None,
                 default_type: None,
             },
             form: ParameterForm::Value,
@@ -1282,9 +1277,9 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
-            annotated_type: None,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
+                annotated_type: None,
                 default_type: None,
             },
             form: ParameterForm::Value,
@@ -1293,17 +1288,19 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            kind: ParameterKind::Variadic { name },
+            kind: ParameterKind::Variadic {
+                name,
+                annotated_type: None,
+            },
             form: ParameterForm::Value,
         }
     }
 
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
-            annotated_type: None,
             kind: ParameterKind::KeywordOnly {
                 name,
+                annotated_type: None,
                 default_type: None,
             },
             form: ParameterForm::Value,
@@ -1312,14 +1309,24 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            kind: ParameterKind::KeywordVariadic { name },
+            kind: ParameterKind::KeywordVariadic {
+                name,
+                annotated_type: None,
+            },
             form: ParameterForm::Value,
         }
     }
 
-    pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
-        self.annotated_type = Some(annotated_type);
+    pub(crate) fn with_annotated_type(mut self, annotated: Type<'db>) -> Self {
+        match &mut self.kind {
+            ParameterKind::PositionalOnly { annotated_type, .. }
+            | ParameterKind::PositionalOrKeyword { annotated_type, .. }
+            | ParameterKind::Variadic { annotated_type, .. }
+            | ParameterKind::KeywordOnly { annotated_type, .. }
+            | ParameterKind::KeywordVariadic { annotated_type, .. } => {
+                *annotated_type = Some(annotated);
+            }
+        }
         self
     }
 
@@ -1342,21 +1349,13 @@ impl<'db> Parameter<'db> {
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
-            annotated_type: Some(
-                self.annotated_type
-                    .unwrap_or(Type::unknown())
-                    .materialize(db, variance),
-            ),
-            kind: self.kind.clone(),
+            kind: self.kind.materialize(db, variance),
             form: self.form,
         }
     }
 
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         Self {
-            annotated_type: self
-                .annotated_type
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
             kind: self.kind.apply_type_mapping(db, type_mapping),
             form: self.form,
         }
@@ -1371,69 +1370,80 @@ impl<'db> Parameter<'db> {
         db: &'db dyn Db,
         visitor: &mut TypeTransformer<'db>,
     ) -> Self {
-        let Parameter {
-            annotated_type,
-            kind,
-            form,
-        } = self;
+        let Parameter { kind, form } = self;
 
         // Ensure unions and intersections are ordered in the annotated type (if there is one).
         // Ensure that a parameter without an annotation is treated equivalently to a parameter
         // with a dynamic type as its annotation. (We must use `Any` here as all dynamic types
         // normalize to `Any`.)
-        let annotated_type = annotated_type
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .unwrap_or_else(Type::any);
-
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
         // (strip the precise *type* of the default from the parameter, replacing it with `Never`).
         let kind = match kind {
             ParameterKind::PositionalOnly {
                 name: _,
+                annotated_type,
                 default_type,
             } => ParameterKind::PositionalOnly {
                 name: None,
+                annotated_type: Some(
+                    annotated_type
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .unwrap_or_else(Type::any),
+                ),
                 default_type: default_type.map(|_| Type::Never),
             },
-            ParameterKind::PositionalOrKeyword { name, default_type } => {
-                ParameterKind::PositionalOrKeyword {
-                    name: name.clone(),
-                    default_type: default_type.map(|_| Type::Never),
-                }
-            }
-            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+            ParameterKind::PositionalOrKeyword {
+                name,
+                annotated_type,
+                default_type,
+            } => ParameterKind::PositionalOrKeyword {
                 name: name.clone(),
+                annotated_type: Some(
+                    annotated_type
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .unwrap_or_else(Type::any),
+                ),
                 default_type: default_type.map(|_| Type::Never),
             },
-            ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
-                name: Name::new_static("args"),
+            ParameterKind::KeywordOnly {
+                name,
+                annotated_type,
+                default_type,
+            } => ParameterKind::KeywordOnly {
+                name: name.clone(),
+                annotated_type: Some(
+                    annotated_type
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .unwrap_or_else(Type::any),
+                ),
+                default_type: default_type.map(|_| Type::Never),
             },
-            ParameterKind::KeywordVariadic { name: _ } => ParameterKind::KeywordVariadic {
+            ParameterKind::Variadic {
+                name: _,
+                annotated_type,
+            } => ParameterKind::Variadic {
+                name: Name::new_static("args"),
+                annotated_type: Some(
+                    annotated_type
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .unwrap_or_else(Type::any),
+                ),
+            },
+            ParameterKind::KeywordVariadic {
+                name: _,
+                annotated_type,
+            } => ParameterKind::KeywordVariadic {
                 name: Name::new_static("kwargs"),
+                annotated_type: Some(
+                    annotated_type
+                        .map(|ty| ty.normalized_impl(db, visitor))
+                        .unwrap_or_else(Type::any),
+                ),
             },
         };
 
-        Self {
-            annotated_type: Some(annotated_type),
-            kind,
-            form: *form,
-        }
-    }
-
-    fn from_node_and_kind(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        parameter: &ast::Parameter,
-        kind: ParameterKind<'db>,
-    ) -> Self {
-        Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
-            kind,
-            form: ParameterForm::Value,
-        }
+        Self { kind, form: *form }
     }
 
     /// Returns `true` if this is a keyword-only parameter.
@@ -1479,7 +1489,13 @@ impl<'db> Parameter<'db> {
 
     /// Annotated type of the parameter, if annotated.
     pub(crate) fn annotated_type(&self) -> Option<Type<'db>> {
-        self.annotated_type
+        match &self.kind {
+            ParameterKind::PositionalOnly { annotated_type, .. }
+            | ParameterKind::PositionalOrKeyword { annotated_type, .. }
+            | ParameterKind::Variadic { annotated_type, .. }
+            | ParameterKind::KeywordOnly { annotated_type, .. }
+            | ParameterKind::KeywordVariadic { annotated_type, .. } => *annotated_type,
+        }
     }
 
     /// Kind of the parameter.
@@ -1492,9 +1508,9 @@ impl<'db> Parameter<'db> {
         match &self.kind {
             ParameterKind::PositionalOnly { name, .. } => name.as_ref(),
             ParameterKind::PositionalOrKeyword { name, .. } => Some(name),
-            ParameterKind::Variadic { name } => Some(name),
+            ParameterKind::Variadic { name, .. } => Some(name),
             ParameterKind::KeywordOnly { name, .. } => Some(name),
-            ParameterKind::KeywordVariadic { name } => Some(name),
+            ParameterKind::KeywordVariadic { name, .. } => Some(name),
         }
     }
 
@@ -1527,6 +1543,7 @@ pub(crate) enum ParameterKind<'db> {
         /// It is possible for signatures to be defined in ways that leave positional-only parameters
         /// nameless (e.g. via `Callable` annotations).
         name: Option<Name>,
+        annotated_type: Option<Type<'db>>,
         default_type: Option<Type<'db>>,
     },
 
@@ -1534,6 +1551,7 @@ pub(crate) enum ParameterKind<'db> {
     PositionalOrKeyword {
         /// Parameter name.
         name: Name,
+        annotated_type: Option<Type<'db>>,
         default_type: Option<Type<'db>>,
     },
 
@@ -1541,12 +1559,14 @@ pub(crate) enum ParameterKind<'db> {
     Variadic {
         /// Parameter name.
         name: Name,
+        annotated_type: Option<Type<'db>>,
     },
 
     /// Keyword-only parameter, e.g. `def f(*, x): ...`
     KeywordOnly {
         /// Parameter name.
         name: Name,
+        annotated_type: Option<Type<'db>>,
         default_type: Option<Type<'db>>,
     },
 
@@ -1554,31 +1574,136 @@ pub(crate) enum ParameterKind<'db> {
     KeywordVariadic {
         /// Parameter name.
         name: Name,
+        annotated_type: Option<Type<'db>>,
     },
 }
 
 impl<'db> ParameterKind<'db> {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        match self {
+            Self::PositionalOnly {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::PositionalOnly {
+                annotated_type: Some(
+                    annotated_type
+                        .unwrap_or(Type::unknown())
+                        .materialize(db, variance),
+                ),
+                default_type: *default_type,
+                name: name.clone(),
+            },
+            Self::PositionalOrKeyword {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::PositionalOrKeyword {
+                annotated_type: Some(
+                    annotated_type
+                        .unwrap_or(Type::unknown())
+                        .materialize(db, variance),
+                ),
+                default_type: *default_type,
+                name: name.clone(),
+            },
+            Self::KeywordOnly {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::KeywordOnly {
+                annotated_type: Some(
+                    annotated_type
+                        .unwrap_or(Type::unknown())
+                        .materialize(db, variance),
+                ),
+                default_type: *default_type,
+                name: name.clone(),
+            },
+            Self::Variadic {
+                annotated_type,
+                name,
+            } => Self::Variadic {
+                annotated_type: Some(
+                    annotated_type
+                        .unwrap_or(Type::unknown())
+                        .materialize(db, variance),
+                ),
+                name: name.clone(),
+            },
+            Self::KeywordVariadic {
+                annotated_type,
+                name,
+            } => Self::KeywordVariadic {
+                annotated_type: Some(
+                    annotated_type
+                        .unwrap_or(Type::unknown())
+                        .materialize(db, variance),
+                ),
+                name: name.clone(),
+            },
+        }
+    }
+
     fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
-            Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
+            Self::PositionalOnly {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::PositionalOnly {
+                annotated_type: annotated_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 default_type: default_type
                     .as_ref()
                     .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 name: name.clone(),
             },
-            Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
+            Self::PositionalOrKeyword {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::PositionalOrKeyword {
+                annotated_type: annotated_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 default_type: default_type
                     .as_ref()
                     .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 name: name.clone(),
             },
-            Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
+            Self::KeywordOnly {
+                annotated_type,
+                default_type,
+                name,
+            } => Self::KeywordOnly {
+                annotated_type: annotated_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 default_type: default_type
                     .as_ref()
                     .map(|ty| ty.apply_type_mapping(db, type_mapping)),
                 name: name.clone(),
             },
-            Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),
+            Self::Variadic {
+                annotated_type,
+                name,
+            } => Self::Variadic {
+                annotated_type: annotated_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                name: name.clone(),
+            },
+            Self::KeywordVariadic {
+                annotated_type,
+                name,
+            } => Self::KeywordVariadic {
+                annotated_type: annotated_type
+                    .as_ref()
+                    .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                name: name.clone(),
+            },
         }
     }
 }
@@ -1702,8 +1827,12 @@ mod tests {
 
         let [
             Parameter {
-                annotated_type,
-                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name,
+                        annotated_type,
+                        ..
+                    },
                 ..
             },
         ] = &sig.parameters.value[..]
@@ -1740,8 +1869,12 @@ mod tests {
 
         let [
             Parameter {
-                annotated_type,
-                kind: ParameterKind::PositionalOrKeyword { name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name,
+                        annotated_type,
+                        ..
+                    },
                 ..
             },
         ] = &sig.parameters.value[..]
@@ -1778,13 +1911,21 @@ mod tests {
 
         let [
             Parameter {
-                annotated_type: a_annotated_ty,
-                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name: a_name,
+                        annotated_type: a_annotated_ty,
+                        ..
+                    },
                 ..
             },
             Parameter {
-                annotated_type: b_annotated_ty,
-                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name: b_name,
+                        annotated_type: b_annotated_ty,
+                        ..
+                    },
                 ..
             },
         ] = &sig.parameters.value[..]
@@ -1826,13 +1967,21 @@ mod tests {
 
         let [
             Parameter {
-                annotated_type: a_annotated_ty,
-                kind: ParameterKind::PositionalOrKeyword { name: a_name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name: a_name,
+                        annotated_type: a_annotated_ty,
+                        ..
+                    },
                 ..
             },
             Parameter {
-                annotated_type: b_annotated_ty,
-                kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
+                kind:
+                    ParameterKind::PositionalOrKeyword {
+                        name: b_name,
+                        annotated_type: b_annotated_ty,
+                        ..
+                    },
                 ..
             },
         ] = &sig.parameters.value[..]
