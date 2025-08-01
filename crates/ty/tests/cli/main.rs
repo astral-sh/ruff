@@ -15,6 +15,83 @@ use std::{
 use tempfile::TempDir;
 
 #[test]
+fn test_quiet_output() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "x: int = 1")?;
+
+    // By default, we emit an "all checks passed" message
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    // With `quiet`, the message is not displayed
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    let case = CliTest::with_file("test.py", "x: int = 'foo'")?;
+
+    // By default, we emit a diagnostic
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-assignment]: Object of type `Literal["foo"]` is not assignable to `int`
+     --> test.py:1:1
+      |
+    1 | x: int = 'foo'
+      | ^
+      |
+    info: rule `invalid-assignment` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    "#);
+
+    // With `quiet`, the diagnostic is not displayed, just the summary message
+    assert_cmd_snapshot!(case.command().arg("--quiet"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // We allow `-q`
+    assert_cmd_snapshot!(case.command().arg("-q"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // And repeated `-qq`
+    assert_cmd_snapshot!(case.command().arg("-qq"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @r"
@@ -515,8 +592,8 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[unresolved-reference] test.py:2:7: Name `x` used when not defined
-    error[non-subscriptable] test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    test.py:2:7: warning[unresolved-reference] Name `x` used when not defined
+    test.py:3:7: error[non-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
@@ -550,7 +627,7 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] test.py:5:13: Revealed type: `Literal["hello"]`
+    test.py:5:13: info[revealed-type] Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
@@ -583,7 +660,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     2 | from typing_extensions import reveal_type
-    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +…
     4 | reveal_type(total)
       |             ^^^^^ `Literal[2000]`
       |

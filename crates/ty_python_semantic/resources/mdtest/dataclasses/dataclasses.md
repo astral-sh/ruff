@@ -415,8 +415,7 @@ frozen_instance = MyFrozenGeneric[int](1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-When attempting to mutate an unresolved attribute on a frozen dataclass, only `unresolved-attribute`
-is emitted:
+Attempting to mutate an unresolved attribute on a frozen dataclass:
 
 ```py
 from dataclasses import dataclass
@@ -425,7 +424,39 @@ from dataclasses import dataclass
 class MyFrozenClass: ...
 
 frozen = MyFrozenClass()
-frozen.x = 2  # error: [unresolved-attribute]
+frozen.x = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `x` on type `MyFrozenClass`"
+```
+
+A diagnostic is also emitted if a frozen dataclass is inherited, and an attempt is made to mutate an
+attribute in the child class:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+frozen.x = 2  # error: [invalid-assignment]
+```
+
+The same diagnostic is emitted if a frozen dataclass is inherited, and an attempt is made to delete
+an attribute:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class MyFrozenClass:
+    x: int = 1
+
+class MyFrozenChildClass(MyFrozenClass): ...
+
+frozen = MyFrozenChildClass()
+del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
 ### `match_args`
@@ -443,6 +474,33 @@ To do
 ### `weakref_slot`
 
 To do
+
+## `Final` fields
+
+Dataclass fields can be annotated with `Final`, which means that the field cannot be reassigned
+after the instance is created. Fields that are additionally annotated with `ClassVar` are not part
+of the `__init__` signature.
+
+```py
+from dataclasses import dataclass
+from typing import Final, ClassVar
+
+@dataclass
+class C:
+    # a `Final` annotation without a right-hand side is not allowed in normal classes,
+    # but valid for dataclasses. The field will be initialized in the synthesized
+    # `__init__` method
+    instance_variable_no_default: Final[int]
+    instance_variable: Final[int] = 1
+    class_variable1: ClassVar[Final[int]] = 1
+    class_variable2: ClassVar[Final[int]] = 1
+
+reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
+
+c = C(1)
+# error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
+c.instance_variable = 2
+```
 
 ## Inheritance
 
@@ -531,12 +589,58 @@ class C(Base):
 reveal_type(C.__init__)  # revealed: (self: C, x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
 ```
 
+## Conditionally defined fields
+
+### Statically known conditions
+
+Fields that are defined in always-reachable branches are always present in the synthesized
+`__init__` method. Fields that are defined in never-reachable branches are not present:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    normal: int
+
+    if 1 + 2 == 3:
+        always_present: str
+
+    if 1 + 2 == 4:
+        never_present: bool
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, always_present: str) -> None
+```
+
+### Dynamic conditions
+
+If a field is conditionally defined, we currently assume that it is always present. A more complex
+alternative here would be to synthesized a union of all possible `__init__` signatures:
+
+```py
+from dataclasses import dataclass
+
+def flag() -> bool:
+    return True
+
+@dataclass
+class C:
+    normal: int
+
+    if flag():
+        conditionally_present: str
+
+reveal_type(C.__init__)  # revealed: (self: C, normal: int, conditionally_present: str) -> None
+```
+
 ## Generic dataclasses
 
 ```toml
 [environment]
 python-version = "3.12"
 ```
+
+### Basic
 
 ```py
 from dataclasses import dataclass
@@ -554,6 +658,34 @@ reveal_type(d_int.description)  # revealed: str
 
 # error: [invalid-argument-type]
 DataWithDescription[int](None, "description")
+```
+
+### Deriving from generic dataclasses
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/853>.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Wrap[T]:
+    data: T
+
+reveal_type(Wrap[int].__init__)  # revealed: (self: Wrap[int], data: int) -> None
+
+@dataclass
+class WrappedInt(Wrap[int]):
+    other_field: str
+
+reveal_type(WrappedInt.__init__)  # revealed: (self: WrappedInt, data: int, other_field: str) -> None
+
+# Make sure that another generic type parameter does not affect the `data` field
+@dataclass
+class WrappedIntAndExtraData[T](Wrap[int]):
+    extra_data: T
+
+# revealed: (self: WrappedIntAndExtraData[bytes], data: int, extra_data: bytes) -> None
+reveal_type(WrappedIntAndExtraData[bytes].__init__)
 ```
 
 ## Descriptor-typed fields
@@ -760,6 +892,23 @@ class Fails:  # error: [duplicate-kw-only]
     e: bytes
 
 reveal_type(Fails.__init__)  # revealed: (self: Fails, a: int, *, c: str, e: bytes) -> None
+```
+
+This also works if `KW_ONLY` is used in a conditional branch:
+
+```py
+def flag() -> bool:
+    return True
+
+@dataclass
+class D:  # error: [duplicate-kw-only]
+    x: int
+    _1: KW_ONLY
+
+    if flag():
+        y: str
+        _2: KW_ONLY
+        z: float
 ```
 
 ## Other special cases

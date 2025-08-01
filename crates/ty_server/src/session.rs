@@ -1,28 +1,35 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::panic::AssertUnwindSafe;
-use std::sync::Arc;
-
 use anyhow::{Context, anyhow};
+use index::DocumentQueryError;
 use lsp_server::Message;
+use lsp_types::notification::{Exit, Notification};
+use lsp_types::request::{Request, Shutdown};
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 use options::GlobalOptions;
 use ruff_db::Db;
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use std::collections::{BTreeMap, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
 use ty_project::metadata::Options;
-use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_project::watch::ChangeEvent;
+use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
-pub use self::index::DocumentQuery;
-pub(crate) use self::options::{AllOptions, ClientOptions};
+pub(crate) use self::index::DocumentQuery;
+pub(crate) use self::options::AllOptions;
+pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::server::publish_settings_diagnostics;
+use crate::session::client::Client;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
+use index::Index;
 
 mod capabilities;
 pub(crate) mod client;
@@ -32,7 +39,10 @@ mod request_queue;
 mod settings;
 
 /// The global state for the LSP
-pub struct Session {
+pub(crate) struct Session {
+    /// A native system to use with the [`LSPSystem`].
+    native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+
     /// Used to retrieve information about open documents and settings.
     ///
     /// This will be [`None`] when a mutable reference is held to the index via [`index_mut`]
@@ -40,21 +50,26 @@ pub struct Session {
     /// when the mutable reference ([`MutIndexGuard`]) is dropped.
     ///
     /// [`index_mut`]: Session::index_mut
-    index: Option<Arc<index::Index>>,
+    index: Option<Arc<Index>>,
 
     /// Maps workspace folders to their respective workspace.
     workspaces: Workspaces,
 
     /// The projects across all workspaces.
-    projects: BTreeMap<SystemPathBuf, ProjectDatabase>,
+    projects: BTreeMap<SystemPathBuf, ProjectState>,
 
-    default_project: ProjectDatabase,
+    /// The project to use for files outside any workspace. For example, if the user
+    /// opens the project `<home>/my_project` in VS code but they then opens a Python file from their Desktop.
+    /// This file isn't part of the active workspace, nor is it part of any project. But we still want
+    /// to provide some basic functionality like navigation, completions, syntax highlighting, etc.
+    /// That's what we use the default project for.
+    default_project: DefaultProject,
 
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
 
     /// Tracks what LSP features the client supports and doesn't support.
-    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+    resolved_client_capabilities: ResolvedClientCapabilities,
 
     /// Tracks the pending requests between client and server.
     request_queue: RequestQueue,
@@ -65,41 +80,56 @@ pub struct Session {
     deferred_messages: VecDeque<Message>,
 }
 
+/// LSP State for a Project
+pub(crate) struct ProjectState {
+    /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
+    ///
+    /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
+    /// told us to open. Notably settings files like `pyproject.toml`. In this
+    /// mode the client will never pull diagnostics for that file, and because
+    /// the file isn't formally "open" we also don't have a reliable signal to
+    /// refresh diagnostics for it either.
+    ///
+    /// However diagnostics for those files include things like "you typo'd your
+    /// configuration for the LSP itself", so it's really important that we tell
+    /// the user about them! So we remember which ones we have emitted diagnostics
+    /// for so that we can clear the diagnostics for all of them before we go
+    /// to update any of them.
+    pub(crate) untracked_files_with_pushed_diagnostics: Vec<Url>,
+
+    // Note: This field should be last to ensure the `db` gets dropped last.
+    // The db drop order matters because we call `Arc::into_inner` on some Arc's
+    // and we use Salsa's cancellation to guarantee that there's only a single reference to the `Arc`.
+    // However, this requires that the db drops last.
+    // This shouldn't matter here because the db's stored in the session are the
+    // only reference we want to hold on, but better be safe than sorry ;).
+    pub(crate) db: ProjectDatabase,
+}
+
 impl Session {
     pub(crate) fn new(
         client_capabilities: &ClientCapabilities,
         position_encoding: PositionEncoding,
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
+        native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
     ) -> crate::Result<Self> {
-        let index = Arc::new(index::Index::new(global_options.into_settings()));
+        let index = Arc::new(Index::new(global_options.into_settings()));
 
         let mut workspaces = Workspaces::default();
-        for (url, options) in workspace_folders {
-            workspaces.register(url, options)?;
+        for (url, workspace_options) in workspace_folders {
+            workspaces.register(url, workspace_options.into_settings())?;
         }
 
-        let default_project = {
-            let system = LSPSystem::new(index.clone());
-            let metadata = ProjectMetadata::from_options(
-                Options::default(),
-                system.current_directory().to_path_buf(),
-                None,
-            )
-            .unwrap();
-            ProjectDatabase::new(metadata, system).unwrap()
-        };
-
         Ok(Self {
+            native_system,
             position_encoding,
             workspaces,
             deferred_messages: VecDeque::new(),
             index: Some(index),
-            default_project,
+            default_project: DefaultProject::new(),
             projects: BTreeMap::new(),
-            resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
-                client_capabilities,
-            )),
+            resolved_client_capabilities: ResolvedClientCapabilities::new(client_capabilities),
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
         })
@@ -108,7 +138,6 @@ impl Session {
     pub(crate) fn request_queue(&self) -> &RequestQueue {
         &self.request_queue
     }
-
     pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
         &mut self.request_queue
     }
@@ -141,6 +170,9 @@ impl Session {
         } else {
             match &message {
                 Message::Request(request) => {
+                    if request.method == Shutdown::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` request until all workspaces are initialized",
                         request.method
@@ -151,6 +183,9 @@ impl Session {
                     return Some(message);
                 }
                 Message::Notification(notification) => {
+                    if notification.method == Exit::METHOD {
+                        return Some(message);
+                    }
                     tracing::debug!(
                         "Deferring `{}` notification until all workspaces are initialized",
                         notification.method
@@ -167,16 +202,24 @@ impl Session {
         &self.workspaces
     }
 
-    // TODO(dhruvmanila): Ideally, we should have a single method for `workspace_db_for_path_mut`
-    // and `default_workspace_db_mut` but the borrow checker doesn't allow that.
-    // https://github.com/astral-sh/ruff/pull/13041#discussion_r1726725437
+    /// Returns a reference to the project's [`ProjectDatabase`] in which the given `path` belongs.
+    ///
+    /// If the path is a system path, it will return the project database that is closest to the
+    /// given path, or the default project if no project is found for the path.
+    ///
+    /// If the path is a virtual path, it will return the first project database in the session.
+    pub(crate) fn project_db(&self, path: &AnySystemPath) -> &ProjectDatabase {
+        &self.project_state(path).db
+    }
 
-    /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path,
-    /// or the default project if no project is found for the path.
-    pub(crate) fn project_db_or_default(&self, path: &AnySystemPath) -> &ProjectDatabase {
-        path.as_system()
-            .and_then(|path| self.project_db_for_path(path))
-            .unwrap_or_else(|| self.default_project_db())
+    /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
+    /// belongs.
+    ///
+    /// Refer to [`project_db`] for more details on how the project is selected.
+    ///
+    /// [`project_db`]: Session::project_db
+    pub(crate) fn project_db_mut(&mut self, path: &AnySystemPath) -> &mut ProjectDatabase {
+        &mut self.project_state_mut(path).db
     }
 
     /// Returns a reference to the project's [`ProjectDatabase`] corresponding to the given path, if
@@ -185,91 +228,195 @@ impl Session {
         &self,
         path: impl AsRef<SystemPath>,
     ) -> Option<&ProjectDatabase> {
-        self.projects
-            .range(..=path.as_ref().to_path_buf())
-            .next_back()
-            .map(|(_, db)| db)
+        self.project_state_for_path(path).map(|state| &state.db)
     }
 
-    /// Returns a mutable reference to the project [`ProjectDatabase`] corresponding to the given
-    /// path, if any.
-    pub(crate) fn project_db_for_path_mut(
-        &mut self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<&mut ProjectDatabase> {
-        self.projects
-            .range_mut(..=path.as_ref().to_path_buf())
-            .next_back()
-            .map(|(_, db)| db)
-    }
-
-    /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
-    /// minimum root path in the project map.
-    pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
-        &self.default_project
-    }
-
-    /// Returns a mutable reference to the default project [`ProjectDatabase`].
-    pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
-        &mut self.default_project
-    }
-
-    fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
-        self.projects
-            .values_mut()
-            .chain(std::iter::once(&mut self.default_project))
-    }
-
-    pub(crate) fn key_from_url(&self, url: Url) -> crate::Result<DocumentKey> {
-        self.index().key_from_url(url)
-    }
-
-    pub(crate) fn take_workspace_snapshot(&self) -> WorkspaceSnapshot {
-        WorkspaceSnapshot {
-            projects: AssertUnwindSafe(self.projects.values().cloned().collect()),
-            index: self.index.clone().unwrap(),
-            position_encoding: self.position_encoding,
+    /// Returns a reference to the project's [`ProjectState`] in which the given `path` belongs.
+    ///
+    /// If the path is a system path, it will return the project database that is closest to the
+    /// given path, or the default project if no project is found for the path.
+    ///
+    /// If the path is a virtual path, it will return the first project database in the session.
+    pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
+        match path {
+            AnySystemPath::System(system_path) => {
+                self.project_state_for_path(system_path).unwrap_or_else(|| {
+                    self.default_project
+                        .get(self.index.as_ref(), &self.native_system)
+                })
+            }
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects
+                    .iter()
+                    .next()
+                    .map(|(_, project)| project)
+                    .unwrap()
+            }
         }
     }
 
-    pub(crate) fn initialize_workspaces(&mut self, workspace_settings: Vec<(Url, ClientOptions)>) {
-        assert!(!self.workspaces.all_initialized());
+    /// Returns a mutable reference to the project's [`ProjectState`] in which the given `path`
+    /// belongs.
+    ///
+    /// Refer to [`project_db`] for more details on how the project is selected.
+    ///
+    /// [`project_db`]: Session::project_db
+    pub(crate) fn project_state_mut(&mut self, path: &AnySystemPath) -> &mut ProjectState {
+        match path {
+            AnySystemPath::System(system_path) => self
+                .projects
+                .range_mut(..=system_path.to_path_buf())
+                .next_back()
+                .map(|(_, project)| project)
+                .unwrap_or_else(|| {
+                    self.default_project
+                        .get_mut(self.index.as_ref(), &self.native_system)
+                }),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                // TODO: Currently, ty only supports single workspace but we need to figure out
+                // which project should this virtual path belong to when there are multiple
+                // projects: https://github.com/astral-sh/ty/issues/794
+                self.projects
+                    .iter_mut()
+                    .next()
+                    .map(|(_, project)| project)
+                    .unwrap()
+            }
+        }
+    }
 
+    /// Returns a reference to the project's [`ProjectState`] corresponding to the given path, if
+    /// any.
+    pub(crate) fn project_state_for_path(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Option<&ProjectState> {
+        self.projects
+            .range(..=path.as_ref().to_path_buf())
+            .next_back()
+            .map(|(_, project)| project)
+    }
+
+    pub(crate) fn apply_changes(
+        &mut self,
+        path: &AnySystemPath,
+        changes: Vec<ChangeEvent>,
+    ) -> ChangeResult {
+        let overrides = path.as_system().and_then(|root| {
+            self.workspaces()
+                .for_path(root)?
+                .settings()
+                .project_options_overrides()
+                .cloned()
+        });
+
+        self.project_db_mut(path)
+            .apply_changes(changes, overrides.as_ref())
+    }
+
+    /// Returns a mutable iterator over all project databases that have been initialized to this point.
+    ///
+    /// This iterator will only yield the default project database if it has been used.
+    fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
+        self.project_states_mut().map(|project| &mut project.db)
+    }
+
+    /// Returns a mutable iterator over all projects that have been initialized to this point.
+    ///
+    /// This iterator will only yield the default project if it has been used.
+    pub(crate) fn project_states_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectState> + '_ {
+        let default_project = self.default_project.try_get_mut();
+        self.projects.values_mut().chain(default_project)
+    }
+
+    /// Returns the [`DocumentKey`] for the given URL.
+    ///
+    /// Refer to [`Index::key_from_url`] for more details.
+    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
+        self.index().key_from_url(url)
+    }
+
+    pub(crate) fn initialize_workspaces(
+        &mut self,
+        workspace_settings: Vec<(Url, ClientOptions)>,
+        client: &Client,
+    ) {
+        assert!(!self.workspaces.all_initialized());
         for (url, options) in workspace_settings {
-            let Some(workspace) = self.workspaces.initialize(&url, options) else {
+            tracing::debug!("Initializing workspace `{url}`");
+
+            let settings = options.into_settings();
+            let Some((root, workspace)) = self.workspaces.initialize(&url, settings) else {
                 continue;
             };
+
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
             // and create a project database for each.
-            let system = LSPSystem::new(self.index.as_ref().unwrap().clone());
-            let system_path = workspace.root();
+            let system = LSPSystem::new(
+                self.index.as_ref().unwrap().clone(),
+                self.native_system.clone(),
+            );
 
-            let root = system_path.to_path_buf();
             let project = ProjectMetadata::discover(&root, &system)
-                .context("Failed to find project configuration")
+                .context("Failed to discover project configuration")
                 .and_then(|mut metadata| {
-                    // TODO(dhruvmanila): Merge the client options with the project metadata options.
                     metadata
                         .apply_configuration_files(&system)
                         .context("Failed to apply configuration files")?;
-                    ProjectDatabase::new(metadata, system)
-                        .context("Failed to create project database")
+
+                    if let Some(overrides) = workspace.settings.project_options_overrides() {
+                        metadata.apply_overrides(overrides);
+                    }
+
+                    ProjectDatabase::new(metadata, system.clone())
                 });
 
-            // TODO(micha): Handle the case where the program settings are incorrect more gracefully.
-            // The easiest is to ignore those projects but to show a message to the user that we do so.
-            // Ignoring the projects has the effect that we'll use the default project for those files.
-            // The only challenge with this is that we need to register the project when the configuration
-            // becomes valid again. But that's a case we need to handle anyway for good mono repository support.
-            match project {
-                Ok(project) => {
-                    self.projects.insert(root, project);
+            let (root, db) = match project {
+                Ok(mut db) => {
+                    db.set_check_mode(workspace.settings.diagnostic_mode().into_check_mode());
+                    (root, db)
                 }
                 Err(err) => {
-                    tracing::warn!("Failed to create project database for `{root}`: {err}",);
+                    tracing::error!(
+                        "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
+                    );
+
+                    client.show_error_message(format!(
+                        "Failed to load project rooted at {root}. Please refer to the logs for more details.",
+                    ));
+
+                    let db_with_default_settings =
+                        ProjectMetadata::from_options(Options::default(), root, None)
+                            .context("Failed to convert default options to metadata")
+                            .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                            .expect("Default configuration to be valid");
+                    let default_root = db_with_default_settings
+                        .project()
+                        .root(&db_with_default_settings)
+                        .to_path_buf();
+
+                    (default_root, db_with_default_settings)
                 }
-            }
+            };
+
+            // Carry forward diagnostic state if any exists
+            let previous = self.projects.remove(&root);
+            let untracked = previous
+                .map(|state| state.untracked_files_with_pushed_diagnostics)
+                .unwrap_or_default();
+            self.projects.insert(
+                root.clone(),
+                ProjectState {
+                    db,
+                    untracked_files_with_pushed_diagnostics: untracked,
+                },
+            );
+
+            publish_settings_diagnostics(self, client, root);
         }
 
         assert!(
@@ -287,16 +434,32 @@ impl Session {
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    ///
-    /// Returns `None` if the url can't be converted to a document key or if the document isn't open.
-    pub fn take_snapshot(&self, url: Url) -> Option<DocumentSnapshot> {
-        let key = self.key_from_url(url).ok()?;
-        Some(DocumentSnapshot {
-            resolved_client_capabilities: self.resolved_client_capabilities.clone(),
-            client_settings: self.index().global_settings(),
-            document_ref: self.index().make_document_ref(&key)?,
+    pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
+        let index = self.index();
+        DocumentSnapshot {
+            resolved_client_capabilities: self.resolved_client_capabilities,
+            client_settings: index.global_settings(),
             position_encoding: self.position_encoding,
-        })
+            document_query_result: self
+                .key_from_url(url)
+                .map_err(DocumentQueryError::InvalidUrl)
+                .and_then(|key| index.make_document_ref(key)),
+        }
+    }
+
+    /// Creates a snapshot of the current state of the [`Session`].
+    pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
+        SessionSnapshot {
+            projects: self
+                .projects
+                .values()
+                .map(|project| &project.db)
+                .cloned()
+                .collect(),
+            index: self.index.clone().unwrap(),
+            position_encoding: self.position_encoding,
+            resolved_client_capabilities: self.resolved_client_capabilities,
+        }
     }
 
     /// Iterates over the document keys for all open text documents.
@@ -350,7 +513,7 @@ impl Session {
     /// Panics if there's a mutable reference to the index via [`index_mut`].
     ///
     /// [`index_mut`]: Session::index_mut
-    fn index(&self) -> &index::Index {
+    fn index(&self) -> &Index {
         self.index.as_ref().unwrap()
     }
 
@@ -380,12 +543,16 @@ impl Session {
         }
     }
 
-    pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
-        &self.resolved_client_capabilities
+    pub(crate) fn client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 
     pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
         self.index().global_settings()
+    }
+
+    pub(crate) fn position_encoding(&self) -> PositionEncoding {
+        self.position_encoding
     }
 }
 
@@ -394,11 +561,11 @@ impl Session {
 /// When dropped, this guard restores all references to the index.
 struct MutIndexGuard<'a> {
     session: &'a mut Session,
-    index: Option<index::Index>,
+    index: Option<Index>,
 }
 
 impl Deref for MutIndexGuard<'_> {
-    type Target = index::Index;
+    type Target = Index;
 
     fn deref(&self) -> &Self::Target {
         self.index.as_ref().unwrap()
@@ -428,73 +595,106 @@ impl Drop for MutIndexGuard<'_> {
     }
 }
 
-/// An immutable snapshot of `Session` that references
-/// a specific document.
+/// An immutable snapshot of [`Session`] that references a specific document.
 #[derive(Debug)]
-pub struct DocumentSnapshot {
-    resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
+pub(crate) struct DocumentSnapshot {
+    resolved_client_capabilities: ResolvedClientCapabilities,
     client_settings: Arc<ClientSettings>,
-    document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
+    document_query_result: Result<DocumentQuery, DocumentQueryError>,
 }
 
 impl DocumentSnapshot {
-    pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
-        &self.resolved_client_capabilities
+    /// Returns the resolved client capabilities that were captured during initialization.
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 
-    pub(crate) fn query(&self) -> &index::DocumentQuery {
-        &self.document_ref
-    }
-
+    /// Returns the position encoding that was negotiated during initialization.
     pub(crate) fn encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
 
+    /// Returns the client settings for this document.
     pub(crate) fn client_settings(&self) -> &ClientSettings {
         &self.client_settings
     }
 
+    /// Returns the result of the document query for this snapshot.
+    pub(crate) fn document(&self) -> Result<&DocumentQuery, &DocumentQueryError> {
+        self.document_query_result.as_ref()
+    }
+
     pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        match AnySystemPath::try_from_url(self.document_ref.file_url()).ok()? {
-            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
-            AnySystemPath::SystemVirtual(virtual_path) => db
-                .files()
-                .try_virtual_file(&virtual_path)
-                .map(|virtual_file| virtual_file.file()),
+        let document = match self.document() {
+            Ok(document) => document,
+            Err(err) => {
+                tracing::debug!("Failed to resolve file: {}", err);
+                return None;
+            }
+        };
+        let file = document.file(db);
+        if file.is_none() {
+            tracing::debug!(
+                "Failed to resolve file: file not found for path `{}`",
+                document.file_path()
+            );
         }
+        file
     }
 }
 
 /// An immutable snapshot of the current state of [`Session`].
-pub(crate) struct WorkspaceSnapshot {
-    projects: AssertUnwindSafe<Vec<ProjectDatabase>>,
-    index: Arc<index::Index>,
+pub(crate) struct SessionSnapshot {
+    index: Arc<Index>,
     position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
+
+    /// IMPORTANT: It's important that the databases come last, or at least,
+    /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
+    /// and that relies on Salsa's cancellation to guarantee that there's now only a
+    /// single reference to it (e.g. see [`Session::index_mut`]).
+    ///
+    /// Making this field come last guarantees that the db's `Drop` handler is
+    /// dropped after all other fields, which ensures that
+    /// Salsa's cancellation blocks until all fields are dropped (and not only
+    /// waits for the db to be dropped while we still hold on to the `Index`).
+    projects: Vec<ProjectDatabase>,
 }
 
-impl WorkspaceSnapshot {
+impl SessionSnapshot {
     pub(crate) fn projects(&self) -> &[ProjectDatabase] {
         &self.projects
     }
 
-    pub(crate) fn index(&self) -> &index::Index {
+    pub(crate) fn index(&self) -> &Index {
         &self.index
     }
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
+    }
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces {
-    workspaces: BTreeMap<Url, Workspace>,
+    workspaces: BTreeMap<SystemPathBuf, Workspace>,
     uninitialized: usize,
 }
 
 impl Workspaces {
-    pub(crate) fn register(&mut self, url: Url, options: ClientOptions) -> anyhow::Result<()> {
+    /// Registers a new workspace with the given URL and default settings for the workspace.
+    ///
+    /// It's the caller's responsibility to later call [`initialize`] with the resolved settings
+    /// for this workspace. Registering and initializing a workspace is a two-step process because
+    /// the workspace are announced to the server during the `initialize` request, but the
+    /// resolved settings are only available after the client has responded to the `workspace/configuration`
+    /// request.
+    pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -503,35 +703,47 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
 
-        self.workspaces.insert(
-            url,
-            Workspace {
-                options,
-                root: system_path,
-            },
-        );
+        self.workspaces
+            .insert(system_path, Workspace { url, settings });
 
         self.uninitialized += 1;
 
         Ok(())
     }
 
+    /// Initializes the workspace with the resolved client settings for the workspace.
+    ///
+    /// ## Returns
+    ///
+    /// `None` if URL doesn't map to a valid path or if the workspace is not registered.
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
-        options: ClientOptions,
-    ) -> Option<&mut Workspace> {
-        if let Some(workspace) = self.workspaces.get_mut(url) {
-            workspace.options = options;
+        settings: ClientSettings,
+    ) -> Option<(SystemPathBuf, &mut Workspace)> {
+        let path = url.to_file_path().ok()?;
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let system_path = SystemPathBuf::from_path_buf(path).ok()?;
+
+        if let Some(workspace) = self.workspaces.get_mut(&system_path) {
+            workspace.settings = settings;
             self.uninitialized -= 1;
-            Some(workspace)
+            Some((system_path, workspace))
         } else {
             None
         }
     }
 
+    pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+        self.workspaces
+            .range(..=path.as_ref().to_path_buf())
+            .next_back()
+            .map(|(_, db)| db)
+    }
+
     pub(crate) fn urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.workspaces.keys()
+        self.workspaces.values().map(Workspace::url)
     }
 
     pub(crate) fn all_initialized(&self) -> bool {
@@ -540,8 +752,8 @@ impl Workspaces {
 }
 
 impl<'a> IntoIterator for &'a Workspaces {
-    type Item = (&'a Url, &'a Workspace);
-    type IntoIter = std::collections::btree_map::Iter<'a, Url, Workspace>;
+    type Item = (&'a SystemPathBuf, &'a Workspace);
+    type IntoIter = std::collections::btree_map::Iter<'a, SystemPathBuf, Workspace>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.workspaces.iter()
@@ -550,12 +762,77 @@ impl<'a> IntoIterator for &'a Workspaces {
 
 #[derive(Debug)]
 pub(crate) struct Workspace {
-    root: SystemPathBuf,
-    options: ClientOptions,
+    /// The workspace root URL as sent by the client during initialization.
+    url: Url,
+    settings: ClientSettings,
 }
 
 impl Workspace {
-    pub(crate) fn root(&self) -> &SystemPath {
-        &self.root
+    pub(crate) fn url(&self) -> &Url {
+        &self.url
+    }
+
+    pub(crate) fn settings(&self) -> &ClientSettings {
+        &self.settings
+    }
+}
+
+/// Thin wrapper around the default project database that ensures it only gets initialized
+/// when it's first accessed.
+///
+/// There are a few advantages to this:
+///
+/// 1. Salsa has a fast-path for query lookups for the first created database.
+///    We really want that to be the actual project database and not our fallback database.
+/// 2. The logs when the server starts can be confusing if it once shows it uses Python X (for the default db)
+///    but then has another log that it uses Python Y (for the actual project db).
+struct DefaultProject(std::sync::OnceLock<ProjectState>);
+
+impl DefaultProject {
+    pub(crate) fn new() -> Self {
+        DefaultProject(std::sync::OnceLock::new())
+    }
+
+    pub(crate) fn get(
+        &self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &ProjectState {
+        self.0.get_or_init(|| {
+            tracing::info!("Initializing the default project");
+
+            let index = index.unwrap();
+            let system = LSPSystem::new(index.clone(), fallback_system.clone());
+            let metadata = ProjectMetadata::from_options(
+                Options::default(),
+                system.current_directory().to_path_buf(),
+                None,
+            )
+            .unwrap();
+
+            let mut db = ProjectDatabase::new(metadata, system).unwrap();
+            db.set_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
+
+            ProjectState {
+                db,
+                untracked_files_with_pushed_diagnostics: Vec::new(),
+            }
+        })
+    }
+
+    pub(crate) fn get_mut(
+        &mut self,
+        index: Option<&Arc<Index>>,
+        fallback_system: &Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+    ) -> &mut ProjectState {
+        let _ = self.get(index, fallback_system);
+
+        // SAFETY: The `OnceLock` is guaranteed to be initialized at this point because
+        // we called `get` above, which initializes it if it wasn't already.
+        self.0.get_mut().unwrap()
+    }
+
+    pub(crate) fn try_get_mut(&mut self) -> Option<&mut ProjectState> {
+        self.0.get_mut()
     }
 }

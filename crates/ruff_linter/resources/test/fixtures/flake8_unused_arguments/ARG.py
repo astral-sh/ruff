@@ -245,3 +245,14 @@ def f(bar: str):
 class C:
     def __init__(self, x) -> None:
         print(locals())
+
+###
+# Should trigger for t-string here
+# even though the corresponding f-string
+# does not trigger (since it is common in stubs)
+###
+class C:
+    def f(self, x, y):
+        """Docstring."""
+        msg = t"{x}..."
+        raise NotImplementedError(msg)

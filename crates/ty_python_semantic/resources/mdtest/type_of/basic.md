@@ -151,10 +151,33 @@ class Foo(type[int]): ...
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>]
 ```
 
+## Display of generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+class Foo[T]: ...
+
+S = TypeVar("S")
+
+class Bar(Generic[S]): ...
+
+def _(x: Foo[int], y: Bar[str], z: list[bytes]):
+    reveal_type(type(x))  # revealed: type[Foo[int]]
+    reveal_type(type(y))  # revealed: type[Bar[str]]
+    reveal_type(type(z))  # revealed: type[list[bytes]]
+```
+
 ## `@final` classes
 
 `type[]` types are eagerly converted to class-literal types if a class decorated with `@final` is
-used as the type argument. This applies to standard-library classes and user-defined classes:
+used as the type argument. This applies to standard-library classes and user-defined classes. The
+same also applies to enum classes with members, which are implicitly final:
 
 ```toml
 [environment]
@@ -164,11 +187,17 @@ python-version = "3.10"
 ```py
 from types import EllipsisType
 from typing import final
+from enum import Enum
 
 @final
 class Foo: ...
 
-def _(x: type[Foo], y: type[EllipsisType]):
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+def _(x: type[Foo], y: type[EllipsisType], z: type[Answer]):
     reveal_type(x)  # revealed: <class 'Foo'>
     reveal_type(y)  # revealed: <class 'EllipsisType'>
+    reveal_type(z)  # revealed: <class 'Answer'>
 ```

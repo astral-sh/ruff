@@ -89,7 +89,7 @@ impl SourceDb for ModuleDb {
 
 #[salsa::db]
 impl Db for ModuleDb {
-    fn is_file_open(&self, file: File) -> bool {
+    fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 

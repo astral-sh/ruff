@@ -7,7 +7,7 @@ use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COM
 pub use db::{CallStack, Db};
 pub use module_name::ModuleName;
 pub use module_resolver::{
-    KnownModule, Module, SearchPathValidationError, SearchPaths, resolve_module,
+    Module, SearchPathValidationError, SearchPaths, resolve_module, resolve_real_module,
     system_module_search_paths,
 };
 pub use program::{
@@ -15,8 +15,12 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-pub use semantic_model::{Completion, HasType, NameKind, SemanticModel};
+pub use semantic_model::{Completion, CompletionKind, HasType, NameKind, SemanticModel};
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use types::ide_support::{
+    ResolvedDefinition, definitions_for_attribute, definitions_for_imported_symbol,
+    definitions_for_name, map_stub_definition,
+};
 pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
@@ -30,6 +34,7 @@ mod node_key;
 pub(crate) mod place;
 mod program;
 mod python_platform;
+mod rank;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;

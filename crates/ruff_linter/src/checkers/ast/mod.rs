@@ -64,7 +64,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
-use crate::message::diagnostic_from_violation;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
@@ -591,6 +590,16 @@ impl<'a> Checker<'a> {
             member,
         })
     }
+
+    /// Return the [`LintContext`] for the current analysis.
+    ///
+    /// Note that you should always prefer calling methods like `settings`, `report_diagnostic`, or
+    /// `is_rule_enabled` directly on [`Checker`] when possible. This method exists only for the
+    /// rare cases where rules or helper functions need to be accessed by both a `Checker` and a
+    /// `LintContext` in different analysis phases.
+    pub(crate) const fn context(&self) -> &'a LintContext<'a> {
+        self.context
+    }
 }
 
 pub(crate) struct TypingImporter<'a, 'b> {
@@ -671,7 +680,11 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidStarExpression
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
-            | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
+            | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel
+            | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
+            | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
+            | SemanticSyntaxErrorKind::AnnotatedGlobal(_)
+            | SemanticSyntaxErrorKind::AnnotatedNonlocal(_) => {
                 self.semantic_errors.borrow_mut().push(error);
             }
         }
@@ -2767,11 +2780,10 @@ impl<'a> Checker<'a> {
 
                         self.semantic.restore(snapshot);
 
-                        if self.semantic.in_typing_only_annotation() {
-                            if self.is_rule_enabled(Rule::QuotedAnnotation) {
-                                pyupgrade::rules::quoted_annotation(self, annotation, range);
-                            }
+                        if self.is_rule_enabled(Rule::QuotedAnnotation) {
+                            pyupgrade::rules::quoted_annotation(self, annotation, range);
                         }
+
                         if self.source_type.is_stub() {
                             if self.is_rule_enabled(Rule::QuotedAnnotationInStub) {
                                 flake8_pyi::rules::quoted_annotation_in_stub(
@@ -3158,7 +3170,7 @@ impl<'a> LintContext<'a> {
     ) -> DiagnosticGuard<'chk, 'a> {
         DiagnosticGuard {
             context: self,
-            diagnostic: Some(diagnostic_from_violation(kind, range, &self.source_file)),
+            diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
             rule: T::rule(),
         }
     }
@@ -3177,7 +3189,7 @@ impl<'a> LintContext<'a> {
         if self.is_rule_enabled(rule) {
             Some(DiagnosticGuard {
                 context: self,
-                diagnostic: Some(diagnostic_from_violation(kind, range, &self.source_file)),
+                diagnostic: Some(kind.into_diagnostic(range, &self.source_file)),
                 rule,
             })
         } else {
@@ -3213,6 +3225,11 @@ impl<'a> LintContext<'a> {
     #[inline]
     pub(crate) fn iter(&mut self) -> impl Iterator<Item = &Diagnostic> {
         self.diagnostics.get_mut().iter()
+    }
+
+    /// The [`LinterSettings`] for the current analysis, including the enabled rules.
+    pub(crate) const fn settings(&self) -> &LinterSettings {
+        self.settings
     }
 }
 

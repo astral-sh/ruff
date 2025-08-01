@@ -2,7 +2,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::{Arc, Mutex};
 
 use crate::lint::{LintRegistry, RuleSelection};
-use crate::semantic_index::place::FileScopeId;
+use crate::semantic_index::scope::FileScopeId;
 use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
 use rustc_hash::FxHasher;
@@ -44,7 +44,8 @@ impl CallStack {
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
 pub trait Db: SourceDb {
-    fn is_file_open(&self, file: File) -> bool;
+    /// Returns `true` if the file should be checked.
+    fn should_check_file(&self, file: File) -> bool;
 
     /// Resolves the rule selection for a given file.
     fn rule_selection(&self, file: File) -> &RuleSelection;
@@ -157,7 +158,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl Db for TestDb {
-        fn is_file_open(&self, file: File) -> bool {
+        fn should_check_file(&self, file: File) -> bool {
             !file.path(self).is_vendored_path()
         }
 

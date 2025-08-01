@@ -22,6 +22,7 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
@@ -37,6 +38,14 @@ pub(crate) enum TupleLength {
 }
 
 impl TupleLength {
+    pub(crate) const fn unknown() -> TupleLength {
+        TupleLength::Variable(0, 0)
+    }
+
+    pub(crate) fn is_variable(self) -> bool {
+        matches!(self, TupleLength::Variable(_, _))
+    }
+
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(self) -> (usize, Option<usize>) {
@@ -62,6 +71,33 @@ impl TupleLength {
         }
     }
 
+    /// Given two [`TupleLength`]s, return the more precise instance,
+    /// if it makes sense to consider one more precise than the other.
+    pub(crate) fn most_precise(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            // A fixed-length tuple is equally as precise as another fixed-length tuple if they
+            // have the same length. For two differently sized fixed-length tuples, however,
+            // neither tuple length is more precise than the other: the two tuple lengths are
+            // entirely disjoint.
+            (TupleLength::Fixed(left), TupleLength::Fixed(right)) => {
+                (left == right).then_some(self)
+            }
+
+            // A fixed-length tuple is more precise than a variable-length one.
+            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(..))
+            | (TupleLength::Variable(..), fixed @ TupleLength::Fixed(_)) => Some(fixed),
+
+            // For two variable-length tuples, the tuple with the larger number
+            // of required items is more precise.
+            (TupleLength::Variable(..), TupleLength::Variable(..)) => {
+                Some(match self.minimum().cmp(&other.minimum()) {
+                    Ordering::Less => other,
+                    Ordering::Equal | Ordering::Greater => self,
+                })
+            }
+        }
+    }
+
     pub(crate) fn display_minimum(self) -> String {
         let minimum_length = self.minimum();
         match self {
@@ -74,6 +110,13 @@ impl TupleLength {
         match self.maximum() {
             Some(maximum) => maximum.to_string(),
             None => "unlimited".to_string(),
+        }
+    }
+
+    pub(crate) fn into_fixed_length(self) -> Option<usize> {
+        match self {
+            TupleLength::Fixed(len) => Some(len),
+            TupleLength::Variable(_, _) => None,
         }
     }
 }
@@ -241,6 +284,10 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
+    }
+
+    pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
+        self.tuple(db).truthiness()
     }
 }
 
@@ -455,12 +502,12 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_slice(
-        &'db self,
+        &self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         self.0.py_slice(db, start, stop, step)
     }
 }
@@ -969,6 +1016,17 @@ impl<T> Tuple<T> {
         }
     }
 
+    pub(crate) fn truthiness(&self) -> Truthiness {
+        match self.len().size_hint() {
+            // The tuple type is AlwaysFalse if it contains only the empty tuple
+            (_, Some(0)) => Truthiness::AlwaysFalse,
+            // The tuple type is AlwaysTrue if its inhabitants must always have length >=1
+            (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
+            // The tuple type is Ambiguous if its inhabitants could be of any length
+            _ => Truthiness::Ambiguous,
+        }
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_empty(),
@@ -985,6 +1043,10 @@ impl<T> Tuple<T> {
 }
 
 impl<'db> Tuple<Type<'db>> {
+    pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.all_elements())
+    }
+
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
         match self {

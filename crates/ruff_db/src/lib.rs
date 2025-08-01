@@ -5,6 +5,7 @@ use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
+use ty_static::EnvVars;
 
 pub mod diagnostic;
 pub mod display;
@@ -26,6 +27,21 @@ pub use web_time::{Instant, SystemTime, SystemTimeError};
 
 pub type FxDashMap<K, V> = dashmap::DashMap<K, V, BuildHasherDefault<FxHasher>>;
 pub type FxDashSet<K> = dashmap::DashSet<K, BuildHasherDefault<FxHasher>>;
+
+static VERSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Returns the version of the executing program if set.
+pub fn program_version() -> Option<&'static str> {
+    VERSION.get().map(|version| version.as_str())
+}
+
+/// Sets the version of the executing program.
+///
+/// ## Errors
+/// If the version has already been initialized (can only be set once).
+pub fn set_program_version(version: String) -> Result<(), String> {
+    VERSION.set(version)
+}
 
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
 #[salsa::db]
@@ -50,8 +66,8 @@ pub trait Db: salsa::Database {
 /// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
 /// watching the files for changes.
 pub fn max_parallelism() -> NonZeroUsize {
-    std::env::var("TY_MAX_PARALLELISM")
-        .or_else(|_| std::env::var("RAYON_NUM_THREADS"))
+    std::env::var(EnvVars::TY_MAX_PARALLELISM)
+        .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or_else(|| {

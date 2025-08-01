@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.12.2"
+version = "0.12.7"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -15,7 +15,7 @@ license = { workspace = true }
 [dependencies]
 ruff_annotate_snippets = { workspace = true }
 ruff_cache = { workspace = true }
-ruff_db = { workspace = true, features = ["serde"] }
+ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
 ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
@@ -55,7 +55,6 @@ path-absolutize = { workspace = true, features = [
 pathdiff = { workspace = true }
 pep440_rs = { workspace = true }
 pyproject-toml = { workspace = true }
-quick-junit = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }

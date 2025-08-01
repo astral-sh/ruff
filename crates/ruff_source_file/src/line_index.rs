@@ -624,6 +624,12 @@ impl OneIndexed {
     }
 }
 
+impl Default for OneIndexed {
+    fn default() -> Self {
+        Self::MIN
+    }
+}
+
 impl fmt::Display for OneIndexed {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         std::fmt::Debug::fmt(&self.0.get(), f)

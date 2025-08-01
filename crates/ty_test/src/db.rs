@@ -79,7 +79,7 @@ impl SourceDb for Db {
 
 #[salsa::db]
 impl SemanticDb for Db {
-    fn is_file_open(&self, file: File) -> bool {
+    fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
     }
 

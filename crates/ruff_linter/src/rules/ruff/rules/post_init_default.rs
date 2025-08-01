@@ -2,6 +2,7 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
@@ -117,13 +118,7 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 
         if !stopped_fixes {
             diagnostic.try_set_fix(|| {
-                use_initvar(
-                    current_scope,
-                    function_def,
-                    &parameter.parameter,
-                    default,
-                    checker,
-                )
+                use_initvar(current_scope, function_def, parameter, default, checker)
             });
             // Need to stop fixes as soon as there is a parameter we cannot fix.
             // Otherwise, we risk a syntax error (a parameter without a default
@@ -138,10 +133,11 @@ pub(crate) fn post_init_default(checker: &Checker, function_def: &ast::StmtFunct
 fn use_initvar(
     current_scope: &Scope,
     post_init_def: &ast::StmtFunctionDef,
-    parameter: &ast::Parameter,
+    parameter_with_default: &ast::ParameterWithDefault,
     default: &ast::Expr,
     checker: &Checker,
 ) -> anyhow::Result<Fix> {
+    let parameter = &parameter_with_default.parameter;
     if current_scope.has(&parameter.name) {
         return Err(anyhow::anyhow!(
             "Cannot add a `{}: InitVar` field to the class body, as a field by that name already exists",
@@ -157,17 +153,25 @@ fn use_initvar(
         checker.semantic(),
     )?;
 
+    let locator = checker.locator();
+
+    let default_loc = parenthesized_range(
+        default.into(),
+        parameter_with_default.into(),
+        checker.comment_ranges(),
+        checker.source(),
+    )
+    .unwrap_or(default.range());
+
     // Delete the default value. For example,
     // - def __post_init__(self, foo: int = 0) -> None: ...
     // + def __post_init__(self, foo: int) -> None: ...
-    let default_edit = Edit::deletion(parameter.end(), default.end());
+    let default_edit = Edit::deletion(parameter.end(), default_loc.end());
 
     // Add `dataclasses.InitVar` field to class body.
-    let locator = checker.locator();
-
     let content = {
+        let default = locator.slice(default_loc);
         let parameter_name = locator.slice(&parameter.name);
-        let default = locator.slice(default);
         let line_ending = checker.stylist().line_ending().as_str();
 
         if let Some(annotation) = &parameter

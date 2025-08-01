@@ -6,15 +6,16 @@ use ruff_python_ast::{
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::fix;
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` without
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without `maxsplit` set splits on every delimiter in the
+/// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
@@ -29,14 +30,50 @@ use crate::checkers::ast::Checker;
 /// url = "www.example.com"
 /// prefix = url.split(".", maxsplit=1)[0]
 /// ```
+///
+/// To access the last element, use `str.rsplit()` instead of `str.split()`:
+/// ```python
+/// url = "www.example.com"
+/// suffix = url.rsplit(".", maxsplit=1)[-1]
+/// ```
+///
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `**kwargs`, as
+/// adding a `maxsplit` keyword to such a call may lead to a duplicate keyword argument error.
 #[derive(ViolationMetadata)]
-pub(crate) struct MissingMaxsplitArg;
+pub(crate) struct MissingMaxsplitArg {
+    actual_split_type: String,
+    suggested_split_type: String,
+}
 
-impl Violation for MissingMaxsplitArg {
+/// Represents the index of the slice used for this rule (which can only be 0 or -1)
+enum SliceBoundary {
+    First,
+    Last,
+}
+
+impl AlwaysFixableViolation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`"
-            .to_string()
+        let MissingMaxsplitArg {
+            actual_split_type: _,
+            suggested_split_type,
+        } = self;
+
+        format!("Replace with `{suggested_split_type}(..., maxsplit=1)`.")
+    }
+
+    fn fix_title(&self) -> String {
+        let MissingMaxsplitArg {
+            actual_split_type,
+            suggested_split_type,
+        } = self;
+
+        if actual_split_type == suggested_split_type {
+            format!("Pass `maxsplit=1` into `str.{actual_split_type}()`")
+        } else {
+            format!("Use `str.{suggested_split_type}()` and pass `maxsplit=1`")
+        }
     }
 }
 
@@ -82,17 +119,19 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         _ => return,
     };
 
-    if !matches!(index, Some(0 | -1)) {
-        return;
-    }
+    let slice_boundary = match index {
+        Some(0) => SliceBoundary::First,
+        Some(-1) => SliceBoundary::Last,
+        _ => return,
+    };
 
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
 
     // Check the function is "split" or "rsplit"
-    let attr = attr.as_str();
-    if !matches!(attr, "split" | "rsplit") {
+    let actual_split_type = attr.as_str();
+    if !matches!(actual_split_type, "split" | "rsplit") {
         return;
     }
 
@@ -129,5 +168,48 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         }
     }
 
-    checker.report_diagnostic(MissingMaxsplitArg, expr.range());
+    let suggested_split_type = match slice_boundary {
+        SliceBoundary::First => "split",
+        SliceBoundary::Last => "rsplit",
+    };
+
+    let maxsplit_argument_edit = fix::edits::add_argument(
+        "maxsplit=1",
+        arguments,
+        checker.comment_ranges(),
+        checker.locator().contents(),
+    );
+
+    // Only change `actual_split_type` if it doesn't match `suggested_split_type`
+    let split_type_edit: Option<Edit> = if actual_split_type == suggested_split_type {
+        None
+    } else {
+        Some(Edit::range_replacement(
+            suggested_split_type.to_string(),
+            attr.range(),
+        ))
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
+        MissingMaxsplitArg {
+            actual_split_type: actual_split_type.to_string(),
+            suggested_split_type: suggested_split_type.to_string(),
+        },
+        expr.range(),
+    );
+
+    diagnostic.set_fix(Fix::applicable_edits(
+        maxsplit_argument_edit,
+        split_type_edit,
+        // If keyword.arg is `None` (i.e. if the function call contains `**kwargs`), mark the fix as unsafe
+        if arguments
+            .keywords
+            .iter()
+            .any(|keyword| keyword.arg.is_none())
+        {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
 }

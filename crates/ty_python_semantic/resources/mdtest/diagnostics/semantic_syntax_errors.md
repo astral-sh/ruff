@@ -15,7 +15,10 @@ python-version = "3.10"
 ```
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 async def f():
@@ -27,6 +30,7 @@ If all of the comprehensions are `async`, on the other hand, the code was still 
 
 ```py
 async def test():
+    # error: [not-iterable] "Object of type `range` is not async-iterable"
     return [[x async for x in elements(n)] async for n in range(3)]
 ```
 
@@ -53,7 +57,10 @@ python-version = "3.11"
 ```
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 async def f():
@@ -324,7 +331,10 @@ def _():
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
 
 ```py
-async def elements(n):
+from ty_extensions import Unknown
+
+# TODO: async generator type inference support
+async def elements(n) -> Unknown:
     yield n
 
 def _():
@@ -343,6 +353,8 @@ def _():
 ## Load before `global` declaration
 
 ```py
+x: int
+
 def f():
     x = 1
     global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"

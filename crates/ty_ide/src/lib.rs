@@ -1,22 +1,47 @@
 mod completion;
-mod db;
+mod doc_highlights;
+mod docstring;
+mod document_symbols;
 mod find_node;
 mod goto;
+mod goto_declaration;
+mod goto_definition;
+mod goto_references;
+mod goto_type_definition;
 mod hover;
 mod inlay_hints;
 mod markup;
+mod references;
+mod selection_range;
+mod semantic_tokens;
+mod signature_help;
+mod stub_mapping;
+mod symbols;
+mod workspace_symbols;
 
 pub use completion::completion;
-pub use db::Db;
-pub use goto::goto_type_definition;
+pub use doc_highlights::document_highlights;
+pub use docstring::get_parameter_documentation;
+pub use document_symbols::{document_symbols, document_symbols_with_options};
+pub use goto::{goto_declaration, goto_definition, goto_type_definition};
+pub use goto_references::goto_references;
 pub use hover::hover;
 pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
+pub use references::ReferencesMode;
+pub use selection_range::selection_range;
+pub use semantic_tokens::{
+    SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,
+};
+pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
+pub use symbols::{SymbolInfo, SymbolKind, SymbolsOptions};
+pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
+use ty_project::Db;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
@@ -75,6 +100,15 @@ pub struct NavigationTarget {
 }
 
 impl NavigationTarget {
+    /// Creates a new `NavigationTarget` where the focus and full range are identical.
+    pub fn new(file: File, range: TextRange) -> Self {
+        Self {
+            file,
+            focus_range: range,
+            full_range: range,
+        }
+    }
+
     pub fn file(&self) -> File {
         self.file
     }
@@ -88,16 +122,63 @@ impl NavigationTarget {
     }
 }
 
+/// Specifies the kind of reference operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReferenceKind {
+    /// A read reference to a symbol (e.g., using a variable's value)
+    Read,
+    /// A write reference to a symbol (e.g., assigning to a variable)
+    Write,
+    /// Neither a read or a write (e.g., a function or class declaration)
+    Other,
+}
+
+/// Target of a reference with information about the kind of operation.
+/// Unlike `NavigationTarget`, this type is specifically designed for references
+/// and contains only a single range (not separate focus/full ranges) and
+/// includes information about whether the reference is a read or write operation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ReferenceTarget {
+    file_range: FileRange,
+    kind: ReferenceKind,
+}
+
+impl ReferenceTarget {
+    /// Creates a new `ReferenceTarget`.
+    pub fn new(file: File, range: TextRange, kind: ReferenceKind) -> Self {
+        Self {
+            file_range: FileRange::new(file, range),
+            kind,
+        }
+    }
+
+    pub fn file(&self) -> File {
+        self.file_range.file()
+    }
+
+    pub fn range(&self) -> TextRange {
+        self.file_range.range()
+    }
+
+    pub fn file_range(&self) -> FileRange {
+        self.file_range
+    }
+
+    pub fn kind(&self) -> ReferenceKind {
+        self.kind
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
 
 impl NavigationTargets {
     fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
+        Self(smallvec::smallvec_inline![target])
     }
 
     fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
+        Self(smallvec::SmallVec::new_const())
     }
 
     fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {
@@ -199,13 +280,13 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
     use ruff_db::Db;
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_text_size::TextSize;
+    use ty_project::ProjectMetadata;
     use ty_python_semantic::{
         Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
     };
@@ -219,7 +300,7 @@ mod tests {
     }
 
     pub(super) struct CursorTest {
-        pub(super) db: TestDb,
+        pub(super) db: ty_project::TestDb,
         pub(super) cursor: Cursor,
         _insta_settings_guard: SettingsBindDropGuard,
     }
@@ -274,8 +355,13 @@ mod tests {
 
     impl CursorTestBuilder {
         pub(super) fn build(&self) -> CursorTest {
-            let mut db = TestDb::new();
+            let mut db = ty_project::TestDb::new(ProjectMetadata::new(
+                "test".into(),
+                SystemPathBuf::from("/"),
+            ));
+
             let mut cursor: Option<Cursor> = None;
+
             for &Source {
                 ref path,
                 ref contents,
@@ -284,19 +370,19 @@ mod tests {
             {
                 db.write_file(path, contents)
                     .expect("write to memory file system to be successful");
-                let Some(offset) = cursor_offset else {
-                    continue;
-                };
 
                 let file = system_path_to_file(&db, path).expect("newly written file to existing");
-                // This assert should generally never trip, since
-                // we have an assert on `CursorTestBuilder::source`
-                // to ensure we never have more than one marker.
-                assert!(
-                    cursor.is_none(),
-                    "found more than one source that contains `<CURSOR>`"
-                );
-                cursor = Some(Cursor { file, offset });
+
+                if let Some(offset) = cursor_offset {
+                    // This assert should generally never trip, since
+                    // we have an assert on `CursorTestBuilder::source`
+                    // to ensure we never have more than one marker.
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    cursor = Some(Cursor { file, offset });
+                }
             }
 
             let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])

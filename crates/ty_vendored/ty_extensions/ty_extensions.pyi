@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, LiteralString, _SpecialForm
 
 # Special operations
@@ -42,6 +43,9 @@ def generic_context(type: Any) -> Any: ...
 # either the module does not have `__all__` or it has invalid elements.
 def dunder_all_names(module: Any) -> Any: ...
 
+# List all members of an enum.
+def enum_members[E: type[Enum]](enum: E) -> tuple[str, ...]: ...
+
 # Returns the type that's an upper bound of materializing the given (gradual) type.
 def top_materialization(type: Any) -> Any: ...
 
@@ -57,3 +61,11 @@ def bottom_materialization(type: Any) -> Any: ...
 # * `dir` will respect an object's `__dir__` implementation, if present, but
 # this method (currently) does not.
 def all_members(obj: Any) -> tuple[str, ...]: ...
+
+# Returns `True` if the given object has a member with the given name.
+def has_member(obj: Any, name: str) -> bool: ...
+
+# Passing a protocol type to this function will cause ty to emit an info-level
+# diagnostic describing the protocol's interface. Passing a non-protocol type
+# will cause ty to emit an error diagnostic.
+def reveal_protocol_interface(protocol: type) -> None: ...

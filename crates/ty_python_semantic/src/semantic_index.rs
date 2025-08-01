@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
@@ -19,22 +20,28 @@ use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
-use crate::semantic_index::place::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, PlaceExpr, PlaceTable, Scope, ScopeId,
-    ScopeKind, ScopedPlaceId,
+use crate::semantic_index::place::{PlaceExprRef, PlaceTable};
+pub use crate::semantic_index::scope::FileScopeId;
+use crate::semantic_index::scope::{
+    NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
 };
-use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::semantic_index::symbol::ScopedSymbolId;
+use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
+use crate::semantic_model::HasTrackedScope;
 use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
+pub(crate) mod member;
 pub(crate) mod narrowing_constraints;
 pub mod place;
 pub(crate) mod predicate;
 mod re_exports;
 mod reachability_constraints;
+pub(crate) mod scope;
+pub(crate) mod symbol;
 mod use_def;
 
 pub(crate) use self::use_def::{
@@ -42,12 +49,10 @@ pub(crate) use self::use_def::{
     DeclarationWithConstraint, DeclarationsIterator,
 };
 
-type PlaceSet = hashbrown::HashTable<ScopedPlaceId>;
-
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), no_eq, heap_size=get_size2::heap_size)]
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -61,7 +66,7 @@ pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
 pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?file).entered();
@@ -81,7 +86,7 @@ pub(crate) fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Plac
 ///
 ///   - We cannot resolve relative imports (which aren't allowed in `import` statements) without
 ///     knowing the name of the current module, and whether it's a package.
-#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
 pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSet<ModuleName>> {
     semantic_index(db, file).imported_modules.clone()
 }
@@ -91,7 +96,7 @@ pub(crate) fn imported_modules<'db>(db: &'db dyn Db, file: File) -> Arc<FxHashSe
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
 pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ArcUseDefMap<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
@@ -115,10 +120,34 @@ pub(crate) fn attribute_assignments<'db, 's>(
 
     attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
         let place_table = index.place_table(function_scope_id);
-        let place = place_table.place_id_by_instance_attribute_name(name)?;
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.inner.all_reachable_bindings(place),
+            use_def.inner.all_reachable_member_bindings(member),
+            function_scope_id,
+        ))
+    })
+}
+
+/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_declarations<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
+        let use_def = &index.use_def_maps[function_scope_id];
+        Some((
+            use_def.inner.all_reachable_member_declarations(member),
             function_scope_id,
         ))
     })
@@ -155,14 +184,14 @@ pub(crate) fn attribute_scopes<'db, 's>(
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
     FileScopeId::global().to_scope_id(db, file)
 }
 
-pub(crate) enum EagerSnapshotResult<'map, 'db> {
+pub(crate) enum EnclosingSnapshotResult<'map, 'db> {
     FoundConstraint(ScopedNarrowingConstraint),
     FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
     NotFound,
@@ -179,7 +208,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes: IndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
-    scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
@@ -192,9 +221,6 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
-
-    /// Map from the file-local [`FileScopeId`] to the set of explicit-global symbols it contains.
-    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedPlaceId>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, ArcUseDefMap<'db>>,
@@ -211,8 +237,8 @@ pub(crate) struct SemanticIndex<'db> {
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
-    /// Map of all of the eager snapshots that appear in this file.
-    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
+    /// Map of all of the enclosing snapshots that appear in this file.
+    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
@@ -247,25 +273,26 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns the ID of the `expression`'s enclosing scope.
     #[track_caller]
-    pub(crate) fn expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> FileScopeId {
-        self.scopes_by_expression[&expression.into()]
+    pub(crate) fn expression_scope_id<E>(&self, expression: &E) -> FileScopeId
+    where
+        E: HasTrackedScope,
+    {
+        self.try_expression_scope_id(expression)
+            .expect("Expression to be part of a scope if it is from the same module")
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
-    pub(crate) fn try_expression_scope_id(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<FileScopeId> {
-        self.scopes_by_expression.get(&expression.into()).copied()
+    pub(crate) fn try_expression_scope_id<E>(&self, expression: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        self.scopes_by_expression.try_get(expression)
     }
 
     /// Returns the [`Scope`] of the `expression`'s enclosing scope.
     #[allow(unused)]
     #[track_caller]
-    pub(crate) fn expression_scope(&self, expression: impl Into<ExpressionNodeKey>) -> &Scope {
+    pub(crate) fn expression_scope(&self, expression: &impl HasTrackedScope) -> &Scope {
         &self.scopes[self.expression_scope_id(expression)]
     }
 
@@ -281,12 +308,18 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn symbol_is_global_in_scope(
         &self,
-        symbol: ScopedPlaceId,
+        symbol: ScopedSymbolId,
         scope: FileScopeId,
     ) -> bool {
-        self.globals_by_scope
-            .get(&scope)
-            .is_some_and(|globals| globals.contains(&symbol))
+        self.place_table(scope).symbol(symbol).is_global()
+    }
+
+    pub(crate) fn symbol_is_nonlocal_in_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.place_table(scope).symbol(symbol).is_nonlocal()
     }
 
     /// Returns the id of the parent scope.
@@ -352,6 +385,24 @@ impl<'db> SemanticIndex<'db> {
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
         AncestorsIter::new(self, scope)
+    }
+
+    /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
+    /// starting with `scope` itself. This follows Python's lexical scoping rules where
+    /// class scopes are skipped during name resolution (except for the starting scope
+    /// if it happens to be a class scope).
+    ///
+    /// For example, in this code:
+    /// ```python
+    /// x = 1
+    /// class A:
+    ///     x = 2
+    ///     def method(self):
+    ///         print(x)  # Refers to global x=1, not class x=2
+    /// ```
+    /// The `method` function can see the global scope but not the class scope.
+    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter {
+        VisibleAncestorsIter::new(self, scope)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
@@ -432,36 +483,56 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns
     /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
-    ///   (that is, not every scope that will be traversed is eager).
-    /// *  an iterator of bindings for a particular nested eager scope reference if the bindings exist.
-    /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an outer scope symbol.
-    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested eager scope.
-    pub(crate) fn eager_snapshot(
+    ///   (that is, not every scope that will be traversed is eager) and no lazy snapshots were found.
+    /// *  an iterator of bindings for a particular nested scope reference if the bindings exist.
+    /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an enclosing scope place.
+    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested scope.
+    pub(crate) fn enclosing_snapshot(
         &self,
         enclosing_scope: FileScopeId,
-        expr: &PlaceExpr,
+        expr: PlaceExprRef,
         nested_scope: FileScopeId,
-    ) -> EagerSnapshotResult<'_, 'db> {
+    ) -> EnclosingSnapshotResult<'_, 'db> {
         for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
             if ancestor_scope_id == enclosing_scope {
                 break;
             }
             if !ancestor_scope.is_eager() {
-                return EagerSnapshotResult::NoLongerInEagerContext;
+                if let PlaceExprRef::Symbol(symbol) = expr {
+                    if let Some(place_id) =
+                        self.place_tables[enclosing_scope].symbol_id(symbol.name())
+                    {
+                        let key = EnclosingSnapshotKey {
+                            enclosing_scope,
+                            enclosing_place: place_id.into(),
+                            nested_scope,
+                            nested_laziness: ScopeLaziness::Lazy,
+                        };
+                        if let Some(id) = self.enclosing_snapshots.get(&key) {
+                            return self.use_def_maps[enclosing_scope]
+                                .inner
+                                .enclosing_snapshot(*id, key.nested_laziness);
+                        }
+                    }
+                }
+                return EnclosingSnapshotResult::NoLongerInEagerContext;
             }
         }
-        let Some(place_id) = self.place_tables[enclosing_scope].place_id_by_expr(expr) else {
-            return EagerSnapshotResult::NotFound;
+        let Some(place_id) = self.place_tables[enclosing_scope].place_id(expr) else {
+            return EnclosingSnapshotResult::NotFound;
         };
-        let key = EagerSnapshotKey {
+        let key = EnclosingSnapshotKey {
             enclosing_scope,
             enclosing_place: place_id,
             nested_scope,
+            nested_laziness: ScopeLaziness::Eager,
         };
-        let Some(id) = self.eager_snapshots.get(&key) else {
-            return EagerSnapshotResult::NotFound;
+        let Some(id) = self.enclosing_snapshots.get(&key) else {
+            return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].inner.eager_snapshot(*id)
+        self.use_def_maps[enclosing_scope]
+            .inner
+            .enclosing_snapshot(*id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
@@ -491,7 +562,7 @@ impl<'db> ArcUseDefMap<'db> {
     }
 }
 
-pub struct AncestorsIter<'a> {
+pub(crate) struct AncestorsIter<'a> {
     scopes: &'a IndexSlice<FileScopeId, Scope>,
     next_id: Option<FileScopeId>,
 }
@@ -519,7 +590,54 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
-pub struct DescendantsIter<'a> {
+pub(crate) struct VisibleAncestorsIter<'a> {
+    inner: AncestorsIter<'a>,
+    starting_scope_kind: ScopeKind,
+    yielded_count: usize,
+}
+
+impl<'a> VisibleAncestorsIter<'a> {
+    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+        let starting_scope = &module_table.scopes[start];
+        Self {
+            inner: AncestorsIter::new(module_table, start),
+            starting_scope_kind: starting_scope.kind(),
+            yielded_count: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for VisibleAncestorsIter<'a> {
+    type Item = (FileScopeId, &'a Scope);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (scope_id, scope) = self.inner.next()?;
+            self.yielded_count += 1;
+
+            // Always return the first scope (the starting scope)
+            if self.yielded_count == 1 {
+                return Some((scope_id, scope));
+            }
+
+            // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
+            // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
+            if scope.kind() == ScopeKind::Class {
+                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                    return Some((scope_id, scope));
+                }
+                continue;
+            }
+
+            return Some((scope_id, scope));
+        }
+    }
+}
+
+impl FusedIterator for VisibleAncestorsIter<'_> {}
+
+pub(crate) struct DescendantsIter<'a> {
     next_id: FileScopeId,
     descendants: std::slice::Iter<'a, Scope>,
 }
@@ -556,7 +674,7 @@ impl FusedIterator for DescendantsIter<'_> {}
 
 impl ExactSizeIterator for DescendantsIter<'_> {}
 
-pub struct ChildrenIter<'a> {
+pub(crate) struct ChildrenIter<'a> {
     parent: FileScopeId,
     descendants: DescendantsIter<'a>,
 }
@@ -583,6 +701,38 @@ impl<'a> Iterator for ChildrenIter<'a> {
 
 impl FusedIterator for ChildrenIter<'_> {}
 
+/// Interval map that maps a range of expression node ids to their corresponding scopes.
+///
+/// Lookups require `O(log n)` time, where `n` is roughly the number of scopes (roughly
+/// because sub-scopes can be interleaved with expressions in the outer scope, e.g. function, some statements, a function).
+#[derive(Eq, PartialEq, Debug, get_size2::GetSize, Default)]
+struct ExpressionsScopeMap(Box<[(std::ops::RangeInclusive<NodeIndex>, FileScopeId)]>);
+
+impl ExpressionsScopeMap {
+    fn try_get<E>(&self, node: &E) -> Option<FileScopeId>
+    where
+        E: HasTrackedScope,
+    {
+        let node_index = node.node_index().load();
+
+        let entry = self
+            .0
+            .binary_search_by_key(&node_index, |(range, _)| *range.start());
+
+        let index = match entry {
+            Ok(index) => index,
+            Err(index) => index.checked_sub(1)?,
+        };
+
+        let (range, scope) = &self.0[index];
+        if range.contains(&node_index) {
+            Some(*scope)
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::files::{File, system_path_to_file};
@@ -594,13 +744,15 @@ mod tests {
     use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::{FileScopeId, PlaceTable, Scope, ScopeKind, ScopedPlaceId};
+    use crate::semantic_index::place::PlaceTable;
+    use crate::semantic_index::scope::{FileScopeId, Scope, ScopeKind};
+    use crate::semantic_index::symbol::ScopedSymbolId;
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 
     impl UseDefMap<'_> {
-        fn first_public_binding(&self, symbol: ScopedPlaceId) -> Option<Definition<'_>> {
-            self.end_of_scope_bindings(symbol)
+        fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_bindings(symbol)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
@@ -630,8 +782,8 @@ mod tests {
 
     fn names(table: &PlaceTable) -> Vec<String> {
         table
-            .places()
-            .filter_map(|expr| Some(expr.as_name()?.to_string()))
+            .symbols()
+            .map(|expr| expr.name().to_string())
             .collect()
     }
 
@@ -669,7 +821,7 @@ mod tests {
         let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["foo"]);
-        let foo = global_table.place_id_by_name("foo").unwrap();
+        let foo = global_table.symbol_id("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_public_binding(foo).unwrap();
@@ -701,18 +853,14 @@ mod tests {
         assert_eq!(names(global_table), vec!["foo"]);
         assert!(
             global_table
-                .place_by_name("foo")
+                .symbol_by_name("foo")
                 .is_some_and(|symbol| { symbol.is_bound() && !symbol.is_used() }),
             "symbols that are defined get the defined flag"
         );
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(
-                global_table
-                    .place_id_by_name("foo")
-                    .expect("symbol to exist"),
-            )
+            .first_public_binding(global_table.symbol_id("foo").expect("symbol to exist"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::ImportFrom(_)));
     }
@@ -726,13 +874,13 @@ mod tests {
         assert_eq!(names(global_table), vec!["foo", "x"]);
         assert!(
             global_table
-                .place_by_name("foo")
+                .symbol_by_name("foo")
                 .is_some_and(|symbol| { !symbol.is_bound() && symbol.is_used() }),
             "a symbol used but not bound in a scope should have only the used flag"
         );
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -747,7 +895,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(
@@ -789,7 +937,7 @@ y = 2
 
         let use_def = index.use_def_map(class_scope_id);
         let binding = use_def
-            .first_public_binding(class_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(class_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -826,7 +974,7 @@ y = 2
 
         let use_def = index.use_def_map(function_scope_id);
         let binding = use_def
-            .first_public_binding(function_table.place_id_by_name("x").expect("symbol exists"))
+            .first_public_binding(function_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -861,31 +1009,19 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(function_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(
-                    function_table
-                        .place_id_by_name(name)
-                        .expect("symbol exists"),
-                )
+                .first_public_binding(function_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(
-                function_table
-                    .place_id_by_name("args")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(function_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(
-                function_table
-                    .place_id_by_name("kwargs")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
@@ -918,27 +1054,19 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(lambda_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(
-                lambda_table
-                    .place_id_by_name("args")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(
-                lambda_table
-                    .place_id_by_name("kwargs")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
@@ -986,7 +1114,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             let binding = use_def
                 .first_public_binding(
                     comprehension_symbol_table
-                        .place_id_by_name(name)
+                        .symbol_id(name)
                         .expect("symbol exists"),
                 )
                 .unwrap();
@@ -1115,7 +1243,7 @@ with item1 as x, item2 as y:
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1138,7 +1266,7 @@ with context() as (x, y):
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1188,11 +1316,7 @@ def func():
 
         let use_def = index.use_def_map(FileScopeId::global());
         let binding = use_def
-            .first_public_binding(
-                global_table
-                    .place_id_by_name("func")
-                    .expect("symbol exists"),
-            )
+            .first_public_binding(global_table.symbol_id("func").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Function(_)));
     }
@@ -1269,7 +1393,7 @@ class C[T]:
         assert_eq!(names(&ann_table), vec!["T"]);
         assert!(
             ann_table
-                .place_by_name("T")
+                .symbol_by_name("T")
                 .is_some_and(|s| s.is_bound() && !s.is_used()),
             "type parameters are defined by the scope that introduces them"
         );
@@ -1417,7 +1541,7 @@ match subject:
         let global_scope_id = global_scope(&db, file);
         let global_table = place_table(&db, global_scope_id);
 
-        assert!(global_table.place_by_name("Foo").unwrap().is_used());
+        assert!(global_table.symbol_by_name("Foo").unwrap().is_used());
         assert_eq!(
             names(global_table),
             vec![
@@ -1441,7 +1565,7 @@ match subject:
             ("l", 1),
         ] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1471,7 +1595,7 @@ match 1:
         let use_def = use_def_map(&db, global_scope_id);
         for (name, expected_index) in [("first", 0), ("second", 0)] {
             let binding = use_def
-                .first_public_binding(global_table.place_id_by_name(name).expect("symbol exists"))
+                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1491,7 +1615,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
@@ -1507,10 +1631,10 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let x_binding = use_def
-            .first_public_binding(global_table.place_id_by_name("x").unwrap())
+            .first_public_binding(global_table.symbol_id("x").unwrap())
             .unwrap();
         let y_binding = use_def
-            .first_public_binding(global_table.place_id_by_name("y").unwrap())
+            .first_public_binding(global_table.symbol_id("y").unwrap())
             .unwrap();
 
         assert!(matches!(x_binding.kind(&db), DefinitionKind::For(_)));
@@ -1527,7 +1651,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.place_id_by_name("a").unwrap())
+            .first_public_binding(global_table.symbol_id("a").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));

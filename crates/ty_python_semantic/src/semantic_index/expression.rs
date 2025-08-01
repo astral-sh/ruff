@@ -1,6 +1,6 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
-use crate::semantic_index::place::{FileScopeId, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
@@ -58,8 +58,6 @@ pub(crate) struct Expression<'db> {
 
     /// Should this expression be inferred as a normal expression or a type expression?
     pub(crate) kind: ExpressionKind,
-
-    count: countme::Count<Expression<'static>>,
 }
 
 // The Salsa heap is tracked separately.

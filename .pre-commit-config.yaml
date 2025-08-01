@@ -6,7 +6,7 @@ exclude: |
     crates/ty_vendored/vendor/.*|
     crates/ty_project/resources/.*|
     crates/ty_python_semantic/resources/corpus/.*|
-    crates/ty/docs/(configuration|rules|cli).md|
+    crates/ty/docs/(configuration|rules|cli|environment).md|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
@@ -81,10 +81,10 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.2
+    rev: v0.12.5
     hooks:
       - id: ruff-format
-      - id: ruff
+      - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
@@ -127,6 +127,11 @@ repos:
           # and checks these with shellcheck. This is arguably its most useful feature,
           # but the integration only works if shellcheck is installed
           - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
 
 ci:
   skip: [cargo-fmt, dev-generate-all]

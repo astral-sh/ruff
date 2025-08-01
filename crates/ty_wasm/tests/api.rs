@@ -5,6 +5,8 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
 fn check() {
+    ty_wasm::before_main();
+
     let mut workspace = Workspace::new(
         "/",
         PositionEncoding::Utf32,

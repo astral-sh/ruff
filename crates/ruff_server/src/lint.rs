@@ -163,7 +163,7 @@ pub(crate) fn check(
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| {
-                if message.is_syntax_error() && !show_syntax_errors {
+                if message.is_invalid_syntax() && !show_syntax_errors {
                     None
                 } else {
                     Some(to_lsp_diagnostic(
@@ -238,7 +238,7 @@ fn to_lsp_diagnostic(
     let name = diagnostic.name();
     let body = diagnostic.body().to_string();
     let fix = diagnostic.fix();
-    let suggestion = diagnostic.suggestion();
+    let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();
 
     let fix = fix.and_then(|fix| fix.applies(Applicability::Unsafe).then_some(fix));
@@ -301,7 +301,7 @@ fn to_lsp_diagnostic(
             severity,
             tags,
             code,
-            code_description: diagnostic.to_url().and_then(|url| {
+            code_description: diagnostic.to_ruff_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
                     href: lsp_types::Url::parse(&url).ok()?,
                 })

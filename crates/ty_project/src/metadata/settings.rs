@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use ruff_db::{diagnostic::DiagnosticFormat, files::File};
+use ruff_db::files::File;
 use ty_python_semantic::lint::RuleSelection;
 
-use crate::metadata::options::InnerOverrideOptions;
+use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
@@ -57,7 +57,7 @@ impl Settings {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TerminalSettings {
-    pub output_format: DiagnosticFormat,
+    pub output_format: OutputFormat,
     pub error_on_warning: bool,
 }
 
@@ -96,7 +96,7 @@ impl Override {
 }
 
 /// Resolves the settings for a given file.
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     let settings = db.project().settings(db);
 
@@ -155,7 +155,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();

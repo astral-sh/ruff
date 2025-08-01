@@ -14,7 +14,8 @@ use ruff_python_ast::Singleton;
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::global_scope;
-use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -116,13 +117,25 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update)]
+pub(crate) enum ClassPatternKind {
+    Irrefutable,
+    Refutable,
+}
+
+impl ClassPatternKind {
+    pub(crate) fn is_irrefutable(self) -> bool {
+        matches!(self, ClassPatternKind::Irrefutable)
+    }
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>),
+    Class(Expression<'db>, ClassPatternKind),
     Unsupported,
 }
 
@@ -139,7 +152,8 @@ pub(crate) struct PatternPredicate<'db> {
 
     pub(crate) guard: Option<Expression<'db>>,
 
-    count: countme::Count<PatternPredicate<'static>>,
+    /// A reference to the pattern of the previous match case
+    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -204,7 +218,7 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedPlaceId,
+    pub(crate) symbol_id: ScopedSymbolId,
 
     pub(crate) referenced_file: File,
 }

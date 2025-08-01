@@ -43,7 +43,7 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
     Box::default()
 }
 
-#[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(deref), cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial, heap_size=get_size2::heap_size)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);
@@ -257,7 +257,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                                     .iter()
                                     .flat_map(|module| {
                                         module
-                                            .file()
+                                            .file(self.db)
                                             .map(|file| exported_names(self.db, file))
                                             .unwrap_or_default()
                                     })

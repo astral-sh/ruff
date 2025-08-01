@@ -244,27 +244,28 @@ use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
 
 use self::place_state::{
-    Bindings, Declarations, EagerSnapshot, LiveBindingsIterator, LiveDeclaration,
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
     LiveDeclarationsIterator, PlaceState, ScopedDefinitionId,
 };
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::member::ScopedMemberId;
 use crate::semantic_index::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
-use crate::semantic_index::place::{
-    FileScopeId, PlaceExpr, PlaceExprWithFlags, ScopeKind, ScopedPlaceId,
-};
+use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     Predicate, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
 };
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
+use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
+use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::PreviousDefinitions;
-use crate::semantic_index::{EagerSnapshotResult, SemanticIndex};
+use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
@@ -306,17 +307,26 @@ pub(crate) struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
+    ///
+    /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
+    /// bindings to that symbol. If there are any, the assignment is invalid.
+    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
-    /// [`PlaceState`] visible at end of scope for each place.
-    end_of_scope_places: IndexVec<ScopedPlaceId, PlaceState>,
+    /// [`PlaceState`] visible at end of scope for each symbol.
+    end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
 
-    /// All potentially reachable bindings and declarations, for each place.
-    reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
+    /// [`PlaceState`] visible at end of scope for each member.
+    end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+
+    /// All potentially reachable bindings and declarations, for each symbol.
+    reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
+
+    /// All potentially reachable bindings and declarations, for each member.
+    reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
-    /// eager scope.
-    eager_snapshots: EagerSnapshots,
+    /// scope.
+    enclosing_snapshots: EnclosingSnapshots,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -358,7 +368,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         constraint_key: ConstraintKey,
         enclosing_scope: FileScopeId,
-        expr: &PlaceExpr,
+        expr: PlaceExprRef,
         index: &'db SemanticIndex,
     ) -> ApplicableConstraints<'_, 'db> {
         match constraint_key {
@@ -368,9 +378,9 @@ impl<'db> UseDefMap<'db> {
                     constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
                 })
             }
-            ConstraintKey::EagerNestedScope(nested_scope) => {
-                let EagerSnapshotResult::FoundBindings(bindings) =
-                    index.eager_snapshot(enclosing_scope, expr, nested_scope)
+            ConstraintKey::NestedScope(nested_scope) => {
+                let EnclosingSnapshotResult::FoundBindings(bindings) =
+                    index.enclosing_snapshot(enclosing_scope, expr, nested_scope)
                 else {
                     unreachable!(
                         "The result of `SemanticIndex::eager_snapshot` must be `FoundBindings`"
@@ -417,8 +427,28 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_bindings(symbol),
+            ScopedPlaceId::Member(member) => self.end_of_scope_member_bindings(member),
+        }
+    }
+
+    pub(crate) fn end_of_scope_symbol_bindings(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
-            self.end_of_scope_places[place].bindings(),
+            self.end_of_scope_symbols[symbol].bindings(),
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        )
+    }
+
+    pub(crate) fn end_of_scope_member_bindings(
+        &self,
+        member: ScopedMemberId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        self.bindings_iterator(
+            self.end_of_scope_members[member].bindings(),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -427,33 +457,56 @@ impl<'db> UseDefMap<'db> {
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(
-            &self.reachable_definitions[place].bindings,
-            BoundnessAnalysis::AssumeBound,
-        )
-    }
-
-    pub(crate) fn eager_snapshot(
-        &self,
-        eager_bindings: ScopedEagerSnapshotId,
-    ) -> EagerSnapshotResult<'_, 'db> {
-        match self.eager_snapshots.get(eager_bindings) {
-            Some(EagerSnapshot::Constraint(constraint)) => {
-                EagerSnapshotResult::FoundConstraint(*constraint)
-            }
-            Some(EagerSnapshot::Bindings(bindings)) => EagerSnapshotResult::FoundBindings(
-                self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility),
-            ),
-            None => EagerSnapshotResult::NotFound,
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_bindings(symbol),
+            ScopedPlaceId::Member(member) => self.all_reachable_member_bindings(member),
         }
     }
 
-    pub(crate) fn bindings_at_declaration(
+    pub(crate) fn all_reachable_symbol_bindings(
         &self,
-        declaration: Definition<'db>,
+        symbol: ScopedSymbolId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        let bindings = &self.reachable_definitions_by_symbol[symbol].bindings;
+        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+    }
+
+    pub(crate) fn all_reachable_member_bindings(
+        &self,
+        symbol: ScopedMemberId,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        let bindings = &self.reachable_definitions_by_member[symbol].bindings;
+        self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
+    }
+
+    pub(crate) fn enclosing_snapshot(
+        &self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+        nested_laziness: ScopeLaziness,
+    ) -> EnclosingSnapshotResult<'_, 'db> {
+        let boundness_analysis = if nested_laziness.is_eager() {
+            BoundnessAnalysis::BasedOnUnboundVisibility
+        } else {
+            // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
+            BoundnessAnalysis::AssumeBound
+        };
+        match self.enclosing_snapshots.get(snapshot_id) {
+            Some(EnclosingSnapshot::Constraint(constraint)) => {
+                EnclosingSnapshotResult::FoundConstraint(*constraint)
+            }
+            Some(EnclosingSnapshot::Bindings(bindings)) => EnclosingSnapshotResult::FoundBindings(
+                self.bindings_iterator(bindings, boundness_analysis),
+            ),
+            None => EnclosingSnapshotResult::NotFound,
+        }
+    }
+
+    pub(crate) fn bindings_at_definition(
+        &self,
+        definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(
-            &self.bindings_by_declaration[&declaration],
+            &self.bindings_by_definition[&definition],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -472,33 +525,69 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.end_of_scope_places[place].declarations();
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.end_of_scope_symbol_declarations(symbol),
+            ScopedPlaceId::Member(member) => self.end_of_scope_member_declarations(member),
+        }
+    }
+
+    pub(crate) fn end_of_scope_symbol_declarations<'map>(
+        &'map self,
+        symbol: ScopedSymbolId,
+    ) -> DeclarationsIterator<'map, 'db> {
+        let declarations = self.end_of_scope_symbols[symbol].declarations();
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    }
+
+    pub(crate) fn end_of_scope_member_declarations<'map>(
+        &'map self,
+        member: ScopedMemberId,
+    ) -> DeclarationsIterator<'map, 'db> {
+        let declarations = self.end_of_scope_members[member].declarations();
+        self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
+    }
+
+    pub(crate) fn all_reachable_symbol_declarations(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> DeclarationsIterator<'_, 'db> {
+        let declarations = &self.reachable_definitions_by_symbol[symbol].declarations;
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+    }
+
+    pub(crate) fn all_reachable_member_declarations(
+        &self,
+        member: ScopedMemberId,
+    ) -> DeclarationsIterator<'_, 'db> {
+        let declarations = &self.reachable_definitions_by_member[member].declarations;
+        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
     pub(crate) fn all_reachable_declarations(
         &self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.reachable_definitions[place].declarations;
-        self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+        match place {
+            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_declarations(symbol),
+            ScopedPlaceId::Member(member) => self.all_reachable_member_declarations(member),
+        }
     }
 
-    pub(crate) fn all_end_of_scope_declarations<'map>(
+    pub(crate) fn all_end_of_scope_symbol_declarations<'map>(
         &'map self,
-    ) -> impl Iterator<Item = (ScopedPlaceId, DeclarationsIterator<'map, 'db>)> + 'map {
-        (0..self.end_of_scope_places.len())
-            .map(ScopedPlaceId::from_usize)
-            .map(|place_id| (place_id, self.end_of_scope_declarations(place_id)))
+    ) -> impl Iterator<Item = (ScopedSymbolId, DeclarationsIterator<'map, 'db>)> + 'map {
+        self.end_of_scope_symbols
+            .indices()
+            .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_declarations(symbol_id)))
     }
 
-    pub(crate) fn all_end_of_scope_bindings<'map>(
+    pub(crate) fn all_end_of_scope_symbol_bindings<'map>(
         &'map self,
-    ) -> impl Iterator<Item = (ScopedPlaceId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
+    ) -> impl Iterator<Item = (ScopedSymbolId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        (0..self.end_of_scope_places.len())
-            .map(ScopedPlaceId::from_usize)
-            .map(|place_id| (place_id, self.end_of_scope_bindings(place_id)))
+        self.end_of_scope_symbols
+            .indices()
+            .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
     }
 
     pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
@@ -506,6 +595,18 @@ impl<'db> UseDefMap<'db> {
             .reachability_constraints
             .evaluate(db, &self.predicates, self.end_of_scope_reachability)
             .is_always_false()
+    }
+
+    pub(crate) fn is_declaration_reachable(
+        &self,
+        db: &dyn crate::Db,
+        declaration: &DeclarationWithConstraint<'db>,
+    ) -> Truthiness {
+        self.reachability_constraints.evaluate(
+            db,
+            &self.predicates,
+            declaration.reachability_constraint,
+        )
     }
 
     pub(crate) fn is_binding_reachable(
@@ -550,30 +651,37 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of a place state that can be used to resolve a reference in a
-/// nested eager scope.
+/// Uniquely identifies a snapshot of an enclosing scope place state that can be used to resolve a reference in a
+/// nested scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
 /// where the nested scope is defined, instead of using the public type of the place.
 ///
-/// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
+/// There is a unique ID for each distinct [`EnclosingSnapshotKey`] in the file.
 #[newtype_index]
 #[derive(get_size2::GetSize)]
-pub(crate) struct ScopedEagerSnapshotId;
+pub(crate) struct ScopedEnclosingSnapshotId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) struct EagerSnapshotKey {
+pub(crate) struct EnclosingSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
     /// The referenced place (in the enclosing scope)
     pub(crate) enclosing_place: ScopedPlaceId,
-    /// The nested eager scope containing the reference
+    /// The nested scope containing the reference
     pub(crate) nested_scope: FileScopeId,
+    /// Laziness of the nested scope
+    pub(crate) nested_laziness: ScopeLaziness,
 }
 
-/// A snapshot of place states that can be used to resolve a reference in a nested eager scope.
-type EagerSnapshots = IndexVec<ScopedEagerSnapshotId, EagerSnapshot>;
+/// A snapshot of enclosing scope place states that can be used to resolve a reference in a nested scope.
+/// Normally, if the current scope is lazily evaluated,
+/// we do not snapshot the place states from the enclosing scope,
+/// and infer the type of the place from its reachable definitions
+/// (and any narrowing constraints introduced in the enclosing scope do not apply to the current scope).
+/// The exception is if the symbol has never been reassigned, in which case it is snapshotted.
+type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
@@ -700,7 +808,8 @@ struct ReachableDefinitions {
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
-    place_states: IndexVec<ScopedPlaceId, PlaceState>,
+    symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
+    member_states: IndexVec<ScopedMemberId, PlaceState>,
     reachability: ScopedReachabilityConstraintId,
 }
 
@@ -731,18 +840,22 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
 
-    /// Live bindings for each so-far-recorded declaration.
-    bindings_by_declaration: FxHashMap<Definition<'db>, Bindings>,
+    /// Live bindings for each so-far-recorded definition.
+    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
     /// Currently live bindings and declarations for each place.
-    place_states: IndexVec<ScopedPlaceId, PlaceState>,
+    symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
+
+    member_states: IndexVec<ScopedMemberId, PlaceState>,
 
     /// All potentially reachable bindings and declarations, for each place.
-    reachable_definitions: IndexVec<ScopedPlaceId, ReachableDefinitions>,
+    reachable_symbol_definitions: IndexVec<ScopedSymbolId, ReachableDefinitions>,
+
+    reachable_member_definitions: IndexVec<ScopedMemberId, ReachableDefinitions>,
 
     /// Snapshots of place states in this scope that can be used to resolve a reference in a
-    /// nested eager scope.
-    eager_snapshots: EagerSnapshots,
+    /// nested scope.
+    enclosing_snapshots: EnclosingSnapshots,
 
     /// Is this a class scope?
     is_class_scope: bool,
@@ -759,17 +872,27 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
-            bindings_by_declaration: FxHashMap::default(),
-            place_states: IndexVec::new(),
-            reachable_definitions: IndexVec::new(),
-            eager_snapshots: EagerSnapshots::default(),
+            bindings_by_definition: FxHashMap::default(),
+            symbol_states: IndexVec::new(),
+            member_states: IndexVec::new(),
+            reachable_member_definitions: IndexVec::new(),
+            reachable_symbol_definitions: IndexVec::new(),
+            enclosing_snapshots: EnclosingSnapshots::default(),
             is_class_scope,
         }
     }
+
     pub(super) fn mark_unreachable(&mut self) {
         self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 
-        for state in &mut self.place_states {
+        for state in &mut self.symbol_states {
+            state.record_reachability_constraint(
+                &mut self.reachability_constraints,
+                ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            );
+        }
+
+        for state in &mut self.member_states {
             state.record_reachability_constraint(
                 &mut self.reachability_constraints,
                 ScopedReachabilityConstraintId::ALWAYS_FALSE,
@@ -778,39 +901,73 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn add_place(&mut self, place: ScopedPlaceId) {
-        let new_place = self
-            .place_states
-            .push(PlaceState::undefined(self.reachability));
-        debug_assert_eq!(place, new_place);
-        let new_place = self.reachable_definitions.push(ReachableDefinitions {
-            bindings: Bindings::unbound(self.reachability),
-            declarations: Declarations::undeclared(self.reachability),
-        });
-        debug_assert_eq!(place, new_place);
+        match place {
+            ScopedPlaceId::Symbol(symbol) => {
+                let new_place = self
+                    .symbol_states
+                    .push(PlaceState::undefined(self.reachability));
+                debug_assert_eq!(symbol, new_place);
+                let new_place = self
+                    .reachable_symbol_definitions
+                    .push(ReachableDefinitions {
+                        bindings: Bindings::unbound(self.reachability),
+                        declarations: Declarations::undeclared(self.reachability),
+                    });
+                debug_assert_eq!(symbol, new_place);
+            }
+            ScopedPlaceId::Member(member) => {
+                let new_place = self
+                    .member_states
+                    .push(PlaceState::undefined(self.reachability));
+                debug_assert_eq!(member, new_place);
+                let new_place = self
+                    .reachable_member_definitions
+                    .push(ReachableDefinitions {
+                        bindings: Bindings::unbound(self.reachability),
+                        declarations: Declarations::undeclared(self.reachability),
+                    });
+                debug_assert_eq!(member, new_place);
+            }
+        }
     }
 
-    pub(super) fn record_binding(
-        &mut self,
-        place: ScopedPlaceId,
-        binding: Definition<'db>,
-        is_place_name: bool,
-    ) {
+    pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        self.bindings_by_definition
+            .insert(binding, bindings.clone());
+
         let def_id = self.all_definitions.push(DefinitionState::Defined(binding));
-        let place_state = &mut self.place_states[place];
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
         place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
-            is_place_name,
+            place.is_symbol(),
         );
 
-        self.reachable_definitions[place].bindings.record_binding(
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => {
+                &mut self.reachable_symbol_definitions[symbol].bindings
+            }
+            ScopedPlaceId::Member(member) => {
+                &mut self.reachable_member_definitions[member].bindings
+            }
+        };
+
+        bindings.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
-            is_place_name,
+            place.is_symbol(),
             PreviousDefinitions::AreKept,
         );
     }
@@ -835,7 +992,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         let narrowing_constraint = predicate.into();
-        for state in &mut self.place_states {
+        for state in &mut self.symbol_states {
+            state
+                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
+        }
+
+        for state in &mut self.member_states {
             state
                 .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
@@ -846,8 +1008,8 @@ impl<'db> UseDefMapBuilder<'db> {
     /// This is only used for `*`-import reachability constraints, which are handled differently
     /// to most other reachability constraints. See the doc-comment for
     /// [`Self::record_and_negate_star_import_reachability_constraint`] for more details.
-    pub(super) fn single_place_snapshot(&self, place: ScopedPlaceId) -> PlaceState {
-        self.place_states[place].clone()
+    pub(super) fn single_symbol_place_snapshot(&self, symbol: ScopedSymbolId) -> PlaceState {
+        self.symbol_states[symbol].clone()
     }
 
     /// This method exists solely for handling `*`-import reachability constraints.
@@ -882,7 +1044,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_and_negate_star_import_reachability_constraint(
         &mut self,
         reachability_id: ScopedReachabilityConstraintId,
-        symbol: ScopedPlaceId,
+        symbol: ScopedSymbolId,
         pre_definition_state: PlaceState,
     ) {
         let negated_reachability_id = self
@@ -890,17 +1052,17 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_not_constraint(reachability_id);
 
         let mut post_definition_state =
-            std::mem::replace(&mut self.place_states[symbol], pre_definition_state);
+            std::mem::replace(&mut self.symbol_states[symbol], pre_definition_state);
 
         post_definition_state
             .record_reachability_constraint(&mut self.reachability_constraints, reachability_id);
 
-        self.place_states[symbol].record_reachability_constraint(
+        self.symbol_states[symbol].record_reachability_constraint(
             &mut self.reachability_constraints,
             negated_reachability_id,
         );
 
-        self.place_states[symbol].merge(
+        self.symbol_states[symbol].merge(
             post_definition_state,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
@@ -915,7 +1077,11 @@ impl<'db> UseDefMapBuilder<'db> {
             .reachability_constraints
             .add_and_constraint(self.reachability, constraint);
 
-        for state in &mut self.place_states {
+        for state in &mut self.symbol_states {
+            state.record_reachability_constraint(&mut self.reachability_constraints, constraint);
+        }
+
+        for state in &mut self.member_states {
             state.record_reachability_constraint(&mut self.reachability_constraints, constraint);
         }
     }
@@ -928,56 +1094,81 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self
             .all_definitions
             .push(DefinitionState::Defined(declaration));
-        let place_state = &mut self.place_states[place];
-        self.bindings_by_declaration
+
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+
+        self.bindings_by_definition
             .insert(declaration, place_state.bindings().clone());
         place_state.record_declaration(def_id, self.reachability);
 
-        self.reachable_definitions[place]
-            .declarations
-            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
+        let definitions = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
+            ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
+        };
+
+        definitions.declarations.record_declaration(
+            def_id,
+            self.reachability,
+            PreviousDefinitions::AreKept,
+        );
     }
 
     pub(super) fn record_declaration_and_binding(
         &mut self,
         place: ScopedPlaceId,
         definition: Definition<'db>,
-        is_place_name: bool,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self
             .all_definitions
             .push(DefinitionState::Defined(definition));
-        let place_state = &mut self.place_states[place];
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
         place_state.record_declaration(def_id, self.reachability);
         place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
-            is_place_name,
+            place.is_symbol(),
         );
 
-        self.reachable_definitions[place]
-            .declarations
-            .record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
-        self.reachable_definitions[place].bindings.record_binding(
+        let reachable_definitions = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
+            ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
+        };
+
+        reachable_definitions.declarations.record_declaration(
+            def_id,
+            self.reachability,
+            PreviousDefinitions::AreKept,
+        );
+        reachable_definitions.bindings.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
-            is_place_name,
+            place.is_symbol(),
             PreviousDefinitions::AreKept,
         );
     }
 
-    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId, is_place_name: bool) {
+    pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
         let def_id = self.all_definitions.push(DefinitionState::Deleted);
-        let place_state = &mut self.place_states[place];
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+
         place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
-            is_place_name,
+            place.is_symbol(),
         );
     }
 
@@ -987,11 +1178,13 @@ impl<'db> UseDefMapBuilder<'db> {
         use_id: ScopedUseId,
         node_key: NodeKey,
     ) {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => &mut self.member_states[member].bindings(),
+        };
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        let new_use = self
-            .bindings_by_use
-            .push(self.place_states[place].bindings().clone());
+        let new_use = self.bindings_by_use.push(bindings.clone());
         debug_assert_eq!(use_id, new_use);
 
         // Track reachability of all uses of places to silence `unresolved-reference`
@@ -1003,32 +1196,34 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
-    pub(super) fn snapshot_eager_state(
+    pub(super) fn snapshot_outer_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
         scope: ScopeKind,
-        enclosing_place_expr: &PlaceExprWithFlags,
-    ) -> ScopedEagerSnapshotId {
+        enclosing_place_expr: PlaceExprRef,
+    ) -> ScopedEnclosingSnapshotId {
+        let bindings = match enclosing_place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
         // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
         // so we never need to save eager scope bindings in a class scope.
-        if (scope.is_class() && enclosing_place_expr.is_name()) || !enclosing_place_expr.is_bound()
-        {
-            self.eager_snapshots.push(EagerSnapshot::Constraint(
-                self.place_states[enclosing_place]
-                    .bindings()
-                    .unbound_narrowing_constraint(),
+        if (scope.is_class() && enclosing_place.is_symbol()) || !enclosing_place_expr.is_bound() {
+            self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
+                bindings.unbound_narrowing_constraint(),
             ))
         } else {
-            self.eager_snapshots.push(EagerSnapshot::Bindings(
-                self.place_states[enclosing_place].bindings().clone(),
-            ))
+            self.enclosing_snapshots
+                .push(EnclosingSnapshot::Bindings(bindings.clone()))
         }
     }
 
     /// Take a snapshot of the current visible-places state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
-            place_states: self.place_states.clone(),
+            symbol_states: self.symbol_states.clone(),
+            member_states: self.member_states.clone(),
             reachability: self.reachability,
         }
     }
@@ -1038,18 +1233,23 @@ impl<'db> UseDefMapBuilder<'db> {
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
-        let num_places = self.place_states.len();
-        debug_assert!(num_places >= snapshot.place_states.len());
+        let num_symbols = self.symbol_states.len();
+        let num_members = self.member_states.len();
+        debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.place_states = snapshot.place_states;
+        self.symbol_states = snapshot.symbol_states;
+        self.member_states = snapshot.member_states;
         self.reachability = snapshot.reachability;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
-        self.place_states
-            .resize(num_places, PlaceState::undefined(self.reachability));
+        self.symbol_states
+            .resize(num_symbols, PlaceState::undefined(self.reachability));
+
+        self.member_states
+            .resize(num_members, PlaceState::undefined(self.reachability));
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -1074,10 +1274,29 @@ impl<'db> UseDefMapBuilder<'db> {
         // We never remove places from `place_states` (it's an IndexVec, and the place
         // IDs must line up), so the current number of known places must always be equal to or
         // greater than the number of known places in a previously-taken snapshot.
-        debug_assert!(self.place_states.len() >= snapshot.place_states.len());
+        debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
+        debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
-        let mut snapshot_definitions_iter = snapshot.place_states.into_iter();
-        for current in &mut self.place_states {
+        let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
+        for current in &mut self.symbol_states {
+            if let Some(snapshot) = snapshot_definitions_iter.next() {
+                current.merge(
+                    snapshot,
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                );
+            } else {
+                current.merge(
+                    PlaceState::undefined(snapshot.reachability),
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                );
+                // Place not present in snapshot, so it's unbound/undeclared from that path.
+            }
+        }
+
+        let mut snapshot_definitions_iter = snapshot.member_states.into_iter();
+        for current in &mut self.member_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
                 current.merge(
                     snapshot,
@@ -1099,15 +1318,62 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
+    fn mark_reachability_constraints(&mut self) {
+        // We only walk the fields that are copied through to the UseDefMap when we finish building
+        // it.
+        for bindings in &mut self.bindings_by_use {
+            bindings.finish(&mut self.reachability_constraints);
+        }
+        for constraint in self.node_reachability.values() {
+            self.reachability_constraints.mark_used(*constraint);
+        }
+        for symbol_state in &mut self.symbol_states {
+            symbol_state.finish(&mut self.reachability_constraints);
+        }
+        for member_state in &mut self.member_states {
+            member_state.finish(&mut self.reachability_constraints);
+        }
+        for reachable_definition in &mut self.reachable_symbol_definitions {
+            reachable_definition
+                .bindings
+                .finish(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .finish(&mut self.reachability_constraints);
+        }
+        for reachable_definition in &mut self.reachable_member_definitions {
+            reachable_definition
+                .bindings
+                .finish(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .finish(&mut self.reachability_constraints);
+        }
+        for declarations in self.declarations_by_binding.values_mut() {
+            declarations.finish(&mut self.reachability_constraints);
+        }
+        for bindings in self.bindings_by_definition.values_mut() {
+            bindings.finish(&mut self.reachability_constraints);
+        }
+        for eager_snapshot in &mut self.enclosing_snapshots {
+            eager_snapshot.finish(&mut self.reachability_constraints);
+        }
+        self.reachability_constraints.mark_used(self.reachability);
+    }
+
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
+        self.mark_reachability_constraints();
+
         self.all_definitions.shrink_to_fit();
-        self.place_states.shrink_to_fit();
-        self.reachable_definitions.shrink_to_fit();
+        self.symbol_states.shrink_to_fit();
+        self.member_states.shrink_to_fit();
+        self.reachable_symbol_definitions.shrink_to_fit();
+        self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
-        self.bindings_by_declaration.shrink_to_fit();
-        self.eager_snapshots.shrink_to_fit();
+        self.bindings_by_definition.shrink_to_fit();
+        self.enclosing_snapshots.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1116,11 +1382,13 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
-            end_of_scope_places: self.place_states,
-            reachable_definitions: self.reachable_definitions,
+            end_of_scope_symbols: self.symbol_states,
+            end_of_scope_members: self.member_states,
+            reachable_definitions_by_symbol: self.reachable_symbol_definitions,
+            reachable_definitions_by_member: self.reachable_member_definitions,
             declarations_by_binding: self.declarations_by_binding,
-            bindings_by_declaration: self.bindings_by_declaration,
-            eager_snapshots: self.eager_snapshots,
+            bindings_by_definition: self.bindings_by_definition,
+            enclosing_snapshots: self.enclosing_snapshots,
             end_of_scope_reachability: self.reachability,
         }
     }

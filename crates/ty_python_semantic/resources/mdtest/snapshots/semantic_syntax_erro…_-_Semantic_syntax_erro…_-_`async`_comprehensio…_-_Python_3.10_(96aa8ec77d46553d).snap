@@ -12,35 +12,55 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/semantic_syn
 ## mdtest_snippet.py
 
 ```
- 1 | async def elements(n):
- 2 |     yield n
- 3 | 
- 4 | async def f():
- 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
- 6 |     return {n: [x async for x in elements(n)] for n in range(3)}
- 7 | async def test():
- 8 |     return [[x async for x in elements(n)] async for n in range(3)]
- 9 | async def f():
-10 |     [x for x in [1]] and [x async for x in elements(1)]
-11 | 
-12 | async def f():
-13 |     def g():
-14 |         pass
-15 |     [x async for x in elements(1)]
+ 1 | from ty_extensions import Unknown
+ 2 | 
+ 3 | # TODO: async generator type inference support
+ 4 | async def elements(n) -> Unknown:
+ 5 |     yield n
+ 6 | 
+ 7 | async def f():
+ 8 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
+ 9 |     return {n: [x async for x in elements(n)] for n in range(3)}
+10 | async def test():
+11 |     # error: [not-iterable] "Object of type `range` is not async-iterable"
+12 |     return [[x async for x in elements(n)] async for n in range(3)]
+13 | async def f():
+14 |     [x for x in [1]] and [x async for x in elements(1)]
+15 | 
+16 | async def f():
+17 |     def g():
+18 |         pass
+19 |     [x async for x in elements(1)]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-syntax]
- --> src/mdtest_snippet.py:6:19
-  |
-4 | async def f():
-5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (synt...
-6 |     return {n: [x async for x in elements(n)] for n in range(3)}
-  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
-7 | async def test():
-8 |     return [[x async for x in elements(n)] async for n in range(3)]
-  |
+  --> src/mdtest_snippet.py:9:19
+   |
+ 7 | async def f():
+ 8 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (synta…
+ 9 |     return {n: [x async for x in elements(n)] for n in range(3)}
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
+10 | async def test():
+11 |     # error: [not-iterable] "Object of type `range` is not async-iterable"
+   |
+
+```
+
+```
+error[not-iterable]: Object of type `range` is not async-iterable
+  --> src/mdtest_snippet.py:12:59
+   |
+10 | async def test():
+11 |     # error: [not-iterable] "Object of type `range` is not async-iterable"
+12 |     return [[x async for x in elements(n)] async for n in range(3)]
+   |                                                           ^^^^^^^^
+13 | async def f():
+14 |     [x for x in [1]] and [x async for x in elements(1)]
+   |
+info: It has no `__aiter__` method
+info: rule `not-iterable` is enabled by default
 
 ```

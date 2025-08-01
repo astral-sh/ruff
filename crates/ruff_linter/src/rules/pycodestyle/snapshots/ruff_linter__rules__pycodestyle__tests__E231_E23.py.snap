@@ -905,3 +905,38 @@ E23.py:126:99: E231 [*] Missing whitespace after ':'
 127 127 |         pass
 128 128 | 
 129 129 | # Should be no E231 errors on any of these:
+
+E23.py:147:6: E231 [*] Missing whitespace after ','
+    |
+146 | # E231
+147 | t"{(a,b)}"
+    |      ^ E231
+148 |
+149 | # Okay because it's hard to differentiate between the usages of a colon in a t-string
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+144 144 |     pass
+145 145 | 
+146 146 | # E231
+147     |-t"{(a,b)}"
+    147 |+t"{(a, b)}"
+148 148 | 
+149 149 | # Okay because it's hard to differentiate between the usages of a colon in a t-string
+150 150 | t"{a:=1}"
+
+E23.py:161:37: E231 [*] Missing whitespace after ':'
+    |
+160 | #: E231
+161 | {len(t's3://{self.s3_bucket_name}/'):1}
+    |                                     ^ E231
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+158 158 | snapshot.file_uri[len(t's3://{self.s3_bucket_name}/'):]
+159 159 | 
+160 160 | #: E231
+161     |-{len(t's3://{self.s3_bucket_name}/'):1}
+    161 |+{len(t's3://{self.s3_bucket_name}/'): 1}

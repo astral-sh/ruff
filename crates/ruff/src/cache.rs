@@ -454,7 +454,7 @@ impl LintCacheData {
                 CacheMessage {
                     rule,
                     body: msg.body().to_string(),
-                    suggestion: msg.suggestion().map(ToString::to_string),
+                    suggestion: msg.first_help_text().map(ToString::to_string),
                     range: msg.expect_range(),
                     parent: msg.parent(),
                     fix: msg.fix().cloned(),
@@ -681,7 +681,7 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(Diagnostic::is_syntax_error) {
+                if diagnostics.inner.iter().any(Diagnostic::is_invalid_syntax) {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

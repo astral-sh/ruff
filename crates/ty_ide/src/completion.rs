@@ -10,7 +10,7 @@ use ty_python_semantic::{Completion, NameKind, SemanticModel};
 use crate::Db;
 use crate::find_node::covering_node;
 
-pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion> {
+pub fn completion(db: &dyn Db, file: File, offset: TextSize) -> Vec<Completion<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     let Some(target_token) = CompletionTargetTokens::find(&parsed, offset) else {
@@ -66,9 +66,9 @@ enum CompletionTargetTokens<'t> {
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
-    /// No token was found, but we have the offset of the
-    /// cursor.
-    Unknown { offset: TextSize },
+    /// No token was found. We generally treat this like
+    /// `Generic` (i.e., offer scope based completions).
+    Unknown,
 }
 
 impl<'t> CompletionTargetTokens<'t> {
@@ -78,7 +78,7 @@ impl<'t> CompletionTargetTokens<'t> {
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let offset = match parsed.tokens().at_offset(offset) {
-            TokenAt::None => return Some(CompletionTargetTokens::Unknown { offset }),
+            TokenAt::None => return Some(CompletionTargetTokens::Unknown),
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
@@ -122,7 +122,7 @@ impl<'t> CompletionTargetTokens<'t> {
                 return None;
             } else {
                 let Some(last) = before.last() else {
-                    return Some(CompletionTargetTokens::Unknown { offset });
+                    return Some(CompletionTargetTokens::Unknown);
                 };
                 CompletionTargetTokens::Generic { token: last }
             },
@@ -171,7 +171,7 @@ impl<'t> CompletionTargetTokens<'t> {
                     node: covering_node.node(),
                 })
             }
-            CompletionTargetTokens::Unknown { offset } => {
+            CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
                 Some(CompletionTargetAst::Scoped {
@@ -536,6 +536,9 @@ _private_type_var_tuple = TypeVarTuple("_private_type_var_tuple")
 public_explicit_type_alias: TypeAlias = Literal[1]
 _private_explicit_type_alias: TypeAlias = Literal[1]
 
+public_implicit_union_alias = int | str
+_private_implicit_union_alias = int | str
+
 class PublicProtocol(Protocol):
     def method(self) -> None: ...
 
@@ -557,7 +560,9 @@ class _PrivateProtocol(Protocol):
         test.assert_completions_include("public_type_var_tuple");
         test.assert_completions_do_not_include("_private_type_var_tuple");
         test.assert_completions_include("public_explicit_type_alias");
-        test.assert_completions_include("_private_explicit_type_alias");
+        test.assert_completions_do_not_include("_private_explicit_type_alias");
+        test.assert_completions_include("public_implicit_union_alias");
+        test.assert_completions_do_not_include("_private_implicit_union_alias");
         test.assert_completions_include("PublicProtocol");
         test.assert_completions_do_not_include("_PrivateProtocol");
     }
@@ -1223,33 +1228,33 @@ quux.<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        bar
-        baz
-        foo
-        __annotations__
-        __class__
-        __delattr__
-        __dict__
-        __dir__
-        __doc__
-        __eq__
-        __format__
-        __getattribute__
-        __getstate__
-        __hash__
-        __init__
-        __init_subclass__
-        __module__
-        __ne__
-        __new__
-        __reduce__
-        __reduce_ex__
-        __repr__
-        __setattr__
-        __sizeof__
-        __str__
-        __subclasshook__
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+        bar :: Unknown | Literal[2]
+        baz :: Unknown | Literal[3]
+        foo :: Unknown | Literal[1]
+        __annotations__ :: dict[str, Any]
+        __class__ :: type
+        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __dict__ :: dict[str, Any]
+        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: bound method object.__eq__(value: object, /) -> bool
+        __format__ :: bound method object.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method object.__getstate__() -> object
+        __hash__ :: bound method object.__hash__() -> int
+        __init__ :: bound method Quux.__init__() -> Unknown
+        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __module__ :: str
+        __ne__ :: bound method object.__ne__(value: object, /) -> bool
+        __new__ :: bound method object.__new__() -> Self@object
+        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method object.__repr__() -> str
+        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method object.__sizeof__() -> int
+        __str__ :: bound method object.__str__() -> str
+        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
         ");
     }
 
@@ -1268,34 +1273,167 @@ quux.b<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @r"
-        bar
-        baz
-        foo
-        __annotations__
-        __class__
-        __delattr__
-        __dict__
-        __dir__
-        __doc__
-        __eq__
-        __format__
-        __getattribute__
-        __getstate__
-        __hash__
-        __init__
-        __init_subclass__
-        __module__
-        __ne__
-        __new__
-        __reduce__
-        __reduce_ex__
-        __repr__
-        __setattr__
-        __sizeof__
-        __str__
-        __subclasshook__
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+        bar :: Unknown | Literal[2]
+        baz :: Unknown | Literal[3]
+        foo :: Unknown | Literal[1]
+        __annotations__ :: dict[str, Any]
+        __class__ :: type
+        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __dict__ :: dict[str, Any]
+        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: bound method object.__eq__(value: object, /) -> bool
+        __format__ :: bound method object.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method object.__getstate__() -> object
+        __hash__ :: bound method object.__hash__() -> int
+        __init__ :: bound method Quux.__init__() -> Unknown
+        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __module__ :: str
+        __ne__ :: bound method object.__ne__(value: object, /) -> bool
+        __new__ :: bound method object.__new__() -> Self@object
+        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method object.__repr__() -> str
+        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method object.__sizeof__() -> int
+        __str__ :: bound method object.__str__() -> str
+        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
         ");
+    }
+
+    #[test]
+    fn metaclass1() {
+        let test = cursor_test(
+            "\
+class Meta(type):
+    @property
+    def meta_attr(self) -> int:
+        return 0
+
+class C(metaclass=Meta): ...
+
+C.<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+        meta_attr :: int
+        mro :: bound method <class 'C'>.mro() -> list[type]
+        __annotations__ :: dict[str, Any]
+        __base__ :: type | None
+        __bases__ :: tuple[type, ...]
+        __basicsize__ :: int
+        __call__ :: bound method <class 'C'>.__call__(...) -> Any
+        __class__ :: <class 'Meta'>
+        __delattr__ :: def __delattr__(self, name: str, /) -> None
+        __dict__ :: MappingProxyType[str, Any]
+        __dictoffset__ :: int
+        __dir__ :: def __dir__(self) -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: def __eq__(self, value: object, /) -> bool
+        __flags__ :: int
+        __format__ :: def __format__(self, format_spec: str, /) -> str
+        __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
+        __getstate__ :: def __getstate__(self) -> object
+        __hash__ :: def __hash__(self) -> int
+        __init__ :: def __init__(self) -> None
+        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __instancecheck__ :: bound method <class 'C'>.__instancecheck__(instance: Any, /) -> bool
+        __itemsize__ :: int
+        __module__ :: str
+        __mro__ :: tuple[<class 'C'>, <class 'object'>]
+        __name__ :: str
+        __ne__ :: def __ne__(self, value: object, /) -> bool
+        __new__ :: def __new__(cls) -> Self@object
+        __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType
+        __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
+        __qualname__ :: str
+        __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
+        __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: def __repr__(self) -> str
+        __ror__ :: bound method <class 'C'>.__ror__(value: Any, /) -> UnionType
+        __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
+        __sizeof__ :: def __sizeof__(self) -> int
+        __str__ :: def __str__(self) -> str
+        __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
+        __subclasses__ :: bound method <class 'C'>.__subclasses__() -> list[Self]
+        __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
+        __text_signature__ :: str | None
+        __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+        __weakrefoffset__ :: int
+        ");
+    }
+
+    #[test]
+    fn metaclass2() {
+        let test = cursor_test(
+            "\
+class Meta(type):
+    @property
+    def meta_attr(self) -> int:
+        return 0
+
+class C(metaclass=Meta): ...
+
+Meta.<CURSOR>
+",
+        );
+
+        insta::with_settings!({
+            // The formatting of some types are different depending on
+            // whether we're in release mode or not. These differences
+            // aren't really relevant for completion tests AFAIK, so
+            // just redact them. ---AG
+            filters => [(r"(?m)\s*__(annotations|new)__.+$", "")]},
+            {
+                assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+                meta_attr :: property
+                mro :: def mro(self) -> list[type]
+                __base__ :: type | None
+                __bases__ :: tuple[type, ...]
+                __basicsize__ :: int
+                __call__ :: def __call__(self, *args: Any, **kwds: Any) -> Any
+                __class__ :: <class 'type'>
+                __delattr__ :: def __delattr__(self, name: str, /) -> None
+                __dict__ :: MappingProxyType[str, Any]
+                __dictoffset__ :: int
+                __dir__ :: def __dir__(self) -> Iterable[str]
+                __doc__ :: str | None
+                __eq__ :: def __eq__(self, value: object, /) -> bool
+                __flags__ :: int
+                __format__ :: def __format__(self, format_spec: str, /) -> str
+                __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
+                __getstate__ :: def __getstate__(self) -> object
+                __hash__ :: def __hash__(self) -> int
+                __init__ :: Overload[(self, o: object, /) -> None, (self, name: str, bases: tuple[type, ...], dict: dict[str, Any], /, **kwds: Any) -> None]
+                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __instancecheck__ :: def __instancecheck__(self, instance: Any, /) -> bool
+                __itemsize__ :: int
+                __module__ :: str
+                __mro__ :: tuple[<class 'Meta'>, <class 'type'>, <class 'object'>]
+                __name__ :: str
+                __ne__ :: def __ne__(self, value: object, /) -> bool
+                __or__ :: def __or__(self, value: Any, /) -> UnionType
+                __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
+                __qualname__ :: str
+                __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
+                __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+                __repr__ :: def __repr__(self) -> str
+                __ror__ :: def __ror__(self, value: Any, /) -> UnionType
+                __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
+                __sizeof__ :: def __sizeof__(self) -> int
+                __str__ :: def __str__(self) -> str
+                __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
+                __subclasses__ :: def __subclasses__(self: Self) -> list[Self]
+                __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
+                __text_signature__ :: str | None
+                __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+                __weakrefoffset__ :: int
+                ");
+            }
+        );
     }
 
     #[test]
@@ -1319,6 +1457,181 @@ class Quux:
         //
         // See: https://github.com/astral-sh/ty/issues/159
         assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+    }
+
+    #[test]
+    fn class_attributes1() {
+        let test = cursor_test(
+            "\
+class Quux:
+    some_attribute: int = 1
+
+    def __init__(self):
+        self.foo = 1
+        self.bar = 2
+        self.baz = 3
+
+    def some_method(self) -> int:
+        return 1
+
+    @property
+    def some_property(self) -> int:
+        return 1
+
+    @classmethod
+    def some_class_method(self) -> int:
+        return 1
+
+    @staticmethod
+    def some_static_method(self) -> int:
+        return 1
+
+Quux.<CURSOR>
+",
+        );
+
+        assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+        mro :: bound method <class 'Quux'>.mro() -> list[type]
+        some_attribute :: int
+        some_class_method :: bound method <class 'Quux'>.some_class_method() -> int
+        some_method :: def some_method(self) -> int
+        some_property :: property
+        some_static_method :: def some_static_method(self) -> int
+        __annotations__ :: dict[str, Any]
+        __base__ :: type | None
+        __bases__ :: tuple[type, ...]
+        __basicsize__ :: int
+        __call__ :: bound method <class 'Quux'>.__call__(...) -> Any
+        __class__ :: <class 'type'>
+        __delattr__ :: def __delattr__(self, name: str, /) -> None
+        __dict__ :: MappingProxyType[str, Any]
+        __dictoffset__ :: int
+        __dir__ :: def __dir__(self) -> Iterable[str]
+        __doc__ :: str | None
+        __eq__ :: def __eq__(self, value: object, /) -> bool
+        __flags__ :: int
+        __format__ :: def __format__(self, format_spec: str, /) -> str
+        __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
+        __getstate__ :: def __getstate__(self) -> object
+        __hash__ :: def __hash__(self) -> int
+        __init__ :: def __init__(self) -> Unknown
+        __init_subclass__ :: def __init_subclass__(cls) -> None
+        __instancecheck__ :: bound method <class 'Quux'>.__instancecheck__(instance: Any, /) -> bool
+        __itemsize__ :: int
+        __module__ :: str
+        __mro__ :: tuple[<class 'Quux'>, <class 'object'>]
+        __name__ :: str
+        __ne__ :: def __ne__(self, value: object, /) -> bool
+        __new__ :: def __new__(cls) -> Self@object
+        __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType
+        __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
+        __qualname__ :: str
+        __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
+        __reduce_ex__ :: def __reduce_ex__(self, protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: def __repr__(self) -> str
+        __ror__ :: bound method <class 'Quux'>.__ror__(value: Any, /) -> UnionType
+        __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
+        __sizeof__ :: def __sizeof__(self) -> int
+        __str__ :: def __str__(self) -> str
+        __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__() -> list[Self]
+        __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
+        __text_signature__ :: str | None
+        __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+        __weakrefoffset__ :: int
+        ");
+    }
+
+    #[test]
+    fn enum_attributes() {
+        let test = cursor_test(
+            "\
+from enum import Enum
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+Answer.<CURSOR>
+",
+        );
+
+        insta::with_settings!({
+            // See above: filter out some members which contain @Todo types that are
+            // rendered differently in release mode.
+            filters => [(r"(?m)\s*__(call|reduce_ex)__.+$", "")]},
+            {
+                assert_snapshot!(test.completions_without_builtins_with_types(), @r"
+                NO :: Literal[Answer.NO]
+                YES :: Literal[Answer.YES]
+                mro :: bound method <class 'Answer'>.mro() -> list[type]
+                name :: Any
+                value :: Any
+                __annotations__ :: dict[str, Any]
+                __base__ :: type | None
+                __bases__ :: tuple[type, ...]
+                __basicsize__ :: int
+                __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
+                __class__ :: <class 'EnumMeta'>
+                __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
+                __copy__ :: def __copy__(self) -> Self@Enum
+                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@Enum
+                __delattr__ :: def __delattr__(self, name: str, /) -> None
+                __dict__ :: MappingProxyType[str, Any]
+                __dictoffset__ :: int
+                __dir__ :: def __dir__(self) -> list[str]
+                __doc__ :: str | None
+                __eq__ :: def __eq__(self, value: object, /) -> bool
+                __flags__ :: int
+                __format__ :: def __format__(self, format_spec: str) -> str
+                __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
+                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> _EnumMemberT@__getitem__
+                __getstate__ :: def __getstate__(self) -> object
+                __hash__ :: def __hash__(self) -> int
+                __init__ :: def __init__(self) -> None
+                __init_subclass__ :: def __init_subclass__(cls) -> None
+                __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
+                __itemsize__ :: int
+                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[_EnumMemberT@__iter__]
+                __len__ :: bound method <class 'Answer'>.__len__() -> int
+                __members__ :: MappingProxyType[str, Unknown]
+                __module__ :: str
+                __mro__ :: tuple[<class 'Answer'>, <class 'Enum'>, <class 'object'>]
+                __name__ :: str
+                __ne__ :: def __ne__(self, value: object, /) -> bool
+                __new__ :: def __new__(cls, value: object) -> Self@Enum
+                __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType
+                __order__ :: str
+                __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
+                __qualname__ :: str
+                __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
+                __repr__ :: def __repr__(self) -> str
+                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[_EnumMemberT@__reversed__]
+                __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
+                __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
+                __signature__ :: bound method <class 'Answer'>.__signature__() -> str
+                __sizeof__ :: def __sizeof__(self) -> int
+                __str__ :: def __str__(self) -> str
+                __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__() -> list[Self]
+                __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
+                __text_signature__ :: str | None
+                __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+                __weakrefoffset__ :: int
+                _add_alias_ :: def _add_alias_(self, name: str) -> None
+                _add_value_alias_ :: def _add_value_alias_(self, value: Any) -> None
+                _generate_next_value_ :: def _generate_next_value_(name: str, start: int, count: int, last_values: list[Any]) -> Any
+                _ignore_ :: str | list[str]
+                _member_map_ :: dict[str, Enum]
+                _member_names_ :: list[str]
+                _missing_ :: bound method <class 'Answer'>._missing_(value: object) -> Any
+                _name_ :: str
+                _order_ :: str
+                _value2member_map_ :: dict[Any, Enum]
+                _value_ :: Any
+                ");
+            }
+        );
     }
 
     // We don't yet take function parameters into account.
@@ -2309,6 +2622,48 @@ Cougar = 3
     }
 
     #[test]
+    fn from_import_with_submodule1() {
+        let test = CursorTest::builder()
+            .source("main.py", "from package import <CURSOR>")
+            .source("package/__init__.py", "")
+            .source("package/foo.py", "")
+            .source("package/bar.pyi", "")
+            .source("package/foo-bar.py", "")
+            .source("package/data.txt", "")
+            .source("package/sub/__init__.py", "")
+            .source("package/not-a-submodule/__init__.py", "")
+            .build();
+
+        test.assert_completions_include("foo");
+        test.assert_completions_include("bar");
+        test.assert_completions_include("sub");
+        test.assert_completions_do_not_include("foo-bar");
+        test.assert_completions_do_not_include("data");
+        test.assert_completions_do_not_include("not-a-submodule");
+    }
+
+    #[test]
+    fn from_import_with_vendored_submodule1() {
+        let test = cursor_test(
+            "\
+from http import <CURSOR>
+",
+        );
+        test.assert_completions_include("client");
+    }
+
+    #[test]
+    fn from_import_with_vendored_submodule2() {
+        let test = cursor_test(
+            "\
+from email import <CURSOR>
+",
+        );
+        test.assert_completions_include("mime");
+        test.assert_completions_do_not_include("base");
+    }
+
+    #[test]
     fn import_submodule_not_attribute1() {
         let test = cursor_test(
             "\
@@ -2366,7 +2721,22 @@ importlib.<CURSOR>
             self.completions_if(|c| !c.builtin)
         }
 
+        fn completions_without_builtins_with_types(&self) -> String {
+            self.completions_if_snapshot(
+                |c| !c.builtin,
+                |c| format!("{} :: {}", c.name, c.ty.display(&self.db)),
+            )
+        }
+
         fn completions_if(&self, predicate: impl Fn(&Completion) -> bool) -> String {
+            self.completions_if_snapshot(predicate, |c| c.name.as_str().to_string())
+        }
+
+        fn completions_if_snapshot(
+            &self,
+            predicate: impl Fn(&Completion) -> bool,
+            snapshot: impl Fn(&Completion) -> String,
+        ) -> String {
             let completions = completion(&self.db, self.cursor.file, self.cursor.offset);
             if completions.is_empty() {
                 return "<No completions found>".to_string();
@@ -2374,7 +2744,7 @@ importlib.<CURSOR>
             let included = completions
                 .iter()
                 .filter(|label| predicate(label))
-                .map(|completion| completion.name.as_str().to_string())
+                .map(snapshot)
                 .collect::<Vec<String>>();
             if included.is_empty() {
                 // It'd be nice to include the actual number of

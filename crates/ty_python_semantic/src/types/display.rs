@@ -5,6 +5,7 @@ use std::fmt::{self, Display, Formatter, Write};
 use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
@@ -43,7 +44,8 @@ impl Display for DisplayType<'_> {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_) => {
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -100,16 +102,19 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
-                write!(f, "<module '{}'>", module.module(self.db).name())
+                write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
             Type::ClassLiteral(class) => {
                 write!(f, "<class '{}'>", class.name(self.db))
             }
             Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                // Only show the bare class name here; ClassBase::display would render this as
-                // type[<class 'Foo'>] instead of type[Foo].
-                SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                    write!(f, "type[{}]", class.name(self.db))
+                }
+                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                    write!(f, "type[{}]", alias.display(self.db))
+                }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
@@ -191,8 +196,25 @@ impl Display for DisplayRepresentation<'_> {
 
                 escape.bytes_repr(TripleQuotes::No).write(f)
             }
+            Type::EnumLiteral(enum_literal) => {
+                write!(
+                    f,
+                    "{enum_class}.{name}",
+                    enum_class = enum_literal.enum_class(self.db).name(self.db),
+                    name = enum_literal.name(self.db),
+                )
+            }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
+            Type::TypeVar(typevar) => {
+                f.write_str(typevar.name(self.db))?;
+                if let Some(binding_context) = typevar
+                    .binding_context(self.db)
+                    .and_then(|def| def.name(self.db))
+                {
+                    write!(f, "@{binding_context}")?;
+                }
+                Ok(())
+            }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -423,21 +445,6 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
-    /// Renders the specialization in full, e.g. `{T = int, U = str}`.
-    pub fn display(
-        &'db self,
-        db: &'db dyn Db,
-        tuple_specialization: TupleSpecialization,
-    ) -> DisplaySpecialization<'db> {
-        DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
-            types: self.types(db),
-            db,
-            full: true,
-            tuple_specialization,
-        }
-    }
-
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
         &'db self,
@@ -448,7 +455,6 @@ impl<'db> Specialization<'db> {
             typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
-            full: false,
             tuple_specialization,
         }
     }
@@ -458,34 +464,22 @@ pub struct DisplaySpecialization<'db> {
     typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
-    full: bool,
     tuple_specialization: TupleSpecialization,
 }
 
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.full {
-            f.write_char('{')?;
-            for (idx, (var, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                write!(f, "{} = {}", var.name(self.db), ty.display(self.db))?;
+        f.write_char('[')?;
+        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
             }
-            f.write_char('}')
-        } else {
-            f.write_char('[')?;
-            for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                ty.display(self.db).fmt(f)?;
-            }
-            if self.tuple_specialization.is_yes() {
-                f.write_str(", ...")?;
-            }
-            f.write_char(']')
+            ty.display(self.db).fmt(f)?;
         }
+        if self.tuple_specialization.is_yes() {
+            f.write_str(", ...")?;
+        }
+        f.write_char(']')
     }
 }
 
@@ -501,7 +495,7 @@ impl TupleSpecialization {
     }
 
     fn from_class(db: &dyn Db, class: ClassLiteral) -> Self {
-        if class.is_known(db, KnownClass::Tuple) {
+        if class.is_tuple(db) {
             Self::Yes
         } else {
             Self::No
@@ -557,44 +551,191 @@ pub(crate) struct DisplaySignature<'db> {
     db: &'db dyn Db,
 }
 
-impl Display for DisplaySignature<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_char('(')?;
+impl DisplaySignature<'_> {
+    /// Get detailed display information including component ranges
+    pub(crate) fn to_string_parts(&self) -> SignatureDisplayDetails {
+        let mut writer = SignatureWriter::Details(SignatureDetailsWriter::new());
+        self.write_signature(&mut writer).unwrap();
+
+        match writer {
+            SignatureWriter::Details(details) => details.finish(),
+            SignatureWriter::Formatter(_) => unreachable!("Expected Details variant"),
+        }
+    }
+
+    /// Internal method to write signature with the signature writer
+    fn write_signature(&self, writer: &mut SignatureWriter) -> fmt::Result {
+        // Opening parenthesis
+        writer.write_char('(')?;
 
         if self.parameters.is_gradual() {
             // We represent gradual form as `...` in the signature, internally the parameters still
             // contain `(*args, **kwargs)` parameters.
-            f.write_str("...")?;
+            writer.write_str("...")?;
         } else {
             let mut star_added = false;
             let mut needs_slash = false;
-            let mut join = f.join(", ");
+            let mut first = true;
 
             for parameter in self.parameters.as_slice() {
+                // Handle special separators
                 if !star_added && parameter.is_keyword_only() {
-                    join.entry(&'*');
+                    if !first {
+                        writer.write_str(", ")?;
+                    }
+                    writer.write_char('*')?;
                     star_added = true;
+                    first = false;
                 }
                 if parameter.is_positional_only() {
                     needs_slash = true;
                 } else if needs_slash {
-                    join.entry(&'/');
+                    if !first {
+                        writer.write_str(", ")?;
+                    }
+                    writer.write_char('/')?;
                     needs_slash = false;
+                    first = false;
                 }
-                join.entry(&parameter.display(self.db));
+
+                // Add comma before parameter if not first
+                if !first {
+                    writer.write_str(", ")?;
+                }
+
+                // Write parameter with range tracking
+                let param_name = parameter.display_name();
+                writer.write_parameter(&parameter.display(self.db), param_name.as_deref())?;
+
+                first = false;
             }
+
             if needs_slash {
-                join.entry(&'/');
+                if !first {
+                    writer.write_str(", ")?;
+                }
+                writer.write_char('/')?;
             }
-            join.finish()?;
         }
 
-        write!(
-            f,
-            ") -> {}",
-            self.return_ty.unwrap_or(Type::unknown()).display(self.db)
-        )
+        // Closing parenthesis
+        writer.write_char(')')?;
+
+        // Return type
+        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
+        writer.write_return_type(&return_ty.display(self.db))?;
+
+        Ok(())
     }
+}
+
+impl Display for DisplaySignature<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut writer = SignatureWriter::Formatter(f);
+        self.write_signature(&mut writer)
+    }
+}
+
+/// Writer for building signature strings with different output targets
+enum SignatureWriter<'a, 'b> {
+    /// Write directly to a formatter (for Display trait)
+    Formatter(&'a mut Formatter<'b>),
+    /// Build a string with range tracking (for `to_string_parts`)
+    Details(SignatureDetailsWriter),
+}
+
+/// Writer that builds a string with range tracking
+struct SignatureDetailsWriter {
+    label: String,
+    parameter_ranges: Vec<TextRange>,
+    parameter_names: Vec<String>,
+}
+
+impl SignatureDetailsWriter {
+    fn new() -> Self {
+        Self {
+            label: String::new(),
+            parameter_ranges: Vec::new(),
+            parameter_names: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> SignatureDisplayDetails {
+        SignatureDisplayDetails {
+            label: self.label,
+            parameter_ranges: self.parameter_ranges,
+            parameter_names: self.parameter_names,
+        }
+    }
+}
+
+impl SignatureWriter<'_, '_> {
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        match self {
+            SignatureWriter::Formatter(f) => f.write_char(c),
+            SignatureWriter::Details(details) => {
+                details.label.push(c);
+                Ok(())
+            }
+        }
+    }
+
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        match self {
+            SignatureWriter::Formatter(f) => f.write_str(s),
+            SignatureWriter::Details(details) => {
+                details.label.push_str(s);
+                Ok(())
+            }
+        }
+    }
+
+    fn write_parameter<T: Display>(&mut self, param: &T, param_name: Option<&str>) -> fmt::Result {
+        match self {
+            SignatureWriter::Formatter(f) => param.fmt(f),
+            SignatureWriter::Details(details) => {
+                let param_start = details.label.len();
+                let param_display = param.to_string();
+                details.label.push_str(&param_display);
+
+                // Use TextSize::try_from for safe conversion, falling back to empty range on overflow
+                let start = TextSize::try_from(param_start).unwrap_or_default();
+                let length = TextSize::try_from(param_display.len()).unwrap_or_default();
+                details.parameter_ranges.push(TextRange::at(start, length));
+
+                // Store the parameter name if available
+                if let Some(name) = param_name {
+                    details.parameter_names.push(name.to_string());
+                } else {
+                    details.parameter_names.push(String::new());
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    fn write_return_type<T: Display>(&mut self, return_ty: &T) -> fmt::Result {
+        match self {
+            SignatureWriter::Formatter(f) => write!(f, " -> {return_ty}"),
+            SignatureWriter::Details(details) => {
+                let return_display = format!(" -> {return_ty}");
+                details.label.push_str(&return_display);
+                Ok(())
+            }
+        }
+    }
+}
+
+/// Details about signature display components, including ranges for parameters and return type
+#[derive(Debug, Clone)]
+pub(crate) struct SignatureDisplayDetails {
+    /// The full signature string
+    pub label: String,
+    /// Ranges for each parameter within the label
+    pub parameter_ranges: Vec<TextRange>,
+    /// Names of the parameters in order
+    pub parameter_names: Vec<String>,
 }
 
 impl<'db> Parameter<'db> {
@@ -652,6 +793,7 @@ impl Display for DisplayUnionType<'_> {
                     | Type::StringLiteral(_)
                     | Type::BytesLiteral(_)
                     | Type::BooleanLiteral(_)
+                    | Type::EnumLiteral(_)
             )
         }
 
@@ -861,28 +1003,22 @@ mod tests {
     use crate::Db;
     use crate::db::tests::setup_db;
     use crate::place::typing_extensions_symbol;
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type};
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
         let db = setup_db();
 
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, r"\n"))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, r"\n").display(&db).to_string(),
             r#"Literal["\\n"]"#
         );
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, "'"))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, "'").display(&db).to_string(),
             r#"Literal["'"]"#
         );
         assert_eq!(
-            Type::StringLiteral(StringLiteralType::new(&db, r#"""#))
-                .display(&db)
-                .to_string(),
+            Type::string_literal(&db, r#"""#).display(&db).to_string(),
             r#"Literal["\""]"#
         );
     }

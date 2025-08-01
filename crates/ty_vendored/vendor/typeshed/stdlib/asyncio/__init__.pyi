@@ -1,3 +1,5 @@
+"""The asyncio package, tracking PEP 3156."""
+
 # This condition is so big, it's clearer to keep to platform condition in two blocks
 # Can't NOQA on a specific line: https://github.com/plinss/flake8-noqa/issues/22
 import sys
@@ -41,14 +43,11 @@ if sys.platform == "win32":
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "_AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
             "TimerHandle",  # from events
-            "_get_event_loop_policy",  # from events
             "get_event_loop_policy",  # from events
-            "_set_event_loop_policy",  # from events
             "set_event_loop_policy",  # from events
             "get_event_loop",  # from events
             "set_event_loop",  # from events
@@ -517,14 +516,11 @@ else:
             "Server",  # from base_events
             "iscoroutinefunction",  # from coroutines
             "iscoroutine",  # from coroutines
-            "_AbstractEventLoopPolicy",  # from events
             "AbstractEventLoop",  # from events
             "AbstractServer",  # from events
             "Handle",  # from events
             "TimerHandle",  # from events
-            "_get_event_loop_policy",  # from events
             "get_event_loop_policy",  # from events
-            "_set_event_loop_policy",  # from events
             "set_event_loop_policy",  # from events
             "get_event_loop",  # from events
             "set_event_loop",  # from events
@@ -610,7 +606,6 @@ else:
             "DatagramTransport",  # from transports
             "SubprocessTransport",  # from transports
             "SelectorEventLoop",  # from unix_events
-            "_DefaultEventLoopPolicy",  # from unix_events
             "EventLoop",  # from unix_events
         )
     elif sys.version_info >= (3, 13):

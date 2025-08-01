@@ -13,35 +13,33 @@ expression: suite
                     range: 0..10,
                     value: TStringValue {
                         inner: Single(
-                            TString(
-                                TString {
-                                    range: 0..10,
-                                    node_index: AtomicNodeIndex(..),
-                                    elements: [
-                                        Interpolation(
-                                            InterpolatedElement {
-                                                range: 2..9,
-                                                node_index: AtomicNodeIndex(..),
-                                                expression: Yield(
-                                                    ExprYield {
-                                                        node_index: AtomicNodeIndex(..),
-                                                        range: 3..8,
-                                                        value: None,
-                                                    },
-                                                ),
-                                                debug_text: None,
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                    ],
-                                    flags: TStringFlags {
-                                        quote_style: Double,
-                                        prefix: Regular,
-                                        triple_quoted: false,
-                                    },
+                            TString {
+                                range: 0..10,
+                                node_index: AtomicNodeIndex(..),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..9,
+                                            node_index: AtomicNodeIndex(..),
+                                            expression: Yield(
+                                                ExprYield {
+                                                    node_index: AtomicNodeIndex(..),
+                                                    range: 3..8,
+                                                    value: None,
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

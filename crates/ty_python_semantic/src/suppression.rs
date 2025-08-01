@@ -86,7 +86,7 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
@@ -508,7 +508,7 @@ impl<'a> SuppressionsBuilder<'a> {
             lint_registry,
             seen_non_trivia_token: false,
             line: Vec::new(),
-            file: SmallVec::new(),
+            file: SmallVec::new_const(),
             unknown: Vec::new(),
             invalid: Vec::new(),
         }

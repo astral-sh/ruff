@@ -10,6 +10,8 @@ jax  # too many iterations
 mypy # too many iterations (self-recursive type alias)
 packaging  # too many iterations
 pandas  # slow (9s)
+pandas-stubs  # panics on versions of pandas-stubs newer than https://github.com/pandas-dev/pandas-stubs/commit/bf1221eb7ea0e582c30fe233d1f4f5713fce376b
+              # Panicked at crates/ty_python_semantic/src/types/type_ordering.rs:207:13 when checking `/tmp/mypy_primer/projects/pandas-stubs/tests/test_indexes.py`: `internal error: entered unreachable code: our type representation does not permit nested unions`
 pandera  # too many iterations
 pip  # vendors packaging, see above
 pylint  # cycle panics (self-recursive type alias)

@@ -57,6 +57,22 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar: Bar
 /// ```
 ///
+/// ## Preview
+///
+/// When [preview] is enabled, if [`lint.future-annotations`] is set to `true`,
+/// `from __future__ import annotations` will be added if doing so would allow an annotation to be
+/// unquoted.
+///
+/// ## Fix safety
+///
+/// The rule's fix is marked as safe, unless [preview] and
+/// [`lint.future_annotations`] are enabled and a `from __future__ import
+/// annotations` import is added. Such an import may change the behavior of all annotations in the
+/// file.
+///
+/// ## Options
+/// - `lint.future-annotations`
+///
 /// ## See also
 /// - [`quoted-annotation-in-stub`][PYI020]: A rule that
 ///   removes all quoted annotations from stub files
@@ -69,6 +85,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 pub(crate) struct QuotedAnnotation;
 
@@ -85,6 +102,13 @@ impl AlwaysFixableViolation for QuotedAnnotation {
 
 /// UP037
 pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: TextRange) {
+    let add_future_import = checker.settings().future_annotations()
+        && checker.semantic().in_runtime_evaluated_annotation();
+
+    if !(checker.semantic().in_typing_only_annotation() || add_future_import) {
+        return;
+    }
+
     let placeholder_range = TextRange::up_to(annotation.text_len());
     let spans_multiple_lines = annotation.contains_line_break(placeholder_range);
 
@@ -103,8 +127,14 @@ pub(crate) fn quoted_annotation(checker: &Checker, annotation: &str, range: Text
         (true, false) => format!("({annotation})"),
         (_, true) => format!("({annotation}\n)"),
     };
-    let edit = Edit::range_replacement(new_content, range);
-    let fix = Fix::safe_edit(edit);
+    let unquote_edit = Edit::range_replacement(new_content, range);
+
+    let fix = if add_future_import {
+        let import_edit = checker.importer().add_future_import();
+        Fix::unsafe_edits(unquote_edit, [import_edit])
+    } else {
+        Fix::safe_edit(unquote_edit)
+    };
 
     checker
         .report_diagnostic(QuotedAnnotation, range)

@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{FileScopeId, ScopeId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
 
 /// This ingredient represents a single unpacking.
 ///
@@ -44,8 +44,6 @@ pub(crate) struct Unpack<'db> {
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
     pub(crate) value: UnpackValue<'db>,
-
-    count: countme::Count<Unpack<'static>>,
 }
 
 impl<'db> Unpack<'db> {
@@ -102,11 +100,31 @@ impl<'db> UnpackValue<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+pub(crate) enum EvaluationMode {
+    Sync,
+    Async,
+}
+
+impl EvaluationMode {
+    pub(crate) const fn from_is_async(is_async: bool) -> Self {
+        if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        }
+    }
+
+    pub(crate) const fn is_async(self) -> bool {
+        matches!(self, EvaluationMode::Async)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
 pub(crate) enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
-    Iterable,
+    Iterable { mode: EvaluationMode },
     /// An context manager expression like the one in a `with` statement.
-    ContextManager,
+    ContextManager { mode: EvaluationMode },
     /// An expression that is being assigned to a target.
     Assign,
 }

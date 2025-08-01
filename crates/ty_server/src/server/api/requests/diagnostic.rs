@@ -4,10 +4,11 @@ use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
     FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
+    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
 };
 
 use crate::server::Result;
-use crate::server::api::diagnostics::{Diagnostics, compute_diagnostics};
+use crate::server::api::diagnostics::compute_diagnostics;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -22,7 +23,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<lsp_types::Url> {
+    fn document_url(params: &DocumentDiagnosticParams) -> Cow<Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -30,20 +31,38 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
         _client: &Client,
-        _params: DocumentDiagnosticParams,
+        params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
-        Ok(DocumentDiagnosticReportResult::Report(
+        let diagnostics = compute_diagnostics(db, &snapshot);
+
+        let Some(diagnostics) = diagnostics else {
+            return Ok(DocumentDiagnosticReportResult::Report(
+                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
+            ));
+        };
+
+        let result_id = diagnostics.result_id();
+
+        let report = if params.previous_result_id.as_deref() == Some(&result_id) {
+            DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+                related_documents: None,
+                unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                    result_id,
+                },
+            })
+        } else {
             DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                    result_id: None,
+                    result_id: Some(result_id),
                     // SAFETY: Pull diagnostic requests are only called for text documents, not for
                     // notebook documents.
-                    items: compute_diagnostics(db, &snapshot)
-                        .map_or_else(Vec::new, Diagnostics::expect_text_document),
+                    items: diagnostics.to_lsp_diagnostics(db).expect_text_document(),
                 },
-            }),
-        ))
+            })
+        };
+
+        Ok(DocumentDiagnosticReportResult::Report(report))
     }
 }
 

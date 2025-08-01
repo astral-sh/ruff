@@ -23,6 +23,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
+use ty_static::EnvVars;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
 
@@ -149,7 +150,7 @@ impl PythonEnvironment {
             PythonEnvironment::new(path, origin, system)
         }
 
-        if let Ok(virtual_env) = system.env_var("VIRTUAL_ENV") {
+        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
             return resolve_environment(
                 system,
                 SystemPath::new(&virtual_env),
@@ -158,7 +159,7 @@ impl PythonEnvironment {
             .map(Some);
         }
 
-        if let Ok(conda_env) = system.env_var("CONDA_PREFIX") {
+        if let Ok(conda_env) = system.env_var(EnvVars::CONDA_PREFIX) {
             return resolve_environment(
                 system,
                 SystemPath::new(&conda_env),
@@ -1064,6 +1065,8 @@ pub enum SysPrefixPathOrigin {
     ConfigFileSetting(Arc<SystemPathBuf>, Option<TextRange>),
     /// The `sys.prefix` path came from a `--python` CLI flag
     PythonCliFlag,
+    /// The selected interpreter in the VS Code's Python extension.
+    PythonVSCodeExtension,
     /// The `sys.prefix` path came from the `VIRTUAL_ENV` environment variable
     VirtualEnvVar,
     /// The `sys.prefix` path came from the `CONDA_PREFIX` environment variable
@@ -1085,6 +1088,7 @@ impl SysPrefixPathOrigin {
             Self::LocalVenv | Self::VirtualEnvVar => true,
             Self::ConfigFileSetting(..)
             | Self::PythonCliFlag
+            | Self::PythonVSCodeExtension
             | Self::DerivedFromPyvenvCfg
             | Self::CondaPrefixVar => false,
         }
@@ -1096,7 +1100,9 @@ impl SysPrefixPathOrigin {
     /// the `sys.prefix` directory, e.g. the `--python` CLI flag.
     pub(crate) const fn must_point_directly_to_sys_prefix(&self) -> bool {
         match self {
-            Self::PythonCliFlag | Self::ConfigFileSetting(..) => false,
+            Self::PythonCliFlag | Self::ConfigFileSetting(..) | Self::PythonVSCodeExtension => {
+                false
+            }
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
@@ -1114,6 +1120,9 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::CondaPrefixVar => f.write_str("`CONDA_PREFIX` environment variable"),
             Self::DerivedFromPyvenvCfg => f.write_str("derived `sys.prefix` path"),
             Self::LocalVenv => f.write_str("local virtual environment"),
+            Self::PythonVSCodeExtension => {
+                f.write_str("selected interpreter in the VS Code Python extension")
+            }
         }
     }
 }

@@ -40,22 +40,92 @@ else:
 # error: [possibly-unresolved-reference]
 reveal_type(c)  # revealed: Literal[2]
 
-d = 1
+d = [1, 2, 3]
 
 def delete():
-    # TODO: this results in `UnboundLocalError`; we should emit `unresolved-reference`
-    del d
+    del d  # error: [unresolved-reference] "Name `d` used when not defined"
 
 delete()
-reveal_type(d)  # revealed: Literal[1]
+reveal_type(d)  # revealed: list[Unknown]
+
+def delete_element():
+    # When the `del` target isn't a name, it doesn't force local resolution.
+    del d[0]
+    print(d)
 
 def delete_global():
     global d
     del d
+    # We could lint that `d` is unbound in this trivial case, but because it's global we'd need to
+    # be careful about false positives if `d` got reinitialized somehow in between the two `del`s.
+    del d
 
 delete_global()
-# The variable should have been removed, but we won't check it for now.
-reveal_type(d)  # revealed: Literal[1]
+# Again, the variable should have been removed, but we don't check it.
+reveal_type(d)  # revealed: list[Unknown]
+
+def delete_nonlocal():
+    e = 2
+
+    def delete_nonlocal_bad():
+        del e  # error: [unresolved-reference] "Name `e` used when not defined"
+
+    def delete_nonlocal_ok():
+        nonlocal e
+        del e
+        # As with `global` above, we don't track that the nonlocal `e` is unbound.
+        del e
+```
+
+## `del` forces local resolution even if it's unreachable
+
+Without a `global x` or `nonlocal x` declaration in `foo`, `del x` in `foo` causes `print(x)` in an
+inner function `bar` to resolve to `foo`'s binding, in this case an unresolved reference / unbound
+local error:
+
+```py
+x = 1
+
+def foo():
+    print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+    if False:
+        # Assigning to `x` would have the same effect here.
+        del x
+
+    def bar():
+        print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+```
+
+## But `del` doesn't force local resolution of `global` or `nonlocal` variables
+
+However, with `global x` in `foo`, `print(x)` in `bar` resolves in the global scope, despite the
+`del` in `foo`:
+
+```py
+x = 1
+
+def foo():
+    global x
+    def bar():
+        # allowed, refers to `x` in the global scope
+        reveal_type(x)  # revealed: Unknown | Literal[1]
+    bar()
+    del x  # allowed, deletes `x` in the global scope (though we don't track that)
+```
+
+`nonlocal x` has a similar effect, if we add an extra `enclosing` scope to give it something to
+refer to:
+
+```py
+def enclosing():
+    x = 2
+    def foo():
+        nonlocal x
+        def bar():
+            # allowed, refers to `x` in `enclosing`
+            reveal_type(x)  # revealed: Literal[2]
+        bar()
+        del x  # allowed, deletes `x` in `enclosing` (though we don't track that)
 ```
 
 ## Delete attributes
@@ -111,7 +181,7 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # error: [call-non-callable]
+    # error: [invalid-argument-type]
     del l["string"]
 
     l[0] = 1

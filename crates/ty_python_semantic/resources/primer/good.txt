@@ -1,4 +1,5 @@
 AutoSplit
+DateType
 Expression
 PyGithub
 PyWinCtl
@@ -68,7 +69,6 @@ openlibrary
 operator
 optuna
 paasta
-pandas-stubs
 paroxython
 parso
 pegen
@@ -119,4 +119,5 @@ werkzeug
 xarray-dataclasses
 yarl
 zipp
+zope.interface
 zulip

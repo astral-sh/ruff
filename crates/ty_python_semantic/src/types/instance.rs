@@ -6,6 +6,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::types::cyclic::PairVisitor;
+use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
 use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
@@ -125,12 +126,14 @@ impl<'db> NominalInstanceType<'db> {
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         self.class.known(db).is_some_and(KnownClass::is_singleton)
+            || is_single_member_enum(db, self.class.class_literal(db).0)
     }
 
     pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.class
             .known(db)
             .is_some_and(KnownClass::is_single_valued)
+            || is_single_member_enum(db, self.class.class_literal(db).0)
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -270,7 +273,14 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
+        if self == other {
+            return true;
+        }
+        let self_normalized = self.normalized(db);
+        if self_normalized == Type::ProtocolInstance(other) {
+            return true;
+        }
+        self_normalized == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.

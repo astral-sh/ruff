@@ -1,10 +1,13 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
+    PredicateNode,
 };
+use crate::semantic_index::scope::ScopeId;
+use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
@@ -70,7 +73,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -83,7 +86,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=get_size2::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -98,7 +101,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=get_size2::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -109,7 +112,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -237,6 +240,7 @@ impl ClassInfoConstraintFunction {
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
             | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never
@@ -310,11 +314,8 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
 
 fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
-        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
-        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
-        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
-        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
-        _ => None,
+        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
+        _ => PlaceExpr::try_from_expr(expr),
     }
 }
 
@@ -397,15 +398,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton)
             }
-            PatternPredicateKind::Class(cls) => self.evaluate_match_pattern_class(subject, *cls),
+            PatternPredicateKind::Class(cls, kind) => {
+                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
+            }
             PatternPredicateKind::Value(expr) => self.evaluate_match_pattern_value(subject, *expr),
             PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates)
+                self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
             PatternPredicateKind::Unsupported => None,
         }
@@ -417,7 +421,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
-        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
+        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject, is_positive)
             .map(|mut constraints| {
                 negate_if(&mut constraints, self.db, !is_positive);
                 constraints
@@ -442,7 +446,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_expr(place_expr)
+            .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
     }
 
@@ -556,6 +560,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             db,
                             [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
                                 .into_iter()
+                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
+                        )
+                    }
+                    // Treat enums as a union of their members.
+                    Type::NominalInstance(instance)
+                        if enum_metadata(db, instance.class.class_literal(db).0).is_some() =>
+                    {
+                        UnionType::from_elements(
+                            db,
+                            enum_member_literals(db, instance.class.class_literal(db).0, None)
+                                .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
                     }
@@ -891,7 +906,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
+            // we can still narrow the type of the match subject to `Point`. But in the negative case,
+            // we cannot exclude `Point` as a possibility.
+            return None;
+        }
+
         let subject = place_expr(subject.node_ref(self.db, self.module))?;
         let place = self.expect_place(&subject);
 
@@ -916,12 +940,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let db = self.db;
 
         predicates
             .iter()
-            .filter_map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject))
+            .filter_map(|predicate| {
+                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
+            })
             .reduce(|mut constraints, constraints_| {
                 merge_constraints_or(&mut constraints, &constraints_, db);
                 constraints
