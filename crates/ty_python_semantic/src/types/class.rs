@@ -1273,7 +1273,21 @@ impl<'db> ClassLiteral<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(|base_node| definition_expression_type(db, class_definition, base_node))
+            .map(
+                |base_node| match definition_expression_type(db, class_definition, base_node) {
+                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(generic_context)) => {
+                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
+                            generic_context.with_binding_context(db, class_definition),
+                        ))
+                    }
+                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
+                        generic_context,
+                    )) => Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
+                        generic_context.with_binding_context(db, class_definition),
+                    )),
+                    ty => ty,
+                },
+            )
             .collect()
     }
 
@@ -4098,11 +4112,15 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
+                // A freshly created legacy TypeVar does not have a binding context until it is
+                // used in a base class list, function parameter list, or type alias.
+                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
+                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,

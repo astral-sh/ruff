@@ -202,7 +202,7 @@ in the function.
 
 ```py
 def good_param[T: int](x: T) -> None:
-    reveal_type(x)  # revealed: T
+    reveal_type(x)  # revealed: T@good_param
 ```
 
 If the function is annotated as returning the typevar, this means that the upper bound is _not_
@@ -215,7 +215,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `T@bad_return`, found `int`"
     return x + 1
 ```
 
@@ -228,7 +228,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Return type does not match returned value: expected `T`, found `S`"
+        # error: [invalid-return-type] "Return type does not match returned value: expected `T@different_types`, found `S@different_types`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:
@@ -246,7 +246,7 @@ methods that are compatible with the return type, so the `return` expression is 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `T`"
+    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
     return t1 + t2
 ```
 

@@ -701,6 +701,7 @@ impl<'db> Type<'db> {
                     Name::new_static("T_all"),
                     None,
                     None,
+                    None,
                     variance,
                     None,
                     TypeVarKind::Pep695,
@@ -5128,6 +5129,7 @@ impl<'db> Type<'db> {
                     db,
                     Name::new(format!("{}'instance", typevar.name(db))),
                     None,
+                    None,
                     Some(bound_or_constraints),
                     typevar.variance(db),
                     None,
@@ -5295,10 +5297,12 @@ impl<'db> Type<'db> {
                     let instance = Type::ClassLiteral(class).to_instance(db).expect(
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
+                    let class_definition = class.definition(db);
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
-                        Some(class.definition(db)),
+                        Some(class_definition),
+                        Some(class_definition),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
@@ -5573,6 +5577,9 @@ impl<'db> Type<'db> {
                     partial.get(db, typevar).unwrap_or(self)
                 }
                 TypeMapping::PromoteLiterals => self,
+                TypeMapping::BindLegacyTypevars(binding_context) => {
+                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
+                }
             }
 
             Type::FunctionLiteral(function) => {
@@ -5660,7 +5667,8 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) => self,
+                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
             }
@@ -6009,6 +6017,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
     /// to `str`)
     PromoteLiterals,
+    /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
+    /// being used in.
+    BindLegacyTypevars(Definition<'db>),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6023,7 +6034,7 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::PartialSpecialization(specialization) => {
             walk_partial_specialization(db, specialization, visitor);
         }
-        TypeMapping::PromoteLiterals => {}
+        TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) => {}
     }
 }
 
@@ -6037,6 +6048,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.to_owned())
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 
@@ -6049,6 +6063,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 }
@@ -6582,6 +6599,35 @@ pub struct TypeVarInstance<'db> {
     /// The type var's definition (None if synthesized)
     pub definition: Option<Definition<'db>>,
 
+    /// The definition of the generic class, function, or type alias that binds this typevar. This
+    /// is `None` for a legacy typevar outside of a context that can bind it.
+    ///
+    /// For a legacy typevar, the binding context might be missing:
+    ///
+    /// ```py
+    /// T = TypeVar("T")                       # [1]
+    /// def generic_function(t: T) -> T: ...   # [2]
+    /// ```
+    ///
+    /// Here, we will create two `TypeVarInstance`s for the typevar `T`. Both will have `[1]` as
+    /// their [`definition`][Self::definition]. The first represents the variable when it is first
+    /// created, and not yet used, so it's `binding_context` will be `None`. The second represents
+    /// when the typevar is used in `generic_function`, and its `binding_context` will be `[2]`
+    /// (that is, the definition of `generic_function`).
+    ///
+    /// For a PEP 695 typevar, there will always be a binding context, since you can only define
+    /// one as part of creating the generic context that uses it:
+    ///
+    /// ```py
+    /// def generic_function[T](t: T) -> T: ...
+    /// ```
+    ///
+    /// Here, we will create a single `TypeVarInstance`. Its [`definition`][Self::definition] will
+    /// be the `T` in `[T]` (i.e., the definition of the typevar in the syntactic construct that
+    /// creates the generic context that uses it). Its `binding_context` will be the definition of
+    /// `generic_function`.
+    binding_context: Option<Definition<'db>>,
+
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
@@ -6611,6 +6657,25 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn with_binding_context(
+        self,
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            Some(binding_context),
+            self.bound_or_constraints(db),
+            self.variance(db),
+            self.default_ty(db).map(|ty| {
+                ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context))
+            }),
+            self.kind(db),
+        )
+    }
+
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Legacy)
     }
@@ -6640,6 +6705,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.normalized_impl(db, visitor)),
             self.variance(db),
@@ -6653,6 +6719,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.materialize(db, variance)),
             self.variance(db),

@@ -16,8 +16,10 @@ from ty_extensions import generic_context
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
 
-reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
-reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
+# revealed: tuple[T@SingleTypevar]
+reveal_type(generic_context(SingleTypevar))
+# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+reveal_type(generic_context(MultipleTypevars))
 ```
 
 You cannot use the same typevar more than once.
@@ -43,9 +45,12 @@ class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[U, V]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[U]
-reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
+# revealed: tuple[U@InheritedGeneric, V@InheritedGeneric]
+reveal_type(generic_context(InheritedGeneric))
+# revealed: tuple[U@InheritedGenericPartiallySpecialized]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))
+# revealed: None
+reveal_type(generic_context(InheritedGenericFullySpecialized))
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -406,18 +411,18 @@ class C[T]:
     # TODO: error
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
-reveal_type(generic_context(C))  # revealed: tuple[T]
+reveal_type(generic_context(C))  # revealed: tuple[T@C]
 reveal_type(generic_context(C.method))  # revealed: None
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
 reveal_type(generic_context(C[int].method))  # revealed: None
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
 reveal_type(generic_context(c.method))  # revealed: None
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
 ```
 
 ## Specializations propagate
@@ -466,7 +471,8 @@ class WithOverloadedMethod[T]:
     def method[S](self, x: S | T) -> S | T:
         return x
 
-reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
+# revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
+reveal_type(WithOverloadedMethod[int].method)
 ```
 
 ## Cyclic class definitions

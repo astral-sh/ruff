@@ -393,7 +393,7 @@ from typing import SupportsIndex, SupportsAbs
 reveal_protocol_interface(Foo)
 # error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
 reveal_protocol_interface(SupportsIndex)
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co`)}`"
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co@SupportsAbs`)}`"
 reveal_protocol_interface(SupportsAbs)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"

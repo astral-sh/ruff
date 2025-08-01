@@ -15,8 +15,10 @@ S = TypeVar("S")
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
 
-reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
-reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
+# revealed: tuple[T@SingleTypevar]
+reveal_type(generic_context(SingleTypevar))
+# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+reveal_type(generic_context(MultipleTypevars))
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -49,9 +51,12 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[T, S]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[T]
-reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
+# revealed: tuple[T@InheritedGeneric, S@InheritedGeneric]
+reveal_type(generic_context(InheritedGeneric))
+# revealed: tuple[T@InheritedGenericPartiallySpecialized]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))
+# revealed: None
+reveal_type(generic_context(InheritedGenericFullySpecialized))
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -78,9 +83,12 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-reveal_type(generic_context(ExplicitInheritedGeneric))  # revealed: tuple[T, S]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))  # revealed: tuple[T]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))  # revealed: tuple[T, S]
+# revealed: tuple[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
+reveal_type(generic_context(ExplicitInheritedGeneric))
+# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecialized]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
+# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
 ## Specializing generic classes explicitly
@@ -446,18 +454,18 @@ class C(Generic[T]):
     def generic_method(self, t: T, u: U) -> U:
         return u
 
-reveal_type(generic_context(C))  # revealed: tuple[T]
+reveal_type(generic_context(C))  # revealed: tuple[T@C]
 reveal_type(generic_context(C.method))  # revealed: None
-reveal_type(generic_context(C.generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
 reveal_type(generic_context(C[int]))  # revealed: None
 reveal_type(generic_context(C[int].method))  # revealed: None
-reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
 
 c: C[int] = C[int]()
 reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
 reveal_type(generic_context(c))  # revealed: None
 reveal_type(generic_context(c.method))  # revealed: None
-reveal_type(generic_context(c.generic_method))  # revealed: tuple[U]
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
 ```
 
 ## Specializations propagate
@@ -540,7 +548,8 @@ class WithOverloadedMethod(Generic[T]):
     def method(self, x: S | T) -> S | T:
         return x
 
-reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
+# revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
+reveal_type(WithOverloadedMethod[int].method)
 ```
 
 ## Cyclic class definitions
