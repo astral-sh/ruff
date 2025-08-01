@@ -308,6 +308,42 @@ class D[V](C[V, int]):
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+### Generic class inherits `__init__` from generic base class
+
+```py
+class C[T, U]:
+    def __init__(self, t: T, u: U) -> None: ...
+
+class D[T, U](C[T, U]):
+    pass
+
+reveal_type(C(1, "str"))  # revealed: C[int, str]
+reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+### Generic class inherits `__init__` from `dict`
+
+This is a specific example of the above, since it was reported specifically by a user.
+
+```py
+class D[T, U](dict[T, U]):
+    pass
+
+reveal_type(D(key=1))  # revealed: D[str, int]
+```
+
+### Generic class inherits `__new__` from `tuple`
+
+(Technically, we synthesize a `__new__` method that is more precise than the one defined in typeshed
+for `tuple`, so we use a different mechanism to make sure it has the right inherited generic
+context. But from the user's point of view, this is another example of the above.)
+
+```py
+class C[T, U](tuple[T, U]): ...
+
+reveal_type(C((1, 2)))  # revealed: C[int, int]
+```
+
 ### `__init__` is itself generic
 
 ```py
