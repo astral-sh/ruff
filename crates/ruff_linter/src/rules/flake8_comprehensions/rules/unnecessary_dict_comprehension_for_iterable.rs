@@ -96,11 +96,9 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
-    // Don't suggest `dict.fromkeys` if the target is an attribute, subscript, or slice (side-effecting assignment).
-    if matches!(
-        generator.target,
-        Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
-    ) {
+    // Don't suggest `dict.fromkeys` if the target contains side-effecting expressions
+    // (attributes, subscripts, or slices) at the top level.
+    if contains_side_effecting_sub_expression(&generator.target) {
         return;
     }
 
@@ -223,5 +221,14 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         arguments: args,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+    })
+}
+
+fn contains_side_effecting_sub_expression(target: &Expr) -> bool {
+    any_over_expr(target, &|expr| {
+        matches!(
+            expr,
+            Expr::Attribute(_) | Expr::Subscript(_) | Expr::Slice(_)
+        )
     })
 }
