@@ -6479,6 +6479,31 @@ pub struct TypeVarInstance<'db> {
 
     /// The definition of the generic class, function, or type alias that binds this typevar. This
     /// is `None` for a legacy typevar outside of a context that can bind it.
+    ///
+    /// For a legacy typevar, the binding context might be missing:
+    ///
+    /// ```py
+    /// T = TypeVar("T")                       # [1]
+    /// def generic_function(t: T) -> T: ...   # [2]
+    /// ```
+    ///
+    /// Here, we will create two `TypeVarInstance`s for the typevar `T`. Both will have `[1]` as
+    /// their [`definition`][Self::definition]. The first represents the variable when it is first
+    /// created, and not yet used, so it's `binding_context` will be `None`. The second represents
+    /// when the typevar is used in `generic_function`, and its `binding_context` will be `[2]`
+    /// (that is, the definition of `generic_function`).
+    ///
+    /// For a PEP 695 typevar, there will always be a binding context, since you can only define
+    /// one as part of creating the generic context that uses it:
+    ///
+    /// ```py
+    /// def generic_function[T](t: T) -> T: ...
+    /// ```
+    ///
+    /// Here, we will create a single `TypeVarInstance`. Its [`definition`][Self::definition] will
+    /// be the `T` in `[T]` (i.e., the definition of the typevar in the syntactic construct that
+    /// creates the generic context that uses it). Its `binding_context` will be the definition of
+    /// `generic_function`.
     binding_context: Option<Definition<'db>>,
 
     /// The upper bound or constraint on the type of this TypeVar
