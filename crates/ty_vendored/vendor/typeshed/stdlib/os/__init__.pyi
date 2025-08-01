@@ -620,12 +620,12 @@ if sys.platform == "darwin" and sys.version_info >= (3, 12):
     PRIO_DARWIN_PROCESS: int
     PRIO_DARWIN_THREAD: int
 
-SEEK_SET: int
-SEEK_CUR: int
-SEEK_END: int
+SEEK_SET: Final = 0
+SEEK_CUR: Final = 1
+SEEK_END: Final = 2
 if sys.platform != "win32":
-    SEEK_DATA: int
-    SEEK_HOLE: int
+    SEEK_DATA: Final = 3
+    SEEK_HOLE: Final = 4
 
 O_RDONLY: int
 O_WRONLY: int
