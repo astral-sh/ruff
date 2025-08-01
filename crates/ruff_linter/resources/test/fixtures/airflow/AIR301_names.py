@@ -13,6 +13,7 @@ from airflow.api_connexion.security import requires_access
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.datasets import DatasetAliasEvent
 from airflow.operators.subdag import SubDagOperator
+from airflow.secrets.cache import SecretCache
 from airflow.secrets.local_filesystem import LocalFilesystemBackend
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.utils import dates
@@ -55,6 +56,9 @@ SubDagOperator()
 # airflow.secrets
 # get_connection
 LocalFilesystemBackend()
+
+# airflow.secrets.cache
+SecretCache()
 
 
 # airflow.triggers.external_task
@@ -105,8 +109,3 @@ has_access_dataset
 # airflow.www.utils
 get_sensitive_variables_fields
 should_hide_value_for_key
-
-# airflow.secrets.cache
-from airflow.secrets.cache import SecretCache
-
-SecretCache()
