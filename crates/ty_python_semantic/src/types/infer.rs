@@ -89,7 +89,7 @@ use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError};
+use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, DataclassField, MetaclassErrorKind, SliceLiteral};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
@@ -3619,6 +3619,99 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_target_impl(target, assigned_ty);
     }
 
+    /// Make sure that the subscript assignment `obj[slice] = value` is valid.
+    fn validate_subscript_assignment(
+        &mut self,
+        target: &ast::ExprSubscript,
+        assigned_ty: Type<'db>,
+    ) -> bool {
+        let ast::ExprSubscript {
+            range: _,
+            node_index: _,
+            value,
+            slice,
+            ctx: _,
+        } = target;
+
+        let value_ty = self.infer_expression(value);
+        let slice_ty = self.infer_expression(slice);
+
+        let db = self.db();
+        let context = &self.context;
+
+        match value_ty.try_call_dunder(
+            db,
+            "__setitem__",
+            CallArguments::positional([slice_ty, assigned_ty]),
+        ) {
+            Ok(_) => true,
+            Err(err) => match err {
+                CallDunderError::PossiblyUnbound { .. } => {
+                    if let Some(builder) =
+                        context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, &**value)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Method `__setitem__` of type `{}` is possibly unbound",
+                            value_ty.display(db),
+                        ));
+                    }
+                    false
+                }
+                CallDunderError::CallError(call_error_kind, bindings) => {
+                    match call_error_kind {
+                        CallErrorKind::NotCallable => {
+                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` is not callable \
+                                    on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+                        CallErrorKind::BindingError => {
+                            if let Some(builder) =
+                                context.report_lint(&INVALID_ASSIGNMENT, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` cannot be called with \
+                                    a key of type `{}` and a value of type `{}` on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    slice_ty.display(db),
+                                    assigned_ty.display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+                        CallErrorKind::PossiblyNotCallable => {
+                            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, &**value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__setitem__` of type `{}` is possibly not \
+                                    callable on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
+                        }
+                    }
+                    false
+                }
+                CallDunderError::MethodNotAvailable => {
+                    if let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, &**value) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot assign to object of type `{}` with no `__setitem__` method",
+                            value_ty.display(db),
+                        ));
+                    }
+
+                    false
+                }
+            },
+        }
+    }
+
     /// Make sure that the attribute assignment `obj.attribute = value` is valid.
     ///
     /// `target` is the node for the left-hand side, `object_ty` is the type of `obj`, `attribute` is
@@ -4189,6 +4282,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         assigned_ty,
                         true,
                     );
+                }
+            }
+            ast::Expr::Subscript(subscript_expr) => {
+                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
+
+                if let Some(assigned_ty) = assigned_ty {
+                    self.validate_subscript_assignment(subscript_expr, assigned_ty);
                 }
             }
             _ => {
@@ -8616,14 +8716,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 return err.fallback_return_type(db);
             }
-            Err(CallDunderError::CallError(_, bindings)) => {
-                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Method `__getitem__` of type `{}` \
-                            is not callable on object of type `{}`",
-                        bindings.callable_type().display(db),
-                        value_ty.display(db),
-                    ));
+            Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+                match call_error_kind {
+                    CallErrorKind::NotCallable => {
+                        if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                            builder.into_diagnostic(format_args!(
+                                "Method `__getitem__` of type `{}` \
+                                is not callable on object of type `{}`",
+                                bindings.callable_type().display(db),
+                                value_ty.display(db),
+                            ));
+                        }
+                    }
+                    CallErrorKind::BindingError => {
+                        if let Some(builder) =
+                            context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Method `__getitem__` of type `{}` cannot be called with key of \
+                                type `{}` on object of type `{}`",
+                                bindings.callable_type().display(db),
+                                slice_ty.display(db),
+                                value_ty.display(db),
+                            ));
+                        }
+                    }
+                    CallErrorKind::PossiblyNotCallable => {
+                        if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
+                            builder.into_diagnostic(format_args!(
+                                "Method `__getitem__` of type `{}` is possibly not callable on object of type `{}`",
+                                bindings.callable_type().display(db),
+                                value_ty.display(db),
+                            ));
+                        }
+                    }
                 }
 
                 return bindings.return_type(db);

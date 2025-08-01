@@ -181,7 +181,7 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # error: [call-non-callable]
+    # error: [invalid-argument-type]
     del l["string"]
 
     l[0] = 1
