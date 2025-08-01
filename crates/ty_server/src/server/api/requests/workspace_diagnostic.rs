@@ -102,7 +102,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
-        tracing::debug!("Computing workspace diagnostics");
         let index = snapshot.index();
 
         if !index.global_settings().diagnostic_mode().is_workspace() {
@@ -180,14 +179,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                 // Don't respond, keep the response open (long polling).
                 return;
             }
-
-            tracing::debug!(
-                "Respond to workspace diagnostic request with full report because some diagnostics changed"
-            );
-        } else {
-            tracing::debug!(
-                "Respond to workspace diagnostic request because it's a partial result or an error"
-            );
         }
 
         client.respond(id, result);
@@ -433,8 +424,6 @@ impl<'a> ResponseWriter<'a> {
                 .ok()
                 .and_then(|key| self.index.make_document_ref(key).ok())
                 .map(|doc| i64::from(doc.version()));
-
-            tracing::debug!("Reporting empty diagnostics for {}", previous_url);
 
             let new_result_id = Diagnostics::result_id_from_hash(&[]);
 
