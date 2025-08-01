@@ -9268,21 +9268,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
 
-        // TODO: Remove because record_place_load is used instead
-        // let all_definitely_bound = match self.region {
-        //     InferenceRegion::Expression(expression) => {
-        //         let mut visitor = BoundSymbolsVisitor {
-        //             builder: &self,
-        //             all_definitely_bound: true,
-        //         };
-        //         let node = expression.node_ref(self.db(), self.module());
-        //         visitor.visit_expr(node);
-        //         let b = visitor.all_definitely_bound;
-        //         b
-        //     }
-        //     _ => false,
-        // };
-
         let Self {
             context,
             mut expressions,
