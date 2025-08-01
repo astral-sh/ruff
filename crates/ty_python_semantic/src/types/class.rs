@@ -1852,7 +1852,9 @@ impl<'db> ClassLiteral<'db> {
                                     overload.signature.parameters().get_positional(2)
                                 {
                                     value_types = value_types.add(
-                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
+                                        value_param
+                                            .annotated_type(db)
+                                            .unwrap_or_else(Type::unknown),
                                     );
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());

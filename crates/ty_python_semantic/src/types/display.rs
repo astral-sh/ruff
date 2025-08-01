@@ -753,18 +753,19 @@ impl Display for DisplayParameter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            if let Some(annotated_type) = self.param.annotated_type() {
+            if let Some(annotated_type) = self.param.annotated_type(self.db) {
+                // TODO: display starred annotation
                 write!(f, ": {}", annotated_type.display(self.db))?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_ty) = self.param.default_type() {
-                if self.param.annotated_type().is_some() {
+                if self.param.annotated_type(self.db).is_some() {
                     write!(f, " = {}", default_ty.display(self.db))?;
                 } else {
                     write!(f, "={}", default_ty.display(self.db))?;
                 }
             }
-        } else if let Some(ty) = self.param.annotated_type() {
+        } else if let Some(ty) = self.param.annotated_type(self.db) {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided.
             ty.display(self.db).fmt(f)?;

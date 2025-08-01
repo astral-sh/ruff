@@ -1438,7 +1438,7 @@ impl<'db> CallableBinding<'db> {
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
                     // `typing.Self` / `type[typing.Self]`
                     let current_parameter_type = overload.signature.parameters()[*parameter_index]
-                        .annotated_type()
+                        .annotated_type(db)
                         .unwrap_or(Type::unknown());
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
@@ -1483,7 +1483,7 @@ impl<'db> CallableBinding<'db> {
                         // TODO: For an unannotated `self` / `cls` parameter, the type should be
                         // `typing.Self` / `type[typing.Self]`
                         let parameter_type = overload.signature.parameters()[*parameter_index]
-                            .annotated_type()
+                            .annotated_type(db)
                             .unwrap_or(Type::unknown());
                         current_parameter_types.push(parameter_type);
                     }
@@ -2056,7 +2056,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             for parameter_index in &self.argument_matches[argument_index].parameters {
                 let parameter = &parameters[*parameter_index];
-                let Some(expected_type) = parameter.annotated_type() else {
+                let Some(expected_type) = parameter.annotated_type(self.db) else {
                     continue;
                 };
                 if let Err(error) = builder.infer(expected_type, argument_type) {
@@ -2087,7 +2087,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
-        if let Some(mut expected_ty) = parameter.annotated_type() {
+        if let Some(mut expected_ty) = parameter.annotated_type(self.db) {
             if let Some(specialization) = self.specialization {
                 argument_type = argument_type.apply_specialization(self.db, specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, specialization);

@@ -133,7 +133,7 @@ impl<'db> GenericContext<'db> {
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
-            if let Some(ty) = param.annotated_type() {
+            if let Some(ty) = param.annotated_type(db) {
                 ty.find_legacy_typevars(db, &mut variables);
             }
             if let Some(ty) = param.default_type() {

@@ -18,6 +18,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::tuple::TupleSpec;
 use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -255,7 +256,7 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     // By default we usually don't visit the type of the default value,
     // as it isn't relevant to most things
     for parameter in &signature.parameters {
-        if let Some(ty) = parameter.annotated_type() {
+        if let Some(ty) = parameter.annotated_type(db) {
             visitor.visit_type(db, ty);
         }
     }
@@ -431,7 +432,7 @@ impl<'db> Signature<'db> {
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         for param in &self.parameters {
-            if let Some(ty) = param.annotated_type() {
+            if let Some(ty) = param.annotated_type(db) {
                 ty.find_legacy_typevars(db, typevars);
             }
             if let Some(ty) = param.default_type() {
@@ -534,8 +535,8 @@ impl<'db> Signature<'db> {
             }
 
             if !check_types(
-                self_parameter.annotated_type(),
-                other_parameter.annotated_type(),
+                self_parameter.annotated_type(db),
+                other_parameter.annotated_type(db),
             ) {
                 return false;
             }
@@ -628,14 +629,15 @@ impl<'db> Signature<'db> {
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
         if other.parameters.is_gradual()
-            && self
-                .parameters
-                .variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+            && self.parameters.variadic().is_some_and(|(_, param)| {
+                param.annotated_type(db).is_some_and(|ty| ty.is_object(db))
+            })
             && self
                 .parameters
                 .keyword_variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
+                .is_some_and(|(_, param)| {
+                    param.annotated_type(db).is_some_and(|ty| ty.is_object(db))
+                })
         {
             return true;
         }
@@ -700,14 +702,17 @@ impl<'db> Signature<'db> {
                     match (self_parameter.kind(), other_parameter.kind()) {
                         (
                             ParameterKind::PositionalOnly {
+                                annotated_type: self_annotated,
                                 default_type: self_default,
                                 ..
                             }
                             | ParameterKind::PositionalOrKeyword {
+                                annotated_type: self_annotated,
                                 default_type: self_default,
                                 ..
                             },
                             ParameterKind::PositionalOnly {
+                                annotated_type: other_annotated,
                                 default_type: other_default,
                                 ..
                             },
@@ -715,10 +720,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return false;
                             }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
+                            if !check_types(*other_annotated, *self_annotated) {
                                 return false;
                             }
                         }
@@ -726,11 +728,13 @@ impl<'db> Signature<'db> {
                         (
                             ParameterKind::PositionalOrKeyword {
                                 name: self_name,
+                                annotated_type: self_annotated,
                                 default_type: self_default,
                                 ..
                             },
                             ParameterKind::PositionalOrKeyword {
                                 name: other_name,
+                                annotated_type: other_annotated,
                                 default_type: other_default,
                                 ..
                             },
@@ -742,23 +746,24 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return false;
                             }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
+                            if !check_types(*other_annotated, *self_annotated) {
                                 return false;
                             }
                         }
 
                         (
                             ParameterKind::Variadic { .. },
-                            ParameterKind::PositionalOnly { .. }
-                            | ParameterKind::PositionalOrKeyword { .. },
+                            ParameterKind::PositionalOnly {
+                                annotated_type: other_annotated,
+                                ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                annotated_type: other_annotated,
+                                ..
+                            },
                         ) => {
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
+                            let self_annotated = self_parameter.annotated_type(db);
+                            if !check_types(*other_annotated, self_annotated) {
                                 return false;
                             }
 
@@ -795,10 +800,8 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if !check_types(
-                                    other_parameter.annotated_type(),
-                                    self_parameter.annotated_type(),
-                                ) {
+                                if !check_types(other_parameter.annotated_type(db), self_annotated)
+                                {
                                     return false;
                                 }
                                 parameters.next_other();
@@ -807,8 +810,8 @@ impl<'db> Signature<'db> {
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
                             if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
+                                other_parameter.annotated_type(db),
+                                self_parameter.annotated_type(db),
                             ) {
                                 return false;
                             }
@@ -851,8 +854,8 @@ impl<'db> Signature<'db> {
                 | ParameterKind::PositionalOrKeyword { name, .. } => {
                     self_keywords.insert(name.clone(), self_parameter);
                 }
-                ParameterKind::KeywordVariadic { .. } => {
-                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                ParameterKind::KeywordVariadic { annotated_type, .. } => {
+                    self_keyword_variadic = Some(*annotated_type);
                 }
                 ParameterKind::PositionalOnly { .. } => {
                     // These are the unmatched positional-only parameters in `self` from the
@@ -869,31 +872,32 @@ impl<'db> Signature<'db> {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
                     name: other_name,
+                    annotated_type: other_annotated,
                     default_type: other_default,
                     ..
                 }
                 | ParameterKind::PositionalOrKeyword {
                     name: other_name,
+                    annotated_type: other_annotated,
                     default_type: other_default,
                     ..
                 } => {
                     if let Some(self_parameter) = self_keywords.remove(other_name) {
                         match self_parameter.kind() {
                             ParameterKind::PositionalOrKeyword {
+                                annotated_type: self_annotated,
                                 default_type: self_default,
                                 ..
                             }
                             | ParameterKind::KeywordOnly {
+                                annotated_type: self_annotated,
                                 default_type: self_default,
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
                                     return false;
                                 }
-                                if !check_types(
-                                    other_parameter.annotated_type(),
-                                    self_parameter.annotated_type(),
-                                ) {
+                                if !check_types(*other_annotated, *self_annotated) {
                                     return false;
                                 }
                             }
@@ -902,23 +906,23 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !check_types(
-                            other_parameter.annotated_type(),
-                            self_keyword_variadic_type,
-                        ) {
+                        if !check_types(*other_annotated, self_keyword_variadic_type) {
                             return false;
                         }
                     } else {
                         return false;
                     }
                 }
-                ParameterKind::KeywordVariadic { .. } => {
+                ParameterKind::KeywordVariadic {
+                    annotated_type: other_annotated,
+                    ..
+                } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
                         return false;
                     };
-                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                    if !check_types(*other_annotated, self_keyword_variadic_type) {
                         return false;
                     }
                 }
@@ -999,11 +1003,18 @@ impl<'db> Parameters<'db> {
     pub(crate) fn new(parameters: impl IntoIterator<Item = Parameter<'db>>) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
         let is_gradual = value.len() == 2
-            && value
-                .iter()
-                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
-            && value.iter().any(|p| {
-                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
+            && value.iter().any(|p| match p.kind() {
+                ParameterKind::Variadic { annotated_type, .. } => annotated_type
+                    .as_ref()
+                    .and_then(|tuple| tuple.to_homogeneous().copied())
+                    .is_none_or(|ty| ty.is_dynamic()),
+                _ => false,
+            })
+            && value.iter().any(|p| match p.kind() {
+                ParameterKind::KeywordVariadic { annotated_type, .. } => {
+                    annotated_type.is_none_or(|ty| ty.is_dynamic())
+                }
+                _ => false,
             });
         Self { value, is_gradual }
     }
@@ -1138,7 +1149,7 @@ impl<'db> Parameters<'db> {
         let variadic = vararg.as_ref().map(|arg| Parameter {
             kind: ParameterKind::Variadic {
                 name: arg.name.id.clone(),
-                annotated_type: annotated_type(arg),
+                annotated_type: annotated_type(arg).map(TupleSpec::homogeneous),
             },
             form: ParameterForm::Value,
         });
@@ -1321,10 +1332,12 @@ impl<'db> Parameter<'db> {
         match &mut self.kind {
             ParameterKind::PositionalOnly { annotated_type, .. }
             | ParameterKind::PositionalOrKeyword { annotated_type, .. }
-            | ParameterKind::Variadic { annotated_type, .. }
             | ParameterKind::KeywordOnly { annotated_type, .. }
             | ParameterKind::KeywordVariadic { annotated_type, .. } => {
                 *annotated_type = Some(annotated);
+            }
+            ParameterKind::Variadic { annotated_type, .. } => {
+                *annotated_type = Some(TupleSpec::homogeneous(annotated));
             }
         }
         self
@@ -1426,8 +1439,9 @@ impl<'db> Parameter<'db> {
                 name: Name::new_static("args"),
                 annotated_type: Some(
                     annotated_type
-                        .map(|ty| ty.normalized_impl(db, visitor))
-                        .unwrap_or_else(Type::any),
+                        .as_ref()
+                        .map(|tuple| tuple.normalized_impl(db, visitor))
+                        .unwrap_or_else(|| TupleSpec::homogeneous(Type::any())),
                 ),
             },
             ParameterKind::KeywordVariadic {
@@ -1488,13 +1502,15 @@ impl<'db> Parameter<'db> {
     }
 
     /// Annotated type of the parameter, if annotated.
-    pub(crate) fn annotated_type(&self) -> Option<Type<'db>> {
+    pub(crate) fn annotated_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match &self.kind {
             ParameterKind::PositionalOnly { annotated_type, .. }
             | ParameterKind::PositionalOrKeyword { annotated_type, .. }
-            | ParameterKind::Variadic { annotated_type, .. }
             | ParameterKind::KeywordOnly { annotated_type, .. }
             | ParameterKind::KeywordVariadic { annotated_type, .. } => *annotated_type,
+            ParameterKind::Variadic { annotated_type, .. } => annotated_type
+                .as_ref()
+                .map(|tuple| tuple.homogeneous_element_type(db)),
         }
     }
 
@@ -1559,7 +1575,7 @@ pub(crate) enum ParameterKind<'db> {
     Variadic {
         /// Parameter name.
         name: Name,
-        annotated_type: Option<Type<'db>>,
+        annotated_type: Option<TupleSpec<'db>>,
     },
 
     /// Keyword-only parameter, e.g. `def f(*, x): ...`
@@ -1626,8 +1642,9 @@ impl<'db> ParameterKind<'db> {
             } => Self::Variadic {
                 annotated_type: Some(
                     annotated_type
-                        .unwrap_or(Type::unknown())
-                        .materialize(db, variance),
+                        .as_ref()
+                        .map(|tuple| tuple.materialize(db, variance))
+                        .unwrap_or_else(|| TupleSpec::homogeneous(Type::unknown())),
                 ),
                 name: name.clone(),
             },
