@@ -32,9 +32,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
-        let index = snapshot.index();
-
-        if !index.global_settings().diagnostic_mode().is_workspace() {
+        if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
             return Ok(WorkspaceDiagnosticReportResult::Report(
                 WorkspaceDiagnosticReport { items: vec![] },
@@ -61,6 +59,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
 
         // Collect all diagnostics from all projects with their database references
         let mut items = Vec::new();
+        let index = snapshot.index();
 
         for db in snapshot.projects() {
             let diagnostics = db.check_with_reporter(

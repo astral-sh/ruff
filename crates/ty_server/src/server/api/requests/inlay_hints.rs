@@ -29,7 +29,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

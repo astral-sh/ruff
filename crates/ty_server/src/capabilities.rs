@@ -1,4 +1,4 @@
-use lsp_types::{ClientCapabilities, MarkupKind};
+use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind, WorkDoneProgressOptions};
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -18,6 +18,9 @@ bitflags::bitflags! {
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
+        const FILE_WATCHER_SUPPORT = 1 << 12;
+        const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
+        const WORKSPACE_CONFIGURATION = 1 << 14;
     }
 }
 
@@ -25,6 +28,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
         self.contains(Self::WORKSPACE_DIAGNOSTIC_REFRESH)
+    }
+
+    /// Returns `true` if the client supports workspace configuration.
+    pub(crate) const fn supports_workspace_configuration(self) -> bool {
+        self.contains(Self::WORKSPACE_CONFIGURATION)
     }
 
     /// Returns `true` if the client supports inlay hint refresh.
@@ -82,6 +90,16 @@ impl ResolvedClientCapabilities {
         self.contains(Self::WORK_DONE_PROGRESS)
     }
 
+    /// Returns `true` if the client supports file watcher capabilities.
+    pub(crate) const fn supports_file_watcher(self) -> bool {
+        self.contains(Self::FILE_WATCHER_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
+    pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
+        self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -96,14 +114,35 @@ impl ResolvedClientCapabilities {
         }
 
         if workspace
+            .and_then(|workspace| workspace.configuration)
+            .unwrap_or_default()
+        {
+            flags |= Self::WORKSPACE_CONFIGURATION;
+        }
+
+        if workspace
             .and_then(|workspace| workspace.inlay_hint.as_ref()?.refresh_support)
             .unwrap_or_default()
         {
             flags |= Self::INLAY_HINT_REFRESH;
         }
 
+        if workspace
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::FILE_WATCHER_SUPPORT;
+        }
+
         if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
             flags |= Self::PULL_DIAGNOSTICS;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.diagnostic.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
         }
 
         if text_document
@@ -207,5 +246,19 @@ impl ResolvedClientCapabilities {
         }
 
         flags
+    }
+}
+
+/// Creates the default [`DiagnosticOptions`] for the server.
+pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> DiagnosticOptions {
+    DiagnosticOptions {
+        identifier: Some(crate::DIAGNOSTIC_NAME.to_string()),
+        inter_file_dependencies: true,
+        workspace_diagnostics,
+        work_done_progress_options: WorkDoneProgressOptions {
+            // Currently, the server only supports reporting work done progress for "workspace"
+            // diagnostic mode.
+            work_done_progress: Some(workspace_diagnostics),
+        },
     }
 }

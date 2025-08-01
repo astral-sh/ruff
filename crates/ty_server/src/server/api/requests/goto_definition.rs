@@ -30,7 +30,10 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
         _client: &Client,
         params: GotoDefinitionParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

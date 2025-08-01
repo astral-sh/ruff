@@ -30,7 +30,10 @@ impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
         _client: &Client,
         params: DocumentHighlightParams,
     ) -> crate::server::Result<Option<Vec<DocumentHighlight>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

@@ -65,7 +65,6 @@ use lsp_types::{
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use serde::de::DeserializeOwned;
-use serde_json::json;
 use tempfile::TempDir;
 
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -148,15 +147,12 @@ pub(crate) struct TestServer {
 
     /// Workspace configurations for `workspace/configuration` requests
     workspace_configurations: HashMap<Url, ClientOptions>,
-
-    /// Capabilities registered by the server
-    registered_capabilities: Vec<String>,
 }
 
 impl TestServer {
     /// Create a new test server with the given workspace configurations
     fn new(
-        workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
+        workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
@@ -193,7 +189,7 @@ impl TestServer {
 
         let workspace_configurations = workspaces
             .into_iter()
-            .map(|(folder, options)| (folder.uri, options))
+            .filter_map(|(folder, options)| Some((folder.uri, options?)))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -206,12 +202,15 @@ impl TestServer {
             requests: VecDeque::new(),
             initialize_response: None,
             workspace_configurations,
-            registered_capabilities: Vec::new(),
         }
         .initialize(workspace_folders, capabilities, initialization_options)
     }
 
     /// Perform LSP initialization handshake
+    ///
+    /// # Panics
+    ///
+    /// If the `initialization_options` cannot be serialized to JSON
     fn initialize(
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
@@ -221,10 +220,8 @@ impl TestServer {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
-            // TODO: This should be configurable by the test server builder. This might not be
-            // required after client settings are implemented in the server.
             initialization_options: initialization_options
-                .map(|options| json!({ "settings": options})),
+                .map(|options| serde_json::to_value(options).unwrap()),
             ..Default::default()
         };
 
@@ -544,19 +541,26 @@ impl TestServer {
             };
             let config_value = if let Some(options) = self.workspace_configurations.get(scope_uri) {
                 // Return the configuration for the specific workspace
+                //
+                // As per the spec:
+                //
+                // > If the client can't provide a configuration setting for a given scope
+                // > then null needs to be present in the returned array.
                 match item.section.as_deref() {
                     Some("ty") => serde_json::to_value(options)?,
-                    Some(_) | None => {
-                        // TODO: Handle `python` section once it's implemented in the server
-                        // As per the spec:
-                        //
-                        // > If the client can't provide a configuration setting for a given scope
-                        // > then null needs to be present in the returned array.
+                    Some(section) => {
+                        tracing::debug!("Unrecognized section `{section}` for {scope_uri}");
+                        serde_json::Value::Null
+                    }
+                    None => {
+                        tracing::debug!(
+                            "No section specified for workspace configuration of {scope_uri}",
+                        );
                         serde_json::Value::Null
                     }
                 }
             } else {
-                tracing::warn!("No workspace configuration found for {scope_uri}");
+                tracing::debug!("No workspace configuration provided for {scope_uri}");
                 serde_json::Value::Null
             };
             results.push(config_value);
@@ -681,7 +685,6 @@ impl fmt::Debug for TestServer {
             .field("server_requests", &self.requests)
             .field("initialize_response", &self.initialize_response)
             .field("workspace_configurations", &self.workspace_configurations)
-            .field("registered_capabilities", &self.registered_capabilities)
             .finish_non_exhaustive()
     }
 }
@@ -734,7 +737,7 @@ impl Drop for TestServer {
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
-    workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
+    workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
 }
@@ -742,10 +745,12 @@ pub(crate) struct TestServerBuilder {
 impl TestServerBuilder {
     /// Create a new builder
     pub(crate) fn new() -> Result<Self> {
-        // Default client capabilities for the test server. These are assumptions made by the real
-        // server and are common for most clients:
+        // Default client capabilities for the test server:
         //
+        // These are common capabilities that all clients support:
         // - Supports publishing diagnostics
+        //
+        // These are enabled by default but can be disabled using the builder methods:
         // - Supports pulling workspace configuration
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
@@ -767,6 +772,7 @@ impl TestServerBuilder {
         })
     }
 
+    /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
         self
@@ -779,7 +785,7 @@ impl TestServerBuilder {
     pub(crate) fn with_workspace(
         mut self,
         workspace_root: &SystemPath,
-        options: ClientOptions,
+        options: Option<ClientOptions>,
     ) -> Result<Self> {
         // TODO: Support multiple workspaces in the test server
         if self.workspaces.len() == 1 {
@@ -803,7 +809,6 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable pull diagnostics capability
-    #[must_use]
     pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
@@ -816,8 +821,28 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable or disable dynamic registration of diagnostics capability
+    pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_with(Default::default)
+            .diagnostic
+            .get_or_insert_with(Default::default)
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable workspace configuration capability
+    #[expect(dead_code)]
+    pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_with(Default::default)
+            .configuration = Some(enabled);
+        self
+    }
+
     /// Enable or disable file watching capability
-    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
@@ -832,7 +857,6 @@ impl TestServerBuilder {
     }
 
     /// Set custom client capabilities (overrides any previously set capabilities)
-    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;

@@ -19,7 +19,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -45,7 +45,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -101,7 +101,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content_v1)?
         .enable_pull_diagnostics(true)
         .build()?
@@ -213,14 +213,11 @@ def foo() -> str:
     return 42  # Same error: expected str, got int
 ";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut server = TestServerBuilder::new()?
-        .with_workspace(
-            workspace_root,
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
-        )?
-        .with_initialization_options(global_options)
+        )
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
         .with_file(file_c, file_c_content_v1)?

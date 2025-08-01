@@ -30,7 +30,10 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
         _client: &Client,
         params: SelectionRangeParams,
     ) -> crate::server::Result<Option<Vec<LspSelectionRange>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
