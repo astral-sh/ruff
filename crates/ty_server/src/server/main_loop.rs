@@ -116,7 +116,7 @@ impl Server {
 
                             self.connection.sender.send(Message::Response(response))?;
                         } else {
-                            tracing::debug!(
+                            tracing::trace!(
                                 "Ignoring response for canceled request id={}",
                                 response.id
                             );
@@ -131,7 +131,6 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            tracing::debug!("Retrying request {}/{}", request.method, request.id);
                             let task = api::request(request);
                             scheduler.dispatch(task, &mut self.session, client);
                         } else {
