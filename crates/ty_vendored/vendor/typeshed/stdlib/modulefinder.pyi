@@ -1,3 +1,5 @@
+"""Find modules used by a script, using introspection.
+"""
 import sys
 from collections.abc import Container, Iterable, Iterator, Sequence
 from types import CodeType
@@ -60,9 +62,24 @@ class ModuleFinder:
     def find_module(
         self, name: str, path: str | None, parent: Module | None = None
     ) -> tuple[IO[Any] | None, str | None, tuple[str, str, int]]: ...  # undocumented
-    def report(self) -> None: ...
-    def any_missing(self) -> list[str]: ...  # undocumented
-    def any_missing_maybe(self) -> tuple[list[str], list[str]]: ...  # undocumented
+    def report(self) -> None:
+        """Print a report to stdout, listing the found modules with their
+paths, as well as modules that are missing, or seem to be missing.
+"""
+    def any_missing(self) -> list[str]:  # undocumented
+        """Return a list of modules that appear to be missing. Use
+any_missing_maybe() if you want to know which modules are
+certain to be missing, and which *may* be missing.
+"""
+    def any_missing_maybe(self) -> tuple[list[str], list[str]]:  # undocumented
+        """Return two lists, one with modules that are certainly missing
+and one with modules that *may* be missing. The latter names could
+either be submodules *or* just global names in the package.
+
+The reason it can't always be determined is that it's impossible to
+tell which names are imported when "from module import *" is done
+with an extension module, short of actually importing it.
+"""
     def replace_paths_in_code(self, co: CodeType) -> CodeType: ...  # undocumented
 
 def test() -> ModuleFinder | None: ...  # undocumented
