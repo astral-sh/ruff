@@ -70,7 +70,15 @@ where
     );
 
     let span = Span::from(file).with_range(range);
-    let annotation = Annotation::primary(span);
+    let mut annotation = Annotation::primary(span);
+    // The `0..0` range is used to highlight file-level diagnostics.
+    //
+    // TODO(brent) We should instead set this flag on annotations for individual lint rules that
+    // actually need it, but we need to be able to cache the new diagnostic model first. See
+    // https://github.com/astral-sh/ruff/issues/19688.
+    if range == TextRange::default() {
+        annotation.set_file_level(true);
+    }
     diagnostic.annotate(annotation);
 
     if let Some(suggestion) = suggestion {
