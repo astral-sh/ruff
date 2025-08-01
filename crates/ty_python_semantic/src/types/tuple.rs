@@ -500,12 +500,12 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_slice(
-        &'db self,
+        &self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         self.0.py_slice(db, start, stop, step)
     }
 }

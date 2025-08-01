@@ -8520,7 +8520,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
 
                         if let Ok(new_elements) = tuple.py_slice(db, start, stop, step) {
-                            TupleType::from_elements(db, new_elements.copied())
+                            TupleType::from_elements(db, new_elements)
                         } else {
                             report_slice_step_size_zero(context, value_node.into());
                             Type::unknown()
@@ -8599,7 +8599,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let literal_value = literal_ty.value(db);
 
                     if let Ok(new_bytes) = literal_value.py_slice(db, start, stop, step) {
-                        let new_bytes: Vec<u8> = new_bytes.copied().collect();
+                        let new_bytes: Vec<u8> = new_bytes.collect();
                         Type::bytes_literal(db, &new_bytes)
                     } else {
                         report_slice_step_size_zero(context, value_node.into());
