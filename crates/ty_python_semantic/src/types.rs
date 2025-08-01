@@ -5891,9 +5891,11 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::ProtocolInstance(protocol_instance_type) => protocol_instance_type.variance_of(db, type_var),
             Type::Union(union_type) => union_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var)).collect(),
-            Type::Intersection(intersection_type) => itertools::chain(intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var)),
+            Type::Intersection(intersection_type) => intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var)).chain(
                 intersection_type.negative(db).iter().map(|ty| ty.with_polarity(TypeVarVariance::Contravariant).variance_of(db, type_var))).collect(),
             Type::Tuple(tuple_type) => tuple_type.tuple(db).all_elements().map(|ty| ty.variance_of(db, type_var)).collect(),
+            Type::PropertyInstance(property_instance_type) =>
+                property_instance_type.getter(db).iter().chain(&property_instance_type.setter(db)).map(|ty| ty.variance_of(db, type_var)).collect(),
             | Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -5911,7 +5913,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
             | Type::SubclassOf(_) // TODO: double check
             | Type::TypeVar(_)
