@@ -960,7 +960,7 @@ pub(crate) enum DisplayAnnotationType {
 
 impl DisplayAnnotationType {
     #[inline]
-    pub(crate) const fn is_none(&self) -> bool {
+    const fn is_none(&self) -> bool {
         matches!(self, Self::None)
     }
 }
