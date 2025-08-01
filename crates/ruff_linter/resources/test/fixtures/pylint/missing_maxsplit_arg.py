@@ -114,8 +114,7 @@ Foo("1,2,3").rsplit(",")[0]
 Foo("1,2,3").rsplit(",")[-1]
 
 ## Test split called on sliced list
-# This test case was incorrect - lists don't have split() method
-# ["1", "2", "3"][::-1].split(",")[0]
+["1", "2", "3"][::-1].split(",")[0]
 
 ## Test class attribute named split
 Bar.split[0]

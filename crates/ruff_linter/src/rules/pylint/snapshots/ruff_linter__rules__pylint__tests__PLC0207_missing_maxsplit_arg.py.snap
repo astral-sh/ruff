@@ -636,100 +636,100 @@ missing_maxsplit_arg.py:58:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
 60 60 | 
 61 61 | # OK
 
-missing_maxsplit_arg.py:180:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+missing_maxsplit_arg.py:179:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
-178 | # Errors
-179 | kwargs_without_maxsplit = {"seq": ","}
-180 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+177 | # Errors
+178 | kwargs_without_maxsplit = {"seq": ","}
+179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-181 | # OK
-182 | kwargs_with_maxsplit = {"maxsplit": 1}
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
-177 177 | ## TODO: These require the ability to resolve a dict variable name to a value
-178 178 | # Errors
-179 179 | kwargs_without_maxsplit = {"seq": ","}
-180     |-"1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-    180 |+"1,2,3".split(maxsplit=1, **kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-181 181 | # OK
-182 182 | kwargs_with_maxsplit = {"maxsplit": 1}
-183 183 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+176 176 | ## TODO: These require the ability to resolve a dict variable name to a value
+177 177 | # Errors
+178 178 | kwargs_without_maxsplit = {"seq": ","}
+179     |-"1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+    179 |+"1,2,3".split(maxsplit=1, **kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+180 180 | # OK
+181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 
-missing_maxsplit_arg.py:183:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+missing_maxsplit_arg.py:182:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
-181 | # OK
-182 | kwargs_with_maxsplit = {"maxsplit": 1}
-183 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+180 | # OK
+181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-184 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-185 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
-180 180 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-181 181 | # OK
-182 182 | kwargs_with_maxsplit = {"maxsplit": 1}
-183     |-"1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-    183 |+"1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
-184 184 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-185 185 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-186 186 | 
+179 179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+180 180 | # OK
+181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182     |-"1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+    182 |+"1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+185 185 | 
 
-missing_maxsplit_arg.py:185:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+missing_maxsplit_arg.py:184:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
-183 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-184 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-185 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
-182 182 | kwargs_with_maxsplit = {"maxsplit": 1}
-183 183 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-184 184 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-185     |-"1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-    185 |+"1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+181 181 | kwargs_with_maxsplit = {"maxsplit": 1}
+182 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+183 183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+184     |-"1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+    184 |+"1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+185 185 | 
 186 186 | 
-187 187 | 
-188 188 | ## Test unpacked list literal args (starred expressions)
+187 187 | ## Test unpacked list literal args (starred expressions)
 
-missing_maxsplit_arg.py:190:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+missing_maxsplit_arg.py:189:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
-188 | ## Test unpacked list literal args (starred expressions)
-189 | # Errors
-190 | "1,2,3".split(",", *[-1])[0]
+187 | ## Test unpacked list literal args (starred expressions)
+188 | # Errors
+189 | "1,2,3".split(",", *[-1])[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-191 |
-192 | ## Test unpacked list variable args
+190 |
+191 | ## Test unpacked list variable args
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
-187 187 | 
-188 188 | ## Test unpacked list literal args (starred expressions)
-189 189 | # Errors
-190     |-"1,2,3".split(",", *[-1])[0]
-    190 |+"1,2,3".split(",", *[-1], maxsplit=1)[0]
-191 191 | 
-192 192 | ## Test unpacked list variable args
-193 193 | # Errors
+186 186 | 
+187 187 | ## Test unpacked list literal args (starred expressions)
+188 188 | # Errors
+189     |-"1,2,3".split(",", *[-1])[0]
+    189 |+"1,2,3".split(",", *[-1], maxsplit=1)[0]
+190 190 | 
+191 191 | ## Test unpacked list variable args
+192 192 | # Errors
 
-missing_maxsplit_arg.py:195:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+missing_maxsplit_arg.py:194:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
     |
-193 | # Errors
-194 | args_list = [-1]
-195 | "1,2,3".split(",", *args_list)[0]
+192 | # Errors
+193 | args_list = [-1]
+194 | "1,2,3".split(",", *args_list)[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
     |
     = help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
-192 192 | ## Test unpacked list variable args
-193 193 | # Errors
-194 194 | args_list = [-1]
-195     |-"1,2,3".split(",", *args_list)[0]
-    195 |+"1,2,3".split(",", *args_list, maxsplit=1)[0]
+191 191 | ## Test unpacked list variable args
+192 192 | # Errors
+193 193 | args_list = [-1]
+194     |-"1,2,3".split(",", *args_list)[0]
+    194 |+"1,2,3".split(",", *args_list, maxsplit=1)[0]
