@@ -436,21 +436,6 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
-    /// Renders the specialization in full, e.g. `{T = int, U = str}`.
-    pub fn display(
-        &'db self,
-        db: &'db dyn Db,
-        tuple_specialization: TupleSpecialization,
-    ) -> DisplaySpecialization<'db> {
-        DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
-            types: self.types(db),
-            db,
-            full: true,
-            tuple_specialization,
-        }
-    }
-
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
         &'db self,
@@ -461,7 +446,6 @@ impl<'db> Specialization<'db> {
             typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
-            full: false,
             tuple_specialization,
         }
     }
@@ -471,34 +455,22 @@ pub struct DisplaySpecialization<'db> {
     typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
-    full: bool,
     tuple_specialization: TupleSpecialization,
 }
 
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.full {
-            f.write_char('{')?;
-            for (idx, (var, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                write!(f, "{} = {}", var.name(self.db), ty.display(self.db))?;
+        f.write_char('[')?;
+        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
             }
-            f.write_char('}')
-        } else {
-            f.write_char('[')?;
-            for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                ty.display(self.db).fmt(f)?;
-            }
-            if self.tuple_specialization.is_yes() {
-                f.write_str(", ...")?;
-            }
-            f.write_char(']')
+            ty.display(self.db).fmt(f)?;
         }
+        if self.tuple_specialization.is_yes() {
+            f.write_str(", ...")?;
+        }
+        f.write_char(']')
     }
 }
 
