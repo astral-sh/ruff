@@ -15,8 +15,8 @@ class Person(TypedDict):
     age: int | None
 ```
 
-New instances can be created from dict literals. When accessing properties, the correct types should
-be inferred based on the `TypedDict` definition:
+New inhabitants can be created from dict literals. When accessing keys, the correct types should be
+inferred based on the `TypedDict` definition:
 
 ```py
 alice: Person = {"name": "Alice", "age": 30}
@@ -27,19 +27,19 @@ reveal_type(alice["name"])  # revealed: Unknown
 reveal_type(alice["age"])  # revealed: Unknown
 ```
 
-Instances can also be created through a constructor call:
+Inhabitants can also be created through a constructor call:
 
 ```py
 bob = Person(name="Bob", age=25)
 ```
 
-Methods that are available on `dict` are also available on `TypedDict` instances:
+Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
 bob.update(age=26)
 ```
 
-Construction of instances is checked for type correctness:
+The construction of a `TypedDict` is checked for type correctness:
 
 ```py
 # TODO: these should be errors (invalid argument type)
@@ -102,6 +102,27 @@ class Person(TypedDict):
 m: Mapping[str, object] = Person(name="Alice", age=30)
 ```
 
+They can *not* be assigned to `dict[str, object]`, as that would allow them to be mutated in unsafe
+ways:
+
+```py
+from typing import TypedDict
+
+def dangerous(d: dict[str, object]) -> None:
+    d["name"] = 1
+
+class Person(TypedDict):
+    name: str
+
+alice: Person = {"name": "Alice"}
+
+# TODO: this should be an invalid-assignment error
+dangerous(alice)
+
+# TODO: this should be `str`
+reveal_type(alice["name"])  # revealed: Unknown
+```
+
 ## Types of keys and values
 
 ```py
@@ -119,7 +140,7 @@ def _(p: Person) -> None:
 ## Unlike normal classes
 
 `TypedDict` types are not like normal classes. The "attributes" can not be accessed. Neither on the
-type, nor on instances:
+class itself, nor on inhabitants of the type defined by the class:
 
 ```py
 from typing import TypedDict
@@ -137,7 +158,7 @@ Person(name="Alice", age=30).name
 
 ## Special properties
 
-`TypedDict` instances have some special properties that can be used for introspection:
+`TypedDict` class definitions have some special properties that can be used for introspection:
 
 ```py
 from typing import TypedDict
@@ -172,7 +193,9 @@ eve: Employee = {"name": "Eve"}
 
 ## Generic `TypedDict`
 
-`TypedDict`s can be generic:
+`TypedDict`s can also be generic.
+
+### Legacy generics
 
 ```py
 from typing import Generic, TypeVar, TypedDict
@@ -180,6 +203,27 @@ from typing import Generic, TypeVar, TypedDict
 T = TypeVar("T")
 
 class TaggedData(TypedDict, Generic[T]):
+    data: T
+    tag: str
+
+p1: TaggedData[int] = {"data": 42, "tag": "number"}
+p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
+
+# TODO: this should be an error (type mismatch)
+p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
+```
+
+### PEP-695 generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class TaggedData[T](TypedDict):
     data: T
     tag: str
 
