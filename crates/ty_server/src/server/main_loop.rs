@@ -49,7 +49,8 @@ impl Server {
 
                             if self.session.is_shutdown_requested() {
                                 tracing::warn!(
-                                    "Received request after server shutdown was requested, discarding"
+                                    "Received request `{}` after server shutdown was requested, discarding",
+                                    &req.method
                                 );
                                 client.respond_err(
                                     req.id,

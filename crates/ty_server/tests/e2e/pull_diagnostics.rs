@@ -8,7 +8,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
-use crate::{TestServer, TestServerBuilder};
+use crate::{TestServer, TestServerBuilder, TestServerError};
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -640,4 +640,79 @@ fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) 
     }
 
     items.sort_unstable_by(|a, b| item_uri(a).cmp(item_uri(b)));
+}
+
+#[test]
+fn workspace_diagnostic_long_polling_responds_on_shutdown() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let file_path = SystemPath::new("src/test.py");
+    let file_content = "\
+def hello() -> str:
+    return \"world\"
+";
+
+    // Create a project with one file but no diagnostics
+    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, global_options.clone())?
+        .with_file(file_path, file_content)?
+        .with_initialization_options(global_options)
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    // Make a workspace diagnostic request to a project with one file but no diagnostics
+    // This should trigger long-polling since the project has no diagnostics
+    let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        identifier: None,
+        previous_result_ids: Vec::new(),
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: None,
+        },
+    });
+
+    match server.await_response::<WorkspaceDiagnosticReportResult>(request_id.clone()) {
+        Ok(_) => {
+            panic!("Expected workspace diagnostic request to suspend.");
+        }
+        Err(error) => {
+            if let Some(test_error) = error.downcast_ref::<TestServerError>() {
+                assert!(
+                    matches!(test_error, TestServerError::RecvTimeoutError(_)),
+                    "Response should time out because the request is suspended"
+                );
+            } else {
+                panic!("Unexpected error type: {:?}", error);
+            }
+        }
+    }
+
+    // Send shutdown request - this should cause the suspended workspace diagnostic request to respond
+    let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
+
+    // The workspace diagnostic request should now respond with an empty report
+    let workspace_response =
+        server.await_response::<WorkspaceDiagnosticReportResult>(request_id)?;
+
+    // Complete shutdown sequence
+    let _shutdown_response = server.await_response::<()>(shutdown_id)?;
+    server.send_notification::<lsp_types::notification::Exit>(());
+
+    // Verify we got a report with one file (default response during shutdown)
+    match workspace_response {
+        WorkspaceDiagnosticReportResult::Report(report) => {
+            assert!(report.items.is_empty());
+        }
+        WorkspaceDiagnosticReportResult::Partial(_) => {
+            panic!("Expected full report on shutdown, not partial");
+        }
+    }
+
+    Ok(())
 }

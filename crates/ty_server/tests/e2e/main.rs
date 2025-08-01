@@ -151,6 +151,10 @@ pub(crate) struct TestServer {
 
     /// Capabilities registered by the server
     registered_capabilities: Vec<String>,
+
+    /// Whether a Shutdown request has been sent by the test
+    /// and the exit sequence should be skipped during `Drop`
+    shutdown_requested: bool,
 }
 
 impl TestServer {
@@ -207,6 +211,7 @@ impl TestServer {
             initialize_response: None,
             workspace_configurations,
             registered_capabilities: Vec::new(),
+            shutdown_requested: false,
         }
         .initialize(workspace_folders, capabilities, initialization_options)
     }
@@ -330,6 +335,11 @@ impl TestServer {
     where
         R: Request,
     {
+        // Track if an Exit notification is being sent
+        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+            self.shutdown_requested = true;
+        }
+
         let id = self.next_request_id();
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
@@ -699,7 +709,7 @@ impl Drop for TestServer {
         //
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
-        let shutdown_error = if self.server_thread.is_some() {
+        let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
             match self.await_response::<()>(shutdown_id) {
                 Ok(()) => {
