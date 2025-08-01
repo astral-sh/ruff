@@ -43,23 +43,26 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
 
         let result_id = diagnostics.result_id();
 
-        let report = if params.previous_result_id.as_deref() == Some(&result_id) {
-            DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
-                related_documents: None,
-                unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                    result_id,
-                },
-            })
-        } else {
-            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-                related_documents: None,
-                full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                    result_id: Some(result_id),
-                    // SAFETY: Pull diagnostic requests are only called for text documents, not for
-                    // notebook documents.
-                    items: diagnostics.to_lsp_diagnostics(db).expect_text_document(),
-                },
-            })
+        let report = match result_id {
+            Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {
+                DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+                    related_documents: None,
+                    unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                        result_id: new_id,
+                    },
+                })
+            }
+            new_id => {
+                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                    related_documents: None,
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: new_id,
+                        // SAFETY: Pull diagnostic requests are only called for text documents, not for
+                        // notebook documents.
+                        items: diagnostics.to_lsp_diagnostics(db).expect_text_document(),
+                    },
+                })
+            }
         };
 
         Ok(DocumentDiagnosticReportResult::Report(report))
