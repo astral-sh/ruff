@@ -1,9 +1,3 @@
-"""distutils.command.bdist_rpm
-
-Implements the Distutils 'bdist_rpm' command (create RPM source and binary
-distributions).
-"""
-
 from _typeshed import Incomplete
 from typing import ClassVar
 

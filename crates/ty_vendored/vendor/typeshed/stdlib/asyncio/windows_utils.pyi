@@ -1,5 +1,3 @@
-"""Various Windows specific bits and pieces."""
-
 import subprocess
 import sys
 from collections.abc import Callable
@@ -13,15 +11,9 @@ if sys.platform == "win32":
     BUFSIZE: Final = 8192
     PIPE = subprocess.PIPE
     STDOUT = subprocess.STDOUT
-    def pipe(*, duplex: bool = False, overlapped: tuple[bool, bool] = (True, True), bufsize: int = 8192) -> tuple[int, int]:
-        """Like os.pipe() but with overlapped support and using handles not fds."""
+    def pipe(*, duplex: bool = False, overlapped: tuple[bool, bool] = (True, True), bufsize: int = 8192) -> tuple[int, int]: ...
 
     class PipeHandle:
-        """Wrapper for an overlapped pipe handle which is vaguely file-object like.
-
-        The IOCP event loop can use these instead of socket objects.
-        """
-
         def __init__(self, handle: int) -> None: ...
         def __del__(self) -> None: ...
         def __enter__(self) -> Self: ...
@@ -32,11 +24,6 @@ if sys.platform == "win32":
         def close(self, *, CloseHandle: Callable[[int], object] = ...) -> None: ...
 
     class Popen(subprocess.Popen[AnyStr]):
-        """Replacement for subprocess.Popen using overlapped pipe handles.
-
-        The stdin, stdout, stderr are None or instances of PipeHandle.
-        """
-
         stdin: PipeHandle | None  # type: ignore[assignment]
         stdout: PipeHandle | None  # type: ignore[assignment]
         stderr: PipeHandle | None  # type: ignore[assignment]
