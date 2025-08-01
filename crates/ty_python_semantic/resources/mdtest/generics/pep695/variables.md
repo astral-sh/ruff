@@ -431,7 +431,7 @@ def constrained_non_singletons[T: (int, str)](t: T) -> None:
 def constrained_singletons[T: (Literal[True], Literal[False])](t: T) -> None:
     static_assert(is_singleton(T))
 
-def constrained_single_valued[T: (Literal[True], tuple[()])](t: T) -> None:
+def constrained_single_valued[T: (Literal[True], Literal[42])](t: T) -> None:
     static_assert(is_single_valued(T))
 ```
 
