@@ -469,11 +469,6 @@ pub(crate) struct ScopeInference<'db> {
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra>>,
-
-    /// The returnees of this region (if this is a function body).
-    ///
-    /// These are stored in `Vec` to delay the creation of the union type as long as possible.
-    returnees: Vec<Option<ExpressionNodeKey>>,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
@@ -485,6 +480,11 @@ struct ScopeInferenceExtra {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// The returnees of this region (if this is a function body).
+    ///
+    /// These are stored in `Vec` to delay the creation of the union type as long as possible.
+    returnees: Vec<Option<ExpressionNodeKey>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -495,7 +495,6 @@ impl<'db> ScopeInference<'db> {
                 cycle_fallback: true,
                 ..ScopeInferenceExtra::default()
             })),
-            returnees: Vec::new(),
             expressions: FxHashMap::default(),
         }
     }
@@ -539,7 +538,12 @@ impl<'db> ScopeInference<'db> {
         method_ty: Option<BoundMethodType<'db>>,
     ) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for returnee in &self.returnees {
+        let Some(extra) = &self.extra else {
+            unreachable!(
+                "infer_return_type should only be called on a function body scope inference"
+            );
+        };
+        for returnee in &extra.returnees {
             let ty = returnee.map_or(Type::none(db), |expression| {
                 self.expression_type(expression)
             });
@@ -9228,6 +9232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
+        let db = self.db();
 
         let Self {
             context,
@@ -9251,25 +9256,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty() || cycle_fallback).then(|| {
-            Box::new(ScopeInferenceExtra {
-                cycle_fallback,
-                diagnostics,
-            })
-        });
+        let extra = (!diagnostics.is_empty() || cycle_fallback || scope.is_function_or_lambda(db))
+            .then(|| {
+                let returnees = returnees
+                    .into_iter()
+                    .map(|returnee| returnee.expression)
+                    .collect();
+
+                Box::new(ScopeInferenceExtra {
+                    cycle_fallback,
+                    diagnostics,
+                    returnees,
+                })
+            });
 
         expressions.shrink_to_fit();
-
-        let returnees = returnees
-            .into_iter()
-            .map(|returnee| returnee.expression)
-            .collect();
 
         ScopeInference {
             scope,
             expressions,
             extra,
-            returnees,
         }
     }
 }
