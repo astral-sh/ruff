@@ -24,6 +24,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
+    TypedDict,
 }
 
 impl<'db> ClassBase<'db> {
@@ -39,7 +40,7 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Protocol | Self::Generic => self,
+            Self::Protocol | Self::Generic | Self::TypedDict => self,
         }
     }
 
@@ -51,11 +52,11 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias
-                | DynamicType::TodoTypedDict,
+                | DynamicType::TodoTypeAlias,
             ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
+            ClassBase::TypedDict => "TypedDict",
         }
     }
 
@@ -234,7 +235,14 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
-                SpecialFormType::TypedDict => Some(Self::Dynamic(DynamicType::TodoTypedDict)),
+                SpecialFormType::TypedDict => Some(ClassBase::Class(
+                    KnownClass::Dict
+                        .to_specialized_class_type(
+                            db,
+                            [KnownClass::Str.to_instance(db), Type::unknown()],
+                        )
+                        .unwrap(),
+                )),
                 SpecialFormType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
@@ -245,14 +253,14 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => None,
         }
     }
 
     fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
-            Self::Dynamic(_) | Self::Generic | Self::Protocol => self,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
     }
 
@@ -276,7 +284,10 @@ impl<'db> ClassBase<'db> {
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)
             }
-            ClassBase::Dynamic(_) | ClassBase::Generic | ClassBase::Protocol => false,
+            ClassBase::Dynamic(_)
+            | ClassBase::Generic
+            | ClassBase::Protocol
+            | ClassBase::TypedDict => false,
         }
     }
 
@@ -292,6 +303,14 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
+            ClassBase::TypedDict => ClassBaseMroIterator::from_class(
+                db,
+                KnownClass::Dict
+                    .to_class_literal(db)
+                    .to_class_type(db)
+                    .unwrap(),
+                additional_specialization,
+            ),
         }
     }
 }
@@ -309,6 +328,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
+            ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
         }
     }
 }

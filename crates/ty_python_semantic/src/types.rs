@@ -5197,7 +5197,23 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => Type::instance(db, class.default_specialization(db)),
+                    _ => {
+                        for base in class.explicit_bases(db) {
+                            if *base == Type::SpecialForm(SpecialFormType::TypedDict) {
+                                return Ok(todo_type!("TypedDict"));
+                            }
+                        }
+                        Type::instance(db, class.default_specialization(db))
+                        // todo_type!("TypedDict")
+                        // if class
+                        //     .iter_mro(db, None)
+                        //     .any(|base| matches!(base, ClassBase::TypedDict))
+                        // {
+                        //     todo_type!("TypedDict")
+                        // } else {
+                        //     Type::instance(db, class.default_specialization(db))
+                        // }
+                    }
                 };
                 Ok(ty)
             }
@@ -6233,9 +6249,6 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
-    /// A special Todo-variant for classes inheriting from `TypedDict`.
-    /// A temporary variant to avoid false positives while we wait for full support.
-    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -6263,13 +6276,6 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
-            DynamicType::TodoTypedDict => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(Support for `TypedDict`)")
                 } else {
                     f.write_str("@Todo")
                 }
