@@ -714,8 +714,8 @@ pub struct Annotation {
     tags: Vec<DiagnosticTag>,
     /// Whether this annotation is a file-level or full-file annotation.
     ///
-    /// When set, rendering will not include a file snippet but will still have the file's name and
-    /// (optional) range.
+    /// When set, rendering will only include the file's name and (optional) range. Everything else
+    /// is omitted, including any file snippet or message.
     is_file_level: bool,
 }
 
