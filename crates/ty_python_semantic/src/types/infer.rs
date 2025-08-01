@@ -3676,7 +3676,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 builder.into_diagnostic(format_args!(
                                     "Method `__setitem__` of type `{}` cannot be called with \
-                                    arguments of type `{}` and `{}` on object of type `{}`",
+                                    a key of type `{}` and a value of type `{}` on object of type `{}`",
                                     bindings.callable_type().display(db),
                                     slice_ty.display(db),
                                     assigned_ty.display(db),
@@ -8733,7 +8733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` cannot be called with argument of \
+                                "Method `__getitem__` of type `{}` cannot be called with key of \
                                 type `{}` on object of type `{}`",
                                 bindings.callable_type().display(db),
                                 slice_ty.display(db),
