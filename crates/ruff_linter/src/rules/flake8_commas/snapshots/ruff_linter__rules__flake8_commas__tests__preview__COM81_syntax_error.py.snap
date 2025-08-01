@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_commas/mod.rs
 ---
-COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
+COM81_syntax_error.py:3:5: invalid-syntax: Starred expression cannot be used here
   |
 1 | # Check for `flake8-commas` violation for a file containing syntax errors.
 2 | (
@@ -10,7 +10,7 @@ COM81_syntax_error.py:3:5: SyntaxError: Starred expression cannot be used here
 4 | )
   |
 
-COM81_syntax_error.py:6:9: SyntaxError: Type parameter list cannot be empty
+COM81_syntax_error.py:6:9: invalid-syntax: Type parameter list cannot be empty
   |
 4 | )
 5 |

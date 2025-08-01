@@ -366,6 +366,16 @@ impl Diagnostic {
         self.inner.secondary_code.as_ref()
     }
 
+    /// Returns the secondary code for the diagnostic if it exists, or the lint name otherwise.
+    ///
+    /// This is a common pattern for Ruff diagnostics, which want to use the noqa code in general,
+    /// but fall back on the `invalid-syntax` identifier for syntax errors, which don't have
+    /// secondary codes.
+    pub fn secondary_code_or_id(&self) -> &str {
+        self.secondary_code()
+            .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
+    }
+
     /// Set the secondary code for this diagnostic.
     pub fn set_secondary_code(&mut self, code: SecondaryCode) {
         Arc::make_mut(&mut self.inner).secondary_code = Some(code);

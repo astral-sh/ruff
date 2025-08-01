@@ -11,7 +11,7 @@ invalid_characters_syntax_error.py:5:6: PLE2510 Invalid unescaped character back
   |
   = help: Replace with escape sequence
 
-invalid_characters_syntax_error.py:7:5: SyntaxError: missing closing quote in string literal
+invalid_characters_syntax_error.py:7:5: invalid-syntax: missing closing quote in string literal
   |
 5 | b = '␈'
 6 | # Unterminated string
@@ -21,7 +21,7 @@ invalid_characters_syntax_error.py:7:5: SyntaxError: missing closing quote in st
 9 | # Unterminated f-string
   |
 
-invalid_characters_syntax_error.py:7:7: SyntaxError: Expected a statement
+invalid_characters_syntax_error.py:7:7: invalid-syntax: Expected a statement
    |
  5 | b = '␈'
  6 | # Unterminated string
@@ -43,7 +43,7 @@ invalid_characters_syntax_error.py:8:6: PLE2510 Invalid unescaped character back
    |
    = help: Replace with escape sequence
 
-invalid_characters_syntax_error.py:10:7: SyntaxError: f-string: unterminated string
+invalid_characters_syntax_error.py:10:7: invalid-syntax: f-string: unterminated string
    |
  8 | b = '␈'
  9 | # Unterminated f-string
@@ -53,7 +53,7 @@ invalid_characters_syntax_error.py:10:7: SyntaxError: f-string: unterminated str
 12 | # Implicitly concatenated
    |
 
-invalid_characters_syntax_error.py:10:8: SyntaxError: Expected FStringEnd, found newline
+invalid_characters_syntax_error.py:10:8: invalid-syntax: Expected FStringEnd, found newline
    |
  8 | b = '␈'
  9 | # Unterminated f-string
@@ -93,7 +93,7 @@ invalid_characters_syntax_error.py:13:11: PLE2510 Invalid unescaped character ba
    |
    = help: Replace with escape sequence
 
-invalid_characters_syntax_error.py:13:14: SyntaxError: missing closing quote in string literal
+invalid_characters_syntax_error.py:13:14: invalid-syntax: missing closing quote in string literal
    |
 11 | b = f'␈'
 12 | # Implicitly concatenated
@@ -101,7 +101,7 @@ invalid_characters_syntax_error.py:13:14: SyntaxError: missing closing quote in 
    |              ^^
    |
 
-invalid_characters_syntax_error.py:13:16: SyntaxError: Expected a statement
+invalid_characters_syntax_error.py:13:16: invalid-syntax: Expected a statement
    |
 11 | b = f'␈'
 12 | # Implicitly concatenated

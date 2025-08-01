@@ -21,7 +21,7 @@ expression: env.render_diagnostics(&diagnostics)
           }
         }
       },
-      "message": "SyntaxError: Expected one or more symbol names after import"
+      "message": "Expected one or more symbol names after import"
     },
     {
       "code": {
@@ -40,7 +40,7 @@ expression: env.render_diagnostics(&diagnostics)
           }
         }
       },
-      "message": "SyntaxError: Expected ')', found newline"
+      "message": "Expected ')', found newline"
     }
   ],
   "severity": "WARNING",

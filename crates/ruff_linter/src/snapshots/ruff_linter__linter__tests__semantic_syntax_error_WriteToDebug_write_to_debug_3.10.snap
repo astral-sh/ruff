@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:2:1: SyntaxError: cannot assign to `__debug__`
+<filename>:2:1: invalid-syntax: cannot assign to `__debug__`
   |
 2 | __debug__ = False
   | ^^^^^^^^^

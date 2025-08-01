@@ -11,7 +11,7 @@ E11.py:9:1: E112 Expected an indented block
 11 | print()
    |
 
-E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+E11.py:9:1: invalid-syntax: Expected an indented block after `if` statement
    |
  7 | #: E112
  8 | if False:
@@ -21,7 +21,7 @@ E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
 11 | print()
    |
 
-E11.py:12:1: SyntaxError: Unexpected indentation
+E11.py:12:1: invalid-syntax: Unexpected indentation
    |
 10 | #: E113
 11 | print()
@@ -31,7 +31,7 @@ E11.py:12:1: SyntaxError: Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-E11.py:14:1: SyntaxError: Expected a statement
+E11.py:14:1: invalid-syntax: Expected a statement
    |
 12 |     print()
 13 | #: E114 E116
@@ -51,7 +51,7 @@ E11.py:45:1: E112 Expected an indented block
 47 | if False:
    |
 
-E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+E11.py:45:1: invalid-syntax: Expected an indented block after `if` statement
    |
 43 | #: E112
 44 | if False:  #

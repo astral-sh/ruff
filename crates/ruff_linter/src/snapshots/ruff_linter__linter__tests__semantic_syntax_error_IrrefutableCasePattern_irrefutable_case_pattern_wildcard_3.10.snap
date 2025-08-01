@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:3:10: SyntaxError: wildcard makes remaining patterns unreachable
+<filename>:3:10: invalid-syntax: wildcard makes remaining patterns unreachable
   |
 2 | match value:
 3 |     case _:

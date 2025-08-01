@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC_syntax_error.py:2:5: SyntaxError: missing closing quote in string literal
+ISC_syntax_error.py:2:5: invalid-syntax: missing closing quote in string literal
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -10,7 +10,7 @@ ISC_syntax_error.py:2:5: SyntaxError: missing closing quote in string literal
 4 | "a" """b
   |
 
-ISC_syntax_error.py:2:7: SyntaxError: Expected a statement
+ISC_syntax_error.py:2:7: invalid-syntax: Expected a statement
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -20,7 +20,7 @@ ISC_syntax_error.py:2:7: SyntaxError: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:3:9: SyntaxError: missing closing quote in string literal
+ISC_syntax_error.py:3:9: invalid-syntax: missing closing quote in string literal
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -30,7 +30,7 @@ ISC_syntax_error.py:3:9: SyntaxError: missing closing quote in string literal
 5 | c""" "d
   |
 
-ISC_syntax_error.py:3:11: SyntaxError: Expected a statement
+ISC_syntax_error.py:3:11: invalid-syntax: Expected a statement
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -40,7 +40,7 @@ ISC_syntax_error.py:3:11: SyntaxError: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:5:6: SyntaxError: missing closing quote in string literal
+ISC_syntax_error.py:5:6: invalid-syntax: missing closing quote in string literal
   |
 3 | "a" "b" "c
 4 | "a" """b
@@ -50,7 +50,7 @@ ISC_syntax_error.py:5:6: SyntaxError: missing closing quote in string literal
 7 | # For f-strings, the `FStringRanges` won't contain the range for
   |
 
-ISC_syntax_error.py:5:8: SyntaxError: Expected a statement
+ISC_syntax_error.py:5:8: invalid-syntax: Expected a statement
   |
 3 | "a" "b" "c
 4 | "a" """b
@@ -61,7 +61,7 @@ ISC_syntax_error.py:5:8: SyntaxError: Expected a statement
 8 | # unterminated f-strings.
   |
 
-ISC_syntax_error.py:9:8: SyntaxError: f-string: unterminated string
+ISC_syntax_error.py:9:8: invalid-syntax: f-string: unterminated string
    |
  7 | # For f-strings, the `FStringRanges` won't contain the range for
  8 | # unterminated f-strings.
@@ -71,7 +71,7 @@ ISC_syntax_error.py:9:8: SyntaxError: f-string: unterminated string
 11 | f"a" f"""b
    |
 
-ISC_syntax_error.py:9:9: SyntaxError: Expected FStringEnd, found newline
+ISC_syntax_error.py:9:9: invalid-syntax: Expected FStringEnd, found newline
    |
  7 | # For f-strings, the `FStringRanges` won't contain the range for
  8 | # unterminated f-strings.
@@ -82,7 +82,7 @@ ISC_syntax_error.py:9:9: SyntaxError: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:10:13: SyntaxError: f-string: unterminated string
+ISC_syntax_error.py:10:13: invalid-syntax: f-string: unterminated string
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
@@ -92,7 +92,7 @@ ISC_syntax_error.py:10:13: SyntaxError: f-string: unterminated string
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:10:14: SyntaxError: Expected FStringEnd, found newline
+ISC_syntax_error.py:10:14: invalid-syntax: Expected FStringEnd, found newline
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
@@ -102,7 +102,7 @@ ISC_syntax_error.py:10:14: SyntaxError: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:16:5: SyntaxError: missing closing quote in string literal
+ISC_syntax_error.py:16:5: invalid-syntax: missing closing quote in string literal
    |
 14 | (
 15 |     "a"
@@ -112,7 +112,7 @@ ISC_syntax_error.py:16:5: SyntaxError: missing closing quote in string literal
 18 |     "d"
    |
 
-ISC_syntax_error.py:26:9: SyntaxError: f-string: unterminated triple-quoted string
+ISC_syntax_error.py:26:9: invalid-syntax: f-string: unterminated triple-quoted string
    |
 24 |   (
 25 |       """abc"""
@@ -124,14 +124,14 @@ ISC_syntax_error.py:26:9: SyntaxError: f-string: unterminated triple-quoted stri
    | |__^
    |
 
-ISC_syntax_error.py:30:1: SyntaxError: unexpected EOF while parsing
+ISC_syntax_error.py:30:1: invalid-syntax: unexpected EOF while parsing
    |
 28 |     "i" "j"
 29 | )
    |  ^
    |
 
-ISC_syntax_error.py:30:1: SyntaxError: f-string: unterminated string
+ISC_syntax_error.py:30:1: invalid-syntax: f-string: unterminated string
    |
 28 |     "i" "j"
 29 | )

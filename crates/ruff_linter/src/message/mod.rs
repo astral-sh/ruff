@@ -33,8 +33,7 @@ mod text;
 /// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
 ///
 /// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
-/// `message` is stored as the primary diagnostic message instead of on the primary annotation, and
-/// `SyntaxError: ` is prepended to the message.
+/// `message` is stored as the primary diagnostic message instead of on the primary annotation.
 ///
 /// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
 /// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
@@ -43,11 +42,7 @@ pub fn create_syntax_error_diagnostic(
     message: impl std::fmt::Display,
     range: impl Ranged,
 ) -> Diagnostic {
-    let mut diag = Diagnostic::new(
-        DiagnosticId::InvalidSyntax,
-        Severity::Error,
-        format_args!("SyntaxError: {message}"),
-    );
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
     let span = span.into().with_range(range.range());
     diag.annotate(Annotation::primary(span));
     diag

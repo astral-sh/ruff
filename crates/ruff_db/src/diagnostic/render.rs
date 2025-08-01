@@ -135,7 +135,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                     .none(stylesheet.none);
 
                 for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag);
+                    let resolved = Resolved::new(self.resolver, diag, self.config);
                     let renderable = resolved.to_renderable(self.config.context);
                     for diag in renderable.diagnostics.iter() {
                         writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
@@ -191,9 +191,13 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(
+        resolver: &'a dyn FileResolver,
+        diag: &'a Diagnostic,
+        config: &DisplayDiagnosticConfig,
+    ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -223,12 +227,14 @@ struct ResolvedDiagnostic<'a> {
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
+    is_fixable: bool,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
+        config: &DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -241,13 +247,35 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
-        let id = Some(diag.inner.id.to_string());
-        let message = diag.inner.message.as_str().to_string();
+
+        let id = if config.hide_severity {
+            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
+            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
+            // the formatting of syntax errors for now. This should also be kept consistent with the
+            // concise formatting.
+            Some(diag.secondary_code().map_or_else(
+                || format!("{id}:", id = diag.inner.id),
+                |code| code.to_string(),
+            ))
+        } else {
+            Some(diag.inner.id.to_string())
+        };
+
+        let level = if config.hide_severity {
+            AnnotateLevel::None
+        } else {
+            diag.inner.severity.to_annotate()
+        };
+
         ResolvedDiagnostic {
-            level: diag.inner.severity.to_annotate(),
+            level,
             id,
-            message,
+            message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: diag
+                .fix()
+                .is_some_and(|fix| fix.applies(config.fix_applicability)),
         }
     }
 
@@ -271,6 +299,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: false,
         }
     }
 
@@ -338,6 +367,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
+            is_fixable: self.is_fixable,
         }
     }
 }
@@ -436,6 +466,10 @@ struct RenderableDiagnostic<'r> {
     /// should be from the same file, and none of the snippets inside of a
     /// collection should overlap with one another or be directly adjacent.
     snippets_by_input: Vec<RenderableSnippets<'r>>,
+    /// Whether or not the diagnostic is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the diagnostic ID.
+    is_fixable: bool,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -448,7 +482,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message);
+        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -2850,10 +2884,10 @@ if call(foo
         env.format(format);
 
         let diagnostics = vec![
-            env.invalid_syntax("SyntaxError: Expected one or more symbol names after import")
+            env.invalid_syntax("Expected one or more symbol names after import")
                 .primary("syntax_errors.py", "1:14", "1:15", "")
                 .build(),
-            env.invalid_syntax("SyntaxError: Expected ')', found newline")
+            env.invalid_syntax("Expected ')', found newline")
                 .primary("syntax_errors.py", "3:11", "3:12", "")
                 .build(),
         ];

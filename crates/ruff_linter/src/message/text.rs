@@ -154,7 +154,12 @@ impl Display for RuleCodeAndBody<'_> {
                 body = self.message.body(),
             )
         } else {
-            f.write_str(self.message.body())
+            write!(
+                f,
+                "{code}: {body}",
+                code = self.message.id().as_str().red().bold(),
+                body = self.message.body(),
+            )
         }
     }
 }

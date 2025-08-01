@@ -57,7 +57,7 @@ export interface Diagnostic {
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
-    pub code: Option<String>,
+    pub code: String,
     pub message: String,
     pub start_location: Location,
     pub end_location: Location,
@@ -229,7 +229,7 @@ impl Workspace {
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
             .map(|msg| ExpandedMessage {
-                code: msg.secondary_code().map(ToString::to_string),
+                code: msg.secondary_code_or_id().to_string(),
                 message: msg.body().to_string(),
                 start_location: source_code.line_column(msg.expect_range().start()).into(),
                 end_location: source_code.line_column(msg.expect_range().end()).into(),
