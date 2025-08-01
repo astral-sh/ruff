@@ -299,52 +299,33 @@ impl<'a> ResponseWriter<'a> {
 
         let result_id = Diagnostics::result_id_from_hash(diagnostics);
 
-        let is_unchanged = if let Some(previous) = self.previous_result_ids.remove(&url) {
-            if previous == result_id {
-                true
-            } else {
-                tracing::debug!(
-                    "Result id for {} changed from {} to {}",
-                    url,
-                    previous,
-                    result_id
-                );
-                false
+        let report = match result_id {
+            Some(new_id) if Some(&new_id) == self.previous_result_ids.remove(&url).as_ref() => {
+                WorkspaceDocumentDiagnosticReport::Unchanged(
+                    WorkspaceUnchangedDocumentDiagnosticReport {
+                        uri: url,
+                        version,
+                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                            result_id: new_id,
+                        },
+                    },
+                )
             }
-        } else {
-            tracing::debug!("No previous result id for {}", url);
-            false
-        };
+            new_id => {
+                let lsp_diagnostics = diagnostics
+                    .iter()
+                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .collect::<Vec<_>>();
 
-        // let is_unchanged = self
-        //     .previous_result_ids
-        //     .remove(&url)
-        //     .is_some_and(|previous_result_id| previous_result_id == result_id);
-
-        let report = if is_unchanged {
-            WorkspaceDocumentDiagnosticReport::Unchanged(
-                WorkspaceUnchangedDocumentDiagnosticReport {
+                WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                     uri: url,
                     version,
-                    unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                        result_id,
+                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                        result_id: new_id,
+                        items: lsp_diagnostics,
                     },
-                },
-            )
-        } else {
-            let lsp_diagnostics = diagnostics
-                .iter()
-                .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
-                .collect::<Vec<_>>();
-
-            WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
-                uri: url,
-                version,
-                full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                    result_id: Some(result_id),
-                    items: lsp_diagnostics,
-                },
-            })
+                })
+            }
         };
 
         self.write_report(report);
@@ -393,30 +374,27 @@ impl<'a> ResponseWriter<'a> {
 
             let new_result_id = Diagnostics::result_id_from_hash(&[]);
 
-            // VS code keeps sending the previous result id for files that it has seen before
-            // even if we sent a full report in an earlier response say that the diagnostics
-            // are now empty. That's why we need to keep sending a result ID even if the diagnostics are empty.
-            // so that we don't keep sending Full reports if the file still has no diagnostics (which
-            // breaks long polling
-            let report = if new_result_id == previous_result_id {
-                WorkspaceDocumentDiagnosticReport::Unchanged(
-                    WorkspaceUnchangedDocumentDiagnosticReport {
+            let report = match new_result_id {
+                Some(new_id) if new_id == previous_result_id => {
+                    WorkspaceDocumentDiagnosticReport::Unchanged(
+                        WorkspaceUnchangedDocumentDiagnosticReport {
+                            uri: previous_url,
+                            version,
+                            unchanged_document_diagnostic_report:
+                                UnchangedDocumentDiagnosticReport { result_id: new_id },
+                        },
+                    )
+                }
+                new_id => {
+                    WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                         uri: previous_url,
                         version,
-                        unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_result_id,
+                        full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                            result_id: new_id,
+                            items: vec![], // No diagnostics
                         },
-                    },
-                )
-            } else {
-                WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
-                    uri: previous_url,
-                    version,
-                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                        result_id: Some(new_result_id),
-                        items: vec![], // No diagnostics
-                    },
-                })
+                    })
+                }
             };
 
             items.push(report);
