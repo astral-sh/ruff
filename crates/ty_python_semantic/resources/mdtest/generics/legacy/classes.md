@@ -363,6 +363,23 @@ class D(dict[T, U]):
 reveal_type(D(key=1))  # revealed: D[str, int]
 ```
 
+### Generic class inherits `__new__` from `tuple`
+
+(Technically, we synthesize a `__new__` method that is more precise than the one defined in typeshed
+for `tuple`, so we use a different mechanism to make sure it has the right inherited generic
+context. But from the user's point of view, this is another example of the above.)
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(tuple[T, U]): ...
+
+reveal_type(C((1, 2)))  # revealed: C[int, int]
+```
+
 ### `__init__` is itself generic
 
 ```py

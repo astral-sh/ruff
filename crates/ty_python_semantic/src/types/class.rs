@@ -850,8 +850,11 @@ impl<'db> ClassType<'db> {
                     iterable_parameter,
                 ]);
 
-                let synthesized_dunder =
-                    CallableType::function_like(db, Signature::new(parameters, None));
+                let synthesized_dunder = CallableType::function_like(
+                    db,
+                    Signature::new(parameters, None)
+                        .with_inherited_generic_context(inherited_generic_context),
+                );
 
                 Place::bound(synthesized_dunder).into()
             }
