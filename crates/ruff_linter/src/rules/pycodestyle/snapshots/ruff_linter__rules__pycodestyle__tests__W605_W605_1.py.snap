@@ -654,6 +654,8 @@ W605_1.py:137:9: W605 [*] Invalid escape sequence: `\I`
 136 | # Debug text (should trigger)
 137 | t = t"{'\InHere'=}"
     |         ^^ W605
+138 |
+139 | # https://github.com/astral-sh/ruff/issues/11491
     |
     = help: Use a raw string literal
 
@@ -663,3 +665,196 @@ W605_1.py:137:9: W605 [*] Invalid escape sequence: `\I`
 136 136 | # Debug text (should trigger)
 137     |-t = t"{'\InHere'=}"
     137 |+t = t"{r'\InHere'=}"
+138 138 | 
+139 139 | # https://github.com/astral-sh/ruff/issues/11491
+140 140 | f"\n{a:\XFF}"
+
+W605_1.py:140:8: W605 [*] Invalid escape sequence: `\X`
+    |
+139 | # https://github.com/astral-sh/ruff/issues/11491
+140 | f"\n{a:\XFF}"
+    |        ^^ W605
+141 | f"\XFF{a:\XFF}"
+142 | t"\n{a:\XFF}"
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+137 137 | t = t"{'\InHere'=}"
+138 138 | 
+139 139 | # https://github.com/astral-sh/ruff/issues/11491
+140     |-f"\n{a:\XFF}"
+    140 |+f"\n{a:\\XFF}"
+141 141 | f"\XFF{a:\XFF}"
+142 142 | t"\n{a:\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+
+W605_1.py:141:3: W605 [*] Invalid escape sequence: `\X`
+    |
+139 | # https://github.com/astral-sh/ruff/issues/11491
+140 | f"\n{a:\XFF}"
+141 | f"\XFF{a:\XFF}"
+    |   ^^ W605
+142 | t"\n{a:\XFF}"
+143 | t"\XFF{a:\XFF}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+138 138 | 
+139 139 | # https://github.com/astral-sh/ruff/issues/11491
+140 140 | f"\n{a:\XFF}"
+141     |-f"\XFF{a:\XFF}"
+    141 |+rf"\XFF{a:\XFF}"
+142 142 | t"\n{a:\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+
+W605_1.py:141:10: W605 [*] Invalid escape sequence: `\X`
+    |
+139 | # https://github.com/astral-sh/ruff/issues/11491
+140 | f"\n{a:\XFF}"
+141 | f"\XFF{a:\XFF}"
+    |          ^^ W605
+142 | t"\n{a:\XFF}"
+143 | t"\XFF{a:\XFF}"
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+138 138 | 
+139 139 | # https://github.com/astral-sh/ruff/issues/11491
+140 140 | f"\n{a:\XFF}"
+141     |-f"\XFF{a:\XFF}"
+    141 |+f"\XFF{a:\\XFF}"
+142 142 | t"\n{a:\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+
+W605_1.py:142:8: W605 [*] Invalid escape sequence: `\X`
+    |
+140 | f"\n{a:\XFF}"
+141 | f"\XFF{a:\XFF}"
+142 | t"\n{a:\XFF}"
+    |        ^^ W605
+143 | t"\XFF{a:\XFF}"
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+139 139 | # https://github.com/astral-sh/ruff/issues/11491
+140 140 | f"\n{a:\XFF}"
+141 141 | f"\XFF{a:\XFF}"
+142     |-t"\n{a:\XFF}"
+    142 |+t"\n{a:\\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+145 145 | f"{a:\{1}\}"
+
+W605_1.py:143:3: W605 [*] Invalid escape sequence: `\X`
+    |
+141 | f"\XFF{a:\XFF}"
+142 | t"\n{a:\XFF}"
+143 | t"\XFF{a:\XFF}"
+    |   ^^ W605
+144 |
+145 | f"{a:\{1}\}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+140 140 | f"\n{a:\XFF}"
+141 141 | f"\XFF{a:\XFF}"
+142 142 | t"\n{a:\XFF}"
+143     |-t"\XFF{a:\XFF}"
+    143 |+rt"\XFF{a:\XFF}"
+144 144 | 
+145 145 | f"{a:\{1}\}"
+146 146 | t"{a:\{1}\}"
+
+W605_1.py:143:10: W605 [*] Invalid escape sequence: `\X`
+    |
+141 | f"\XFF{a:\XFF}"
+142 | t"\n{a:\XFF}"
+143 | t"\XFF{a:\XFF}"
+    |          ^^ W605
+144 |
+145 | f"{a:\{1}\}"
+    |
+    = help: Add backslash to escape sequence
+
+ℹ Safe fix
+140 140 | f"\n{a:\XFF}"
+141 141 | f"\XFF{a:\XFF}"
+142 142 | t"\n{a:\XFF}"
+143     |-t"\XFF{a:\XFF}"
+    143 |+t"\XFF{a:\\XFF}"
+144 144 | 
+145 145 | f"{a:\{1}\}"
+146 146 | t"{a:\{1}\}"
+
+W605_1.py:145:6: W605 [*] Invalid escape sequence: `\{`
+    |
+143 | t"\XFF{a:\XFF}"
+144 |
+145 | f"{a:\{1}\}"
+    |      ^^ W605
+146 | t"{a:\{1}\}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+142 142 | t"\n{a:\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+145     |-f"{a:\{1}\}"
+    145 |+rf"{a:\{1}\}"
+146 146 | t"{a:\{1}\}"
+
+W605_1.py:145:10: W605 [*] Invalid escape sequence: `\}`
+    |
+143 | t"\XFF{a:\XFF}"
+144 |
+145 | f"{a:\{1}\}"
+    |          ^^ W605
+146 | t"{a:\{1}\}"
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+142 142 | t"\n{a:\XFF}"
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+145     |-f"{a:\{1}\}"
+    145 |+rf"{a:\{1}\}"
+146 146 | t"{a:\{1}\}"
+
+W605_1.py:146:6: W605 [*] Invalid escape sequence: `\{`
+    |
+145 | f"{a:\{1}\}"
+146 | t"{a:\{1}\}"
+    |      ^^ W605
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+145 145 | f"{a:\{1}\}"
+146     |-t"{a:\{1}\}"
+    146 |+rt"{a:\{1}\}"
+
+W605_1.py:146:10: W605 [*] Invalid escape sequence: `\}`
+    |
+145 | f"{a:\{1}\}"
+146 | t"{a:\{1}\}"
+    |          ^^ W605
+    |
+    = help: Use a raw string literal
+
+ℹ Safe fix
+143 143 | t"\XFF{a:\XFF}"
+144 144 | 
+145 145 | f"{a:\{1}\}"
+146     |-t"{a:\{1}\}"
+    146 |+rt"{a:\{1}\}"
