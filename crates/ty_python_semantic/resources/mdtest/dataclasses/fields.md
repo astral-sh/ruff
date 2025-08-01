@@ -63,13 +63,12 @@ class Person:
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
 
-# TODO: the `age` and `role` fields should be keyword-only
-# revealed: (self: Person, name: str, age: int | None = None, role: str = Literal["user"]) -> None
+# revealed: (self: Person, name: str, *, age: int | None = None, role: str = Literal["user"]) -> None
 reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")
 
-# TODO: this should be an error
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
 bob = Person("Bob", 30)
 ```
 

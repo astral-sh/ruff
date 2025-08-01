@@ -1082,6 +1082,9 @@ pub(crate) struct DataclassField<'db> {
 
     /// Whether or not this field should appear in the signature of `__init__`.
     pub(crate) init: bool,
+
+    /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+    pub(crate) kw_only: Option<bool>,
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1811,6 +1814,7 @@ impl<'db> ClassLiteral<'db> {
                     mut default_ty,
                     init_only: _,
                     init,
+                    kw_only,
                 },
             ) in self.fields(db, specialization, field_policy)
             {
@@ -1875,7 +1879,10 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter = if kw_only_field_seen || name == "__replace__" {
+                let mut parameter = if kw_only_field_seen
+                    || name == "__replace__"
+                    || kw_only.unwrap_or(has_dataclass_param(DataclassParams::KW_ONLY))
+                {
                     Parameter::keyword_only(field_name)
                 } else {
                     Parameter::positional_or_keyword(field_name)
@@ -2075,9 +2082,11 @@ impl<'db> ClassLiteral<'db> {
                         default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
 
                     let mut init = true;
+                    let mut kw_only = None;
                     if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                         default_ty = Some(field.default_type(db));
                         init = field.init(db);
+                        kw_only = field.kw_only(db);
                     }
 
                     attributes.insert(
@@ -2087,6 +2096,7 @@ impl<'db> ClassLiteral<'db> {
                             default_ty,
                             init_only: attr.is_init_var(),
                             init,
+                            kw_only,
                         },
                     );
                 }
