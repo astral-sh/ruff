@@ -244,10 +244,15 @@ impl DisplaySet<'_> {
             // Note that the `invalid-syntax` colon is added manually in `ruff_db`, not here. We
             // could eventually add a colon to Ruff lint diagnostics (`F401:`) and then make the
             // colon below unconditional again.
+            //
+            // This also applies to the hard-coded `stylesheet.error()` styling of the
+            // hidden-severity `id`. This should just be `*color` again later, but for now we don't
+            // want an unformatted `id`, which is what `get_annotation_style` returns for
+            // `DisplayAnnotationType::None`.
             let annotation_type = annotation_type_str(&annotation.annotation_type);
             if let Some(id) = annotation.id {
                 if hide_severity {
-                    buffer.append(line_offset, &format!("{id} "), *color);
+                    buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
                 } else {
                     buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
                 }
