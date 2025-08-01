@@ -26,17 +26,23 @@ pub(super) struct Diagnostics<'a> {
 }
 
 impl Diagnostics<'_> {
-    pub(super) fn result_id_from_hash(diagnostics: &[ruff_db::diagnostic::Diagnostic]) -> String {
+    pub(super) fn result_id_from_hash(
+        diagnostics: &[ruff_db::diagnostic::Diagnostic],
+    ) -> Option<String> {
+        if diagnostics.is_empty() {
+            return None;
+        }
+
         // Generate result ID based on raw diagnostic content only
         let mut hasher = DefaultHasher::new();
 
         // Hash the length first to ensure different numbers of diagnostics produce different hashes
         diagnostics.hash(&mut hasher);
 
-        format!("{:x}", hasher.finish())
+        Some(format!("{:x}", hasher.finish()))
     }
 
-    pub(super) fn result_id(&self) -> String {
+    pub(super) fn result_id(&self) -> Option<String> {
         Self::result_id_from_hash(&self.items)
     }
 

@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: SignatureHelpParams,
     ) -> crate::server::Result<Option<SignatureHelp>> {
