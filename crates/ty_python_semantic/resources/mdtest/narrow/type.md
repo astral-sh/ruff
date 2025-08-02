@@ -56,12 +56,19 @@ def _(x: A | B):
 
 ## No special narrowing for custom `type` callable
 
+`stub.pyi`:
+
+```pyi
+from ty_extensions import TypeOf
+
+def type(x: object) -> TypeOf[int]: ...
+```
+
 ```py
+from stub import type
+
 class A: ...
 class B: ...
-
-def type(x):
-    return int
 
 def _(x: A | B):
     if type(x) is A:
