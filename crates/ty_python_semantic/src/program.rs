@@ -178,6 +178,12 @@ pub struct SearchPathSettings {
 
     /// List of site packages paths to use.
     pub site_packages_paths: Vec<SystemPathBuf>,
+
+    /// Option path to the real stdlib on the system, and not some instance of typeshed.
+    ///
+    /// We should ideally only ever use this for things like goto-definition,
+    /// where typeshed isn't the right answer.
+    pub real_stdlib_path: Option<SystemPathBuf>,
 }
 
 impl SearchPathSettings {
@@ -194,6 +200,7 @@ impl SearchPathSettings {
             extra_paths: vec![],
             custom_typeshed: None,
             site_packages_paths: vec![],
+            real_stdlib_path: None,
         }
     }
 

@@ -166,6 +166,11 @@ impl Options {
             SitePackagesPaths::default()
         };
 
+        let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
+            // For now this is considered non-fatal, we don't Need this for anything.
+            python_environment.real_stdlib_path(system).ok()
+        });
+
         let python_version = options_python_version
             .or_else(|| {
                 python_environment
@@ -180,6 +185,7 @@ impl Options {
             project_root,
             project_name,
             site_packages_paths,
+            real_stdlib_path,
             system,
             vendored,
         )?;
@@ -201,6 +207,7 @@ impl Options {
         project_root: &SystemPath,
         project_name: &str,
         site_packages_paths: SitePackagesPaths,
+        real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> Result<SearchPaths, SearchPathValidationError> {
@@ -273,6 +280,7 @@ impl Options {
                 .as_ref()
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
+            real_stdlib_path,
         };
 
         settings.to_search_paths(system, vendored)
