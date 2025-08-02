@@ -418,6 +418,8 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
+    /// Incompatible string prefixes
+    IncompatibleStringPrefixes(char, char),
     /// An unexpected error occurred.
     OtherError(Box<str>),
 }
@@ -465,6 +467,13 @@ impl std::fmt::Display for LexicalErrorType {
             }
             Self::MissingUnicodeRbrace => {
                 write!(f, "Missing `}}` in Unicode escape sequence")
+            }
+            Self::IncompatibleStringPrefixes(first, second) => {
+                if first.eq_ignore_ascii_case(second) {
+                    write!(f, "repeated string prefixes")
+                } else {
+                    write!(f, "\"{first}\" and \"{second}\" prefixes are incompatible")
+                }
             }
         }
     }
