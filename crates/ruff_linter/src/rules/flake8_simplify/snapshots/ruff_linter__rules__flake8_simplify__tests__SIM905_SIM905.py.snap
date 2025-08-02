@@ -1308,6 +1308,7 @@ SIM905.py:136:1: SIM905 [*] Consider using a list literal instead of `str.split`
     136 |+['"']  # ['"']
 137 137 | r"1" """
 138 138 | """.split("1")  # [r"", "\n"]
+139 139 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
 
 SIM905.py:137:1: SIM905 [*] Consider using a list literal instead of `str.split`
     |
@@ -1316,6 +1317,7 @@ SIM905.py:137:1: SIM905 [*] Consider using a list literal instead of `str.split`
 137 | / r"1" """
 138 | | """.split("1")  # [r"", "\n"]
     | |______________^ SIM905
+139 |   r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
     |
     = help: Replace with list literal
 
@@ -1326,3 +1328,20 @@ SIM905.py:137:1: SIM905 [*] Consider using a list literal instead of `str.split`
 137     |-r"1" """
 138     |-""".split("1")  # [r"", "\n"]
     137 |+[r"", "\n"]  # [r"", "\n"]
+139 138 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+SIM905.py:139:1: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+137 | r"1" """
+138 | """.split("1")  # [r"", "\n"]
+139 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^ SIM905
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+136 136 | r"" "\"".split("1")  # ['"']
+137 137 | r"1" """
+138 138 | """.split("1")  # [r"", "\n"]
+139     |-r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    139 |+["\\n\n'\""]  # ["\\n\n'\""]
