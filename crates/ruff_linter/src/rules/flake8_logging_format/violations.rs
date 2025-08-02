@@ -327,9 +327,15 @@ impl Violation for LoggingStringConcat {
 pub(crate) struct LoggingFString;
 
 impl Violation for LoggingFString {
+    const FIX_AVAILABILITY: crate::FixAvailability = crate::FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Logging statement uses f-string".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Convert to lazy `%` formatting".to_string())
     }
 }
 
