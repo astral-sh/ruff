@@ -5865,6 +5865,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var),
 
             Type::FunctionLiteral(function_type) => {
+                // TODO: do we need to replace self?
                 function_type
                     .signature(db)
                     .variance_of(db, type_var)
