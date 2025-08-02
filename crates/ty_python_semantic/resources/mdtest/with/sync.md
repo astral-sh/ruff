@@ -155,7 +155,7 @@ with context_expr as f:
 <!-- snapshot-diagnostics -->
 
 If a synchronous `with` statement is used on a type with `__aenter__` and `__aexit__`, we show a
-diagnostic hint that the user might have intended to use `asnyc with` instead.
+diagnostic hint that the user might have intended to use `async with` instead.
 
 ```py
 class Manager:

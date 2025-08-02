@@ -2416,7 +2416,11 @@ impl<'db> ClassLiteral<'db> {
                                     db,
                                     index.expression(with_item.context_expr(&module)),
                                 );
-                                let inferred_ty = context_ty.enter(db);
+                                let inferred_ty = if with_item.is_async() {
+                                    context_ty.aenter(db)
+                                } else {
+                                    context_ty.enter(db)
+                                };
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
