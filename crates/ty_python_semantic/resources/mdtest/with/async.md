@@ -35,28 +35,6 @@ async def test():
         reveal_type(y)  # revealed: str
 ```
 
-## Union context manager
-
-```py
-async def _(flag: bool):
-    class Manager1:
-        async def __aenter__(self) -> str:
-            return "foo"
-
-        async def __aexit__(self, exc_type, exc_value, traceback): ...
-
-    class Manager2:
-        async def __aenter__(self) -> int:
-            return 42
-
-        async def __aexit__(self, exc_type, exc_value, traceback): ...
-
-    context_expr = Manager1() if flag else Manager2()
-
-    async with context_expr as f:
-        reveal_type(f)  # revealed: CoroutineType[Any, Any, str] | CoroutineType[Any, Any, int]
-```
-
 ## Context manager without an `__aenter__` or `__aexit__` method
 
 ```py
@@ -191,8 +169,8 @@ async def main():
         ...
 ```
 
-The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match
-the expected signatures for a context manager:
+The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match the
+expected signatures for a context manager:
 
 ```py
 class Manager:

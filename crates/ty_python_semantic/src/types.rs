@@ -4832,24 +4832,22 @@ impl<'db> Type<'db> {
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
 
-
     /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),
-    /// return the return type of its `__enter__` method, which is bound to any potential targets.
+    /// return the return type of its `__enter__` or `__aenter__` method, which is bound to any potential targets.
     ///
     /// E.g., for the following `with` statement, given the type of `x`, infer the type of `y`:
     /// ```python
     /// with x as y:
     ///     pass
     /// ```
-    fn try_enter_with_mode(self, db: &'db dyn Db, mode: EvaluationMode) -> Result<Type<'db>, ContextManagerError<'db>> {
-        let enter_method = match mode {
-            EvaluationMode::Async => "__aenter__",
-            EvaluationMode::Sync => "__enter__",
-        };
-
-        let exit_method = match mode {
-            EvaluationMode::Async => "__aexit__",
-            EvaluationMode::Sync => "__exit__",
+    fn try_enter_with_mode(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Result<Type<'db>, ContextManagerError<'db>> {
+        let (enter_method, exit_method) = match mode {
+            EvaluationMode::Async => ("__aenter__", "__aexit__"),
+            EvaluationMode::Sync => ("__enter__", "__exit__"),
         };
 
         let enter = self.try_call_dunder(db, enter_method, CallArguments::none());
@@ -4861,12 +4859,26 @@ impl<'db> Type<'db> {
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
-            (Ok(enter), Err(exit_error)) => Err(ContextManagerError::Exit {
-                enter_return_type: enter.return_type(db),
-                exit_error,
-                mode
-            }),
+            (Ok(enter), Ok(_)) => {
+                let ty = enter.return_type(db);
+                Ok(if mode.is_async() {
+                    ty.resolve_await(db)
+                } else {
+                    ty
+                })
+            }
+            (Ok(enter), Err(exit_error)) => {
+                let ty = enter.return_type(db);
+                Err(ContextManagerError::Exit {
+                    enter_return_type: if mode.is_async() {
+                        ty.resolve_await(db)
+                    } else {
+                        ty
+                    },
+                    exit_error,
+                    mode,
+                })
+            }
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
             (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error, mode)),
             (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
@@ -6843,13 +6855,13 @@ impl<'db> ContextManagerError<'db> {
             Self::Exit {
                 enter_return_type,
                 exit_error: _,
-                mode: _
+                mode: _,
             } => Some(*enter_return_type),
             Self::Enter(enter_error, _)
             | Self::EnterAndExit {
                 enter_error,
                 exit_error: _,
-                mode: _
+                mode: _,
             } => match enter_error {
                 CallDunderError::PossiblyUnbound(call_outcome) => {
                     Some(call_outcome.return_type(db))
@@ -6861,7 +6873,7 @@ impl<'db> ContextManagerError<'db> {
         }
     }
 
-    fn context_manager_method_name(mode: &EvaluationMode, base: &str) -> &'static str {
+    fn context_manager_method_name(mode: EvaluationMode, base: &str) -> &'static str {
         match (mode, base) {
             (EvaluationMode::Async, "enter") => "__aenter__",
             (EvaluationMode::Async, "exit") => "__aexit__",
@@ -6926,13 +6938,24 @@ impl<'db> ContextManagerError<'db> {
                 enter_return_type: _,
                 exit_error,
                 mode,
-            } => format_call_dunder_error(exit_error, Self::context_manager_method_name(mode, "exit")),
-            Self::Enter(enter_error, mode) => format_call_dunder_error(enter_error, Self::context_manager_method_name(mode, "enter")),
+            } => format_call_dunder_error(
+                exit_error,
+                Self::context_manager_method_name(*mode, "exit"),
+            ),
+            Self::Enter(enter_error, mode) => format_call_dunder_error(
+                enter_error,
+                Self::context_manager_method_name(*mode, "enter"),
+            ),
             Self::EnterAndExit {
                 enter_error,
                 exit_error,
                 mode,
-            } => format_call_dunder_errors(enter_error, Self::context_manager_method_name(mode, "enter"), exit_error, Self::context_manager_method_name(mode, "exit")),
+            } => format_call_dunder_errors(
+                enter_error,
+                Self::context_manager_method_name(*mode, "enter"),
+                exit_error,
+                Self::context_manager_method_name(*mode, "exit"),
+            ),
         };
 
         let mut diag = builder.into_diagnostic(
@@ -6957,23 +6980,24 @@ impl<'db> ContextManagerError<'db> {
                 mode,
             } => mode,
         };
-        let sync_enter = context_expression_type.try_call_dunder(db, "__enter__", CallArguments::none());
-        let sync_exit = context_expression_type.try_call_dunder(
-            db,
-            "__exit__",
-            CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
-        );
-        let async_enter = context_expression_type.try_call_dunder(db, "__aenter__", CallArguments::none());
-        let async_exit = context_expression_type.try_call_dunder(
-            db,
-            "__aexit__",
-            CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
-        );
 
         match mode {
             EvaluationMode::Sync => {
-                if (async_enter.is_ok() || matches!(async_enter, Err(CallDunderError::CallError(..))))
-                    && (async_exit.is_ok() || matches!(async_exit, Err(CallDunderError::CallError(..))))
+                let async_enter = context_expression_type.try_call_dunder(
+                    db,
+                    "__aenter__",
+                    CallArguments::none(),
+                );
+                let async_exit = context_expression_type.try_call_dunder(
+                    db,
+                    "__aexit__",
+                    CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+                );
+
+                if (async_enter.is_ok()
+                    || matches!(async_enter, Err(CallDunderError::CallError(..))))
+                    && (async_exit.is_ok()
+                        || matches!(async_exit, Err(CallDunderError::CallError(..))))
                 {
                     diag.info(format_args!(
                         "Objects of type `{context_expression}` can be used as async context managers",
@@ -6983,8 +7007,17 @@ impl<'db> ContextManagerError<'db> {
                 }
             }
             EvaluationMode::Async => {
+                let sync_enter =
+                    context_expression_type.try_call_dunder(db, "__enter__", CallArguments::none());
+                let sync_exit = context_expression_type.try_call_dunder(
+                    db,
+                    "__exit__",
+                    CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+                );
+
                 if (sync_enter.is_ok() || matches!(sync_enter, Err(CallDunderError::CallError(..))))
-                    && (sync_exit.is_ok() || matches!(sync_exit, Err(CallDunderError::CallError(..))))
+                    && (sync_exit.is_ok()
+                        || matches!(sync_exit, Err(CallDunderError::CallError(..))))
                 {
                     diag.info(format_args!(
                         "Objects of type `{context_expression}` can be used as sync context managers",
