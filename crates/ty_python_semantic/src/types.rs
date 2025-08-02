@@ -4817,51 +4817,76 @@ impl<'db> Type<'db> {
     /// Returns the type bound from a context manager with type `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
-    /// For type checking, use [`try_enter`](Self::try_enter) instead.
+    /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
     fn enter(self, db: &'db dyn Db) -> Type<'db> {
-        self.try_enter(db)
+        self.try_enter_with_mode(db, EvaluationMode::Sync)
+            .unwrap_or_else(|err| err.fallback_enter_type(db))
+    }
+
+    /// Returns the type bound from a context manager with type `self`.
+    ///
+    /// This method should only be used outside of type checking because it omits any errors.
+    /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
+    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_enter_with_mode(db, EvaluationMode::Async)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
 
     /// Given the type of an object that is used as a context manager (i.e. in a `with` statement),
-    /// return the return type of its `__enter__` method, which is bound to any potential targets.
+    /// return the return type of its `__enter__` or `__aenter__` method, which is bound to any potential targets.
     ///
     /// E.g., for the following `with` statement, given the type of `x`, infer the type of `y`:
     /// ```python
     /// with x as y:
     ///     pass
     /// ```
-    fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", CallArguments::none());
+    fn try_enter_with_mode(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Result<Type<'db>, ContextManagerError<'db>> {
+        let (enter_method, exit_method) = match mode {
+            EvaluationMode::Async => ("__aenter__", "__aexit__"),
+            EvaluationMode::Sync => ("__enter__", "__exit__"),
+        };
+
+        let enter = self.try_call_dunder(db, enter_method, CallArguments::none());
         let exit = self.try_call_dunder(
             db,
-            "__exit__",
+            exit_method,
             CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
         match (enter, exit) {
-            (Ok(enter), Ok(_)) => Ok(enter.return_type(db)),
-            (Ok(enter), Err(exit_error)) => Err(ContextManagerError::Exit {
-                enter_return_type: enter.return_type(db),
-                exit_error,
-            }),
+            (Ok(enter), Ok(_)) => {
+                let ty = enter.return_type(db);
+                Ok(if mode.is_async() {
+                    ty.resolve_await(db)
+                } else {
+                    ty
+                })
+            }
+            (Ok(enter), Err(exit_error)) => {
+                let ty = enter.return_type(db);
+                Err(ContextManagerError::Exit {
+                    enter_return_type: if mode.is_async() {
+                        ty.resolve_await(db)
+                    } else {
+                        ty
+                    },
+                    exit_error,
+                    mode,
+                })
+            }
             // TODO: Use the `exit_ty` to determine if any raised exception is suppressed.
-            (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error)),
+            (Err(enter_error), Ok(_)) => Err(ContextManagerError::Enter(enter_error, mode)),
             (Err(enter_error), Err(exit_error)) => Err(ContextManagerError::EnterAndExit {
                 enter_error,
                 exit_error,
+                mode,
             }),
         }
-    }
-
-    /// Similar to [`Self::try_enter`], but for async context managers.
-    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add proper error handling and rename this method to `try_aenter`.
-        self.try_call_dunder(db, "__aenter__", CallArguments::none())
-            .map_or(Type::unknown(), |result| {
-                result.return_type(db).resolve_await(db)
-            })
     }
 
     /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
@@ -6805,14 +6830,16 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
 /// Error returned if a type is not (or may not be) a context manager.
 #[derive(Debug)]
 enum ContextManagerError<'db> {
-    Enter(CallDunderError<'db>),
+    Enter(CallDunderError<'db>, EvaluationMode),
     Exit {
         enter_return_type: Type<'db>,
         exit_error: CallDunderError<'db>,
+        mode: EvaluationMode,
     },
     EnterAndExit {
         enter_error: CallDunderError<'db>,
         exit_error: CallDunderError<'db>,
+        mode: EvaluationMode,
     },
 }
 
@@ -6828,11 +6855,13 @@ impl<'db> ContextManagerError<'db> {
             Self::Exit {
                 enter_return_type,
                 exit_error: _,
+                mode: _,
             } => Some(*enter_return_type),
-            Self::Enter(enter_error)
+            Self::Enter(enter_error, _)
             | Self::EnterAndExit {
                 enter_error,
                 exit_error: _,
+                mode: _,
             } => match enter_error {
                 CallDunderError::PossiblyUnbound(call_outcome) => {
                     Some(call_outcome.return_type(db))
@@ -6841,6 +6870,16 @@ impl<'db> ContextManagerError<'db> {
                 CallDunderError::CallError(_, bindings) => Some(bindings.return_type(db)),
                 CallDunderError::MethodNotAvailable => None,
             },
+        }
+    }
+
+    fn context_manager_method_name(mode: EvaluationMode, base: &str) -> &'static str {
+        match (mode, base) {
+            (EvaluationMode::Async, "enter") => "__aenter__",
+            (EvaluationMode::Async, "exit") => "__aexit__",
+            (EvaluationMode::Sync, "enter") => "__enter__",
+            (EvaluationMode::Sync, "exit") => "__exit__",
+            _ => unreachable!(),
         }
     }
 
@@ -6898,12 +6937,25 @@ impl<'db> ContextManagerError<'db> {
             Self::Exit {
                 enter_return_type: _,
                 exit_error,
-            } => format_call_dunder_error(exit_error, "__exit__"),
-            Self::Enter(enter_error) => format_call_dunder_error(enter_error, "__enter__"),
+                mode,
+            } => format_call_dunder_error(
+                exit_error,
+                Self::context_manager_method_name(*mode, "exit"),
+            ),
+            Self::Enter(enter_error, mode) => format_call_dunder_error(
+                enter_error,
+                Self::context_manager_method_name(*mode, "enter"),
+            ),
             Self::EnterAndExit {
                 enter_error,
                 exit_error,
-            } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
+                mode,
+            } => format_call_dunder_errors(
+                enter_error,
+                Self::context_manager_method_name(*mode, "enter"),
+                exit_error,
+                Self::context_manager_method_name(*mode, "exit"),
+            ),
         };
 
         let mut diag = builder.into_diagnostic(
@@ -6913,23 +6965,67 @@ impl<'db> ContextManagerError<'db> {
             ),
         );
 
-        // If `__aenter__` and `__aexit__` are available, the user may have intended to use `async with` instead of `with`:
-        if let (
-            Ok(_) | Err(CallDunderError::CallError(..)),
-            Ok(_) | Err(CallDunderError::CallError(..)),
-        ) = (
-            context_expression_type.try_call_dunder(db, "__aenter__", CallArguments::none()),
-            context_expression_type.try_call_dunder(
-                db,
-                "__aexit__",
-                CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
-            ),
-        ) {
-            diag.info(format_args!(
-                "Objects of type `{context_expression}` can be used as async context managers",
-                context_expression = context_expression_type.display(db)
-            ));
-            diag.info("Consider using `async with` here");
+        // Suggest using `async with` if only async methods are available in a sync context,
+        // or suggest using `with` if only sync methods are available in an async context.
+        let mode = match self {
+            Self::Exit {
+                enter_return_type: _,
+                exit_error: _,
+                mode,
+            } => mode,
+            Self::Enter(_, mode) => mode,
+            Self::EnterAndExit {
+                enter_error: _,
+                exit_error: _,
+                mode,
+            } => mode,
+        };
+
+        match mode {
+            EvaluationMode::Sync => {
+                let async_enter = context_expression_type.try_call_dunder(
+                    db,
+                    "__aenter__",
+                    CallArguments::none(),
+                );
+                let async_exit = context_expression_type.try_call_dunder(
+                    db,
+                    "__aexit__",
+                    CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+                );
+
+                if (async_enter.is_ok()
+                    || matches!(async_enter, Err(CallDunderError::CallError(..))))
+                    && (async_exit.is_ok()
+                        || matches!(async_exit, Err(CallDunderError::CallError(..))))
+                {
+                    diag.info(format_args!(
+                        "Objects of type `{context_expression}` can be used as async context managers",
+                        context_expression = context_expression_type.display(db)
+                    ));
+                    diag.info("Consider using `async with` here");
+                }
+            }
+            EvaluationMode::Async => {
+                let sync_enter =
+                    context_expression_type.try_call_dunder(db, "__enter__", CallArguments::none());
+                let sync_exit = context_expression_type.try_call_dunder(
+                    db,
+                    "__exit__",
+                    CallArguments::positional([Type::unknown(), Type::unknown(), Type::unknown()]),
+                );
+
+                if (sync_enter.is_ok() || matches!(sync_enter, Err(CallDunderError::CallError(..))))
+                    && (sync_exit.is_ok()
+                        || matches!(sync_exit, Err(CallDunderError::CallError(..))))
+                {
+                    diag.info(format_args!(
+                        "Objects of type `{context_expression}` can be used as sync context managers",
+                        context_expression = context_expression_type.display(db)
+                    ));
+                    diag.info("Consider using `with` here");
+                }
+            }
         }
     }
 }

@@ -75,20 +75,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     );
                     err.fallback_element_type(self.db())
                 }),
-            UnpackKind::ContextManager { mode } => {
-                if mode.is_async() {
-                    value_type.aenter(self.db())
-                } else {
-                    value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(
-                            &self.context,
-                            value_type,
-                            value.as_any_node_ref(self.db(), self.module()),
-                        );
-                        err.fallback_enter_type(self.db())
-                    })
-                }
-            }
+            UnpackKind::ContextManager { mode } => value_type
+                .try_enter_with_mode(self.db(), mode)
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_enter_type(self.db())
+                }),
         };
 
         self.unpack_inner(

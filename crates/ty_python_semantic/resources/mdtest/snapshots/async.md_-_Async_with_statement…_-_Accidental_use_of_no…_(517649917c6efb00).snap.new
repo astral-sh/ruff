@@ -1,0 +1,92 @@
+---
+source: crates/ty_test/src/lib.rs
+assertion_line: 397
+expression: snapshot
+---
+---
+mdtest name: async.md - Async with statements - Accidental use of non-async `with`
+mdtest path: crates/ty_python_semantic/resources/mdtest/with/async.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Manager:
+ 2 |     async def __enter__(self): ...
+ 3 |     async def __exit__(self, *args): ...
+ 4 | 
+ 5 | async def main():
+ 6 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+ 7 |     async with Manager():
+ 8 |         ...
+ 9 | class Manager:
+10 |     async def __enter__(self): ...
+11 |     async def __exit__(self, typ: str, exc, traceback): ...
+12 | 
+13 | async def main():
+14 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+15 |     async with Manager():
+16 |         ...
+17 | class Manager:
+18 |     def __enter__(self, wrong_extra_arg): ...
+19 |     def __exit__(self, typ, exc, traceback, wrong_extra_arg): ...
+20 | 
+21 | async def main():
+22 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+23 |     async with Manager():
+24 |         ...
+```
+
+# Diagnostics
+
+```
+error[invalid-context-manager]: Object of type `Manager | Manager | Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`
+ --> src/mdtest_snippet.py:7:16
+  |
+5 | async def main():
+6 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__`…
+7 |     async with Manager():
+  |                ^^^^^^^^^
+8 |         ...
+9 | class Manager:
+  |
+info: Objects of type `Manager | Manager | Manager` can be used as sync context managers
+info: Consider using `with` here
+info: rule `invalid-context-manager` is enabled by default
+
+```
+
+```
+error[invalid-context-manager]: Object of type `Manager | Manager | Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`
+  --> src/mdtest_snippet.py:15:16
+   |
+13 | async def main():
+14 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__`…
+15 |     async with Manager():
+   |                ^^^^^^^^^
+16 |         ...
+17 | class Manager:
+   |
+info: Objects of type `Manager | Manager | Manager` can be used as sync context managers
+info: Consider using `with` here
+info: rule `invalid-context-manager` is enabled by default
+
+```
+
+```
+error[invalid-context-manager]: Object of type `Manager | Manager | Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`
+  --> src/mdtest_snippet.py:23:16
+   |
+21 | async def main():
+22 |     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__`…
+23 |     async with Manager():
+   |                ^^^^^^^^^
+24 |         ...
+   |
+info: Objects of type `Manager | Manager | Manager` can be used as sync context managers
+info: Consider using `with` here
+info: rule `invalid-context-manager` is enabled by default
+
+```
