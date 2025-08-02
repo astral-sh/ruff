@@ -1,8 +1,9 @@
+use crate::semantic_index::scope::FileScopeId;
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -123,6 +124,26 @@ pub(super) struct SymbolTable {
     ///
     /// Uses a hash table to avoid storing the name twice.
     map: hashbrown::HashTable<ScopedSymbolId>,
+
+    // The resolutions of variables that are either used-but-not-defined or explicitly marked
+    // `global` or `nonlocal` in this scope. These (keys) are similar to what CPython calls "free"
+    // variables, except that we also include variables marked `global`.
+    pub(super) definitions_in_enclosing_scopes:
+        FxHashMap<ScopedSymbolId, (FileScopeId, ScopedSymbolId)>,
+
+    // The inverse of `definitions_in_enclosing_scopes` above: variables defined in this scope,
+    // and not marked `global` or `nonlocal` here, which are used or bound in nested scopes.
+    // These (keys) are similar to what CPython calls "cell" variables, except that this scope
+    // may also be the global scope. We also include nested scopes that only mark a variable
+    // `global` or `nonlocal` but don't touch it after that. Those aren't very useful, but IDE
+    // features like "rename all" will still want to know about them.
+    pub(super) references_in_nested_scopes:
+        FxHashMap<ScopedSymbolId, Vec<(FileScopeId, ScopedSymbolId)>>,
+
+    // A subset of `references_in_nested_scopes` above: variables defined in this scope, and not
+    // marked `nonlocal` or `global`, which are bound in nested scopes.
+    pub(super) bindings_in_nested_scopes:
+        FxHashMap<ScopedSymbolId, Vec<(FileScopeId, ScopedSymbolId)>>,
 }
 
 impl SymbolTable {
@@ -154,6 +175,11 @@ impl SymbolTable {
     /// Iterate over the symbols in this symbol table.
     pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
         self.symbols.iter()
+    }
+
+    /// Iterate over the symbols in this symbol table, along with their IDs.
+    pub(crate) fn iter_enumerated(&self) -> impl Iterator<Item = (ScopedSymbolId, &Symbol)> {
+        self.symbols.iter_enumerated()
     }
 
     fn hash_name(name: &str) -> u64 {
@@ -212,12 +238,64 @@ impl SymbolTableBuilder {
         }
     }
 
+    pub(super) fn add_reference_in_nested_scope(
+        &mut self,
+        this_scope_symbol_id: ScopedSymbolId,
+        nested_scope: FileScopeId,
+        nested_scope_symbol_id: ScopedSymbolId,
+        is_bound_in_nested_scope: bool,
+    ) {
+        let references = self
+            .table
+            .references_in_nested_scopes
+            .entry(this_scope_symbol_id)
+            .or_default();
+        debug_assert!(
+            !references.contains(&(nested_scope, nested_scope_symbol_id)),
+            "the same scoped symbol shouldn't get added more than once",
+        );
+        references.push((nested_scope, nested_scope_symbol_id));
+
+        if is_bound_in_nested_scope {
+            let bindings = self
+                .table
+                .bindings_in_nested_scopes
+                .entry(this_scope_symbol_id)
+                .or_default();
+            debug_assert!(
+                !bindings.contains(&(nested_scope, nested_scope_symbol_id)),
+                "the same scoped symbol shouldn't get added more than once",
+            );
+            bindings.push((nested_scope, nested_scope_symbol_id));
+        }
+    }
+
+    pub(super) fn add_definition_in_enclosing_scope(
+        &mut self,
+        this_scope_symbol_id: ScopedSymbolId,
+        enclosing_scope: FileScopeId,
+        enclosing_scope_symbol_id: ScopedSymbolId,
+    ) {
+        let definition_pair = (enclosing_scope, enclosing_scope_symbol_id);
+        let previous = self
+            .table
+            .definitions_in_enclosing_scopes
+            .insert(this_scope_symbol_id, definition_pair);
+        assert!(
+            previous.is_none(),
+            "each free variable should only be resolved once",
+        );
+    }
+
     pub(super) fn build(self) -> SymbolTable {
         let mut table = self.table;
         table.symbols.shrink_to_fit();
         table
             .map
             .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
+        table.definitions_in_enclosing_scopes.shrink_to_fit();
+        table.references_in_nested_scopes.shrink_to_fit();
+        table.bindings_in_nested_scopes.shrink_to_fit();
         table
     }
 }
