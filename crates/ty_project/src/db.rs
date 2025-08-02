@@ -15,7 +15,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_python_semantic::{CallStack, Db as SemanticDb, Program};
 
 mod changes;
 
@@ -39,6 +39,8 @@ pub struct ProjectDatabase {
     // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
     // we try to mutably borrow using `Arc::get_mut` (like `system`).
     storage: salsa::Storage<ProjectDatabase>,
+
+    call_stack: CallStack,
 }
 
 impl ProjectDatabase {
@@ -63,6 +65,7 @@ impl ProjectDatabase {
             }),
             files: Files::default(),
             system: Arc::new(system),
+            call_stack: CallStack::default(),
         };
 
         // TODO: Use the `program_settings` to compute the key for the database's persistent
@@ -415,6 +418,10 @@ impl SemanticDb for ProjectDatabase {
     fn lint_registry(&self) -> &LintRegistry {
         &DEFAULT_LINT_REGISTRY
     }
+
+    fn call_stack(&self) -> &CallStack {
+        &self.call_stack
+    }
 }
 
 #[salsa::db]
@@ -473,7 +480,7 @@ pub(crate) mod tests {
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 
     use crate::DEFAULT_LINT_REGISTRY;
-    use crate::db::Db;
+    use crate::db::{CallStack, Db};
     use crate::{Project, ProjectMetadata};
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
@@ -487,6 +494,7 @@ pub(crate) mod tests {
         system: TestSystem,
         vendored: VendoredFileSystem,
         project: Option<Project>,
+        call_stack: CallStack,
     }
 
     impl TestDb {
@@ -505,6 +513,7 @@ pub(crate) mod tests {
                 files: Files::default(),
                 events,
                 project: None,
+                call_stack: CallStack::default(),
             };
 
             let project = Project::from_metadata(&db, project).unwrap();
@@ -563,6 +572,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             &DEFAULT_LINT_REGISTRY
+        }
+
+        fn call_stack(&self) -> &CallStack {
+            &self.call_stack
         }
     }
 

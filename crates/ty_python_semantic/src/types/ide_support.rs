@@ -743,7 +743,9 @@ pub fn call_signature_details<'db>(
             CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
                 splatted_value.inferred_type(&model)
             });
-        let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
+        let bindings = callable_type
+            .bindings(db)
+            .match_parameters(db, &call_arguments);
 
         // Extract signature details from all callable bindings
         bindings

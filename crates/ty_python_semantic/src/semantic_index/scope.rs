@@ -29,6 +29,10 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
+    pub(crate) fn is_function_or_lambda(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_function_or_lambda()
+    }
+
     pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_type_parameter()
     }
@@ -245,6 +249,10 @@ impl ScopeKind {
                 | ScopeKind::TypeAlias
                 | ScopeKind::Comprehension
         )
+    }
+
+    pub(crate) const fn is_function_or_lambda(self) -> bool {
+        matches!(self, ScopeKind::Function | ScopeKind::Lambda)
     }
 
     pub(crate) const fn is_class(self) -> bool {

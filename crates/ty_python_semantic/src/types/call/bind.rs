@@ -98,11 +98,15 @@ impl<'db> Bindings<'db> {
     ///
     /// Once you have argument types available, you can call [`check_types`][Self::check_types] to
     /// verify that each argument type is assignable to the corresponding parameter type.
-    pub(crate) fn match_parameters(mut self, arguments: &CallArguments<'_, 'db>) -> Self {
+    pub(crate) fn match_parameters(
+        mut self,
+        db: &'db dyn Db,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
         let mut conflicting_forms = vec![false; arguments.len()];
         for binding in &mut self.elements {
-            binding.match_parameters(arguments, &mut argument_forms, &mut conflicting_forms);
+            binding.match_parameters(db, arguments, &mut argument_forms, &mut conflicting_forms);
         }
         self.argument_forms = argument_forms.into();
         self.conflicting_forms = conflicting_forms.into();
@@ -1221,6 +1225,7 @@ impl<'db> CallableBinding<'db> {
 
     fn match_parameters(
         &mut self,
+        db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -1230,7 +1235,7 @@ impl<'db> CallableBinding<'db> {
         let arguments = arguments.with_self(self.bound_type);
 
         for overload in &mut self.overloads {
-            overload.match_parameters(arguments.as_ref(), argument_forms, conflicting_forms);
+            overload.match_parameters(db, arguments.as_ref(), argument_forms, conflicting_forms);
         }
     }
 
@@ -2263,6 +2268,7 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn match_parameters(
         &mut self,
+        db: &'db dyn Db,
         arguments: &CallArguments<'_, 'db>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -2292,7 +2298,12 @@ impl<'db> Binding<'db> {
                 }
             }
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+
+        self.return_ty = self.signature.return_ty.unwrap_or_else(|| {
+            self.callable_type
+                .infer_return_type(db)
+                .unwrap_or(Type::unknown())
+        });
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.argument_matches = matcher.finish();
     }

@@ -1,6 +1,5 @@
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
-use ruff_db::parsed::parsed_module;
 
 use std::borrow::Cow;
 use std::slice::Iter;
@@ -14,6 +13,7 @@ use diagnostic::{
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -43,7 +43,7 @@ use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, walk_generic_context,
@@ -54,7 +54,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name,
 };
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::{infer_scope_types_with_call_stack, infer_unpack_types};
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -4549,6 +4549,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
+    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
+                Some(function_type.infer_return_type(db))
+            }
+            Type::BoundMethod(method_type) if !method_type.function(db).file(db).is_stub(db) => {
+                Some(method_type.infer_return_type(db))
+            }
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4561,7 +4574,7 @@ impl<'db> Type<'db> {
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
-            .match_parameters(argument_types)
+            .match_parameters(db, argument_types)
             .check_types(db, argument_types)
     }
 
@@ -4610,7 +4623,7 @@ impl<'db> Type<'db> {
             Place::Type(dunder_callable, boundness) => {
                 let bindings = dunder_callable
                     .bindings(db)
-                    .match_parameters(argument_types)
+                    .match_parameters(db, argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -7765,6 +7778,7 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, method.self_instance(db));
 }
 
+#[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
@@ -7778,6 +7792,74 @@ impl<'db> BoundMethodType<'db> {
             ),
             false,
         )
+    }
+
+    /// Infers this method scope's types and returns the inferred return type.
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self
+            .function(db)
+            .literal(db)
+            .last_definition(db)
+            .body_scope(db);
+        if db
+            .call_stack()
+            .contains(scope.file(db), scope.file_scope_id(db))
+        {
+            return Type::unknown();
+        }
+        let inference = infer_scope_types_with_call_stack(db, scope, db.call_stack().hash_value());
+        inference.infer_return_type(db, Some(self))
+    }
+
+    #[salsa::tracked]
+    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        let module = parsed_module(db, definition_scope.file(db)).load(db);
+        Some(index.expect_single_definition(definition_scope.node(db).as_class(&module)?))
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let Some(class_ty) = self
+            .class_definition(db)
+            .and_then(|class| binding_type(db, class).into_class_literal())
+        else {
+            return false;
+        };
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    pub(crate) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
+        let name = self.function(db).name(db);
+
+        let base = class
+            .iter_mro(db)
+            .nth(1)
+            .and_then(class_base::ClassBase::into_class)?;
+        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
+        if let Place::Type(Type::FunctionLiteral(base_func), _) = base_member.place {
+            if let [signature] = base_func.signature(db).overloads.as_slice() {
+                signature.return_ty.or_else(|| {
+                    let base_method_ty =
+                        base_func.into_bound_method_type(db, Type::instance(db, class));
+                    base_method_ty.infer_return_type(db)
+                })
+            } else {
+                // TODO: Handle overloaded base methods.
+                None
+            }
+        } else {
+            None
+        }
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
