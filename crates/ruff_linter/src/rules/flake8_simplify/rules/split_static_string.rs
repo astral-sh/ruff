@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringFlags, StringLiteral,
-    StringLiteralFlags, StringLiteralValue, UnaryOp, str::TripleQuotes,
+    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
+    StringLiteralValue, UnaryOp, str::TripleQuotes,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -116,23 +117,45 @@ pub(crate) fn split_static_string(
     }
 }
 
+fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
+    // In the ideal case we can wrap the element in _single_ quotes of the same
+    // style. For example, both of these are okay:
+    //
+    // ```python
+    // """itemA
+    // itemB
+    // itemC""".split() # -> ["itemA", "itemB", "itemC"]
+    // ```
+    //
+    // ```python
+    // r"""itemA
+    // 'single'quoted
+    // """.split() # -> [r"itemA",r"'single'quoted'"]
+    // ```
+    if !flags.prefix().is_raw() || !elt.contains(flags.quote_style().as_char()) {
+        flags.with_triple_quotes(TripleQuotes::No)
+    }
+    // If we have a raw string containing a quotation mark of the same style,
+    // then we have to swap the style of quotation marks used
+    else if !elt.contains(flags.quote_style().opposite().as_char()) {
+        flags
+            .with_quote_style(flags.quote_style().opposite())
+            .with_triple_quotes(TripleQuotes::No)
+    } else
+    // If both types of quotes are used in the raw, triple-quoted string, then
+    // we are forced to either add escapes or keep the triple quotes. We opt for
+    // the latter.
+    {
+        flags
+    }
+}
+
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     Expr::List(ExprList {
         elts: elts
             .iter()
             .map(|elt| {
-                let element_flags = if flags.prefix().is_raw() {
-                    if elt.contains('"') || elt.contains('\'') {
-                        StringLiteralFlags::empty()
-                            .with_quote_style(flags.quote_style())
-                            .with_triple_quotes(TripleQuotes::No)
-                    } else {
-                        flags.with_triple_quotes(TripleQuotes::No)
-                    }
-                } else {
-                    flags.with_triple_quotes(TripleQuotes::No)
-                };
-
+                let element_flags = replace_flags(elt, flags);
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
