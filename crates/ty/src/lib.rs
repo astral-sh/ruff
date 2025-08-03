@@ -265,6 +265,9 @@ impl MainLoop {
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
+            if self.watcher.is_some() {
+                Printer::clear_screen()?;
+            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();

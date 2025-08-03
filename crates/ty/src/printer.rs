@@ -1,5 +1,6 @@
 use std::io::StdoutLock;
 
+use anyhow::Result;
 use indicatif::ProgressDrawTarget;
 
 use crate::logging::VerbosityLevel;
@@ -108,6 +109,12 @@ impl Printer {
     /// For example, in `ty check`, this would be used for the diagnostic output.
     pub(crate) fn stream_for_details(self) -> Stdout {
         self.stdout_general()
+    }
+
+    pub(crate) fn clear_screen() -> Result<()> {
+        #[cfg(not(target_family = "wasm"))]
+        clearscreen::clear()?;
+        Ok(())
     }
 }
 
