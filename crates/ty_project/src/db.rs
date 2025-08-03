@@ -12,8 +12,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Event, Setter};
+use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -34,7 +33,7 @@ pub struct ProjectDatabase {
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 
-    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // IMPORTANT: This field must be the last because we use `trigger_cancellation` (drops all other storage references)
     // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
     // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
     // we try to mutably borrow using `Arc::get_mut` (like `system`).
@@ -114,12 +113,11 @@ impl ProjectDatabase {
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
     pub fn system_mut(&mut self) -> &mut dyn System {
-        // TODO: Use a more official method to cancel other queries.
-        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = self.zalsa_mut();
+        self.trigger_cancellation();
 
-        Arc::get_mut(&mut self.system)
-            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
+        Arc::get_mut(&mut self.system).expect(
+            "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
+        )
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
