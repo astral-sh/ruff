@@ -155,3 +155,9 @@ user+mailbox/department=shipping@example.com
 "Abc@def"@example.com
 "Fred\ Bloggs"@example.com
 "Joe.\\Blow"@example.com""".split("\n")
+
+
+r"""first
+'no need' to escape
+"swap" quote style
+"use' ugly triple quotes""".split("\n")
