@@ -2,6 +2,8 @@
 //! Helper functions for the tests of rule implementations.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
+use std::fmt;
 use std::path::Path;
 
 #[cfg(not(fuzzing))]
@@ -32,6 +34,85 @@ use crate::source_kind::SourceKind;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
+/// Represents the difference between two diagnostic runs.
+#[derive(Debug)]
+pub(crate) struct DiagnosticsDiff {
+    /// Diagnostics that were removed (present in 'before' but not in 'after')
+    removed: Vec<Diagnostic>,
+    /// Diagnostics that were added (present in 'after' but not in 'before')
+    added: Vec<Diagnostic>,
+    /// Diagnostic that are the same in both runs
+    unchanged: Vec<Diagnostic>,
+}
+
+impl fmt::Display for DiagnosticsDiff {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "--- Summary ---")?;
+        writeln!(f, "Removed: {}", self.removed.len())?;
+        writeln!(f, "Added: {}", self.added.len())?;
+        writeln!(f, "Unchanged: {}", self.unchanged.len())?;
+        writeln!(f)?;
+
+        if !self.removed.is_empty() {
+            writeln!(f, "--- Removed ---")?;
+            for diagnostic in &self.removed {
+                writeln!(f, "{}", print_messages(&[diagnostic.clone()]))?;
+            }
+            writeln!(f)?;
+        }
+
+        if !self.added.is_empty() {
+            writeln!(f, "--- Added ---")?;
+            for diagnostic in &self.added {
+                writeln!(f, "{}", print_messages(&[diagnostic.clone()]))?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// Compare two sets of diagnostics and return the differences
+fn diff_diagnostics(before: Vec<Diagnostic>, after: Vec<Diagnostic>) -> DiagnosticsDiff {
+    fn key(diagnostic: &Diagnostic) -> String {
+        format!(
+            "{}:{}:{}",
+            diagnostic.expect_range().start().to_usize(),
+            diagnostic.expect_range().end().to_usize(),
+            diagnostic.id()
+        )
+    }
+
+    let mut after_map: HashMap<String, Diagnostic> = after
+        .iter()
+        .map(|diagnostic| (key(diagnostic), diagnostic.clone()))
+        .collect();
+
+    let mut removed = Vec::new();
+    let mut unchanged = Vec::new();
+
+    // Iterate over original `before` vector to preserve ordering
+    for diagnostic in before {
+        if after_map.remove(&key(&diagnostic)).is_some() {
+            unchanged.push(diagnostic);
+        } else {
+            removed.push(diagnostic);
+        }
+    }
+
+    let added: Vec<Diagnostic> = after
+        .into_iter()
+        .filter(|diagnostic| after_map.contains_key(&key(diagnostic)))
+        .collect();
+
+    DiagnosticsDiff {
+        removed,
+        added,
+        unchanged,
+    }
+}
+
 #[cfg(not(fuzzing))]
 pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
@@ -47,6 +128,20 @@ pub(crate) fn test_path(
     let source_type = PySourceType::from(&path);
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
+}
+
+/// Test a file with two different settings and return the differences
+#[cfg(not(fuzzing))]
+pub(crate) fn test_path_with_settings_diff(
+    path: impl AsRef<Path>,
+    settings_before: &LinterSettings,
+    settings_after: &LinterSettings,
+) -> Result<DiagnosticsDiff> {
+    let diagnostics_before = test_path(&path, settings_before)?;
+    let diagnostic_after = test_path(&path, settings_after)?;
+
+    let diff = diff_diagnostics(diagnostics_before, diagnostic_after);
+    Ok(diff)
 }
 
 #[cfg(not(fuzzing))]
@@ -399,4 +494,65 @@ macro_rules! assert_diagnostics {
             insta::assert_snapshot!($crate::test::print_messages(&$value));
         });
     }};
+}
+
+#[macro_export]
+macro_rules! assert_diagnostics_diff {
+    ($snapshot:expr, $path:expr, $settings_before:expr, $settings_after:expr) => {{
+        let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!($snapshot, format!("{}", diff));
+        });
+    }};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_diff_diagnostics() -> Result<()> {
+        use crate::codes::Rule;
+        use ruff_db::diagnostic::{DiagnosticId, LintName};
+
+        let settings_before = LinterSettings::for_rule(Rule::Print);
+        let settings_after = LinterSettings::for_rule(Rule::UnusedImport);
+
+        let test_code = r#"
+import sys
+import unused_module
+
+def main():
+    print(sys.version)
+"#;
+
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("test_diff.py");
+        std::fs::write(&test_file, test_code)?;
+
+        let diff =
+            super::test_path_with_settings_diff(&test_file, &settings_before, &settings_after)?;
+
+        assert_eq!(diff.removed.len(), 1, "Should remove 1 print diagnostic");
+        assert_eq!(
+            diff.removed[0].id(),
+            DiagnosticId::Lint(LintName::of("print")),
+            "Should remove the print diagnostic"
+        );
+        assert_eq!(diff.added.len(), 1, "Should add 1 unused import diagnostic");
+        assert_eq!(
+            diff.added[0].id(),
+            DiagnosticId::Lint(LintName::of("unused-import")),
+            "Should add the unused import diagnostic"
+        );
+        assert_eq!(
+            diff.unchanged.len(),
+            0,
+            "Should have no unchanged diagnostics"
+        );
+
+        std::fs::remove_file(test_file)?;
+
+        Ok(())
+    }
 }
