@@ -1326,4 +1326,27 @@ SIM905.py:135:1: SIM905 [*] Consider using a list literal instead of `str.split`
 155     |-"Abc@def"@example.com
 156     |-"Fred\ Bloggs"@example.com
 157     |-"Joe.\\Blow"@example.com""".split("\n")
-    135 |+[r"simple@example.com", r"very.common@example.com", r"FirstName.LastName@EasierReading.org", r"x@example.com", r"long.email-address-with-hyphens@and.subdomains.example.com", r"user.name+tag+sorting@example.com", r"name/surname@example.com", r"xample@s.example", '" "@example.org', '"john..doe"@example.org', r"mailhost!username@example.org", '"very.(),:;<>[]\\".VERY.\\"very@\\\\ \\"very\\".unusual"@strange.example.com', r"user%example.com@example.org", r"user-@example.org", r"I❤️CHOCOLATE@example.com", 'this\\ still\\"not\\\\allowed@example.com', r"stellyamburrr985@example.com", r"Abc.123@example.com", r"user+mailbox/department=shipping@example.com", "!#$%&'*+-/=?^_`.{|}~@example.com", '"Abc@def"@example.com', '"Fred\\ Bloggs"@example.com', '"Joe.\\\\Blow"@example.com']
+    135 |+[r"simple@example.com", r"very.common@example.com", r"FirstName.LastName@EasierReading.org", r"x@example.com", r"long.email-address-with-hyphens@and.subdomains.example.com", r"user.name+tag+sorting@example.com", r"name/surname@example.com", r"xample@s.example", r'" "@example.org', r'"john..doe"@example.org', r"mailhost!username@example.org", r'"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com', r"user%example.com@example.org", r"user-@example.org", r"I❤️CHOCOLATE@example.com", r'this\ still\"not\\allowed@example.com', r"stellyamburrr985@example.com", r"Abc.123@example.com", r"user+mailbox/department=shipping@example.com", r"!#$%&'*+-/=?^_`.{|}~@example.com", r'"Abc@def"@example.com', r'"Fred\ Bloggs"@example.com', r'"Joe.\\Blow"@example.com']
+158 136 | 
+159 137 | 
+160 138 | r"""first
+
+SIM905.py:160:1: SIM905 [*] Consider using a list literal instead of `str.split`
+    |
+160 | / r"""first
+161 | | 'no need' to escape
+162 | | "swap" quote style
+163 | | "use' ugly triple quotes""".split("\n")
+    | |_______________________________________^ SIM905
+    |
+    = help: Replace with list literal
+
+ℹ Safe fix
+157 157 | "Joe.\\Blow"@example.com""".split("\n")
+158 158 | 
+159 159 | 
+160     |-r"""first
+161     |-'no need' to escape
+162     |-"swap" quote style
+163     |-"use' ugly triple quotes""".split("\n")
+    160 |+[r"first", r"'no need' to escape", r'"swap" quote style', r""""use' ugly triple quotes"""]
