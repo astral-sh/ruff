@@ -158,7 +158,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
         Ok("full") => {
             write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
-            write!(stdout, "{:#?}", take_memory_usage())?;
         }
         Ok(other) => {
             tracing::warn!(

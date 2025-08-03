@@ -3,7 +3,6 @@ use crate::semantic_index::member::{
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
-use ruff_db::increment_memory_usage;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
 use smallvec::SmallVec;
@@ -140,22 +139,10 @@ pub enum ScopedPlaceId {
     Member(ScopedMemberId),
 }
 
-#[derive(Debug, Eq, PartialEq, salsa::Update)]
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
-}
-
-impl get_size2::GetSize for PlaceTable {
-    fn get_heap_size(&self) -> usize {
-        let symbols = self.symbols.get_heap_size();
-        let members = self.members.get_heap_size();
-
-        increment_memory_usage("symbols", symbols);
-        increment_memory_usage("members", members);
-
-        symbols + members
-    }
 }
 
 impl PlaceTable {

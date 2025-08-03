@@ -43,25 +43,6 @@ pub fn set_program_version(version: String) -> Result<(), String> {
     VERSION.set(version)
 }
 
-thread_local! {
-    static MEMORY_USAGE_MAP: std::cell::RefCell<FxDashMap<String, usize>> = std::cell::RefCell::new(FxDashMap::default());
-}
-
-pub fn take_memory_usage() -> FxDashMap<String, usize> {
-    MEMORY_USAGE_MAP.with(|map| {
-        let mut map = map.borrow_mut();
-        std::mem::take(&mut *map)
-    })
-}
-
-pub fn increment_memory_usage(ty: &str, amount: usize) {
-    MEMORY_USAGE_MAP.with(|map| {
-        let map = map.borrow_mut();
-        let mut entry = map.entry(ty.to_string()).or_default();
-        *entry += amount;
-    });
-}
-
 /// Most basic database that gives access to files, the host system, source code, and parsed AST.
 #[salsa::db]
 pub trait Db: salsa::Database {
