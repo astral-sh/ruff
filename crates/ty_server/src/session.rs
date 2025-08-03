@@ -1,10 +1,5 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
-
 use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::Message;
@@ -15,14 +10,18 @@ use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use std::collections::{BTreeMap, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
-pub use self::options::ClientOptions;
-pub(crate) use self::options::{AllOptions, DiagnosticMode};
+pub(crate) use self::options::AllOptions;
+pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::ClientSettings;
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::publish_settings_diagnostics;
@@ -83,7 +82,6 @@ pub(crate) struct Session {
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
-    pub(crate) db: ProjectDatabase,
     /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
@@ -98,6 +96,14 @@ pub(crate) struct ProjectState {
     /// for so that we can clear the diagnostics for all of them before we go
     /// to update any of them.
     pub(crate) untracked_files_with_pushed_diagnostics: Vec<Url>,
+
+    // Note: This field should be last to ensure the `db` gets dropped last.
+    // The db drop order matters because we call `Arc::into_inner` on some Arc's
+    // and we use Salsa's cancellation to guarantee that there's only a single reference to the `Arc`.
+    // However, this requires that the db drops last.
+    // This shouldn't matter here because the db's stored in the session are the
+    // only reference we want to hold on, but better be safe than sorry ;).
+    pub(crate) db: ProjectDatabase,
 }
 
 impl Session {
@@ -339,7 +345,6 @@ impl Session {
         client: &Client,
     ) {
         assert!(!self.workspaces.all_initialized());
-
         for (url, options) in workspace_settings {
             tracing::debug!("Initializing workspace `{url}`");
 
@@ -453,6 +458,7 @@ impl Session {
                 .collect(),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
+            resolved_client_capabilities: self.resolved_client_capabilities,
         }
     }
 
@@ -640,9 +646,20 @@ impl DocumentSnapshot {
 
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
-    projects: Vec<ProjectDatabase>,
     index: Arc<Index>,
     position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
+
+    /// IMPORTANT: It's important that the databases come last, or at least,
+    /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
+    /// and that relies on Salsa's cancellation to guarantee that there's now only a
+    /// single reference to it (e.g. see [`Session::index_mut`]).
+    ///
+    /// Making this field come last guarantees that the db's `Drop` handler is
+    /// dropped after all other fields, which ensures that
+    /// Salsa's cancellation blocks until all fields are dropped (and not only
+    /// waits for the db to be dropped while we still hold on to the `Index`).
+    projects: Vec<ProjectDatabase>,
 }
 
 impl SessionSnapshot {
@@ -656,6 +673,10 @@ impl SessionSnapshot {
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
+    }
+
+    pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
+        self.resolved_client_capabilities
     }
 }
 

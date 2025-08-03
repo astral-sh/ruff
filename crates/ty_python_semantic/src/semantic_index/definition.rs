@@ -8,7 +8,9 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
 
 /// A definition of a place.
@@ -56,6 +58,35 @@ impl<'db> Definition<'db> {
 
     pub fn focus_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
+    }
+
+    /// Returns the name of the item being defined, if applicable.
+    pub fn name(self, db: &'db dyn Db) -> Option<String> {
+        let file = self.file(db);
+        let module = parsed_module(db, file).load(db);
+        let kind = self.kind(db);
+        match kind {
+            DefinitionKind::Function(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::Class(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::TypeAlias(def) => {
+                let node = def.node(&module);
+                Some(
+                    node.name
+                        .as_name_expr()
+                        .expect("type alias name should be a NameExpr")
+                        .id
+                        .as_str()
+                        .to_string(),
+                )
+            }
+            _ => None,
+        }
     }
 
     /// Extract a docstring from this definition, if applicable.
@@ -305,7 +336,7 @@ pub(crate) struct ImportDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct StarImportDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) place_id: ScopedPlaceId,
+    pub(crate) symbol_id: ScopedSymbolId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -395,10 +426,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef { node, place_id } = star_import;
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
-                    place_id,
+                    symbol_id,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -522,7 +553,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-            Self::ImportStar(StarImportDefinitionNodeRef { node, place_id: _ }) => node
+            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
                 .names
                 .iter()
                 .find(|alias| &alias.name == "*")
@@ -822,7 +853,7 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 #[derive(Clone, Debug)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    place_id: ScopedPlaceId,
+    symbol_id: ScopedSymbolId,
 }
 
 impl StarImportDefinitionKind {
@@ -844,8 +875,8 @@ impl StarImportDefinitionKind {
             )
     }
 
-    pub(crate) fn place_id(&self) -> ScopedPlaceId {
-        self.place_id
+    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
+        self.symbol_id
     }
 }
 

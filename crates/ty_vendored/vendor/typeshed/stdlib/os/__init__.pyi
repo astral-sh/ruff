@@ -620,12 +620,12 @@ if sys.platform == "darwin" and sys.version_info >= (3, 12):
     PRIO_DARWIN_PROCESS: int
     PRIO_DARWIN_THREAD: int
 
-SEEK_SET: int
-SEEK_CUR: int
-SEEK_END: int
+SEEK_SET: Final = 0
+SEEK_CUR: Final = 1
+SEEK_END: Final = 2
 if sys.platform != "win32":
-    SEEK_DATA: int
-    SEEK_HOLE: int
+    SEEK_DATA: Final = 3
+    SEEK_HOLE: Final = 4
 
 O_RDONLY: int
 O_WRONLY: int
@@ -1727,7 +1727,7 @@ def chdir(path: FileDescriptorOrPath) -> None:
 
     path may always be specified as a string.
     On some platforms, path may also be specified as an open file descriptor.
-      If this functionality is unavailable, using it raises an exception.
+    If this functionality is unavailable, using it raises an exception.
     """
 
 if sys.platform != "win32":
@@ -1886,6 +1886,7 @@ def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) ->
     will be created if it does not exist. If the target directory already
     exists, raise an OSError if exist_ok is False. Otherwise no exception is
     raised.  This is recursive.
+
     """
 
 if sys.platform != "win32":
@@ -1950,6 +1951,7 @@ def removedirs(name: StrOrBytesPath) -> None:
     segments will be pruned away until either the whole path is
     consumed or an error occurs.  Errors during this latter phase are
     ignored -- they generally mean that a directory was not empty.
+
     """
 
 def rename(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
@@ -1975,6 +1977,7 @@ def renames(old: StrOrBytesPath, new: StrOrBytesPath) -> None:
     Note: this function can fail with the new directory structure made
     if you lack permissions needed to unlink the leaf directory or
     file.
+
     """
 
 def replace(src: StrOrBytesPath, dst: StrOrBytesPath, *, src_dir_fd: int | None = None, dst_dir_fd: int | None = None) -> None:
@@ -2181,6 +2184,7 @@ def walk(
         print("bytes in", len(files), "non-directory files")
         if '__pycache__' in dirs:
             dirs.remove('__pycache__')  # don't visit __pycache__ directories
+
     """
 
 if sys.platform != "win32":
@@ -2896,7 +2900,8 @@ if sys.version_info >= (3, 13):
     # available. See https://github.com/python/cpython/blob/417c130/Lib/os.py#L1175-L1186.
     if sys.platform != "win32" and sys.platform != "darwin":
         def process_cpu_count() -> int:
-            """Get the number of CPUs of the current process.
+            """
+            Get the number of CPUs of the current process.
 
             Return the number of logical CPUs usable by the calling thread of the
             current process. Return None if indeterminable.

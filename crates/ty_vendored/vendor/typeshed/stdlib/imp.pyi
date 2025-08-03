@@ -40,6 +40,7 @@ def new_module(name: str) -> types.ModuleType:
     Create a new module.
 
     The module is not entered into sys.modules.
+
     """
 
 def get_magic() -> bytes:
@@ -63,6 +64,7 @@ def cache_from_source(path: StrPath, debug_override: bool | None = None) -> str:
     place of sys.flags.optimize.
 
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
+
     """
 
 def source_from_cache(path: StrPath) -> str:
@@ -74,6 +76,7 @@ def source_from_cache(path: StrPath) -> str:
     the .py file calculated to correspond to the .pyc file.  If path does
     not conform to PEP 3147 format, ValueError will be raised. If
     sys.implementation.cache_tag is None then NotImplementedError is raised.
+
     """
 
 def get_suffixes() -> list[tuple[str, str, int]]:
@@ -83,6 +86,7 @@ class NullImporter:
     """**DEPRECATED**
 
     Null import object.
+
     """
 
     def __init__(self, path: StrPath) -> None: ...
@@ -113,6 +117,7 @@ def load_module(name: str, file: _FileLike | None, filename: str, details: tuple
     Load a module, given information returned by find_module().
 
     The module name must include the full package name, if any.
+
     """
 
 # IO[Any] is a TextIOWrapper if name is a .py file, and a FileIO otherwise.
@@ -127,6 +132,7 @@ def find_module(
     module and continue search in sys.path. The module name cannot
     contain '.'; to search for a submodule of a package, pass the
     submodule name and the package's __path__.
+
     """
 
 def reload(module: types.ModuleType) -> types.ModuleType:
@@ -135,6 +141,7 @@ def reload(module: types.ModuleType) -> types.ModuleType:
     Reload the module and return it.
 
     The module must have been successfully imported before.
+
     """
 
 def init_builtin(name: str) -> types.ModuleType | None:

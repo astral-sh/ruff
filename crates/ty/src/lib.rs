@@ -24,7 +24,7 @@ use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
-use salsa::plumbing::ZalsaDatabase;
+use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{Db, watch};
@@ -380,9 +380,7 @@ impl MainLoop {
                 }
                 MainLoopMessage::Exit => {
                     // Cancel any pending queries and wait for them to complete.
-                    // TODO: Don't use Salsa internal APIs
-                    //  [Zulip-Thread](https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries)
-                    let _ = db.zalsa_mut();
+                    db.trigger_cancellation();
                     return Ok(ExitStatus::Success);
                 }
             }

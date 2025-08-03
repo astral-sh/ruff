@@ -427,6 +427,7 @@ def get_fws(value: str) -> tuple[WhiteSpaceTerminal, str]:
     This isn't the RFC definition.  We're using fws to represent tokens where
     folding can be done, but when we are parsing the *un*folding has already
     been done so we don't need to watch out for CRLF.
+
     """
 
 def get_encoded_word(value: str, terminal_type: str = "vtext") -> tuple[EncodedWord, str]:
@@ -449,6 +450,7 @@ def get_unstructured(value: str) -> UnstructuredTokenList:
     Because an 'unstructured' value must by definition constitute the entire
     value, this 'get' routine does not return a remaining value, only the
     parsed TokenList.
+
     """
 
 def get_qp_ctext(value: str) -> tuple[WhiteSpaceTerminal, str]:
@@ -461,6 +463,7 @@ def get_qp_ctext(value: str) -> tuple[WhiteSpaceTerminal, str]:
     quoted pairs are converted to their unquoted values, what is returned is
     a 'ptext' token.  In this case it is a WhiteSpaceTerminal, so it's value
     is ' '.
+
     """
 
 def get_qcontent(value: str) -> tuple[ValueTerminal, str]:
@@ -471,6 +474,7 @@ def get_qcontent(value: str) -> tuple[ValueTerminal, str]:
     added to the token's defects list.  Any quoted pairs are converted to their
     unquoted values, so what is returned is a 'ptext' token.  In this case it
     is a ValueTerminal.
+
     """
 
 def get_atext(value: str) -> tuple[ValueTerminal, str]:
@@ -536,6 +540,7 @@ def get_word(value: str) -> tuple[Any, str]:
     This means the 'word' level of the formal grammar is not represented in the
     parse tree; this is because having that extra layer when manipulating the
     parse tree is more confusing than it is helpful.
+
     """
 
 def get_phrase(value: str) -> tuple[Phrase, str]:
@@ -548,6 +553,7 @@ def get_phrase(value: str) -> tuple[Phrase, str]:
     list.  We also accept a phrase that starts with CFWS followed by a dot;
     this is registered as an InvalidHeaderDefect, since it is not supported by
     even the obsolete grammar.
+
     """
 
 def get_local_part(value: str) -> tuple[LocalPart, str]:
@@ -566,6 +572,7 @@ def get_dtext(value: str) -> tuple[ValueTerminal, str]:
     unquoted values, so what is returned is a ptext token, in this case a
     ValueTerminal.  If there were quoted-printables, an ObsoleteHeaderDefect is
     added to the returned token's defect list.
+
     """
 
 def get_domain_literal(value: str) -> tuple[DomainLiteral, str]:
@@ -574,6 +581,7 @@ def get_domain_literal(value: str) -> tuple[DomainLiteral, str]:
 def get_domain(value: str) -> tuple[Domain, str]:
     """domain = dot-atom / domain-literal / obs-domain
     obs-domain = atom *("." atom))
+
     """
 
 def get_addr_spec(value: str) -> tuple[AddrSpec, str]:
@@ -590,6 +598,7 @@ def get_obs_route(value: str) -> tuple[ObsRoute, str]:
 def get_angle_addr(value: str) -> tuple[AngleAddr, str]:
     """angle-addr = [CFWS] "<" addr-spec ">" [CFWS] / obs-angle-addr
     obs-angle-addr = [CFWS] "<" obs-route addr-spec ">" [CFWS]
+
     """
 
 def get_display_name(value: str) -> tuple[DisplayName, str]:
@@ -598,6 +607,7 @@ def get_display_name(value: str) -> tuple[DisplayName, str]:
     Because this is simply a name-rule, we don't return a display-name
     token containing a phrase, but rather a display-name token with
     the content of the phrase.
+
     """
 
 def get_name_addr(value: str) -> tuple[NameAddr, str]:
@@ -611,6 +621,7 @@ def get_invalid_mailbox(value: str, endchars: str) -> tuple[InvalidMailbox, str]
 
     This is outside the formal grammar.  The InvalidMailbox TokenList that is
     returned acts like a Mailbox, but the data attributes are None.
+
     """
 
 def get_mailbox_list(value: str) -> tuple[MailboxList, str]:
@@ -623,11 +634,13 @@ def get_mailbox_list(value: str) -> tuple[MailboxList, str]:
     invalid mailboxes into InvalidMailbox tokens and continue parsing any
     remaining valid mailboxes.  We also allow all mailbox entries to be null,
     and this condition is handled appropriately at a higher level.
+
     """
 
 def get_group_list(value: str) -> tuple[GroupList, str]:
     """group-list = mailbox-list / CFWS / obs-group-list
     obs-group-list = 1*([CFWS] ",") [CFWS]
+
     """
 
 def get_group(value: str) -> tuple[Group, str]:
@@ -641,6 +654,7 @@ def get_address(value: str) -> tuple[Address, str]:
     a 'mailboxes' attribute which treats a single address as a list of length
     one.  When you need to differentiate between to two cases, extract the single
     element, which is either a mailbox or a group token.
+
     """
 
 def get_address_list(value: str) -> tuple[AddressList, str]:
@@ -651,6 +665,7 @@ def get_address_list(value: str) -> tuple[AddressList, str]:
     of the input, assuming the input to be entirely composed of an
     address-list.  This is always true in email parsing, and allows us
     to skip invalid addresses to parse additional valid ones.
+
     """
 
 def get_no_fold_literal(value: str) -> tuple[NoFoldLiteral, str]:
@@ -674,6 +689,7 @@ def get_invalid_parameter(value: str) -> tuple[InvalidParameter, str]:
 
     This is outside the formal grammar.  The InvalidParameter TokenList that is
     returned acts like a Parameter, but the data attributes are None.
+
     """
 
 def get_ttext(value: str) -> tuple[ValueTerminal, str]:
@@ -683,6 +699,7 @@ def get_ttext(value: str) -> tuple[ValueTerminal, str]:
     defects list if we find non-ttext characters.  We also register defects for
     *any* non-printables even though the RFC doesn't exclude all of them,
     because we follow the spirit of RFC 5322.
+
     """
 
 def get_token(value: str) -> tuple[Token, str]:
@@ -692,6 +709,7 @@ def get_token(value: str) -> tuple[Token, str]:
     tspecials.  We also exclude tabs even though the RFC doesn't.
 
     The RFC implies the CFWS but is not explicit about it in the BNF.
+
     """
 
 def get_attrtext(value: str) -> tuple[ValueTerminal, str]:
@@ -701,6 +719,7 @@ def get_attrtext(value: str) -> tuple[ValueTerminal, str]:
     token's defects list if we find non-attrtext characters.  We also register
     defects for *any* non-printables even though the RFC doesn't exclude all of
     them, because we follow the spirit of RFC 5322.
+
     """
 
 def get_attribute(value: str) -> tuple[Attribute, str]:
@@ -710,6 +729,7 @@ def get_attribute(value: str) -> tuple[Attribute, str]:
     value terminal for the actual run of characters.  The RFC equivalent of
     attrtext is the token characters, with the subtraction of '*', "'", and '%'.
     We include tab in the excluded set just as we do for token.
+
     """
 
 def get_extended_attrtext(value: str) -> tuple[ValueTerminal, str]:
@@ -718,6 +738,7 @@ def get_extended_attrtext(value: str) -> tuple[ValueTerminal, str]:
     This is a special parsing routine so that we get a value that
     includes % escapes as a single string (which we decode as a single
     string later).
+
     """
 
 def get_extended_attribute(value: str) -> tuple[Attribute, str]:
@@ -725,6 +746,7 @@ def get_extended_attribute(value: str) -> tuple[Attribute, str]:
 
     This is like the non-extended version except we allow % characters, so that
     we can pick up an encoded value as a single string.
+
     """
 
 def get_section(value: str) -> tuple[Section, str]:
@@ -734,6 +756,7 @@ def get_section(value: str) -> tuple[Section, str]:
     check for that and add a defect.  We also assume no CFWS is allowed between
     the '*' and the digits, though the RFC is not crystal clear on that.
     The caller should already have dealt with leading CFWS.
+
     """
 
 def get_value(value: str) -> tuple[Value, str]:
@@ -759,6 +782,7 @@ def parse_mime_parameters(value: str) -> MimeParameters:
     This is 'parse' routine because it consumes the remaining value, but it
     would never be called to parse a full header.  Instead it is called to
     parse everything after the non-parameter value of a specific MIME header.
+
     """
 
 def parse_content_type_header(value: str) -> ContentType:

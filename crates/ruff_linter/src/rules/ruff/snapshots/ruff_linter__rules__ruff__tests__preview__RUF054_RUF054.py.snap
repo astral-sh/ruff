@@ -22,7 +22,7 @@ RUF054.py:10:3: RUF054 Indented form feed
 RUF054.py:13:2: RUF054 Indented form feed
    |
 12 | def _():
-13 |        pass
+13 |         pass
    |     ^ RUF054
 14 |
 15 | if False:

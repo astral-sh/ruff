@@ -5,7 +5,7 @@ use crate::place::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
@@ -31,35 +31,33 @@ pub(crate) fn all_declarations_and_bindings<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_end_of_scope_declarations()
+        .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
                 .ok()
                 .and_then(|result| {
-                    result.place.ignore_possibly_unbound().and_then(|ty| {
-                        table
-                            .place_expr(symbol_id)
-                            .as_name()
-                            .cloned()
-                            .map(|name| Member { name, ty })
+                    result.place.ignore_possibly_unbound().map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
                     })
                 })
         })
-        .chain(
-            use_def_map
-                .all_end_of_scope_bindings()
-                .filter_map(move |(symbol_id, bindings)| {
-                    place_from_bindings(db, bindings)
-                        .ignore_possibly_unbound()
-                        .and_then(|ty| {
-                            table
-                                .place_expr(symbol_id)
-                                .as_name()
-                                .cloned()
-                                .map(|name| Member { name, ty })
-                        })
-                }),
-        )
+        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+            move |(symbol_id, bindings)| {
+                place_from_bindings(db, bindings)
+                    .ignore_possibly_unbound()
+                    .map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
+                    })
+            },
+        ))
 }
 
 struct AllMembers<'db> {
@@ -164,10 +162,8 @@ impl<'db> AllMembers<'db> {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_end_of_scope_declarations() {
-                    let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
-                        continue;
-                    };
+                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
+                    let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
@@ -204,7 +200,7 @@ impl<'db> AllMembers<'db> {
                     }
 
                     self.members.insert(Member {
-                        name: place_table.place_expr(symbol_id).expect_name().clone(),
+                        name: symbol_name.clone(),
                         ty,
                     });
                 }
@@ -276,7 +272,7 @@ impl<'db> AllMembers<'db> {
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                for place_expr in place_table.places() {
+                for place_expr in place_table.members() {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
@@ -376,11 +372,11 @@ pub fn definition_kind_for_name<'db>(
     let place_table = index.place_table(file_scope);
 
     // Look up the place by name
-    let place_id = place_table.place_id_by_name(name_str)?;
+    let symbol_id = place_table.symbol_id(name_str)?;
 
     // Get the use-def map and look up definitions for this place
     let use_def_map = index.use_def_map(file_scope);
-    let declarations = use_def_map.all_reachable_declarations(place_id);
+    let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
     // Find the first valid definition and return its kind
     for declaration in declarations {
@@ -412,14 +408,14 @@ pub fn definitions_for_name<'db>(
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
-        let Some(place_id) = place_table.place_id_by_name(name_str) else {
+        let Some(symbol_id) = place_table.symbol_id(name_str) else {
             continue; // Name not found in this scope, try parent scope
         };
 
         // Check if this place is marked as global or nonlocal
-        let place_expr = place_table.place_expr(place_id);
-        let is_global = place_expr.is_marked_global();
-        let is_nonlocal = place_expr.is_marked_nonlocal();
+        let place_expr = place_table.symbol(symbol_id);
+        let is_global = place_expr.is_global();
+        let is_nonlocal = place_expr.is_nonlocal();
 
         // TODO: The current algorithm doesn't return definintions or bindings
         // for other scopes that are outside of this scope hierarchy that target
@@ -432,11 +428,12 @@ pub fn definitions_for_name<'db>(
             let global_scope_id = global_scope(db, file);
             let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
 
-            if let Some(global_place_id) = global_place_table.place_id_by_name(name_str) {
+            if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
-                let global_bindings = global_use_def_map.all_reachable_bindings(global_place_id);
+                let global_bindings =
+                    global_use_def_map.all_reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.all_reachable_declarations(global_place_id);
+                    global_use_def_map.all_reachable_symbol_declarations(global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
@@ -462,8 +459,8 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -577,11 +574,11 @@ pub fn definitions_for_attribute<'db>(
             let class_place_table = crate::semantic_index::place_table(db, class_scope);
 
             // Look for class-level declarations and bindings
-            if let Some(place_id) = class_place_table.place_id_by_name(name_str) {
+            if let Some(place_id) = class_place_table.symbol_id(name_str) {
                 let use_def = use_def_map(db, class_scope);
 
                 // Check declarations first
-                for decl in use_def.all_reachable_declarations(place_id) {
+                for decl in use_def.all_reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(db, def, Some(name_str)));
                         break 'scopes;
@@ -589,7 +586,7 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.all_reachable_bindings(place_id) {
+                for binding in use_def.all_reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(db, def, Some(name_str)));
                         break 'scopes;
@@ -604,11 +601,11 @@ pub fn definitions_for_attribute<'db>(
             for function_scope_id in attribute_scopes(db, class_scope) {
                 let place_table = index.place_table(function_scope_id);
 
-                if let Some(place_id) = place_table.place_id_by_instance_attribute_name(name_str) {
+                if let Some(place_id) = place_table.member_id_by_instance_attribute_name(name_str) {
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
-                    for decl in use_def.all_reachable_declarations(place_id) {
+                    for decl in use_def.all_reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
                             resolved.extend(resolve_definition(db, def, Some(name_str)));
                             break 'scopes;
@@ -616,7 +613,7 @@ pub fn definitions_for_attribute<'db>(
                     }
 
                     // If no declarations found, check bindings
-                    for binding in use_def.all_reachable_bindings(place_id) {
+                    for binding in use_def.all_reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
                             resolved.extend(resolve_definition(db, def, Some(name_str)));
                             break 'scopes;
@@ -801,7 +798,7 @@ mod resolve_definition {
 
     use crate::module_resolver::file_to_module;
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::{NodeWithScopeKind, ScopeId};
+    use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
     use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
@@ -971,7 +968,7 @@ mod resolve_definition {
         symbol_name: &str,
     ) -> IndexSet<Definition<'db>> {
         let place_table = place_table(db, scope);
-        let Some(place_id) = place_table.place_id_by_name(symbol_name) else {
+        let Some(symbol_id) = place_table.symbol_id(symbol_name) else {
             return IndexSet::new();
         };
 
@@ -979,8 +976,8 @@ mod resolve_definition {
         let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {

@@ -12,6 +12,7 @@ mod diagnostics;
 mod notifications;
 mod requests;
 mod semantic_tokens;
+mod symbols;
 mod traits;
 
 use self::traits::{NotificationHandler, RequestHandler};
@@ -82,6 +83,17 @@ pub(super) fn request(req: server::Request) -> Task {
             requests::CompletionRequestHandler,
         >(
             req, BackgroundSchedule::LatencySensitive
+        ),
+        requests::SelectionRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::SelectionRangeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::DocumentSymbolRequestHandler::METHOD => background_document_request_task::<
+            requests::DocumentSymbolRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+        requests::WorkspaceSymbolRequestHandler::METHOD => background_request_task::<
+            requests::WorkspaceSymbolRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
         ),
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
@@ -206,7 +218,10 @@ where
                 return;
             }
 
-            let result = ruff_db::panic::catch_unwind(|| R::run(snapshot, client, params));
+            let result = ruff_db::panic::catch_unwind(|| {
+                let snapshot = snapshot;
+                R::run(snapshot.0, client, params)
+            });
 
             if let Some(response) = request_result_to_response::<R>(&id, client, result, retry) {
                 respond::<R>(&id, response, client);

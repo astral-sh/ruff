@@ -33,7 +33,8 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::{ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -58,6 +59,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
@@ -699,6 +701,7 @@ impl<'db> Type<'db> {
                     Name::new_static("T_all"),
                     None,
                     None,
+                    None,
                     variance,
                     None,
                     TypeVarKind::Pep695,
@@ -1277,6 +1280,15 @@ impl<'db> Type<'db> {
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
+
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // This allows field definitions like `name: str = field(default="")` in dataclasses
+            // to pass the assignability check of the inferred type to the declared type.
+            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+                if relation.is_assignability() =>
+            {
+                field.default_type(db).has_relation_to(db, right, relation)
+            }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
@@ -2567,7 +2579,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(heap_size=get_size2::heap_size)]
     #[allow(unused_variables)]
     // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
     fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
@@ -2588,7 +2600,7 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=get_size2::heap_size)]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -2749,7 +2761,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(heap_size=get_size2::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
@@ -3042,7 +3054,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=get_size2::heap_size)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -4627,6 +4639,65 @@ impl<'db> Type<'db> {
     /// y(*x)
     /// ```
     fn try_iterate(self, db: &'db dyn Db) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        self.try_iterate_with_mode(db, EvaluationMode::Sync)
+    }
+
+    fn try_iterate_with_mode(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        if mode.is_async() {
+            let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| {
+                iterator
+                    .try_call_dunder(db, "__anext__", CallArguments::none())
+                    .map(|dunder_anext_outcome| {
+                        dunder_anext_outcome.return_type(db).resolve_await(db)
+                    })
+            };
+
+            return match self.try_call_dunder(db, "__aiter__", CallArguments::none()) {
+                Ok(dunder_aiter_bindings) => {
+                    let iterator = dunder_aiter_bindings.return_type(db);
+                    match try_call_dunder_anext_on_iterator(iterator) {
+                        Ok(result) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
+                        Err(dunder_anext_error) => {
+                            Err(IterationError::IterReturnsInvalidIterator {
+                                iterator,
+                                dunder_error: dunder_anext_error,
+                                mode,
+                            })
+                        }
+                    }
+                }
+                Err(CallDunderError::PossiblyUnbound(dunder_aiter_bindings)) => {
+                    let iterator = dunder_aiter_bindings.return_type(db);
+                    match try_call_dunder_anext_on_iterator(iterator) {
+                        Ok(_) => Err(IterationError::IterCallError {
+                            kind: CallErrorKind::PossiblyNotCallable,
+                            bindings: dunder_aiter_bindings,
+                            mode,
+                        }),
+                        Err(dunder_anext_error) => {
+                            Err(IterationError::IterReturnsInvalidIterator {
+                                iterator,
+                                dunder_error: dunder_anext_error,
+                                mode,
+                            })
+                        }
+                    }
+                }
+                Err(CallDunderError::CallError(kind, bindings)) => {
+                    Err(IterationError::IterCallError {
+                        kind,
+                        bindings,
+                        mode,
+                    })
+                }
+                Err(CallDunderError::MethodNotAvailable) => Err(IterationError::UnboundAiterError),
+            };
+        }
+
         match self {
             Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
@@ -4683,7 +4754,8 @@ impl<'db> Type<'db> {
                     .map_err(
                         |dunder_next_error| IterationError::IterReturnsInvalidIterator {
                             iterator,
-                            dunder_next_error,
+                            dunder_error: dunder_next_error,
+                            mode,
                         },
                     )
             }
@@ -4718,15 +4790,18 @@ impl<'db> Type<'db> {
 
                     Err(dunder_next_error) => Err(IterationError::IterReturnsInvalidIterator {
                         iterator,
-                        dunder_next_error,
+                        dunder_error: dunder_next_error,
+                        mode,
                     }),
                 }
             }
 
             // `__iter__` is definitely bound but it can't be called with the expected arguments
-            Err(CallDunderError::CallError(kind, bindings)) => {
-                Err(IterationError::IterCallError(kind, bindings))
-            }
+            Err(CallDunderError::CallError(kind, bindings)) => Err(IterationError::IterCallError {
+                kind,
+                bindings,
+                mode,
+            }),
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
@@ -4777,6 +4852,64 @@ impl<'db> Type<'db> {
                 enter_error,
                 exit_error,
             }),
+        }
+    }
+
+    /// Similar to [`Self::try_enter`], but for async context managers.
+    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: Add proper error handling and rename this method to `try_aenter`.
+        self.try_call_dunder(db, "__aenter__", CallArguments::none())
+            .map_or(Type::unknown(), |result| {
+                result.return_type(db).resolve_await(db)
+            })
+    }
+
+    /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
+    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
+        // TODO: Add proper error handling and rename this method to `try_await`.
+        self.try_call_dunder(db, "__await__", CallArguments::none())
+            .map_or(Type::unknown(), |result| {
+                result
+                    .return_type(db)
+                    .generator_return_type(db)
+                    .unwrap_or_else(Type::unknown)
+            })
+    }
+
+    /// Get the return type of a `yield from …` expression where `self` is the type of the generator.
+    ///
+    /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
+    /// protocol.
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
+        // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
+        // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
+        // from the `Generator` protocol, such as `types.GeneratorType`.
+
+        let from_class_base = |base: ClassBase<'db>| {
+            let class = base.into_class()?;
+            if class.is_known(db, KnownClass::Generator) {
+                if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                    if let [_, _, return_ty] = specialization.types(db) {
+                        return Some(*return_ty);
+                    }
+                }
+            }
+            None
+        };
+
+        match self {
+            Type::NominalInstance(instance) => {
+                instance.class.iter_mro(db).find_map(from_class_base)
+            }
+            Type::ProtocolInstance(instance) => {
+                if let Protocol::FromClass(class) = instance.inner {
+                    class.iter_mro(db).find_map(from_class_base)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 
@@ -4996,6 +5129,7 @@ impl<'db> Type<'db> {
                     db,
                     Name::new(format!("{}'instance", typevar.name(db))),
                     None,
+                    None,
                     Some(bound_or_constraints),
                     typevar.variance(db),
                     None,
@@ -5108,6 +5242,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::Field(__call__) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Field],
+                    fallback_type: Type::unknown(),
+                }),
                 KnownInstanceType::SubscriptedProtocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::Protocol
@@ -5159,10 +5297,12 @@ impl<'db> Type<'db> {
                     let instance = Type::ClassLiteral(class).to_instance(db).expect(
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
+                    let class_definition = class.definition(db);
                     Ok(Type::TypeVar(TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
-                        Some(class.definition(db)),
+                        Some(class_definition),
+                        Some(class_definition),
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
@@ -5414,7 +5554,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(heap_size=get_size2::heap_size)]
     pub fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -5437,6 +5577,9 @@ impl<'db> Type<'db> {
                     partial.get(db, typevar).unwrap_or(self)
                 }
                 TypeMapping::PromoteLiterals => self,
+                TypeMapping::BindLegacyTypevars(binding_context) => {
+                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
+                }
             }
 
             Type::FunctionLiteral(function) => {
@@ -5524,7 +5667,8 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) => self,
+                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::BindLegacyTypevars(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
             }
@@ -5873,6 +6017,9 @@ pub enum TypeMapping<'a, 'db> {
     /// Promotes any literal types to their corresponding instance types (e.g. `Literal["string"]`
     /// to `str`)
     PromoteLiterals,
+    /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
+    /// being used in.
+    BindLegacyTypevars(Definition<'db>),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -5887,7 +6034,7 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::PartialSpecialization(specialization) => {
             walk_partial_specialization(db, specialization, visitor);
         }
-        TypeMapping::PromoteLiterals => {}
+        TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) => {}
     }
 }
 
@@ -5901,6 +6048,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.to_owned())
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 
@@ -5913,6 +6063,9 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::PartialSpecialization(partial.normalized_impl(db, visitor))
             }
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
+            TypeMapping::BindLegacyTypevars(binding_context) => {
+                TypeMapping::BindLegacyTypevars(*binding_context)
+            }
         }
     }
 }
@@ -5956,6 +6109,9 @@ pub enum KnownInstanceType<'db> {
 
     /// A single instance of `warnings.deprecated` or `typing_extensions.deprecated`
     Deprecated(DeprecatedInstance<'db>),
+
+    /// A single instance of `dataclasses.Field`
+    Field(FieldInstance<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -5977,6 +6133,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::Deprecated(_) => {
             // Nothing to visit
         }
+        KnownInstanceType::Field(field) => {
+            visitor.visit_type(db, field.default_type(db));
+        }
     }
 }
 
@@ -5997,6 +6156,7 @@ impl<'db> KnownInstanceType<'db> {
                 // Nothing to normalize
                 Self::Deprecated(deprecated)
             }
+            Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
         }
     }
 
@@ -6006,6 +6166,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::Deprecated(_) => KnownClass::Deprecated,
+            Self::Field(_) => KnownClass::Field,
         }
     }
 
@@ -6051,6 +6212,11 @@ impl<'db> KnownInstanceType<'db> {
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
+                    KnownInstanceType::Field(field) => {
+                        f.write_str("dataclasses.Field[")?;
+                        field.default_type(self.db).display(self.db).fmt(f)?;
+                        f.write_str("]")
+                    }
                 }
             }
         }
@@ -6260,6 +6426,8 @@ enum InvalidTypeExpression<'db> {
     Generic,
     /// Same for `@deprecated`
     Deprecated,
+    /// Same for `dataclasses.Field`
+    Field,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6303,6 +6471,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Deprecated => {
                         f.write_str("`warnings.deprecated` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::Field => {
+                        f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
@@ -6370,6 +6541,36 @@ pub struct DeprecatedInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
+/// Contains information about instances of `dataclasses.Field`, typically created using
+/// `dataclasses.field()`.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct FieldInstance<'db> {
+    /// The type of the default value for this field. This is derived from the `default` or
+    /// `default_factory` arguments to `dataclasses.field()`.
+    pub default_type: Type<'db>,
+
+    /// Whether this field is part of the `__init__` signature, or not.
+    pub init: bool,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FieldInstance<'_> {}
+
+impl<'db> FieldInstance<'db> {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
+        FieldInstance::new(
+            db,
+            self.default_type(db).normalized_impl(db, visitor),
+            self.init(db),
+        )
+    }
+}
+
 /// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeVarKind {
@@ -6397,6 +6598,35 @@ pub struct TypeVarInstance<'db> {
 
     /// The type var's definition (None if synthesized)
     pub definition: Option<Definition<'db>>,
+
+    /// The definition of the generic class, function, or type alias that binds this typevar. This
+    /// is `None` for a legacy typevar outside of a context that can bind it.
+    ///
+    /// For a legacy typevar, the binding context might be missing:
+    ///
+    /// ```py
+    /// T = TypeVar("T")                       # [1]
+    /// def generic_function(t: T) -> T: ...   # [2]
+    /// ```
+    ///
+    /// Here, we will create two `TypeVarInstance`s for the typevar `T`. Both will have `[1]` as
+    /// their [`definition`][Self::definition]. The first represents the variable when it is first
+    /// created, and not yet used, so it's `binding_context` will be `None`. The second represents
+    /// when the typevar is used in `generic_function`, and its `binding_context` will be `[2]`
+    /// (that is, the definition of `generic_function`).
+    ///
+    /// For a PEP 695 typevar, there will always be a binding context, since you can only define
+    /// one as part of creating the generic context that uses it:
+    ///
+    /// ```py
+    /// def generic_function[T](t: T) -> T: ...
+    /// ```
+    ///
+    /// Here, we will create a single `TypeVarInstance`. Its [`definition`][Self::definition] will
+    /// be the `T` in `[T]` (i.e., the definition of the typevar in the syntactic construct that
+    /// creates the generic context that uses it). Its `binding_context` will be the definition of
+    /// `generic_function`.
+    binding_context: Option<Definition<'db>>,
 
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
@@ -6427,6 +6657,25 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn with_binding_context(
+        self,
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db),
+            self.definition(db),
+            Some(binding_context),
+            self.bound_or_constraints(db),
+            self.variance(db),
+            self.default_ty(db).map(|ty| {
+                ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context))
+            }),
+            self.kind(db),
+        )
+    }
+
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Legacy)
     }
@@ -6456,6 +6705,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.normalized_impl(db, visitor)),
             self.variance(db),
@@ -6469,6 +6719,7 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
+            self.binding_context(db),
             self.bound_or_constraints(db)
                 .map(|b| b.materialize(db, variance)),
             self.variance(db),
@@ -6686,18 +6937,24 @@ impl<'db> ContextManagerError<'db> {
 /// Error returned if a type is not (or may not be) iterable.
 #[derive(Debug)]
 enum IterationError<'db> {
-    /// The object being iterated over has a bound `__iter__` method,
+    /// The object being iterated over has a bound `__(a)iter__` method,
     /// but calling it with the expected arguments results in an error.
-    IterCallError(CallErrorKind, Box<Bindings<'db>>),
+    IterCallError {
+        kind: CallErrorKind,
+        bindings: Box<Bindings<'db>>,
+        mode: EvaluationMode,
+    },
 
-    /// The object being iterated over has a bound `__iter__` method that can be called
+    /// The object being iterated over has a bound `__(a)iter__` method that can be called
     /// with the expected types, but it returns an object that is not a valid iterator.
     IterReturnsInvalidIterator {
-        /// The type of the object returned by the `__iter__` method.
+        /// The type of the object returned by the `__(a)iter__` method.
         iterator: Type<'db>,
-        /// The error we encountered when we tried to call `__next__` on the type
-        /// returned by `__iter__`
-        dunder_next_error: CallDunderError<'db>,
+        /// The error we encountered when we tried to call `__(a)next__` on the type
+        /// returned by `__(a)iter__`
+        dunder_error: CallDunderError<'db>,
+        /// Whether this is a synchronous or an asynchronous iterator.
+        mode: EvaluationMode,
     },
 
     /// The object being iterated over has a bound `__iter__` method that returns a
@@ -6718,6 +6975,9 @@ enum IterationError<'db> {
     UnboundIterAndGetitemError {
         dunder_getitem_error: CallDunderError<'db>,
     },
+
+    /// The asynchronous iterable has no `__aiter__` method.
+    UnboundAiterError,
 }
 
 impl<'db> IterationError<'db> {
@@ -6727,16 +6987,43 @@ impl<'db> IterationError<'db> {
 
     /// Returns the element type if it is known, or `None` if the type is never iterable.
     fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let return_type = |result: Result<Bindings<'db>, CallDunderError<'db>>| {
+            result
+                .map(|outcome| Some(outcome.return_type(db)))
+                .unwrap_or_else(|call_error| call_error.return_type(db))
+        };
+
         match self {
             Self::IterReturnsInvalidIterator {
-                dunder_next_error, ..
-            } => dunder_next_error.return_type(db),
+                dunder_error, mode, ..
+            } => dunder_error.return_type(db).map(|ty| {
+                if mode.is_async() {
+                    ty.resolve_await(db)
+                } else {
+                    ty
+                }
+            }),
 
-            Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
-                .return_type(db)
-                .try_call_dunder(db, "__next__", CallArguments::none())
-                .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
-                .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
+            Self::IterCallError {
+                kind: _,
+                bindings: dunder_iter_bindings,
+                mode,
+            } => {
+                if mode.is_async() {
+                    return_type(dunder_iter_bindings.return_type(db).try_call_dunder(
+                        db,
+                        "__anext__",
+                        CallArguments::none(),
+                    ))
+                    .map(|ty| ty.resolve_await(db))
+                } else {
+                    return_type(dunder_iter_bindings.return_type(db).try_call_dunder(
+                        db,
+                        "__next__",
+                        CallArguments::none(),
+                    ))
+                }
+            }
 
             Self::PossiblyUnboundIterAndGetitemError {
                 dunder_next_return,
@@ -6762,6 +7049,19 @@ impl<'db> IterationError<'db> {
             Self::UnboundIterAndGetitemError {
                 dunder_getitem_error,
             } => dunder_getitem_error.return_type(db),
+
+            Self::UnboundAiterError => None,
+        }
+    }
+
+    /// Does this error concern a synchronous or asynchronous iterable?
+    fn mode(&self) -> EvaluationMode {
+        match self {
+            Self::IterCallError { mode, .. } => *mode,
+            Self::IterReturnsInvalidIterator { mode, .. } => *mode,
+            Self::PossiblyUnboundIterAndGetitemError { .. }
+            | Self::UnboundIterAndGetitemError { .. } => EvaluationMode::Sync,
+            Self::UnboundAiterError => EvaluationMode::Async,
         }
     }
 
@@ -6778,6 +7078,7 @@ impl<'db> IterationError<'db> {
             db: &'a dyn Db,
             builder: LintDiagnosticGuardBuilder<'a, 'a>,
             iterable_type: Type<'a>,
+            mode: EvaluationMode,
         }
 
         impl<'a> Reporter<'a> {
@@ -6787,8 +7088,9 @@ impl<'db> IterationError<'db> {
             #[expect(clippy::wrong_self_convention)]
             fn is_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
-                    "Object of type `{iterable_type}` is not iterable",
+                    "Object of type `{iterable_type}` is not {maybe_async}iterable",
                     iterable_type = self.iterable_type.display(self.db),
+                    maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
                 diag
@@ -6799,8 +7101,9 @@ impl<'db> IterationError<'db> {
             /// `because` should explain why `iterable_type` is likely not iterable.
             fn may_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
-                    "Object of type `{iterable_type}` may not be iterable",
+                    "Object of type `{iterable_type}` may not be {maybe_async}iterable",
                     iterable_type = self.iterable_type.display(self.db),
+                    maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
                 diag
@@ -6811,106 +7114,132 @@ impl<'db> IterationError<'db> {
             return;
         };
         let db = context.db();
+        let mode = self.mode();
         let reporter = Reporter {
             db,
             builder,
             iterable_type,
+            mode,
         };
 
         // TODO: for all of these error variants, the "explanation" for the diagnostic
         // (everything after the "because") should really be presented as a "help:", "note",
         // or similar, rather than as part of the same sentence as the error message.
         match self {
-            Self::IterCallError(CallErrorKind::NotCallable, bindings) => {
-                reporter.is_not(format_args!(
-                    "Its `__iter__` attribute has type `{dunder_iter_type}`, which is not callable",
-                    dunder_iter_type = bindings.callable_type().display(db),
-                ));
-            }
-            Self::IterCallError(CallErrorKind::PossiblyNotCallable, bindings)
-                if bindings.is_single() =>
-            {
-                reporter.may_not(format_args!(
-                    "Its `__iter__` attribute (with type `{dunder_iter_type}`) \
-                     may not be callable",
-                    dunder_iter_type = bindings.callable_type().display(db),
-                ));
-            }
-            Self::IterCallError(CallErrorKind::PossiblyNotCallable, bindings) => {
-                reporter.may_not(format_args!(
-                    "Its `__iter__` attribute (with type `{dunder_iter_type}`) \
-                     may not be callable",
-                    dunder_iter_type = bindings.callable_type().display(db),
-                ));
-            }
-            Self::IterCallError(CallErrorKind::BindingError, bindings) if bindings.is_single() => {
-                reporter
-                    .is_not("Its `__iter__` method has an invalid signature")
-                    .info("Expected signature `def __iter__(self): ...`");
-            }
-            Self::IterCallError(CallErrorKind::BindingError, bindings) => {
-                let mut diag =
-                    reporter.may_not("Its `__iter__` method may have an invalid signature");
-                diag.info(format_args!(
-                    "Type of `__iter__` is `{dunder_iter_type}`",
-                    dunder_iter_type = bindings.callable_type().display(db),
-                ));
-                diag.info("Expected signature for `__iter__` is `def __iter__(self): ...`");
+            Self::IterCallError {
+                kind,
+                bindings,
+                mode,
+            } => {
+                let method = if mode.is_async() {
+                    "__aiter__"
+                } else {
+                    "__iter__"
+                };
+
+                match kind {
+                    CallErrorKind::NotCallable => {
+                        reporter.is_not(format_args!(
+                        "Its `{method}` attribute has type `{dunder_iter_type}`, which is not callable",
+                        dunder_iter_type = bindings.callable_type().display(db),
+                    ));
+                    }
+                    CallErrorKind::PossiblyNotCallable => {
+                        reporter.may_not(format_args!(
+                            "Its `{method}` attribute (with type `{dunder_iter_type}`) \
+                             may not be callable",
+                            dunder_iter_type = bindings.callable_type().display(db),
+                        ));
+                    }
+                    CallErrorKind::BindingError => {
+                        if bindings.is_single() {
+                            reporter
+                                .is_not(format_args!(
+                                    "Its `{method}` method has an invalid signature"
+                                ))
+                                .info(format_args!("Expected signature `def {method}(self): ...`"));
+                        } else {
+                            let mut diag = reporter.may_not(format_args!(
+                                "Its `{method}` method may have an invalid signature"
+                            ));
+                            diag.info(format_args!(
+                                "Type of `{method}` is `{dunder_iter_type}`",
+                                dunder_iter_type = bindings.callable_type().display(db),
+                            ));
+                            diag.info(format_args!(
+                                "Expected signature for `{method}` is `def {method}(self): ...`",
+                            ));
+                        }
+                    }
+                }
             }
 
             Self::IterReturnsInvalidIterator {
                 iterator,
-                dunder_next_error,
-            } => match dunder_next_error {
-                CallDunderError::MethodNotAvailable => {
-                    reporter.is_not(format_args!(
-                        "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                     which has no `__next__` method",
+                dunder_error: dunder_next_error,
+                mode,
+            } => {
+                let dunder_iter_name = if mode.is_async() {
+                    "__aiter__"
+                } else {
+                    "__iter__"
+                };
+                let dunder_next_name = if mode.is_async() {
+                    "__anext__"
+                } else {
+                    "__next__"
+                };
+                match dunder_next_error {
+                    CallDunderError::MethodNotAvailable => {
+                        reporter.is_not(format_args!(
+                        "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                         which has no `{dunder_next_name}` method",
                         iterator_type = iterator.display(db),
                     ));
-                }
-                CallDunderError::PossiblyUnbound(_) => {
-                    reporter.may_not(format_args!(
-                        "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                     which may not have a `__next__` method",
-                        iterator_type = iterator.display(db),
-                    ));
-                }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
-                    reporter.is_not(format_args!(
-                        "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                         which has a `__next__` attribute that is not callable",
-                        iterator_type = iterator.display(db),
-                    ));
-                }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
-                    reporter.may_not(format_args!(
-                        "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                         which has a `__next__` attribute that may not be callable",
-                        iterator_type = iterator.display(db),
-                    ));
-                }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings)
-                    if bindings.is_single() =>
-                {
-                    reporter
-                        .is_not(format_args!(
-                            "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                             which has an invalid `__next__` method",
+                    }
+                    CallDunderError::PossiblyUnbound(_) => {
+                        reporter.may_not(format_args!(
+                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                            which may not have a `{dunder_next_name}` method",
                             iterator_type = iterator.display(db),
-                        ))
-                        .info("Expected signature for `__next__` is `def __next__(self): ...`");
-                }
-                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
-                    reporter
-                        .may_not(format_args!(
-                            "Its `__iter__` method returns an object of type `{iterator_type}`, \
-                             which may have an invalid `__next__` method",
+                        ));
+                    }
+                    CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                        reporter.is_not(format_args!(
+                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                            which has a `{dunder_next_name}` attribute that is not callable",
                             iterator_type = iterator.display(db),
-                        ))
-                        .info("Expected signature for `__next__` is `def __next__(self): ...`)");
+                        ));
+                    }
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                        reporter.may_not(format_args!(
+                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                            which has a `{dunder_next_name}` attribute that may not be callable",
+                            iterator_type = iterator.display(db),
+                        ));
+                    }
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                        if bindings.is_single() =>
+                    {
+                        reporter
+                            .is_not(format_args!(
+                                "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                                which has an invalid `{dunder_next_name}` method",
+                                iterator_type = iterator.display(db),
+                            ))
+                            .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
+                    }
+                    CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                        reporter
+                            .may_not(format_args!(
+                                "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
+                                which may have an invalid `{dunder_next_name}` method",
+                                iterator_type = iterator.display(db),
+                            ))
+                            .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
+                    }
                 }
-            },
+            }
 
             Self::PossiblyUnboundIterAndGetitemError {
                 dunder_getitem_error,
@@ -7047,6 +7376,10 @@ impl<'db> IterationError<'db> {
                         );
                 }
             },
+
+            IterationError::UnboundAiterError => {
+                reporter.is_not("It has no `__aiter__` method");
+            }
         }
     }
 }
@@ -7874,7 +8207,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
-    #[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(heap_size=get_size2::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -8313,21 +8646,27 @@ impl<'db> IntersectionType<'db> {
         sorted_self == other.normalized(db)
     }
 
+    /// Returns an iterator over the positive elements of the intersection. If
+    /// there are no positive elements, returns a single `object` type.
+    fn positive_elements_or_object(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        if self.positive(db).is_empty() {
+            Either::Left(std::iter::once(Type::object(db)))
+        } else {
+            Either::Right(self.positive(db).iter().copied())
+        }
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions");
-        }
-
         let mut builder = IntersectionBuilder::new(db);
 
         let mut all_unbound = true;
         let mut any_definitely_bound = false;
-        for ty in self.positive(db) {
-            let ty_member = transform_fn(ty);
+        for ty in self.positive_elements_or_object(db) {
+            let ty_member = transform_fn(&ty);
             match ty_member {
                 Place::Unbound => {}
                 Place::Type(ty_member, member_boundness) => {
@@ -8360,21 +8699,16 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        if !self.negative(db).is_empty() {
-            return Place::todo("map_with_boundness: intersections with negative contributions")
-                .into();
-        }
-
         let mut builder = IntersectionBuilder::new(db);
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut any_unbound = false;
         let mut any_possibly_unbound = false;
-        for ty in self.positive(db) {
+        for ty in self.positive_elements_or_object(db) {
             let PlaceAndQualifiers {
                 place: member,
                 qualifiers: new_qualifiers,
-            } = transform_fn(ty);
+            } = transform_fn(&ty);
             qualifiers |= new_qualifiers;
             match member {
                 Place::Unbound => {
@@ -8840,7 +9174,7 @@ impl<'db> TypeIsType<'db> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);
 
-        Some(format!("{}", table.place_expr(place)))
+        Some(format!("{}", table.place(place)))
     }
 
     pub fn unbound(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

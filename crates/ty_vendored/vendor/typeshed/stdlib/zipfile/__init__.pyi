@@ -46,7 +46,8 @@ BadZipfile = BadZipFile
 error = BadZipfile
 
 class LargeZipFile(Exception):
-    """Raised when writing a zipfile, the zipfile requires ZIP64 extensions
+    """
+    Raised when writing a zipfile, the zipfile requires ZIP64 extensions
     and those extensions are disabled.
     """
 
@@ -160,6 +161,7 @@ class ZipFile:
                    When using ZIP_ZSTANDARD integers -7 though 22 are common,
                    see the CompressionParameter enum in compression.zstd for
                    details.
+
     """
 
     filename: str | None
@@ -379,12 +381,6 @@ class ZipFile:
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None:
             """Creates a directory inside the zip archive."""
-    if sys.version_info >= (3, 14):
-        @property
-        def data_offset(self) -> int | None:
-            """The offset to the start of zip data in the file or None if
-            unavailable.
-            """
 
     def __del__(self) -> None:
         """Call the "close()" method in case the user forgot."""
@@ -462,19 +458,22 @@ if sys.version_info >= (3, 12):
 
 else:
     class CompleteDirs(ZipFile):
-        """A ZipFile subclass that ensures that implied directories
+        """
+        A ZipFile subclass that ensures that implied directories
         are always included in the namelist.
         """
 
         def resolve_dir(self, name: str) -> str:
-            """If the name represents a directory, return that name
+            """
+            If the name represents a directory, return that name
             as a directory (with the trailing slash).
             """
 
         @overload
         @classmethod
         def make(cls, source: ZipFile) -> CompleteDirs:
-            """Given a source (filename or zipfile), return an
+            """
+            Given a source (filename or zipfile), return an
             appropriate CompleteDirs subclass.
             """
 
@@ -483,7 +482,8 @@ else:
         def make(cls, source: StrPath | IO[bytes]) -> Self: ...
 
     class Path:
-        """A pathlib-compatible interface for zip files.
+        """
+        A pathlib-compatible interface for zip files.
 
         Consider a zip file with this structure::
 
@@ -562,7 +562,8 @@ else:
         root: CompleteDirs
         at: str
         def __init__(self, root: ZipFile | StrPath | IO[bytes], at: str = "") -> None:
-            """Construct a Path from a ZipFile or filename.
+            """
+            Construct a Path from a ZipFile or filename.
 
             Note: When the source is an existing ZipFile object,
             its type (__class__) will be mutated to a
@@ -598,7 +599,8 @@ else:
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
-            """Open this entry as text or binary following the semantics
+            """
+            Open this entry as text or binary following the semantics
             of ``pathlib.Path.open()`` by passing arguments through
             to io.TextIOWrapper().
             """

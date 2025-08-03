@@ -2251,6 +2251,41 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
+pub(crate) fn report_bad_argument_to_protocol_interface(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    param_type: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `reveal_protocol_interface`");
+    diagnostic
+        .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
+
+    if let Some(class) = param_type.to_class_type(context.db()) {
+        let mut class_def_diagnostic = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{}` is declared here, but it is not a protocol class:",
+                class.name(db)
+            ),
+        );
+        class_def_diagnostic.annotate(Annotation::primary(
+            class.class_literal(db).0.header_span(db),
+        ));
+        diagnostic.sub(class_def_diagnostic);
+    }
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // See TODO in `report_bad_argument_to_get_protocol_members` above
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html");
+}
+
 pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,

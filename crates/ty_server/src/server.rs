@@ -7,9 +7,10 @@ use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
     HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
-    MessageType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
-    ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
+    MessageType, SelectionRangeProviderCapability, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
 };
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
@@ -17,13 +18,16 @@ use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
 mod api;
+mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
 pub(crate) use api::publish_settings_diagnostics;
-pub(crate) use main_loop::{Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender};
+pub(crate) use main_loop::{
+    Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
+};
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
@@ -197,7 +201,9 @@ impl Server {
                 inter_file_dependencies: true,
                 // TODO: Dynamically register for workspace diagnostics.
                 workspace_diagnostics: diagnostic_mode.is_workspace(),
-                ..Default::default()
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: Some(diagnostic_mode.is_workspace()),
+                },
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
                 TextDocumentSyncOptions {
@@ -241,6 +247,9 @@ impl Server {
                 trigger_characters: Some(vec!['.'.to_string()]),
                 ..Default::default()
             }),
+            selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+            document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
+            workspace_symbol_provider: Some(lsp_types::OneOf::Left(true)),
             ..Default::default()
         }
     }

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+        DiagnosticFormat, Severity,
+        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
     };
 
     #[test]
@@ -60,6 +60,141 @@ mod tests {
           |            ^
         4 |     def bar():
         5 |         pass
+          |
+        ");
+    }
+
+    /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit c9b99e4.
+    ///
+    /// For example, without the fix, we get diagnostics like this:
+    ///
+    /// ```
+    /// error[no-indented-block]: Expected an indented block
+    ///  --> example.py:3:1
+    ///   |
+    /// 2 | if False:
+    ///   |          ^
+    /// 3 | print()
+    ///   |
+    ///  ```
+    ///
+    /// where the caret points to the end of the previous line instead of the start of the next.
+    #[test]
+    fn empty_span_after_line_terminator() {
+        let mut env = TestEnvironment::new();
+        env.add(
+            "example.py",
+            r#"
+if False:
+print()
+"#,
+        );
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env
+            .builder(
+                "no-indented-block",
+                Severity::Error,
+                "Expected an indented block",
+            )
+            .primary("example.py", "3:0", "3:0", "")
+            .build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[no-indented-block]: Expected an indented block
+         --> example.py:3:1
+          |
+        2 | if False:
+        3 | print()
+          | ^
+          |
+        ");
+    }
+
+    /// Check that the new `full` rendering code in `ruff_db` handles cases fixed by commit 2922490.
+    ///
+    /// For example, without the fix, we get diagnostics like this:
+    ///
+    /// ```
+    /// error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+    ///  --> example.py:1:25
+    ///   |
+    /// 1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+    ///   |                       ^
+    ///   |
+    ///  ```
+    ///
+    /// where the caret points to the `f` in the f-string instead of the start of the invalid
+    /// character (`^Z`).
+    #[test]
+    fn unprintable_characters() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "nested_fstrings = f'{f'{f''}'}'");
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env
+            .builder(
+                "invalid-character-sub",
+                Severity::Error,
+                r#"Invalid unescaped character SUB, use "\x1A" instead"#,
+            )
+            .primary("example.py", "1:24", "1:24", "")
+            .build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r#"
+        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+         --> example.py:1:25
+          |
+        1 | nested_fstrings = f'␈{f'{f'␛'}'}'
+          |                         ^
+          |
+        "#);
+    }
+
+    #[test]
+    fn multiple_unprintable_characters() -> std::io::Result<()> {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "");
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env
+            .builder(
+                "invalid-character-sub",
+                Severity::Error,
+                r#"Invalid unescaped character SUB, use "\x1A" instead"#,
+            )
+            .primary("example.py", "1:1", "1:1", "")
+            .build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r#"
+        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+         --> example.py:1:2
+          |
+        1 | ␈␛
+          |  ^
+          |
+        "#);
+
+        Ok(())
+    }
+
+    /// Ensure that the header column matches the column in the user's input, even if we've replaced
+    /// tabs with spaces for rendering purposes.
+    #[test]
+    fn tab_replacement() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "def foo():\n\treturn 1");
+        env.format(DiagnosticFormat::Full);
+
+        let diagnostic = env.err().primary("example.py", "2:1", "2:9", "").build();
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:2:2
+          |
+        1 | def foo():
+        2 |     return 1
+          |     ^^^^^^^^
           |
         ");
     }

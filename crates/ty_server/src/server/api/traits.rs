@@ -35,8 +35,6 @@
 
 use std::borrow::Cow;
 
-use std::panic::AssertUnwindSafe;
-
 use crate::session::client::Client;
 use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
 
@@ -109,7 +107,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
     fn run(
-        snapshot: AssertUnwindSafe<SessionSnapshot>,
+        snapshot: SessionSnapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;

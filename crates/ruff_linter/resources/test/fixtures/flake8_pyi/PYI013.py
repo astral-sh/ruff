@@ -39,6 +39,11 @@ class NonEmptyWithInit:
         pass
 
 
+class NonEmptyChildWithInlineComment:
+    value: int
+    ... # preserve me
+
+
 class EmptyClass:
     ...
 

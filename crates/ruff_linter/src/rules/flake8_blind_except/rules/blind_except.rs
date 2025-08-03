@@ -47,9 +47,10 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or `logging.error()`
-/// with `exc_info` enabled will _not_ be flagged, as this is a common pattern
-/// for propagating exception traces:
+/// Exceptions that are logged via `logging.exception()` or are logged via
+/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// _not_ be flagged, as this is a common pattern for propagating exception
+/// traces:
 /// ```python
 /// try:
 ///     foo()
@@ -201,7 +202,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             ) {
                                 if match attr.as_str() {
                                     "exception" => true,
-                                    "error" => arguments
+                                    "error" | "critical" => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,
@@ -214,7 +215,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error"] => arguments
+                                    ["logging", "error" | "critical"] => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,
