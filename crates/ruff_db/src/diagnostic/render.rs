@@ -608,12 +608,17 @@ struct RenderableSnippet<'r> {
 
 impl<'r> RenderableSnippet<'r> {
     /// Creates a new snippet with one or more annotations that is ready to be
-    /// renderer.
+    /// rendered.
     ///
     /// The first line of the snippet is the smallest line number on which one
     /// of the annotations begins, minus the context window size. The last line
     /// is the largest line number on which one of the annotations ends, plus
     /// the context window size.
+    ///
+    /// For Jupyter notebooks, the context window may also be truncated at cell
+    /// boundaries. If multiple annotations are present, and they point to
+    /// different cells, these will have already been split into separate
+    /// snippets by `ResolvedDiagnostic::to_renderable`.
     ///
     /// Callers should guarantee that the `input` on every `ResolvedAnnotation`
     /// given is identical.
