@@ -661,7 +661,8 @@ impl<'db> ClassType<'db> {
         match name {
             "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
-                    .and_then(|spec| spec.tuple(db).len().into_fixed_length())
+                    .and_then(|spec| spec.tuple(db))
+                    .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
@@ -671,7 +672,8 @@ impl<'db> ClassType<'db> {
 
             "__bool__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
-                    .map(|spec| spec.tuple(db).truthiness().into_type(db))
+                    .and_then(|spec| spec.tuple(db))
+                    .map(|tuple| tuple.truthiness().into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_simple_tuple_method(return_type)
@@ -679,9 +681,8 @@ impl<'db> ClassType<'db> {
 
             "__getitem__" if class_literal.is_tuple(db) => {
                 specialization
-                    .map(|spec| {
-                        let tuple = spec.tuple(db);
-
+                    .and_then(|spec| spec.tuple(db))
+                    .map(|tuple| {
                         let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
                             FxIndexMap::default();
 
@@ -844,11 +845,12 @@ impl<'db> ClassType<'db> {
                 let mut iterable_parameter =
                     Parameter::positional_only(Some(Name::new_static("iterable")));
 
-                match specialization {
-                    Some(spec) => {
+                let tuple = specialization.and_then(|spec| spec.tuple(db));
+
+                match tuple {
+                    Some(tuple) => {
                         // TODO: Once we support PEP 646 annotations for `*args` parameters, we can
                         // use the tuple itself as the argument type.
-                        let tuple = spec.tuple(db);
                         let tuple_len = tuple.len();
 
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
@@ -883,7 +885,7 @@ impl<'db> ClassType<'db> {
                 // - a zero-length tuple
                 // - an unspecialized tuple
                 // - a tuple with no minimum length
-                if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
+                if tuple.is_none_or(|tuple| tuple.len().minimum() == 0) {
                     iterable_parameter =
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
@@ -1108,7 +1110,7 @@ impl<'db> ClassType<'db> {
         match class_literal.known(db)? {
             KnownClass::Tuple => Some(
                 specialization
-                    .map(|spec| Cow::Borrowed(spec.tuple(db)))
+                    .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
                     .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
             ),
             KnownClass::VersionInfo => {
@@ -1285,7 +1287,7 @@ impl<'db> ClassLiteral<'db> {
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            GenericContext::from_type_params(db, index, type_params, self.known(db))
         })
     }
 
@@ -1309,6 +1311,7 @@ impl<'db> ClassLiteral<'db> {
                 .iter()
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+            self.known(db),
         )
     }
 
