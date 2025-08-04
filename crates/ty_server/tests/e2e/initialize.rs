@@ -36,7 +36,7 @@ fn single_workspace_folder() -> Result<()> {
 /// Tests that the server sends a registration request for diagnostics if workspace diagnostics
 /// are enabled and dynamic registration is enabled.
 #[test]
-fn workspace_diagnostic_registration_enable() -> Result<()> {
+fn workspace_diagnostic_registration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_workspace(
@@ -60,10 +60,10 @@ fn workspace_diagnostic_registration_enable() -> Result<()> {
     Ok(())
 }
 
-/// Tests that the server does *not* send a registration request if workspace diagnostics
-/// are disabled, even if dynamic registration is enabled.
+/// Tests that the server sends a registration request for diagnostics if workspace diagnostics are
+/// disabled and dynamic registration is enabled.
 #[test]
-fn workspace_diagnostic_registration_disable() -> Result<()> {
+fn open_files_diagnostic_registration() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_workspace(
