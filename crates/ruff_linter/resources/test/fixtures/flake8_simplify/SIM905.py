@@ -137,3 +137,34 @@ r"" "\"".split("1")  # ['"']
 r"1" """
 """.split("1")  # [r"", "\n"]
 r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+# https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+r"""simple@example.com
+very.common@example.com
+FirstName.LastName@EasierReading.org
+x@example.com
+long.email-address-with-hyphens@and.subdomains.example.com
+user.name+tag+sorting@example.com
+name/surname@example.com
+xample@s.example
+" "@example.org
+"john..doe"@example.org
+mailhost!username@example.org
+"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
+user%example.com@example.org
+user-@example.org
+I❤️CHOCOLATE@example.com
+this\ still\"not\\allowed@example.com
+stellyamburrr985@example.com
+Abc.123@example.com
+user+mailbox/department=shipping@example.com
+!#$%&'*+-/=?^_`.{|}~@example.com
+"Abc@def"@example.com
+"Fred\ Bloggs"@example.com
+"Joe.\\Blow"@example.com""".split("\n")
+
+
+r"""first
+'no need' to escape
+"swap" quote style
+"use' ugly triple quotes""".split("\n")

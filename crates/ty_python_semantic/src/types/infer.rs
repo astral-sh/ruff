@@ -2868,7 +2868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                TupleType::homogeneous(self.db(), annotated_type)
+                Type::homogeneous_tuple(self.db(), annotated_type)
             };
 
             self.add_declaration_with_binding(
@@ -2880,7 +2880,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                TupleType::homogeneous(self.db(), Type::unknown()),
+                Type::homogeneous_tuple(self.db(), Type::unknown()),
             );
         }
     }
@@ -3293,7 +3293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         } else if node_ty.is_assignable_to(
             self.db(),
-            TupleType::homogeneous(self.db(), type_base_exception),
+            Type::homogeneous_tuple(self.db(), type_base_exception),
         ) {
             extract_tuple_specialization(self.db(), node_ty)
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
@@ -3303,7 +3303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.db(),
                 [
                     type_base_exception,
-                    TupleType::homogeneous(self.db(), type_base_exception),
+                    Type::homogeneous_tuple(self.db(), type_base_exception),
                 ],
             ),
         ) {
@@ -3584,7 +3584,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_nested_match_pattern(&mut self, pattern: &ast::Pattern) {
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
-                self.infer_expression(&match_value.value);
+                self.infer_maybe_standalone_expression(&match_value.value);
             }
             ast::Pattern::MatchSequence(match_sequence) => {
                 for pattern in &match_sequence.patterns {
@@ -3619,7 +3619,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for keyword in &arguments.keywords {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
-                self.infer_expression(cls);
+                self.infer_maybe_standalone_expression(cls);
             }
             ast::Pattern::MatchAs(match_as) => {
                 if let Some(pattern) = &match_as.pattern {
@@ -5611,7 +5611,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // consuming the whole iterator).
         let element_types: Vec<_> = elts.iter().map(|elt| self.infer_expression(elt)).collect();
 
-        TupleType::from_elements(self.db(), element_types)
+        Type::heterogeneous_tuple(self.db(), element_types)
     }
 
     fn infer_list_expression(&mut self, list: &ast::ExprList) -> Type<'db> {
@@ -6069,7 +6069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            if !matches!(
+            let has_special_cased_constructor = matches!(
                 class.known(self.db()),
                 Some(
                     KnownClass::Bool
@@ -6083,20 +6083,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
-            )
-
-            // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-            // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-            // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-            // in `ClassType::own_class_member()`).
-            && (callable_type.is_generic_alias() || !class.is_known(self.db(), KnownClass::Tuple))
+            ) || (
+                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+                // in `ClassType::own_class_member()`).
+                class.is_known(self.db(), KnownClass::Tuple) && class.is_not_generic()
+            );
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
-            && KnownClass::Enum
-                .to_class_literal(self.db())
-                .to_class_type(self.db())
-                .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
+            if !has_special_cased_constructor
+                && KnownClass::Enum
+                    .to_class_literal(self.db())
+                    .to_class_type(self.db())
+                    .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
@@ -8478,6 +8479,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let tuple_generic_alias = |db: &'db dyn Db, tuple: Option<TupleType<'db>>| {
+            let tuple =
+                tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()).unwrap());
+            tuple
+                .to_class_type(db)
+                .map(Type::from)
+                .unwrap_or_else(Type::unknown)
+        };
+
         // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
         // subscript inference logic and treat this as an explicit specialization.
         // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
@@ -8486,9 +8496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
             if class.is_tuple(self.db()) {
-                return self
-                    .infer_tuple_type_expression(slice)
-                    .to_meta_type(self.db());
+                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
             }
             if let Some(generic_context) = class.generic_context(self.db()) {
                 return self.infer_explicit_class_specialization(
@@ -8500,9 +8508,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
-            return self
-                .infer_tuple_type_expression(slice)
-                .to_meta_type(self.db());
+            return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -8525,7 +8531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 self.store_expression_type(
                     slice_node,
-                    TupleType::from_elements(self.db(), arguments.iter_types()),
+                    Type::heterogeneous_tuple(self.db(), arguments.iter_types()),
                 );
                 arguments
             }
@@ -8557,7 +8563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_subscript_expression_types(
         &self,
-        value_node: &ast::Expr,
+        value_node: &'ast ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         expr_context: ExprContext,
@@ -8617,7 +8623,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         };
 
                         if let Ok(new_elements) = tuple.py_slice(db, start, stop, step) {
-                            TupleType::from_elements(db, new_elements)
+                            Type::heterogeneous_tuple(db, new_elements)
                         } else {
                             report_slice_step_size_zero(context, value_node.into());
                             Type::unknown()
@@ -8726,7 +8732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|context| {
                             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context))
                         })
-                        .unwrap_or_else(Type::unknown),
+                        .unwrap_or_else(GenericContextError::into_type),
                     // TODO: emit a diagnostic
                     TupleSpec::Variable(_) => Type::unknown(),
                 })
@@ -8739,7 +8745,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
-                .unwrap_or_else(Type::unknown),
+                .unwrap_or_else(GenericContextError::into_type),
             ),
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -8758,7 +8764,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|context| {
                             Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
                         })
-                        .unwrap_or_else(Type::unknown),
+                        .unwrap_or_else(GenericContextError::into_type),
                     // TODO: emit a diagnostic
                     TupleSpec::Variable(_) => Type::unknown(),
                 })
@@ -8771,7 +8777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
-                .unwrap_or_else(Type::unknown),
+                .unwrap_or_else(GenericContextError::into_type),
             ),
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
@@ -8940,11 +8946,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_node: &ast::Expr,
         typevars: &[Type<'db>],
         origin: LegacyGenericBase,
-    ) -> Option<GenericContext<'db>> {
-        let typevars: Option<FxOrderSet<_>> = typevars
+    ) -> Result<GenericContext<'db>, GenericContextError> {
+        let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
+                Type::NominalInstance(NominalInstanceType { class, .. })
+                    if matches!(
+                        class.known(self.db()),
+                        Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
+                    ) =>
+                {
+                    Err(GenericContextError::NotYetSupported)
+                }
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -8954,7 +8968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typevar.display(self.db()),
                         ));
                     }
-                    None
+                    Err(GenericContextError::InvalidArgument)
                 }
             })
             .collect();
@@ -9644,7 +9658,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let hinted_type = if list.len() == 1 {
                             KnownClass::List.to_specialized_instance(db, inner_types)
                         } else {
-                            TupleType::from_elements(db, inner_types)
+                            Type::heterogeneous_tuple(db, inner_types)
                         };
 
                         diagnostic.set_primary_message(format_args!(
@@ -9676,7 +9690,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 Type::Dynamic(DynamicType::Todo(_) | DynamicType::Unknown)
                             )
                         }) {
-                            let hinted_type = TupleType::from_elements(self.db(), inner_types);
+                            let hinted_type = Type::heterogeneous_tuple(self.db(), inner_types);
                             diagnostic.set_primary_message(format_args!(
                                 "Did you mean `{}`?",
                                 hinted_type.display(self.db()),
@@ -9895,7 +9909,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
-                Some(KnownClass::Tuple) => self.infer_tuple_type_expression(slice),
+                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(slice)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
@@ -9920,7 +9934,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
-    fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Type<'db> {
+    fn infer_tuple_type_expression(&mut self, tuple_slice: &ast::Expr) -> Option<TupleType<'db>> {
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
         /// we should only infer `Todo` for that specific subelement.
         /// Certain specific AST nodes can however change the meaning of the entire tuple,
@@ -9961,7 +9975,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(ellipsis);
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
-                    self.store_expression_type(tuple_slice, result);
+                    self.store_expression_type(tuple_slice, Type::tuple(result));
                     return result;
                 }
 
@@ -9988,15 +10002,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let ty = if return_todo {
-                    todo_type!("PEP 646")
+                    TupleType::homogeneous(self.db(), todo_type!("PEP 646"))
                 } else {
-                    Type::tuple(TupleType::new(self.db(), element_types))
+                    TupleType::new(self.db(), element_types)
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
                 // stored in the surrounding `infer_type_expression` call:
-                self.store_expression_type(tuple_slice, ty);
+                self.store_expression_type(tuple_slice, Type::tuple(ty));
 
                 ty
             }
@@ -10004,7 +10018,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    todo_type!("PEP 646")
+                    TupleType::homogeneous(self.db(), todo_type!("PEP 646"))
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
                 }
@@ -10668,7 +10682,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::Type => self.infer_subclass_of_type_expression(arguments_slice),
-            SpecialFormType::Tuple => self.infer_tuple_type_expression(arguments_slice),
+            SpecialFormType::Tuple => {
+                Type::tuple(self.infer_tuple_type_expression(arguments_slice))
+            }
             SpecialFormType::Generic | SpecialFormType::Protocol => {
                 self.infer_expression(arguments_slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
@@ -10849,6 +10865,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GenericContextError {
+    /// It's invalid to subscript `Generic` or `Protocol` with this type
+    InvalidArgument,
+    /// It's valid to subscribe `Generic` or `Protocol` with this type,
+    /// but the type is not yet supported.
+    NotYetSupported,
+}
+
+impl GenericContextError {
+    const fn into_type<'db>(self) -> Type<'db> {
+        match self {
+            GenericContextError::InvalidArgument => Type::unknown(),
+            GenericContextError::NotYetSupported => todo_type!("ParamSpecs and TypeVarTuples"),
+        }
     }
 }
 

@@ -410,6 +410,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }

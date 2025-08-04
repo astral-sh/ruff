@@ -147,3 +147,93 @@ BLE.py:131:8: BLE001 Do not catch blind exception: `Exception`
     |        ^^^^^^^^^ BLE001
 132 |     critical("...", exc_info=None)
     |
+
+BLE.py:169:9: BLE001 Do not catch blind exception: `Exception`
+    |
+167 | try:
+168 |     pass
+169 | except (Exception,):
+    |         ^^^^^^^^^ BLE001
+170 |     pass
+    |
+
+BLE.py:174:9: BLE001 Do not catch blind exception: `Exception`
+    |
+172 | try:
+173 |     pass
+174 | except (Exception, ValueError):
+    |         ^^^^^^^^^ BLE001
+175 |     pass
+    |
+
+BLE.py:179:21: BLE001 Do not catch blind exception: `Exception`
+    |
+177 | try:
+178 |     pass
+179 | except (ValueError, Exception):
+    |                     ^^^^^^^^^ BLE001
+180 |     pass
+    |
+
+BLE.py:184:21: BLE001 Do not catch blind exception: `Exception`
+    |
+182 | try:
+183 |     pass
+184 | except (ValueError, Exception) as e:
+    |                     ^^^^^^^^^ BLE001
+185 |     print(e)
+    |
+
+BLE.py:189:9: BLE001 Do not catch blind exception: `BaseException`
+    |
+187 | try:
+188 |     pass
+189 | except (BaseException, TypeError):
+    |         ^^^^^^^^^^^^^ BLE001
+190 |     pass
+    |
+
+BLE.py:194:20: BLE001 Do not catch blind exception: `BaseException`
+    |
+192 | try:
+193 |     pass
+194 | except (TypeError, BaseException):
+    |                    ^^^^^^^^^^^^^ BLE001
+195 |     pass
+    |
+
+BLE.py:199:9: BLE001 Do not catch blind exception: `Exception`
+    |
+197 | try:
+198 |     pass
+199 | except (Exception, BaseException):
+    |         ^^^^^^^^^ BLE001
+200 |     pass
+    |
+
+BLE.py:204:9: BLE001 Do not catch blind exception: `BaseException`
+    |
+202 | try:
+203 |     pass
+204 | except (BaseException, Exception):
+    |         ^^^^^^^^^^^^^ BLE001
+205 |     pass
+    |
+
+BLE.py:210:10: BLE001 Do not catch blind exception: `Exception`
+    |
+208 | try:
+209 |     pass
+210 | except ((Exception, ValueError), TypeError):
+    |          ^^^^^^^^^ BLE001
+211 |     pass
+    |
+
+BLE.py:215:22: BLE001 Do not catch blind exception: `BaseException`
+    |
+213 | try:
+214 |     pass
+215 | except (ValueError, (BaseException, TypeError)):
+    |                      ^^^^^^^^^^^^^ BLE001
+216 |     pass
+    |

@@ -2,8 +2,6 @@ use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StringFlags;
-use ruff_python_ast::str::TripleQuotes;
-use ruff_python_ast::str_prefix::StringLiteralPrefix;
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
     StringLiteralValue, UnaryOp,
@@ -119,66 +117,52 @@ pub(crate) fn split_static_string(
     }
 }
 
-/// Check if a string contains characters that would be unescapable in an r-string.
-///
-/// In r-strings, backslashes are treated literally, so sequences like `\n`, `\t`, etc.
-/// are not valid escape sequences and will cause syntax errors.
-/// This function now checks for all cases where a string cannot be safely represented as a raw string.
-fn contains_unescapable_for_rstring(s: &str, quote: char, triple_quoted: bool) -> bool {
-    if s.ends_with('\\') {
-        return true;
+fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
+    // In the ideal case we can wrap the element in _single_ quotes of the same
+    // style. For example, both of these are okay:
+    //
+    // ```python
+    // """itemA
+    // itemB
+    // itemC""".split() # -> ["itemA", "itemB", "itemC"]
+    // ```
+    //
+    // ```python
+    // r"""itemA
+    // 'single'quoted
+    // """.split() # -> [r"itemA",r"'single'quoted'"]
+    // ```
+    if !flags.prefix().is_raw() || !elt.contains(flags.quote_style().as_char()) {
+        flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
     }
-    if s.contains(quote) {
-        if triple_quoted {
-            let triple = std::iter::repeat_n(quote, 3).collect::<String>();
-            if s.contains(&triple) {
-                return true;
-            }
-        } else {
-            return true;
-        }
+    // If we have a raw string containing a quotation mark of the same style,
+    // then we have to swap the style of quotation marks used
+    else if !elt.contains(flags.quote_style().opposite().as_char()) {
+        flags
+            .with_quote_style(flags.quote_style().opposite())
+            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
+    } else
+    // If both types of quotes are used in the raw, triple-quoted string, then
+    // we are forced to either add escapes or keep the triple quotes. We opt for
+    // the latter.
+    {
+        flags
     }
-    if !triple_quoted && s.contains('\n') {
-        return true;
-    }
-    false
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     let quote = flags.quote_style().as_char();
-    let triple_quoted = flags.triple_quotes() == TripleQuotes::Yes;
+    let triple_quoted = flags.triple_quotes() == ruff_python_ast::str::TripleQuotes::Yes;
     Expr::List(ExprList {
         elts: elts
             .iter()
             .map(|elt| {
-                let should_use_r_string = matches!(flags.prefix(), StringLiteralPrefix::Raw { .. })
-                    && !contains_unescapable_for_rstring(elt, quote, triple_quoted);
+                let element_flags = replace_flags(elt, flags);
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-                    // intentionally omit the triple quote flag, if set, to avoid strange
-                    // replacements like
-                    //
-                    // ```python
-                    // """
-                    // itemA
-                    // itemB
-                    // itemC
-                    // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
-                    // ```
-                    flags: if should_use_r_string {
-                        flags.with_triple_quotes(TripleQuotes::No)
-                    } else {
-                        let new_prefix = match flags.prefix() {
-                            StringLiteralPrefix::Raw { .. } => StringLiteralPrefix::Empty,
-                            StringLiteralPrefix::Unicode => StringLiteralPrefix::Unicode,
-                            StringLiteralPrefix::Empty => StringLiteralPrefix::Empty,
-                        };
-                        flags
-                            .with_triple_quotes(TripleQuotes::No)
-                            .with_prefix(new_prefix)
-                    },
+                    flags: element_flags,
                 })
             })
             .collect(),

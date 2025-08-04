@@ -56,7 +56,7 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
-    InitializeResult, InitializedParams, PartialResultParams, PreviousResultId,
+    InitializeResult, InitializedParams, NumberOrString, PartialResultParams, PreviousResultId,
     PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Url,
     VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
@@ -151,6 +151,10 @@ pub(crate) struct TestServer {
 
     /// Capabilities registered by the server
     registered_capabilities: Vec<String>,
+
+    /// Whether a Shutdown request has been sent by the test
+    /// and the exit sequence should be skipped during `Drop`
+    shutdown_requested: bool,
 }
 
 impl TestServer {
@@ -174,7 +178,7 @@ impl TestServer {
             let worker_threads = NonZeroUsize::new(1).unwrap();
             let test_system = Arc::new(TestSystem::new(os_system));
 
-            match Server::new(worker_threads, server_connection, test_system, false) {
+            match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
@@ -207,6 +211,7 @@ impl TestServer {
             initialize_response: None,
             workspace_configurations,
             registered_capabilities: Vec::new(),
+            shutdown_requested: false,
         }
         .initialize(workspace_folders, capabilities, initialization_options)
     }
@@ -229,7 +234,7 @@ impl TestServer {
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<InitializeResult>(init_request_id)?);
+        self.initialize_response = Some(self.await_response::<InitializeResult>(&init_request_id)?);
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
@@ -270,6 +275,7 @@ impl TestServer {
     /// This should be called before the test server is dropped to ensure that all server messages
     /// have been properly consumed by the test. If there are any pending messages, this will panic
     /// with detailed information about what was left unconsumed.
+    #[track_caller]
     fn assert_no_pending_messages(&self) {
         let mut errors = Vec::new();
 
@@ -330,6 +336,11 @@ impl TestServer {
     where
         R: Request,
     {
+        // Track if an Exit notification is being sent
+        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+            self.shutdown_requested = true;
+        }
+
         let id = self.next_request_id();
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
@@ -354,9 +365,9 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
+    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: &RequestId) -> Result<T> {
         loop {
-            if let Some(response) = self.responses.remove(&id) {
+            if let Some(response) = self.responses.remove(id) {
                 match response {
                     Response {
                         error: None,
@@ -373,7 +384,11 @@ impl TestServer {
                         return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, Box::new(response)).into());
+                        return Err(TestServerError::InvalidResponse(
+                            id.clone(),
+                            Box::new(response),
+                        )
+                        .into());
                     }
                 }
             }
@@ -491,20 +506,25 @@ impl TestServer {
     fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
         match message {
             Message::Request(request) => {
+                tracing::debug!("Received server request {}", &request.method);
                 self.requests.push_back(request);
             }
-            Message::Response(response) => match self.responses.entry(response.id.clone()) {
-                Entry::Occupied(existing) => {
-                    return Err(TestServerError::DuplicateResponse(
-                        response.id,
-                        Box::new(existing.get().clone()),
-                    ));
+            Message::Response(response) => {
+                tracing::debug!("Received server response for request {}", &response.id);
+                match self.responses.entry(response.id.clone()) {
+                    Entry::Occupied(existing) => {
+                        return Err(TestServerError::DuplicateResponse(
+                            response.id,
+                            Box::new(existing.get().clone()),
+                        ));
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(response);
+                    }
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert(response);
-                }
-            },
+            }
             Message::Notification(notification) => {
+                tracing::debug!("Received notification {}", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
@@ -524,6 +544,16 @@ impl TestServer {
         }
 
         panic!("Server dropped client receiver while still running");
+    }
+
+    pub(crate) fn cancel(&mut self, request_id: &RequestId) {
+        let id_string = request_id.to_string();
+        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+            id: match id_string.parse() {
+                Ok(id) => NumberOrString::Number(id),
+                Err(_) => NumberOrString::String(id_string),
+            },
+        });
     }
 
     /// Handle workspace configuration requests from the server.
@@ -647,27 +677,24 @@ impl TestServer {
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
-        self.await_response::<DocumentDiagnosticReportResult>(id)
+        self.await_response::<DocumentDiagnosticReportResult>(&id)
     }
 
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
     pub(crate) fn workspace_diagnostic_request(
         &mut self,
+        work_done_token: Option<lsp_types::NumberOrString>,
         previous_result_ids: Option<Vec<PreviousResultId>>,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
-            work_done_progress_params: WorkDoneProgressParams {
-                work_done_token: Some(lsp_types::NumberOrString::String(
-                    "test-progress-token".to_string(),
-                )),
-            },
+            work_done_progress_params: WorkDoneProgressParams { work_done_token },
             partial_result_params: PartialResultParams::default(),
         };
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
-        self.await_response::<WorkspaceDiagnosticReportResult>(id)
+        self.await_response::<WorkspaceDiagnosticReportResult>(&id)
     }
 }
 
@@ -694,9 +721,9 @@ impl Drop for TestServer {
         //
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
-        let shutdown_error = if self.server_thread.is_some() {
+        let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<()>(shutdown_id) {
+            match self.await_response::<()>(&shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
                     None

@@ -838,6 +838,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .collect();
                 PatternPredicateKind::Or(predicates)
             }
+            ast::Pattern::MatchAs(pattern) => PatternPredicateKind::As(
+                pattern
+                    .pattern
+                    .as_ref()
+                    .map(|p| Box::new(self.predicate_kind(p))),
+                pattern.name.as_ref().map(|name| name.id.clone()),
+            ),
             _ => PatternPredicateKind::Unsupported,
         }
     }

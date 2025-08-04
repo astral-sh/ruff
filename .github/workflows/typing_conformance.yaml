@@ -24,6 +24,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
+  CONFORMANCE_SUITE_COMMIT: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
 
 jobs:
   typing_conformance:
@@ -40,7 +41,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: python/typing
-          ref: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+          ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}
           path: typing
           persist-credentials: false
 
@@ -95,6 +96,7 @@ jobs:
           fi
 
           echo ${{ github.event.number }} > pr-number
+          echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
 
       - name: Upload diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -107,3 +109,9 @@ jobs:
         with:
           name: pr-number
           path: pr-number
+
+      - name: Upload conformance suite commit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: conformance-suite-commit
+          path: conformance-suite-commit

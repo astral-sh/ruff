@@ -20,7 +20,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
@@ -268,6 +268,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) const fn is_not_generic(self) -> bool {
+        matches!(self, Self::NonGeneric(_))
+    }
+
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
@@ -778,7 +782,7 @@ impl<'db> ClassType<'db> {
 
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             KnownClass::Slice.to_instance(db),
-                            TupleType::homogeneous(db, all_elements_unioned),
+                            Type::homogeneous_tuple(db, all_elements_unioned),
                         ));
 
                         let getitem_signature =
@@ -841,7 +845,8 @@ impl<'db> ClassType<'db> {
                 // - an unspecialized tuple
                 // - a tuple with no minimum length
                 if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
-                    iterable_parameter = iterable_parameter.with_default_type(TupleType::empty(db));
+                    iterable_parameter =
+                        iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
 
                 let parameters = Parameters::new([
@@ -1533,7 +1538,7 @@ impl<'db> ClassLiteral<'db> {
             }
         } else {
             let name = Type::string_literal(db, self.name(db));
-            let bases = TupleType::from_elements(db, self.explicit_bases(db).iter().copied());
+            let bases = Type::heterogeneous_tuple(db, self.explicit_bases(db));
             let namespace = KnownClass::Dict
                 .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()]);
 
@@ -1624,8 +1629,8 @@ impl<'db> ClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db, specialization).map(Type::from);
-            return Place::bound(TupleType::from_elements(db, tuple_elements)).into();
+            let tuple_elements = self.iter_mro(db, specialization);
+            return Place::bound(Type::heterogeneous_tuple(db, tuple_elements)).into();
         }
 
         self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))

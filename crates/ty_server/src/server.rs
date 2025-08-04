@@ -29,10 +29,10 @@ pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
+pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 
 pub struct Server {
     connection: Connection,
-    client_capabilities: ClientCapabilities,
     worker_threads: NonZeroUsize,
     main_loop_receiver: MainLoopReceiver,
     main_loop_sender: MainLoopSender,
@@ -44,7 +44,7 @@ impl Server {
         worker_threads: NonZeroUsize,
         connection: Connection,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
-        initialize_logging: bool,
+        in_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
         let init_params: InitializeParams = serde_json::from_value(init_value)?;
@@ -81,7 +81,7 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        if initialize_logging {
+        if !in_test {
             crate::logging::init_logging(
                 global_options.tracing.log_level.unwrap_or_default(),
                 global_options.tracing.log_file.as_deref(),
@@ -160,8 +160,8 @@ impl Server {
                 global_options,
                 workspaces,
                 native_system,
+                in_test,
             )?,
-            client_capabilities,
         })
     }
 

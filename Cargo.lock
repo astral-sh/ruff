@@ -2050,9 +2050,9 @@ checksum = "61807f77802ff30975e01f4f071c8ba10c022052f98b3294119f3e615d13e5be"
 
 [[package]]
 name = "notify"
-version = "8.1.0"
+version = "8.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3163f59cd3fa0e9ef8c32f242966a7b9994fd7378366099593e0e73077cd8c97"
+checksum = "4d3d07927151ff8575b7087f245456e549fea62edf0ec4e565a5ee50c8402bc3"
 dependencies = [
  "bitflags 2.9.1",
  "fsevent-sys",
@@ -3441,7 +3441,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=f3dc2f30f9a250618161e35600a00de7fe744953#f3dc2f30f9a250618161e35600a00de7fe744953"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=86ca4a9d70e97dd5107e6111a09647dd10ff7535#86ca4a9d70e97dd5107e6111a09647dd10ff7535"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3454,7 +3454,6 @@ dependencies = [
  "inventory",
  "parking_lot",
  "portable-atomic",
- "rayon",
  "rustc-hash",
  "salsa-macro-rules",
  "salsa-macros",
@@ -3466,12 +3465,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=f3dc2f30f9a250618161e35600a00de7fe744953#f3dc2f30f9a250618161e35600a00de7fe744953"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=86ca4a9d70e97dd5107e6111a09647dd10ff7535#86ca4a9d70e97dd5107e6111a09647dd10ff7535"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=f3dc2f30f9a250618161e35600a00de7fe744953#f3dc2f30f9a250618161e35600a00de7fe744953"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=86ca4a9d70e97dd5107e6111a09647dd10ff7535#86ca4a9d70e97dd5107e6111a09647dd10ff7535"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3568,9 +3567,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.141"
+version = "1.0.142"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30b9eff21ebe718216c6ec64e1d9ac57087aad11efc64e32002bce4a0d4c03d3"
+checksum = "030fedb782600dcbd6f02d479bf0d817ac3bb40d644745b769d6a96bc3afc5a7"
 dependencies = [
  "itoa",
  "memchr",
@@ -4187,6 +4186,7 @@ dependencies = [
  "argfile",
  "clap",
  "clap_complete_command",
+ "clearscreen",
  "colored 3.0.0",
  "crossbeam",
  "ctrlc",
