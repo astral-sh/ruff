@@ -18,7 +18,10 @@
 /python/py-fuzzer/ @AlexWaygood
 
 # ty
-/crates/ty* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
-/crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/ty* @carljm @MichaReiser @sharkdp @dcreager
+/crates/ruff_db/ @carljm @MichaReiser @sharkdp @dcreager
 /scripts/ty_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /crates/ty_python_semantic @carljm @AlexWaygood @sharkdp @dcreager
+/crates/ty_ide @carljm @AlexWaygood @MichaReiser @sharkdp @dcreager
+/crates/ty_vendored @carljm @AlexWaygood @MichaReiser @sharkdp @dcreager
+/crates/ty_test @carljm @AlexWaygood @MichaReiser @sharkdp @dcreager
