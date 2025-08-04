@@ -90,6 +90,7 @@ mod string_annotation;
 mod subclass_of;
 mod tuple;
 mod type_ordering;
+mod unification;
 mod unpacker;
 mod visitor;
 
@@ -8670,6 +8671,21 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 }
 
 impl<'db> IntersectionType<'db> {
+    /// Create an intersection from a list of elements
+    /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
+    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(IntersectionBuilder::new(db), |builder, element| {
+                builder.add_positive(element.into())
+            })
+            .build()
+    }
+
     /// Return a new `IntersectionType` instance with the positive and negative types sorted
     /// according to a canonical ordering, and other normalizations applied to each element as applicable.
     ///

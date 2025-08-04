@@ -1,0 +1,80 @@
+//! Implements the _tallying_ algorithm from [[POPL2015][]], which finds the unification of a
+//! set of subtyping constraints.
+//!
+//! [POPL2015]: https://doi.org/10.1145/2676726.2676991
+
+// XXX
+#![allow(dead_code)]
+
+use crate::Db;
+use crate::types::{IntersectionType, Type, TypeVarInstance, UnionType};
+
+/// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
+/// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct Constraint<'db> {
+    pub(crate) lower: Type<'db>,
+    pub(crate) typevar: TypeVarInstance<'db>,
+    pub(crate) upper: Type<'db>,
+}
+
+impl<'db> Constraint<'db> {
+    /// Returns whether this constraint subsumes `other` — if it constrains the same typevar and
+    /// has tighter bounds.
+    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+        self.typevar == other.typevar
+            && other.lower.is_assignable_to(db, self.lower)
+            && self.upper.is_assignable_to(db, other.upper)
+    }
+
+    /// Merges another constraint into this one. Panics if the two constraints have different
+    /// typevars.
+    fn merge(&mut self, db: &'db dyn Db, other: Self) {
+        debug_assert!(self.typevar == other.typevar);
+        self.lower = UnionType::from_elements(db, [self.lower, other.lower]);
+        self.upper = IntersectionType::from_elements(db, [self.upper, other.upper]);
+    }
+}
+
+/// A set of merged constraints. We guarantee that no constraint in the set subsumes another, and
+/// that no two constraints in the set have the same typevar.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ConstraintSet<'db> {
+    constraints: Vec<Constraint<'db>>,
+}
+
+impl<'db> ConstraintSet<'db> {
+    /// Returns an empty constraint set
+    fn empty() -> Self {
+        Self {
+            constraints: vec![],
+        }
+    }
+
+    /// Adds a new constraint to this set, ensuring that no constraint in the set subsumes another,
+    /// and that no two constraints in the set have the same typevar.
+    fn add(&mut self, db: &'db dyn Db, constraint: Constraint<'db>) {
+        for existing in &mut self.constraints {
+            if constraint.typevar == existing.typevar {
+                existing.merge(db, constraint);
+                return;
+            }
+        }
+        self.constraints.push(constraint);
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ConstraintSetSet<'db>(Vec<ConstraintSet<'db>>);
+
+impl<'db> ConstraintSetSet<'db> {
+    /// Returns the set of constraint sets that is unsolvable.
+    pub(crate) fn none() -> Self {
+        Self(vec![])
+    }
+
+    /// Returns the set of constraints set that is always satisfied.
+    pub(crate) fn always() -> Self {
+        Self(vec![ConstraintSet::empty()])
+    }
+}
