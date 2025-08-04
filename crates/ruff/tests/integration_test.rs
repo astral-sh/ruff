@@ -2424,3 +2424,321 @@ fn pyproject_toml_stdin_schema_error_fix_diff() {
     "
     );
 }
+
+// ...existing code...
+
+// ...existing code...
+
+fn strip_ansi_codes(text: &str) -> String {
+    // Simple regex to remove ANSI escape sequences
+    let re = regex::Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]").unwrap();
+    re.replace_all(text, "").to_string()
+}
+
+#[test]
+fn should_output_correct_text_in_watch_mode_with_full_output_format() -> Result<()> {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    const COMPLETION_TEXT: &str = "help: Replace with `functools.reduce`";
+    // Create a temporary directory and a test file
+    let tempdir = TempDir::new()?;
+    let test_file = tempdir.path().join("test.py");
+
+    // RUF017 is a rule that checks for quadratic list summation
+    fs::write(
+        &test_file,
+        "lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\njoined = sum(lists, [])",
+    )?;
+
+    // Start ruff in watch mode with full output format
+    let mut child = Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "check",
+            "--watch",
+            "--output-format",
+            "full",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "RUF017",
+            test_file.to_str().unwrap(),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = child.stdout.take().unwrap();
+
+    // Use a channel to communicate between threads
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn a thread to read output
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        let mut output = String::new();
+        let mut found_error_count = false;
+
+        for line in reader.lines().map_while(Result::ok) {
+            // Filter out ANSI escape codes
+            let clean_line = strip_ansi_codes(&line);
+            //let clean_line = line;
+
+            // Skip empty lines and watch mode status messages
+
+            output.push_str(&clean_line);
+            output.push('\n');
+
+            // Look for the error count line which indicates completion of initial check
+            if clean_line.contains(COMPLETION_TEXT) {
+                found_error_count = true;
+                // Give a small delay to ensure any remaining output is captured
+                thread::sleep(Duration::from_millis(100));
+                let _ = tx.send(output.clone());
+                break;
+            }
+        }
+
+        // Fallback: send whatever we have if no error count found
+        if !found_error_count {
+            let _ = tx.send(output);
+        }
+    });
+
+    // Wait for output with a timeout
+    let Ok(output) = rx.recv_timeout(Duration::from_secs(5)) else {
+        child.kill()?;
+        child.wait()?;
+        return Err(anyhow::anyhow!("Timeout waiting for watch mode output"));
+    };
+
+    // Kill the child process
+    child.kill()?;
+    child.wait()?;
+
+    // Check the output
+    insta::with_settings!({filters => vec![
+        (test_file.to_str().unwrap().replace('\\', "\\\\").as_str(), "/path/to/test.py"),
+        (r"\[\d{2}:\d{2}:\d{2} [AP]M\]", "[HH:MM:SS XX]"),
+    ]}, {
+        insta::assert_snapshot!(output, @r###"
+        [HH:MM:SS XX] Starting linter in watch mode using full formatting...
+
+        [HH:MM:SS XX] Found 1 error. Watching for file changes.
+
+        
+        /path/to/test.py:2:10: RUF017 Avoid quadratic list summation
+          |
+        1 | lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+        2 | joined = sum(lists, [])
+          |          ^^^^^^^^^^^^^^ RUF017
+          |
+          = help: Replace with `functools.reduce`
+        "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn should_output_correct_text_in_watch_mode_with_concise_output_format() -> Result<()> {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    const COMPLETION_TEXT: &str = "RUF017 Avoid quadratic list summation";
+    // Create a temporary directory and a test file
+    let tempdir = TempDir::new()?;
+    let test_file = tempdir.path().join("test.py");
+
+    // RUF017 is a rule that checks for quadratic list summation
+    fs::write(
+        &test_file,
+        "lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\njoined = sum(lists, [])",
+    )?;
+
+    // Start ruff in watch mode with concise output format
+    let mut child = Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "check",
+            "--watch",
+            "--output-format",
+            "concise",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "RUF017",
+            test_file.to_str().unwrap(),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = child.stdout.take().unwrap();
+
+    // Use a channel to communicate between threads
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn a thread to read output
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        let mut output = String::new();
+        let mut found_error_count = false;
+
+        for line in reader.lines().map_while(Result::ok) {
+            // Filter out ANSI escape codes
+            let clean_line = strip_ansi_codes(&line);
+            //let clean_line = line;
+
+            // Skip empty lines and watch mode status messages
+
+            output.push_str(&clean_line);
+            output.push('\n');
+
+            // Look for the error count line which indicates completion of initial check
+            if clean_line.contains(COMPLETION_TEXT) {
+                found_error_count = true;
+                // Give a small delay to ensure any remaining output is captured
+                thread::sleep(Duration::from_millis(100));
+                let _ = tx.send(output.clone());
+                break;
+            }
+        }
+
+        // Fallback: send whatever we have if no error count found
+        if !found_error_count {
+            let _ = tx.send(output);
+        }
+    });
+
+    // Wait for output with a timeout
+    let Ok(output) = rx.recv_timeout(Duration::from_secs(5)) else {
+        child.kill()?;
+        child.wait()?;
+        return Err(anyhow::anyhow!("Timeout waiting for watch mode output"));
+    };
+
+    // Kill the child process
+    child.kill()?;
+    child.wait()?;
+
+    // Check the output
+    insta::with_settings!({filters => vec![
+        (test_file.to_str().unwrap().replace('\\', "\\\\").as_str(), "/path/to/test.py"),
+        (r"\[\d{2}:\d{2}:\d{2} [AP]M\]", "[HH:MM:SS XX]"),
+    ]}, {
+        insta::assert_snapshot!(output, @r###"
+        [HH:MM:SS XX] Starting linter in watch mode using concise formatting...
+
+        [HH:MM:SS XX] Found 1 error. Watching for file changes.
+
+        
+        /path/to/test.py:2:10: RUF017 Avoid quadratic list summation
+        "###);
+    });
+
+    Ok(())
+}
+
+#[test]
+fn should_output_correct_text_in_watch_mode_with_full_output_format_and_no_errors() -> Result<()> {
+    use std::io::{BufRead, BufReader};
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
+
+    const COMPLETION_TEXT: &str = "Found 0 errors. Watching for file changes.";
+    // Create a temporary directory and a test file
+    let tempdir = TempDir::new()?;
+    let test_file = tempdir.path().join("test.py");
+
+    // RUF017 is a rule that checks for quadratic list summation
+    fs::write(
+        &test_file,
+        "import functools\nimport operator\nlists = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\njoined = functools.reduce(operator.add, lists)",
+    )?;
+
+    // Start ruff in watch mode with full output format
+    let mut child = Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "check",
+            "--watch",
+            "--output-format",
+            "json",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "RUF017",
+            test_file.to_str().unwrap(),
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    let stdout = child.stdout.take().unwrap();
+
+    // Use a channel to communicate between threads
+    let (tx, rx) = mpsc::channel();
+
+    // Spawn a thread to read output
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        let mut output = String::new();
+        let mut found_error_count = false;
+
+        for line in reader.lines().map_while(Result::ok) {
+            // Filter out ANSI escape codes
+            let clean_line = strip_ansi_codes(&line);
+            //let clean_line = line;
+
+            // Skip empty lines and watch mode status messages
+
+            output.push_str(&clean_line);
+            output.push('\n');
+
+            // Look for the error count line which indicates completion of initial check
+            if clean_line.contains(COMPLETION_TEXT) {
+                found_error_count = true;
+                // Give a small delay to ensure any remaining output is captured
+                thread::sleep(Duration::from_millis(100));
+                let _ = tx.send(output.clone());
+                break;
+            }
+        }
+
+        // Fallback: send whatever we have if no error count found
+        if !found_error_count {
+            let _ = tx.send(output);
+        }
+    });
+
+    // Wait for output with a timeout
+    let Ok(output) = rx.recv_timeout(Duration::from_secs(5)) else {
+        child.kill()?;
+        child.wait()?;
+        return Err(anyhow::anyhow!("Timeout waiting for watch mode output"));
+    };
+
+    // Kill the child process
+    child.kill()?;
+    child.wait()?;
+
+    // Check the output
+    insta::with_settings!({filters => vec![
+        (r"\[\d{2}:\d{2}:\d{2} [AP]M\]", "[HH:MM:SS XX]"),
+    ]}, {
+        insta::assert_snapshot!(output, @r###"
+        [HH:MM:SS XX] Starting linter in watch mode using json formatting...
+
+        [HH:MM:SS XX] Found 0 errors. Watching for file changes.
+        "###);
+    });
+
+    Ok(())
+}
