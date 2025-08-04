@@ -2485,9 +2485,6 @@ fn should_output_correct_text_in_watch_mode_with_full_output_format() -> Result<
         for line in reader.lines().map_while(Result::ok) {
             // Filter out ANSI escape codes
             let clean_line = strip_ansi_codes(&line);
-            //let clean_line = line;
-
-            // Skip empty lines and watch mode status messages
 
             output.push_str(&clean_line);
             output.push('\n');
@@ -2593,9 +2590,6 @@ fn should_output_correct_text_in_watch_mode_with_concise_output_format() -> Resu
         for line in reader.lines().map_while(Result::ok) {
             // Filter out ANSI escape codes
             let clean_line = strip_ansi_codes(&line);
-            //let clean_line = line;
-
-            // Skip empty lines and watch mode status messages
 
             output.push_str(&clean_line);
             output.push('\n');
@@ -2695,9 +2689,6 @@ fn should_output_correct_text_in_watch_mode_with_full_output_format_and_no_error
         for line in reader.lines().map_while(Result::ok) {
             // Filter out ANSI escape codes
             let clean_line = strip_ansi_codes(&line);
-            //let clean_line = line;
-
-            // Skip empty lines and watch mode status messages
 
             output.push_str(&clean_line);
             output.push('\n');
