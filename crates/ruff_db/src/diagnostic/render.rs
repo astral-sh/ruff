@@ -2739,7 +2739,7 @@ watermelon
         ///
         /// See the docs on `TestEnvironment::span` for the meaning of
         /// `path`, `line_offset_start` and `line_offset_end`.
-        fn secondary(
+        pub(super) fn secondary(
             mut self,
             path: &str,
             line_offset_start: &str,
@@ -2775,7 +2775,7 @@ watermelon
         }
 
         /// Adds a "help" sub-diagnostic with the given message.
-        fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+        pub(super) fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
             self.diag.help(message);
             self
         }
@@ -2946,7 +2946,8 @@ if call(foo
         (env, diagnostics)
     }
 
-    /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    /// A Jupyter notebook for testing diagnostics.
+    ///
     ///
     /// The concatenated cells look like this:
     ///
@@ -2966,17 +2967,7 @@ if call(foo
     /// The first diagnostic is on the unused `os` import with location cell 1, row 2, column 8
     /// (`cell 1:2:8`). The second diagnostic is the unused `math` import at `cell 2:2:8`, and the
     /// third diagnostic is an unfixable unused variable at `cell 3:4:5`.
-    #[allow(
-        dead_code,
-        reason = "This is currently only used for JSON but will be needed soon for other formats"
-    )]
-    pub(crate) fn create_notebook_diagnostics(
-        format: DiagnosticFormat,
-    ) -> (TestEnvironment, Vec<Diagnostic>) {
-        let mut env = TestEnvironment::new();
-        env.add(
-            "notebook.ipynb",
-            r##"
+    pub(super) static NOTEBOOK: &str = r##"
         {
  "cells": [
   {
@@ -3015,8 +3006,14 @@ if call(foo
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"##,
-        );
+"##;
+
+    /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    pub(crate) fn create_notebook_diagnostics(
+        format: DiagnosticFormat,
+    ) -> (TestEnvironment, Vec<Diagnostic>) {
+        let mut env = TestEnvironment::new();
+        env.add("notebook.ipynb", NOTEBOOK);
         env.format(format);
 
         let diagnostics = vec![

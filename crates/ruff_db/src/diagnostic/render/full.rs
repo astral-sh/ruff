@@ -6,7 +6,7 @@ mod tests {
     use crate::diagnostic::{
         Annotation, DiagnosticFormat, Severity,
         render::tests::{
-            TestEnvironment, create_diagnostics, create_notebook_diagnostics,
+            NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
             create_syntax_error_diagnostics,
         },
     };
@@ -323,6 +323,60 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
+        ");
+    }
+
+    /// Check notebook handling for multiple annotations in a single diagnostic that span cells.
+    #[test]
+    fn notebook_output_multiple_annotations() {
+        let mut env = TestEnvironment::new();
+        env.add("notebook.ipynb", NOTEBOOK);
+
+        let diagnostics = vec![
+            // adjacent context windows
+            env.builder("unused-import", Severity::Error, "`os` imported but unused")
+                .primary("notebook.ipynb", "2:7", "2:9", "")
+                .secondary("notebook.ipynb", "4:7", "4:11", "second cell")
+                .help("Remove unused import: `os`")
+                .build(),
+            // non-adjacent context windows
+            env.builder("unused-import", Severity::Error, "`os` imported but unused")
+                .primary("notebook.ipynb", "2:7", "2:9", "")
+                .secondary("notebook.ipynb", "10:4", "10:5", "second cell")
+                .help("Remove unused import: `os`")
+                .build(),
+        ];
+
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
+        error[unused-import]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+        3 | # cell 2
+        4 | import math
+          |        ---- second cell
+        5 |
+        6 | print('hello world')
+          |
+        help: Remove unused import: `os`
+
+        error[unused-import]: `os` imported but unused
+         --> notebook.ipynb:cell 1:2:8
+          |
+        1 | # cell 1
+        2 | import os
+          |        ^^
+          |
+         ::: notebook.ipynb:cell 3:4:5
+          |
+        2 | def foo():
+        3 |     print()
+        4 |     x = 1
+          |     - second cell
+          |
+        help: Remove unused import: `os`
         ");
     }
 }
