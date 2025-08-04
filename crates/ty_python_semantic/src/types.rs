@@ -606,6 +606,7 @@ pub enum Type<'db> {
     BoundSuper(BoundSuperType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
+    /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
 }
 
@@ -2520,7 +2521,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Never => Some(Place::bound(self).into()),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
-                Some(class.typed_dict_member(db, None, name))
+                Some(class.typed_dict_member(db, None, name, policy))
             }
 
             Type::ClassLiteral(class) => {
@@ -2553,7 +2554,7 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Some(alias.origin(db).typed_dict_member(db, None, name))
+                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
             }
 
             Type::GenericAlias(alias) => {
@@ -2766,9 +2767,7 @@ impl<'db> Type<'db> {
                 Place::Unbound.into()
             }
 
-            Type::TypedDict(_) => KnownClass::TypedDictFallback
-                .to_instance(db)
-                .instance_member(db, name),
+            Type::TypedDict(_) => Place::Unbound.into(),
         }
     }
 
@@ -5584,7 +5583,14 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            Type::TypedDict(_) => KnownClass::Dict.to_class_literal(db), // TODO
+            Type::TypedDict(typed_dict) => SubclassOfType::from(
+                db,
+                SubclassOfInner::try_from_type(
+                    db,
+                    Type::ClassLiteral(typed_dict.defining_class(db)),
+                )
+                .expect("A class literal is a valid `SubclassOfInner`"),
+            ),
         }
     }
 

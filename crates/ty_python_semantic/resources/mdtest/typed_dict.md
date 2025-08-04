@@ -130,7 +130,7 @@ dangerous(alice)
 reveal_type(alice["name"])  # revealed: Unknown
 ```
 
-## Types of keys and values
+## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
@@ -140,8 +140,10 @@ class Person(TypedDict):
     age: int | None
 
 def _(p: Person) -> None:
-    reveal_type(p.keys())  # revealed: dict_keys[Unknown, Unknown]
-    reveal_type(p.values())  # revealed: dict_values[Unknown, Unknown]
+    reveal_type(p.keys())  # revealed: dict_keys[str, object]
+    reveal_type(p.values())  # revealed: dict_values[str, object]
+
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
 ```
 
 ## Unlike normal classes
@@ -158,6 +160,10 @@ class Person(TypedDict):
 
 # error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
 Person.name
+
+def _(P: type[Person]):
+    # error: [unresolved-attribute] "Type `type[Person]` has no attribute `name`"
+    P.name
 
 def _(p: Person) -> None:
     # error: [unresolved-attribute] "Type `Person` has no attribute `name`"

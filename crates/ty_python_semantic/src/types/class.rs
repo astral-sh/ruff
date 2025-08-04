@@ -892,7 +892,7 @@ impl<'db> ClassType<'db> {
         let (class_literal, specialization) = self.class_literal(db);
 
         if class_literal.is_typed_dict(db) {
-            return Place::Unbound.with_qualifiers(TypeQualifiers::empty());
+            return Place::Unbound.into();
         }
 
         class_literal
@@ -2021,12 +2021,13 @@ impl<'db> ClassLiteral<'db> {
                 None
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
+                // TODO: synthesize a set of overloads with precise types
                 let signature = Signature::new(
                     Parameters::new([
-                        Parameter::positional_or_keyword(Name::new_static("self"))
+                        Parameter::positional_only(Some(Name::new_static("self")))
                             .with_annotated_type(instance_ty),
-                        Parameter::positional_or_keyword(Name::new_static("name")),
-                        Parameter::positional_or_keyword(Name::new_static("value")),
+                        Parameter::positional_only(Some(Name::new_static("key"))),
+                        Parameter::positional_only(Some(Name::new_static("value"))),
                     ]),
                     Some(Type::none(db)),
                 );
@@ -2034,11 +2035,39 @@ impl<'db> ClassLiteral<'db> {
                 Some(CallableType::function_like(db, signature))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
+                // TODO: synthesize a set of overloads with precise types
                 let signature = Signature::new(
                     Parameters::new([
-                        Parameter::positional_or_keyword(Name::new_static("self"))
+                        Parameter::positional_only(Some(Name::new_static("self")))
                             .with_annotated_type(instance_ty),
-                        Parameter::positional_or_keyword(Name::new_static("name")),
+                        Parameter::positional_only(Some(Name::new_static("key"))),
+                    ]),
+                    Some(todo_type!("Support for `TypedDict`")),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "get") => {
+                // TODO: synthesize a set of overloads with precise types
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key"))),
+                    ]),
+                    Some(todo_type!("Support for `TypedDict`")),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "setdefault") => {
+                // TODO: synthesize a set of overloads with precise types
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key"))),
+                        Parameter::positional_only(Some(Name::new_static("default"))),
                     ]),
                     Some(todo_type!("Support for `TypedDict`")),
                 );
@@ -2054,14 +2083,15 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if let Some(member) = self.own_synthesized_member(db, specialization, name) {
-            Place::bound(member).with_qualifiers(TypeQualifiers::empty())
+            Place::bound(member).into()
         } else {
             KnownClass::TypedDictFallback
                 .to_class_literal(db)
-                .find_name_in_mro(db, name)
-                .unwrap()
+                .find_name_in_mro_with_policy(db, name, policy)
+                .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
         }
     }
 
@@ -2196,7 +2226,7 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         if self.is_typed_dict(db) {
-            return Place::Unbound.with_qualifiers(TypeQualifiers::empty());
+            return Place::Unbound.into();
         }
 
         let mut union = UnionBuilder::new(db);
