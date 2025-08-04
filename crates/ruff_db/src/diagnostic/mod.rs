@@ -828,7 +828,7 @@ impl Annotation {
     /// documentation.
     ///
     /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
-    /// https://github.com/astral-sh/ruff/issues/19688, especially my first comment, for more
+    /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
     /// details.
     pub fn set_file_level(&mut self, yes: bool) {
         self.is_file_level = yes;
