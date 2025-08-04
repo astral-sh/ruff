@@ -370,6 +370,12 @@ fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     Ok(())
 }
 
+/// Tests that the server sends partial results for workspace diagnostics
+/// if a client sets the `partial_result_token` in the request.
+///
+/// Note: In production, the server throttles the partial results to one every 50ms. However,
+/// this behavior makes testing very hard. That's why the server, in tests, sends a partial response
+/// as soon as it batched at least 2 diagnostics together.
 #[test]
 fn workspace_diagnostic_streaming() -> Result<()> {
     const NUM_FILES: usize = 5;
@@ -404,13 +410,7 @@ def foo() -> str:
         .build()?
         .wait_until_workspaces_are_initialized()?;
 
-    // Open one of the files to trigger workspace diagnostics
-    let first_file = SystemPath::new("src/file_000.py");
-    server.open_text_document(first_file, &error_content, 1);
-
-    // Send streaming workspace diagnostic request
     let partial_token = lsp_types::ProgressToken::String("streaming-diagnostics".to_string());
-
     let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,
         previous_result_ids: Vec::new(),
@@ -428,17 +428,17 @@ def foo() -> str:
     // Note: This response comes after the progress notifications but it simplifies the test to read it first.
     let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(request_id)?;
 
-    // Process the initial report
+    // Process the final report.
     // This should always be a partial report. However, the type definition in the LSP specification
-    // is broken in the sense that both `Report` and `Partial` have the exact same structure
-    // but it also doesn't use a tag to tell them apart...
-    // That means, a client can never tell if it's a full report or a partial report 🤷🏻.
+    // is broken in the sense that both `Report` and `Partial` have the exact same shape
+    // and deserializing a previously serialized `Partial` result will yield a `Report` type.
     let response_items = match final_response {
         WorkspaceDiagnosticReportResult::Report(report) => report.items,
         WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
     };
 
-    // The last batch should contain 1 item
+    // The last batch should contain 1 item because the server sends a partial result with
+    // 2 items each.
     assert_eq!(response_items.len(), 1);
     received_results += response_items.len();
 
@@ -455,7 +455,7 @@ def foo() -> str:
                 WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
             };
 
-            // All streamed batches should contain 2 items.
+            // All streamed batches should contain 2 items (test behavior).
             assert_eq!(streamed_items.len(), 2);
             received_results += streamed_items.len();
 
@@ -470,6 +470,8 @@ def foo() -> str:
     Ok(())
 }
 
+/// Tests that the server's diagnostic streaming (partial results) work correctly
+/// with result ids.
 #[test]
 fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     const NUM_FILES: usize = 7;

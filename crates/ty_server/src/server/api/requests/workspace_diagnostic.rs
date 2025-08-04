@@ -69,7 +69,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
             db.check_with_reporter(&mut reporter);
         }
 
-        Ok(reporter.finish())
+        Ok(reporter.into_final_report())
     }
 }
 
@@ -87,7 +87,9 @@ impl RetriableRequestHandler for WorkspaceDiagnosticRequestHandler {
 }
 
 /// ty progress reporter that streams the diagnostics to the client
-/// and reports progress.
+/// and sends progress reports (checking X/Y files).
+///
+/// Diagnostics are only streamed if the client sends a partial result token.
 struct WorkspaceDiagnosticsProgressReporter<'a> {
     total_files: usize,
     checked_files: AtomicUsize,
@@ -105,9 +107,9 @@ impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
         }
     }
 
-    fn finish(self) -> WorkspaceDiagnosticReportResult {
+    fn into_final_report(self) -> WorkspaceDiagnosticReportResult {
         let writer = self.response.into_inner().unwrap();
-        writer.into_response()
+        writer.into_final_report()
     }
 
     fn report_progress(&self) {
@@ -245,9 +247,7 @@ impl<'a> ResponseWriter<'a> {
             .remove(&url)
             .is_some_and(|previous_result_id| previous_result_id == result_id);
 
-        // Check if this file's diagnostics have changed since the previous request
         let report = if is_unchanged {
-            // Diagnostics haven't changed, return unchanged report
             WorkspaceDocumentDiagnosticReport::Unchanged(
                 WorkspaceUnchangedDocumentDiagnosticReport {
                     uri: url,
@@ -258,13 +258,11 @@ impl<'a> ResponseWriter<'a> {
                 },
             )
         } else {
-            // Convert diagnostics to LSP format
             let lsp_diagnostics = diagnostics
                 .iter()
                 .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
                 .collect::<Vec<_>>();
 
-            // Diagnostics have changed or this is the first request, return full report
             WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                 uri: url,
                 version,
@@ -299,7 +297,11 @@ impl<'a> ResponseWriter<'a> {
         }
     }
 
-    fn into_response(mut self) -> WorkspaceDiagnosticReportResult {
+    /// Creates the final response after all files have been processed.
+    ///
+    /// The result can be a partial or full report depending on whether the server's streaming
+    /// diagnostics and if it already sent some diagnostics.
+    fn into_final_report(mut self) -> WorkspaceDiagnosticReportResult {
         let mut items = Vec::new();
 
         // Handle files that had diagnostics in previous request but no longer have any
@@ -353,7 +355,9 @@ enum ReportingMode {
     /// Streams the diagnostics to the client as they are computed (file by file).
     /// Requires that the client provides a partial result token.
     Streaming(Streaming),
-    /// Sends all diagnostics in a single report after processing all files.
+
+    /// For clients that don't support streaming diagnostics. Collects all workspace
+    /// diagnostics and sends them in the `workspace/diagnostic` response.
     Bulk(Vec<WorkspaceDocumentDiagnosticReport>),
 }
 
@@ -407,7 +411,7 @@ impl Streaming {
             return;
         }
 
-        // Flush every ~100ms or whenever we have two items and this is a test run.
+        // Flush every ~50ms or whenever we have two items and this is a test run.
         let should_flush = if self.is_test {
             self.batched.len() >= 2
         } else {
@@ -436,8 +440,9 @@ impl Streaming {
         &mut self,
         items: Vec<WorkspaceDocumentDiagnosticReport>,
     ) -> WorkspaceDiagnosticReportResult {
-        //  partial result: The first literal send need to be a WorkspaceDiagnosticReport followed
-        // by `n` WorkspaceDiagnosticReportPartialResult literals defined as follows:
+        // As per the LSP spec:
+        // > partial result: The first literal send need to be a WorkspaceDiagnosticReport followed
+        // > by `n` WorkspaceDiagnosticReportPartialResult literals defined as follows:
         if self.first {
             self.first = false;
             WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
