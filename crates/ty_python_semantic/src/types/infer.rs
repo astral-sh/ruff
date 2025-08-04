@@ -6069,7 +6069,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            if !matches!(
+            let has_special_cased_constructor = matches!(
                 class.known(self.db()),
                 Some(
                     KnownClass::Bool
@@ -6083,20 +6083,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
-            )
-
-            // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-            // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-            // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-            // in `ClassType::own_class_member()`).
-            && (callable_type.is_generic_alias() || !class.is_known(self.db(), KnownClass::Tuple))
+            ) || (
+                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+                // in `ClassType::own_class_member()`).
+                class.is_known(self.db(), KnownClass::Tuple) && class.is_not_generic()
+            );
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
-            && KnownClass::Enum
-                .to_class_literal(self.db())
-                .to_class_type(self.db())
-                .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
+            if !has_special_cased_constructor
+                && KnownClass::Enum
+                    .to_class_literal(self.db())
+                    .to_class_type(self.db())
+                    .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {
                 let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
                 self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
@@ -8478,6 +8479,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let tuple_generic_alias = |db: &'db dyn Db, tuple: Option<TupleType<'db>>| {
+            let tuple =
+                tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()).unwrap());
+            tuple
+                .to_class_type(db)
+                .map(Type::from)
+                .unwrap_or_else(Type::unknown)
+        };
+
         // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
         // subscript inference logic and treat this as an explicit specialization.
         // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
@@ -8486,8 +8496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // special cases, too.
         if let Type::ClassLiteral(class) = value_ty {
             if class.is_tuple(self.db()) {
-                return Type::tuple(self.infer_tuple_type_expression(slice))
-                    .to_meta_type(self.db());
+                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
             }
             if let Some(generic_context) = class.generic_context(self.db()) {
                 return self.infer_explicit_class_specialization(
@@ -8499,7 +8508,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
         if let Type::SpecialForm(SpecialFormType::Tuple) = value_ty {
-            return Type::tuple(self.infer_tuple_type_expression(slice)).to_meta_type(self.db());
+            return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
         }
 
         let slice_ty = self.infer_expression(slice);

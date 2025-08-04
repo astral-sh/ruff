@@ -268,6 +268,10 @@ pub enum ClassType<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
+    pub(super) const fn is_not_generic(self) -> bool {
+        matches!(self, Self::NonGeneric(_))
+    }
+
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,

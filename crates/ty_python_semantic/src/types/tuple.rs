@@ -22,8 +22,8 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
-use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -236,6 +236,11 @@ impl<'db> TupleType<'db> {
                         .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
                 ),
             })
+    }
+
+    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_type(db)
+            .map(|class| SubclassOfType::from(db, class))
     }
 
     /// Return a normalized version of `self`.
