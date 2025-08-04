@@ -5241,7 +5241,7 @@ impl<'db> Type<'db> {
                     ),
                     _ => {
                         if class.is_typed_dict(db) {
-                            Type::TypedDict(TypedDictType::new(db, class))
+                            Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
                         } else {
                             Type::instance(db, class.default_specialization(db))
                         }
@@ -5251,7 +5251,10 @@ impl<'db> Type<'db> {
             }
             Type::GenericAlias(alias) => {
                 if alias.is_typed_dict(db) {
-                    Ok(Type::TypedDict(TypedDictType::new(db, alias.origin(db))))
+                    Ok(Type::TypedDict(TypedDictType::new(
+                        db,
+                        ClassType::from(*alias),
+                    )))
                 } else {
                     Ok(Type::instance(db, ClassType::from(*alias)))
                 }
@@ -5583,14 +5586,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            Type::TypedDict(typed_dict) => SubclassOfType::from(
-                db,
-                SubclassOfInner::try_from_type(
-                    db,
-                    Type::ClassLiteral(typed_dict.defining_class(db)),
-                )
-                .expect("A class literal is a valid `SubclassOfInner`"),
-            ),
+            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class(db)),
         }
     }
 
@@ -5691,9 +5687,8 @@ impl<'db> Type<'db> {
                 Type::GenericAlias(generic.apply_type_mapping(db, type_mapping))
             }
 
-            Type::TypedDict(_) => {
-                // TODO: apply type mapping to TypedDict
-                self
+            Type::TypedDict(typed_dict) => {
+                Type::TypedDict(typed_dict.apply_type_mapping(db, type_mapping))
             }
 
             Type::SubclassOf(subclass_of) => Type::SubclassOf(
@@ -8884,14 +8879,39 @@ impl<'db> EnumLiteralType<'db> {
     }
 }
 
+/// Type that represents the set of all inhabitants (`dict` instances) that conform to
+/// a given `TypedDict` schema.
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct TypedDictType<'db> {
-    defining_class: ClassLiteral<'db>,
+    /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
+    /// schema of this `TypedDict`.
+    defining_class: ClassType<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TypedDictType<'_> {}
+
+impl<'db> TypedDictType<'db> {
+    pub(crate) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.defining_class(db).apply_type_mapping(db, type_mapping),
+        )
+    }
+}
+
+fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, typed_dict.defining_class(db).into());
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {

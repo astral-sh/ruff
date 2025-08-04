@@ -4,7 +4,7 @@ use crate::{
         BoundMethodType, BoundSuperType, CallableType, GenericAlias, IntersectionType,
         KnownInstanceType, MethodWrapperKind, NominalInstanceType, PropertyInstanceType,
         ProtocolInstanceType, SubclassOfType, Type, TypeAliasType, TypeIsType, TypeVarInstance,
-        UnionType,
+        TypedDictType, UnionType,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
@@ -12,7 +12,8 @@ use crate::{
         tuple::{TupleType, walk_tuple_type},
         walk_bound_method_type, walk_bound_super_type, walk_callable_type, walk_intersection_type,
         walk_known_instance_type, walk_method_wrapper_type, walk_property_instance_type,
-        walk_type_alias_type, walk_type_var_type, walk_typeis_type, walk_union,
+        walk_type_alias_type, walk_type_var_type, walk_typed_dict_type, walk_typeis_type,
+        walk_union,
     },
 };
 
@@ -107,6 +108,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_type_alias_type(&mut self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
         walk_type_alias_type(db, type_alias, self);
     }
+
+    fn visit_typed_dict_type(&mut self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        walk_typed_dict_type(db, typed_dict, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -128,6 +133,7 @@ enum NonAtomicType<'db> {
     TypeIs(TypeIsType<'db>),
     TypeVar(TypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
+    TypedDict(TypedDictType<'db>),
 }
 
 enum TypeKind<'db> {
@@ -153,9 +159,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::Dynamic(_)
-            | Type::TypedDict(_) // TODO
-             => TypeKind::Atomic,
+            | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types
             Type::FunctionLiteral(function) => {
@@ -192,6 +196,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             }
             Type::TypeVar(type_var) => TypeKind::NonAtomic(NonAtomicType::TypeVar(type_var)),
             Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
+            Type::TypedDict(typed_dict) => {
+                TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
+            }
         }
     }
 }
@@ -228,6 +235,7 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::ProtocolInstance(protocol) => {
             visitor.visit_protocol_instance_type(db, protocol);
         }
+        NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
     }
 }
 

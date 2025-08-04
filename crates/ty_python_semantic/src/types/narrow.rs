@@ -257,8 +257,7 @@ impl ClassInfoConstraintFunction {
             | Type::TypeIs(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
-            | Type::TypedDict(_) // TODO
-            => None,
+            | Type::TypedDict(_) => None,
         }
     }
 }

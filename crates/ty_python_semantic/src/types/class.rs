@@ -2110,6 +2110,11 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Member lookup for classes that inherit from `typing.TypedDict`.
+    ///
+    /// This is implemented as a separate method because the item definitions on a `TypedDict`-based
+    /// class are *not* accessible as class members. Instead, this mostly defers to `TypedDictFallback`,
+    /// unless `name` corresponds to one of the specialized synthetic members like `__getitem__`.
     pub(crate) fn typed_dict_member(
         self,
         db: &'db dyn Db,
