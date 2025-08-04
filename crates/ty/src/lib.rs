@@ -238,11 +238,6 @@ impl MainLoop {
         })?;
 
         self.watcher = Some(ProjectWatcher::new(watcher, db));
-
-        // Do not show progress bars with `--watch`, indicatif does not seem to
-        // handle cancelling independent progress bars very well.
-        // TODO(zanieb): We can probably use `MultiProgress` to handle this case in the future.
-        self.printer = self.printer.with_no_progress();
         self.run(db)?;
 
         Ok(ExitStatus::Success)
@@ -273,8 +268,9 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
+                        let reporter = IndicatifReporter::from(self.printer);
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = IndicatifReporter::from(self.printer);
+                            let mut reporter = reporter.clone();
                             db.check_with_reporter(&mut reporter)
                         }) {
                             Ok(result) => {
@@ -284,6 +280,7 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
+                                reporter.bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -393,54 +390,43 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-enum IndicatifReporter {
-    /// A constructed reporter that is not yet ready, contains the target for the progress bar.
-    Pending(indicatif::ProgressDrawTarget),
+#[derive(Clone)]
+struct IndicatifReporter {
     /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
     /// do not initialize the bar too early as it may take a while to collect the number of files to
     /// process and we don't want to display an empty "0/0" bar.
-    Initialized(indicatif::ProgressBar),
+    bar: indicatif::ProgressBar,
+
+    printer: Printer,
 }
 
 impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
-        Self::Pending(printer.progress_target())
+        Self {
+            bar: indicatif::ProgressBar::hidden(),
+            printer,
+        }
     }
 }
 
 impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
-        let target = match std::mem::replace(
-            self,
-            IndicatifReporter::Pending(indicatif::ProgressDrawTarget::hidden()),
-        ) {
-            Self::Pending(target) => target,
-            Self::Initialized(_) => panic!("The progress reporter should only be initialized once"),
-        };
-
-        let bar = indicatif::ProgressBar::with_draw_target(Some(files as u64), target);
-        bar.set_style(
+        self.bar.set_length(files as u64);
+        self.bar.set_message("Checking");
+        self.bar.set_style(
             indicatif::ProgressStyle::with_template(
                 "{msg:8.dim} {bar:60.green/dim} {pos}/{len} files",
             )
             .unwrap()
             .progress_chars("--"),
         );
-        bar.set_message("Checking");
-        *self = Self::Initialized(bar);
+        self.bar.set_draw_target(self.printer.progress_target());
     }
 
     fn report_file(&self, _file: &ruff_db::files::File) {
-        match self {
-            IndicatifReporter::Initialized(progress_bar) => {
-                progress_bar.inc(1);
-            }
-            IndicatifReporter::Pending(_) => {
-                panic!("`report_file` called before `set_files`")
-            }
-        }
+        self.bar.inc(1);
     }
 }
 
