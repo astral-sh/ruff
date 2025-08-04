@@ -6083,12 +6083,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
-            ) || (class.is_known(self.db(), KnownClass::Tuple)
-                && (callable_type.is_class_literal()
-                    || callable_type
-                        .into_subclass_of()
-                        .and_then(|subclass_of| subclass_of.subclass_of().into_class())
-                        .is_some_and(ClassType::is_not_generic)));
+            ) || (
+                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+                // in `ClassType::own_class_member()`).
+                class.is_known(self.db(), KnownClass::Tuple) && class.is_not_generic()
+            );
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
