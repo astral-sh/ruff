@@ -41,7 +41,7 @@ async def test():
 class Manager: ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
         ...
 ```
@@ -53,7 +53,7 @@ class Manager:
     async def __aexit__(self, exc_tpe, exc_value, traceback): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__`"
     async with Manager():
         ...
 ```
@@ -65,7 +65,7 @@ class Manager:
     async def __aenter__(self): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aexit__`"
     async with Manager():
         ...
 ```
@@ -79,7 +79,7 @@ class Manager:
     async def __aexit__(self, exc_tpe, exc_value, traceback): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__aenter__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aenter__`"
     async with Manager():
         ...
 ```
@@ -95,7 +95,7 @@ class Manager:
     __aexit__: int = 32
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aexit__`"
     async with Manager():
         ...
 ```
@@ -113,7 +113,7 @@ async def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__aenter__` and `__aexit__` are possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly unbound"
     async with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
@@ -129,7 +129,7 @@ async def _(flag: bool):
 
         async def __exit__(self, *args): ...
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__aenter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because the method `__aenter__` is possibly unbound"
     async with Manager() as f:
         reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
 ```
@@ -146,42 +146,46 @@ class Manager:
 async def main():
     context_expr = Manager()
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__aenter__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aenter__`"
     async with context_expr as f:
         reveal_type(f)  # revealed: CoroutineType[Any, Any, str]
 ```
 
-## Accidental use of non-async `with`
+## Accidental use of async `async with`
 
 <!-- snapshot-diagnostics -->
 
-If a asynchronous `with` statement is used on a type with `__enter__` and `__exit__`, we show a
+If a asynchronous `async with` statement is used on a type with `__enter__` and `__exit__`, we show a
 diagnostic hint that the user might have intended to use `with` instead.
 
 ```py
 class Manager:
-    async def __enter__(self): ...
-    async def __exit__(self, *args): ...
+    def __enter__(self): ...
+    def __exit__(self, *args): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
         ...
 ```
 
-The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match the
+## Incorrect signatures 
+
+The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match the
 expected signatures for a context manager:
 
 ```py
 class Manager:
-    async def __enter__(self): ...
-    async def __exit__(self, typ: str, exc, traceback): ...
+    def __enter__(self): ...
+    def __exit__(self, typ: str, exc, traceback): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
         ...
 ```
+
+## Incorrect number of arguments
 
 Similarly, we also show the hint if the functions have the wrong number of arguments:
 
@@ -191,7 +195,7 @@ class Manager:
     def __exit__(self, typ, exc, traceback, wrong_extra_arg): ...
 
 async def main():
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__aenter__` and `__aexit__`"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
         ...
 ```

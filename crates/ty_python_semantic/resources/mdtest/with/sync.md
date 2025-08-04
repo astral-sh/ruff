@@ -167,6 +167,8 @@ with Manager():
     ...
 ```
 
+## Incorrect signatures 
+
 The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match
 the expected signatures for a context manager:
 
@@ -179,6 +181,8 @@ class Manager:
 with Manager():
     ...
 ```
+
+## Incorrect number of arguments
 
 Similarly, we also show the hint if the functions have the wrong number of arguments:
 
