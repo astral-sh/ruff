@@ -112,6 +112,7 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_typed_dict_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &bool,
@@ -1469,13 +1470,21 @@ impl<'db> ClassLiteral<'db> {
             .contains(&ClassBase::Class(other))
     }
 
-    /// Return `true` if this class constitutes a typed dict specification.
+    /// Return `true` if this class constitutes a typed dict specification (inherits from
+    /// `typing.TypedDict`, either directly or indirectly).
     #[salsa::tracked(
         cycle_fn=is_typed_dict_cycle_recover,
         cycle_initial=is_typed_dict_cycle_initial,
         heap_size=get_size2::heap_size
     )]
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        if self
+            .known(db)
+            .is_some_and(KnownClass::is_typed_dict_subclass)
+        {
+            return true;
+        }
+
         self.iter_mro(db, None)
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
@@ -3083,6 +3092,82 @@ impl KnownClass {
     /// Return `true` if this class is a subclass of `enum.Enum` *and* has enum members, i.e.
     /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
     pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
+        match self {
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Tuple
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::Any
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NamedTuple
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::VersionInfo
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::InitVar
+            | KnownClass::NamedTupleFallback => false,
+        }
+    }
+
+    /// Return `true` if this class is a (true) subclass of `typing.TypedDict`.
+    pub(crate) const fn is_typed_dict_subclass(self) -> bool {
         match self {
             KnownClass::Bool
             | KnownClass::Object
