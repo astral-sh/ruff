@@ -8563,7 +8563,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_subscript_expression_types(
         &self,
-        value_node: &ast::Expr,
+        value_node: &'ast ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         expr_context: ExprContext,
@@ -8732,7 +8732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|context| {
                             Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context))
                         })
-                        .unwrap_or_else(Type::unknown),
+                        .unwrap_or_else(GenericContextError::into_type),
                     // TODO: emit a diagnostic
                     TupleSpec::Variable(_) => Type::unknown(),
                 })
@@ -8745,7 +8745,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
-                .unwrap_or_else(Type::unknown),
+                .unwrap_or_else(GenericContextError::into_type),
             ),
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -8764,7 +8764,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|context| {
                             Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
                         })
-                        .unwrap_or_else(Type::unknown),
+                        .unwrap_or_else(GenericContextError::into_type),
                     // TODO: emit a diagnostic
                     TupleSpec::Variable(_) => Type::unknown(),
                 })
@@ -8777,7 +8777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     LegacyGenericBase::Generic,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
-                .unwrap_or_else(Type::unknown),
+                .unwrap_or_else(GenericContextError::into_type),
             ),
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
@@ -8946,11 +8946,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value_node: &ast::Expr,
         typevars: &[Type<'db>],
         origin: LegacyGenericBase,
-    ) -> Option<GenericContext<'db>> {
-        let typevars: Option<FxOrderSet<_>> = typevars
+    ) -> Result<GenericContext<'db>, GenericContextError> {
+        let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
+                Type::NominalInstance(NominalInstanceType { class, .. })
+                    if matches!(
+                        class.known(self.db()),
+                        Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
+                    ) =>
+                {
+                    Err(GenericContextError::NotYetSupported)
+                }
                 _ => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -8960,7 +8968,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             typevar.display(self.db()),
                         ));
                     }
-                    None
+                    Err(GenericContextError::InvalidArgument)
                 }
             })
             .collect();
@@ -10857,6 +10865,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic::add_type_expression_reference_link(diag);
         }
         None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GenericContextError {
+    /// It's invalid to subscript `Generic` or `Protocol` with this type
+    InvalidArgument,
+    /// It's valid to subscribe `Generic` or `Protocol` with this type,
+    /// but the type is not yet supported.
+    NotYetSupported,
+}
+
+impl GenericContextError {
+    const fn into_type<'db>(self) -> Type<'db> {
+        match self {
+            GenericContextError::InvalidArgument => Type::unknown(),
+            GenericContextError::NotYetSupported => todo_type!("ParamSpecs and TypeVarTuples"),
+        }
     }
 }
 
