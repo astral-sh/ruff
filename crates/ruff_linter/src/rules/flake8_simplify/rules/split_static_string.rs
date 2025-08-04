@@ -151,8 +151,6 @@ fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
-    let quote = flags.quote_style().as_char();
-    let triple_quoted = flags.triple_quotes() == ruff_python_ast::str::TripleQuotes::Yes;
     Expr::List(ExprList {
         elts: elts
             .iter()
