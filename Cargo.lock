@@ -4186,6 +4186,7 @@ dependencies = [
  "argfile",
  "clap",
  "clap_complete_command",
+ "clearscreen",
  "colored 3.0.0",
  "crossbeam",
  "ctrlc",
