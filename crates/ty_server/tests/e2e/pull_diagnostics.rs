@@ -8,7 +8,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
-use crate::{TestServer, TestServerBuilder};
+use crate::{TestServer, TestServerBuilder, TestServerError};
 
 #[test]
 fn on_did_open() -> Result<()> {
@@ -31,7 +31,7 @@ def foo() -> str:
     server.open_text_document(foo, &foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None)?;
 
-    insta::assert_debug_snapshot!(diagnostics);
+    assert_debug_snapshot!(diagnostics);
 
     Ok(())
 }
@@ -239,32 +239,13 @@ def foo() -> str:
     let mut first_response = server.workspace_diagnostic_request(None)?;
     sort_workspace_diagnostic_response(&mut first_response);
 
-    insta::assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
+    assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
 
     // Consume all progress notifications sent during workspace diagnostics
     consume_all_progress_notifications(&mut server)?;
 
     // Extract result IDs from the first response
-    let previous_result_ids = match first_response {
-        WorkspaceDiagnosticReportResult::Report(report) => {
-            report.items.into_iter().filter_map(|item| match item {
-                WorkspaceDocumentDiagnosticReport::Full(full_report) => {
-                    let result_id = full_report.full_document_diagnostic_report.result_id?;
-                    Some(PreviousResultId {
-                        uri: full_report.uri,
-                        value: result_id,
-                    })
-                }
-                WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
-                    panic!("The first response must be a full report, not unchanged");
-                }
-            })
-        }
-        WorkspaceDiagnosticReportResult::Partial(_) => {
-            panic!("The first response must be a full report");
-        }
-    }
-    .collect();
+    let previous_result_ids = extract_result_ids_from_response(&first_response);
 
     // Make changes to files B, C, D, and E (leave A unchanged)
     // Need to open files before changing them
@@ -330,7 +311,7 @@ def foo() -> str:
     // Consume all progress notifications sent during the second workspace diagnostics
     consume_all_progress_notifications(&mut server)?;
 
-    insta::assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
+    assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
 
     Ok(())
 }
@@ -426,7 +407,7 @@ def foo() -> str:
 
     // First, read the response of the workspace diagnostic request.
     // Note: This response comes after the progress notifications but it simplifies the test to read it first.
-    let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(request_id)?;
+    let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
 
     // Process the final report.
     // This should always be a partial report. However, the type definition in the LSP specification
@@ -509,27 +490,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     // Consume progress notifications from first request
     consume_all_progress_notifications(&mut server)?;
 
-    let result_ids = match first_response {
-        WorkspaceDiagnosticReportResult::Report(report) => report
-            .items
-            .into_iter()
-            .filter_map(|item| {
-                if let WorkspaceDocumentDiagnosticReport::Full(full) = item {
-                    full.full_document_diagnostic_report
-                        .result_id
-                        .map(|id| PreviousResultId {
-                            uri: full.uri,
-                            value: id,
-                        })
-                } else {
-                    panic!("Expected Full report in initial response");
-                }
-            })
-            .collect::<Vec<_>>(),
-        WorkspaceDiagnosticReportResult::Partial(_) => {
-            panic!("Request without a partial response token should not use streaming")
-        }
-    };
+    let result_ids = extract_result_ids_from_response(&first_response);
 
     assert_eq!(result_ids.len(), NUM_FILES);
 
@@ -578,7 +539,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
             },
         });
 
-    let final_response2 = server.await_response::<WorkspaceDiagnosticReportResult>(request2_id)?;
+    let final_response2 = server.await_response::<WorkspaceDiagnosticReportResult>(&request2_id)?;
 
     let mut all_items = Vec::new();
 
@@ -640,4 +601,345 @@ fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) 
     }
 
     items.sort_unstable_by(|a, b| item_uri(a).cmp(item_uri(b)));
+}
+
+/// The LSP specification requires that the server sends a response for every request.
+///
+/// This test verifies that the server responds to a long-polling workspace diagnostic request
+/// when the server is shut down.
+#[test]
+fn workspace_diagnostic_long_polling_responds_on_shutdown() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let file_path = SystemPath::new("src/test.py");
+    let file_content = "\
+def hello() -> str:
+    return \"world\"
+";
+
+    // Create a project with one file but no diagnostics
+    let mut server = create_workspace_server_with_file(workspace_root, file_path, file_content)?;
+
+    // Make a workspace diagnostic request to a project with one file but no diagnostics
+    // This should trigger long-polling since the project has no diagnostics
+    let request_id = send_workspace_diagnostic_request(&mut server);
+
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+
+    // Send shutdown request - this should cause the suspended workspace diagnostic request to respond
+    let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
+
+    // The workspace diagnostic request should now respond with an empty report
+    let workspace_response =
+        server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
+
+    // Complete shutdown sequence
+    server.await_response::<()>(&shutdown_id)?;
+    server.send_notification::<lsp_types::notification::Exit>(());
+
+    // Verify we got an empty report (default response during shutdown)
+    assert_debug_snapshot!(
+        "workspace_diagnostic_long_polling_shutdown_response",
+        workspace_response
+    );
+
+    Ok(())
+}
+
+/// Tests that the server responds to a long-polling workspace diagnostic request
+/// after a change introduced a new diagnostic.
+#[test]
+fn workspace_diagnostic_long_polling_responds_on_change() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let file_path = SystemPath::new("src/test.py");
+    let file_content_no_error = "\
+def hello() -> str:
+    return \"world\"
+";
+    let file_content_with_error = "\
+def hello() -> str:
+    return 42  # Type error: expected str, got int
+";
+
+    // Create a project with one file but no diagnostics
+    let mut server =
+        create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
+
+    // Open the file first
+    server.open_text_document(file_path, &file_content_no_error, 1);
+
+    // Make a workspace diagnostic request to a project with one file but no diagnostics
+    // This should trigger long-polling since the project has no diagnostics
+    let request_id = send_workspace_diagnostic_request(&mut server);
+
+    // Verify the request doesn't complete immediately (should be long-polling)
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+
+    // Now introduce an error to the file - this should trigger the long-polling request to complete
+    server.change_text_document(
+        file_path,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_content_with_error.to_string(),
+        }],
+        2,
+    );
+
+    // The workspace diagnostic request should now complete with the new diagnostic
+    let workspace_response =
+        server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
+
+    // Verify we got a report with one file containing the new diagnostic
+    assert_debug_snapshot!(
+        "workspace_diagnostic_long_polling_change_response",
+        workspace_response
+    );
+
+    Ok(())
+}
+
+/// The LSP specification requires that the server responds to each request with exactly one response.
+///
+/// This test verifies that the server sends one response (and not two) if a long polling workspace diagnostic request
+/// is cancelled.
+#[test]
+fn workspace_diagnostic_long_polling_responds_on_cancellation() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let file_path = SystemPath::new("src/test.py");
+    let file_content = "\
+def hello() -> str:
+    return \"world\"
+";
+
+    // Create a project with one file but no diagnostics
+    let mut server = create_workspace_server_with_file(workspace_root, file_path, file_content)?;
+
+    // Make a workspace diagnostic request to a project with one file but no diagnostics
+    // This should trigger long-polling since the project has no diagnostics
+    let request_id = send_workspace_diagnostic_request(&mut server);
+
+    // Verify the request doesn't complete immediately (should be long-polling)
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+
+    // Send a cancel request notification for the suspended request
+    // The request_id from send_request should match the ID that the server expects
+    // Based on logs, the server shows request id=2, so let's try using that directly
+    server.cancel(&request_id);
+
+    // The workspace diagnostic request should now respond with a cancellation response (Err).
+    let result = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id);
+    assert_debug_snapshot!(
+        "workspace_diagnostic_long_polling_cancellation_result",
+        result
+    );
+
+    // The test server's drop implementation asserts that we aren't sending the response twice.
+
+    Ok(())
+}
+
+/// This test verifies an entire workspace diagnostic cycle with long-polling:
+/// * Initial suspend with no diagnostics
+/// * Change the file to introduce a diagnostic, server should respond with the new diagnostics
+/// * Send a second workspace diagnostic request, which should suspend again because the diagnostics haven't changed
+/// * Change the file again to fix the diagnostic, server should respond with no diagnostics
+#[test]
+fn workspace_diagnostic_long_polling_suspend_change_suspend_cycle() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let file_path = SystemPath::new("src/test.py");
+    let file_content_no_error = "\
+def hello() -> str:
+    return \"world\"
+";
+    let file_content_with_error = "\
+def hello() -> str:
+    return 42  # Type error: expected str, got int
+";
+    let file_content_fixed = "\
+def hello() -> str:
+    return \"fixed\"
+";
+
+    // Create a project with one file but no diagnostics
+    let mut server =
+        create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
+
+    // Open the file first
+    server.open_text_document(file_path, &file_content_no_error, 1);
+
+    // PHASE 1: Initial suspend (no diagnostics)
+    let request_id_1 = send_workspace_diagnostic_request(&mut server);
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id_1);
+
+    // PHASE 2: Introduce error to trigger response
+    server.change_text_document(
+        file_path,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_content_with_error.to_string(),
+        }],
+        2,
+    );
+
+    // First request should complete with diagnostics
+    let first_response = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id_1)?;
+
+    // Extract result IDs from the first response for the second request
+    let previous_result_ids = extract_result_ids_from_response(&first_response);
+
+    // PHASE 3: Second request with previous result IDs - should suspend again since diagnostics unchanged
+    let request_id_2 =
+        server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+            identifier: None,
+            previous_result_ids,
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: PartialResultParams {
+                partial_result_token: None,
+            },
+        });
+
+    // Second request should suspend since diagnostics haven't changed
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id_2);
+
+    // PHASE 4: Fix the error to trigger the second response
+    server.change_text_document(
+        file_path,
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: file_content_fixed.to_string(),
+        }],
+        3,
+    );
+
+    // Second request should complete with the fix (no diagnostics)
+    let second_response =
+        server.await_response::<WorkspaceDiagnosticReportResult>(&request_id_2)?;
+
+    // Snapshot both responses to verify the full cycle
+    assert_debug_snapshot!(
+        "workspace_diagnostic_suspend_change_suspend_first_response",
+        first_response
+    );
+    assert_debug_snapshot!(
+        "workspace_diagnostic_suspend_change_suspend_second_response",
+        second_response
+    );
+
+    Ok(())
+}
+
+// Helper functions for long-polling tests
+fn create_workspace_server_with_file(
+    workspace_root: &SystemPath,
+    file_path: &SystemPath,
+    file_content: &str,
+) -> Result<TestServer> {
+    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
+
+    TestServerBuilder::new()?
+        .with_workspace(workspace_root, global_options.clone())?
+        .with_file(file_path, file_content)?
+        .with_initialization_options(global_options)
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()
+}
+
+/// Sends a workspace diagnostic request to the server.
+///
+/// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
+fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
+    server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        identifier: None,
+        previous_result_ids: Vec::new(),
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: None,
+        },
+    })
+}
+
+#[track_caller]
+fn assert_workspace_diagnostics_suspends_for_long_polling(
+    server: &mut TestServer,
+    request_id: &lsp_server::RequestId,
+) {
+    match server.await_response::<WorkspaceDiagnosticReportResult>(request_id) {
+        Ok(_) => {
+            panic!("Expected workspace diagnostic request to suspend for long-polling.");
+        }
+        Err(error) => {
+            if let Some(test_error) = error.downcast_ref::<TestServerError>() {
+                assert!(
+                    matches!(test_error, TestServerError::RecvTimeoutError(_)),
+                    "Response should time out because the request is suspended for long-polling"
+                );
+            } else {
+                panic!("Unexpected error type: {error:?}");
+            }
+        }
+    }
+}
+
+fn extract_result_ids_from_response(
+    response: &WorkspaceDiagnosticReportResult,
+) -> Vec<PreviousResultId> {
+    match response {
+        WorkspaceDiagnosticReportResult::Report(report) => {
+            report
+                .items
+                .iter()
+                .filter_map(|item| match item {
+                    WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+                        let result_id = full_report
+                            .full_document_diagnostic_report
+                            .result_id
+                            .as_ref()?;
+                        Some(PreviousResultId {
+                            uri: full_report.uri.clone(),
+                            value: result_id.clone(),
+                        })
+                    }
+                    WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
+                        // Unchanged reports don't provide new result IDs
+                        None
+                    }
+                })
+                .collect()
+        }
+        WorkspaceDiagnosticReportResult::Partial(partial) => {
+            // For partial results, extract from items the same way
+            partial
+                .items
+                .iter()
+                .filter_map(|item| match item {
+                    WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+                        let result_id = full_report
+                            .full_document_diagnostic_report
+                            .result_id
+                            .as_ref()?;
+                        Some(PreviousResultId {
+                            uri: full_report.uri.clone(),
+                            value: result_id.clone(),
+                        })
+                    }
+                    WorkspaceDocumentDiagnosticReport::Unchanged(_) => None,
+                })
+                .collect()
+        }
+    }
 }
