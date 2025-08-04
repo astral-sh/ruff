@@ -61,7 +61,7 @@ jobs:
           # subsequent runs
           echo '<!-- generated-comment typing_conformance_diagnostics_diff -->' >> comment.txt
 
-          echo '## Diagnostic diff on typing conformance tests' >> comment.txt
+          echo '## Diagnostic diff on [typing conformance tests](https://github.com/python/typing/tree/main/conformance)' >> comment.txt
           if [ -s "pr/typing_conformance_diagnostics_diff/typing_conformance_diagnostics.diff" ]; then
             echo '<details>' >> comment.txt
             echo '<summary>Changes were detected when running ty on typing conformance tests</summary>' >> comment.txt
