@@ -4918,6 +4918,7 @@ impl<'db> Type<'db> {
                     None
                 }
             }
+            Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
             ty @ Type::Dynamic(_) => Some(ty),
             _ => None,
         }
