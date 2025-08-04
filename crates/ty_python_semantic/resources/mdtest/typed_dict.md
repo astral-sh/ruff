@@ -36,6 +36,9 @@ bob = Person(name="Bob", age=25)
 Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
+# TODO: this should not be an error. The stubs for `TypedDictFallback.update` seem insufficient?
+# error: [missing-argument]
+# error: [unknown-argument]
 bob.update(age=26)
 ```
 
@@ -60,6 +63,8 @@ Assignments to keys are also validated:
 ```py
 # TODO: this should be an error
 alice["name"] = None
+# TODO: this should be an error
+bob["name"] = None
 ```
 
 Assignments to non-existing keys are disallowed:
@@ -67,6 +72,8 @@ Assignments to non-existing keys are disallowed:
 ```py
 # TODO: this should be an error
 alice["extra"] = True
+# TODO: this should be an error
+bob["extra"] = True
 ```
 
 ## Structural assignability
@@ -133,8 +140,8 @@ class Person(TypedDict):
     age: int | None
 
 def _(p: Person) -> None:
-    reveal_type(p.keys())  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.values())  # revealed: @Todo(Support for `TypedDict`)
+    reveal_type(p.keys())  # revealed: dict_keys[Unknown, Unknown]
+    reveal_type(p.values())  # revealed: dict_values[Unknown, Unknown]
 ```
 
 ## Unlike normal classes
@@ -149,11 +156,12 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-# TODO: this should be an error
+# error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
 Person.name
 
-# TODO: this should be an error
-Person(name="Alice", age=30).name
+def _(p: Person) -> None:
+    # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
+    p.name
 ```
 
 ## Special properties
@@ -167,9 +175,9 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-reveal_type(Person.__total__)  # revealed: @Todo(Support for `TypedDict`)
-reveal_type(Person.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
-reveal_type(Person.__optional_keys__)  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(Person.__total__)  # revealed: bool
+reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
+reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
 ```
 
 ## Subclassing
@@ -272,6 +280,9 @@ msg = Message(id=1, content="Hello")
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
 reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
+
+# TODO: this should be an error
+msg.content
 ```
 
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

@@ -98,12 +98,20 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_instance_members(db, class_literal);
             }
 
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
                 if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
                 }
+            }
+
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
             Type::GenericAlias(generic_alias) => {
@@ -139,9 +147,7 @@ impl<'db> AllMembers<'db> {
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypedDict(_) // TODO: we could do better by using typeddictfallback
-            => match ty.to_meta_type(db) {
+            | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
@@ -156,6 +162,14 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {}
             },
+
+            Type::TypedDict(_) => {
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                    self.extend_with_class_members(db, ty, class_literal);
+                }
+
+                self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
+            }
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));

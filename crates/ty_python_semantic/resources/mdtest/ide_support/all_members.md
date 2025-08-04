@@ -208,7 +208,28 @@ static_assert(has_member(Answer, "YES"))
 static_assert(has_member(Answer, "__members__"))
 ```
 
-### Unions
+### TypedDicts
+
+```py
+from ty_extensions import has_member, static_assert
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+static_assert(not has_member(Person, "name"))
+static_assert(not has_member(Person, "age"))
+
+static_assert(has_member(Person, "__total__"))
+static_assert(has_member(Person, "__required_keys__"))
+
+def _(person: Person):
+    static_assert(not has_member(person, "name"))
+    static_assert(not has_member(person, "age"))
+
+    static_assert(has_member(person, "keys"))
+```
 
 For unions, `ide_support::all_members` only returns members that are available on all elements of
 the union.

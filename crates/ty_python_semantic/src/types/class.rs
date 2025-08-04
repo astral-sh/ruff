@@ -155,6 +155,8 @@ pub(crate) enum CodeGeneratorKind {
     DataclassLike,
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
+    /// Classes inheriting from `typing.TypedDict`
+    TypedDict,
 }
 
 impl CodeGeneratorKind {
@@ -163,6 +165,8 @@ impl CodeGeneratorKind {
             Some(CodeGeneratorKind::DataclassLike)
         } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
             Some(CodeGeneratorKind::NamedTuple)
+        } else if CodeGeneratorKind::TypedDict.matches(db, class) {
+            Some(CodeGeneratorKind::TypedDict)
         } else {
             None
         }
@@ -180,6 +184,7 @@ impl CodeGeneratorKind {
                 base.into_class_literal()
                     .is_some_and(|c| c.is_known(db, KnownClass::NamedTuple))
             }),
+            Self::TypedDict => class.is_typed_dict(db),
         }
     }
 }
@@ -252,6 +257,10 @@ impl<'db> GenericAlias<'db> {
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
+    }
+
+    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.origin(db).is_typed_dict(db)
     }
 }
 
@@ -407,11 +416,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal.iter_mro(db, specialization)
-    }
-
-    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        let (class_literal, _) = self.class_literal(db);
-        class_literal.is_typed_dict(db)
     }
 
     /// Iterate over the method resolution order ("MRO") of the class, optionally applying an
@@ -886,6 +890,11 @@ impl<'db> ClassType<'db> {
     /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
+
+        if class_literal.is_typed_dict(db) {
+            return Place::Unbound.with_qualifiers(TypeQualifiers::empty());
+        }
+
         class_literal
             .instance_member(db, specialization, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
@@ -1722,8 +1731,10 @@ impl<'db> ClassLiteral<'db> {
                     });
                 }
                 ClassBase::TypedDict => {
-                    return Place::bound(todo_type!("Support for `TypedDict`"))
-                        .with_qualifiers(TypeQualifiers::empty());
+                    return KnownClass::TypedDictFallback
+                        .to_class_literal(db)
+                        .find_name_in_mro_with_policy(db, name, policy)
+                        .expect("Will return Some() when called on class literal");
                 }
             }
             if lookup_result.is_ok() {
@@ -1825,7 +1836,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
     /// a synthesized `__new__` method for a `NamedTuple`.
-    fn own_synthesized_member(
+    pub(super) fn own_synthesized_member(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -2009,7 +2020,48 @@ impl<'db> ClassLiteral<'db> {
                 }
                 None
             }
+            (CodeGeneratorKind::TypedDict, "__setitem__") => {
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name")),
+                        Parameter::positional_or_keyword(Name::new_static("value")),
+                    ]),
+                    Some(Type::none(db)),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "__getitem__") => {
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_or_keyword(Name::new_static("self"))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_or_keyword(Name::new_static("name")),
+                    ]),
+                    Some(todo_type!("Support for `TypedDict`")),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
             _ => None,
+        }
+    }
+
+    pub(crate) fn typed_dict_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        if let Some(member) = self.own_synthesized_member(db, specialization, name) {
+            Place::bound(member).with_qualifiers(TypeQualifiers::empty())
+        } else {
+            KnownClass::TypedDictFallback
+                .to_class_literal(db)
+                .find_name_in_mro(db, name)
+                .unwrap()
         }
     }
 
@@ -2143,6 +2195,10 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        if self.is_typed_dict(db) {
+            return Place::Unbound.with_qualifiers(TypeQualifiers::empty());
+        }
+
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
@@ -2898,6 +2954,7 @@ pub enum KnownClass {
     InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
+    TypedDictFallback,
 }
 
 impl KnownClass {
@@ -2994,7 +3051,8 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => Truthiness::Ambiguous,
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => Truthiness::Ambiguous,
         }
     }
 
@@ -3076,6 +3134,7 @@ impl KnownClass {
             | Self::SupportsIndex
             | Self::NamedTuple
             | Self::NamedTupleFallback
+            | Self::TypedDictFallback
             | Self::Counter
             | Self::DefaultDict
             | Self::OrderedDict
@@ -3159,7 +3218,8 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::InitVar
-            | KnownClass::NamedTupleFallback => false,
+            | KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictFallback => false,
         }
     }
 
@@ -3235,7 +3295,8 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::InitVar
-            | KnownClass::NamedTupleFallback => false,
+            | KnownClass::NamedTupleFallback
+            | KnownClass::TypedDictFallback => false,
         }
     }
 
@@ -3323,7 +3384,8 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::InitVar
-            | Self::NamedTupleFallback => false,
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => false,
         }
     }
 
@@ -3419,6 +3481,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
+            Self::TypedDictFallback => "TypedDictFallback",
         }
     }
 
@@ -3675,7 +3738,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
-            Self::NamedTupleFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
         }
     }
 
@@ -3752,7 +3815,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
-            | Self::NamedTupleFallback => false,
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => false,
         }
     }
 
@@ -3831,7 +3895,8 @@ impl KnownClass {
             | Self::InitVar
             | Self::Iterable
             | Self::Iterator
-            | Self::NamedTupleFallback => false,
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => false,
         }
     }
 
@@ -3921,6 +3986,7 @@ impl KnownClass {
             "KW_ONLY" => Self::KwOnly,
             "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
+            "TypedDictFallback" => Self::TypedDictFallback,
             _ => return None,
         };
 
@@ -3985,6 +4051,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
+            | Self::TypedDictFallback
             | Self::Awaitable
             | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),

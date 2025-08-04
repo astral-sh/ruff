@@ -1303,7 +1303,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Assignability and subtyping for TypedDicts
+                // TODO: Proper assignability and subtyping for TypedDicts
                 relation.is_assignability()
             }
 
@@ -1772,7 +1772,7 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Disjointness for TypedDicts
+                // TODO: Implement disjointness for TypedDicts
                 false
             }
 
@@ -2519,6 +2519,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Place::bound(self).into()),
 
+            Type::ClassLiteral(class) if class.is_typed_dict(db) => {
+                Some(class.typed_dict_member(db, None, name))
+            }
+
             Type::ClassLiteral(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
@@ -2546,6 +2550,10 @@ impl<'db> Type<'db> {
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
+            }
+
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Some(alias.origin(db).typed_dict_member(db, None, name))
             }
 
             Type::GenericAlias(alias) => {
@@ -2758,7 +2766,9 @@ impl<'db> Type<'db> {
                 Place::Unbound.into()
             }
 
-            Type::TypedDict(_) => Place::todo("Support for `TypedDict`").into(),
+            Type::TypedDict(_) => KnownClass::TypedDictFallback
+                .to_instance(db)
+                .instance_member(db, name),
         }
     }
 
@@ -3224,8 +3234,6 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
 
-            Type::TypedDict(_) => Place::todo("Support for `TypedDict`").into(),
-
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
@@ -3250,7 +3258,8 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::TypeIs(..) => {
+            | Type::TypeIs(..)
+            | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
                 let result = self.invoke_descriptor_protocol(
@@ -5242,14 +5251,10 @@ impl<'db> Type<'db> {
                 Ok(ty)
             }
             Type::GenericAlias(alias) => {
-                let class_type = ClassType::from(*alias);
-                if class_type.is_typed_dict(db) {
-                    Ok(Type::TypedDict(TypedDictType::new(
-                        db,
-                        class_type.class_literal(db).0,
-                    )))
+                if alias.is_typed_dict(db) {
+                    Ok(Type::TypedDict(TypedDictType::new(db, alias.origin(db))))
                 } else {
-                    Ok(Type::instance(db, class_type))
+                    Ok(Type::instance(db, ClassType::from(*alias)))
                 }
             }
 
@@ -5680,6 +5685,11 @@ impl<'db> Type<'db> {
                 Type::GenericAlias(generic.apply_type_mapping(db, type_mapping))
             }
 
+            Type::TypedDict(_) => {
+                // TODO: apply type mapping to TypedDict
+                self
+            }
+
             Type::SubclassOf(subclass_of) => Type::SubclassOf(
                 subclass_of.apply_type_mapping(db, type_mapping),
             ),
@@ -5735,8 +5745,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::TypedDict(_) => self, // TODO: do we need to do something for typeddict?
+            | Type::KnownInstance(_) => self,
         }
     }
 
