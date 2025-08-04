@@ -8,11 +8,17 @@ expression: redact_fingerprint(&content)
     "description": "Expected one or more symbol names after import",
     "fingerprint": "<redacted>",
     "location": {
-      "lines": {
-        "begin": 1,
-        "end": 2
-      },
-      "path": "syntax_errors.py"
+      "path": "syntax_errors.py",
+      "positions": {
+        "begin": {
+          "column": 15,
+          "line": 1
+        },
+        "end": {
+          "column": 1,
+          "line": 2
+        }
+      }
     },
     "severity": "major"
   },
@@ -21,11 +27,17 @@ expression: redact_fingerprint(&content)
     "description": "Expected ')', found newline",
     "fingerprint": "<redacted>",
     "location": {
-      "lines": {
-        "begin": 3,
-        "end": 4
-      },
-      "path": "syntax_errors.py"
+      "path": "syntax_errors.py",
+      "positions": {
+        "begin": {
+          "column": 12,
+          "line": 3
+        },
+        "end": {
+          "column": 1,
+          "line": 4
+        }
+      }
     },
     "severity": "major"
   }

@@ -138,11 +138,15 @@ class Answer(Enum):
 static_assert(is_assignable_to(Literal[Answer.YES], Literal[Answer.YES]))
 static_assert(is_assignable_to(Literal[Answer.YES], Answer))
 static_assert(is_assignable_to(Literal[Answer.YES, Answer.NO], Answer))
-# TODO: this should not be an error
-# error: [static-assert-error]
 static_assert(is_assignable_to(Answer, Literal[Answer.YES, Answer.NO]))
 
 static_assert(not is_assignable_to(Literal[Answer.YES], Literal[Answer.NO]))
+
+class Single(Enum):
+    VALUE = 1
+
+static_assert(is_assignable_to(Literal[Single.VALUE], Single))
+static_assert(is_assignable_to(Single, Literal[Single.VALUE]))
 ```
 
 ### Slice literals
@@ -912,6 +916,7 @@ c: Callable[[Any], str] = A().g
 
 ```py
 from typing import Any, Callable
+from ty_extensions import static_assert, is_assignable_to
 
 c: Callable[[object], type] = type
 c: Callable[[str], Any] = str
@@ -932,6 +937,15 @@ class C:
     def __init__(self, x: int) -> None: ...
 
 c: Callable[[int], C] = C
+
+def f(a: Callable[..., Any], b: Callable[[Any], Any]): ...
+
+f(tuple, tuple)
+
+def g(a: Callable[[Any, Any], Any]): ...
+
+# error: [invalid-argument-type] "Argument to function `g` is incorrect: Expected `(Any, Any, /) -> Any`, found `<class 'tuple'>`"
+g(tuple)
 ```
 
 ### Generic class literal types

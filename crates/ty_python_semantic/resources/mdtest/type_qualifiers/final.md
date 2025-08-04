@@ -48,7 +48,7 @@ reveal_type(FINAL_D)  # revealed: int
 reveal_type(FINAL_F)  # revealed: int
 ```
 
-### `Final` without a type
+### Bare `Final` without a type
 
 When a symbol is qualified with `Final` but no type is specified, the type is inferred from the
 right-hand side of the assignment. We do not union the inferred type with `Unknown`, because the
@@ -87,6 +87,8 @@ class C:
     def __init__(self):
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
+        self.FINAL_E: Final
+        self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
 reveal_type(C.FINAL_B)  # revealed: Literal[1]
@@ -94,8 +96,8 @@ reveal_type(C.FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_A)  # revealed: int
 reveal_type(C().FINAL_B)  # revealed: Literal[1]
 reveal_type(C().FINAL_C)  # revealed: int
-# TODO: this should be `Literal[1]`
-reveal_type(C().FINAL_D)  # revealed: Unknown
+reveal_type(C().FINAL_D)  # revealed: Literal[1]
+reveal_type(C().FINAL_E)  # revealed: Literal[1]
 ```
 
 ## Not modifiable
@@ -181,6 +183,8 @@ class C(metaclass=Meta):
     def __init__(self):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
+        self.INSTANCE_FINAL_C: Final[int]
+        self.INSTANCE_FINAL_C = 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
 C.META_FINAL_A = 2
@@ -197,10 +201,12 @@ c = C()
 c.CLASS_FINAL_A = 2
 # error: [invalid-assignment] "Cannot assign to final attribute `CLASS_FINAL_B` on type `C`"
 c.CLASS_FINAL_B = 2
-# TODO: this should be an error
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_A` on type `C`"
 c.INSTANCE_FINAL_A = 2
-# TODO: this should be an error
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_B` on type `C`"
 c.INSTANCE_FINAL_B = 2
+# error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `C`"
+c.INSTANCE_FINAL_C = 2
 ```
 
 ## Mutability
@@ -221,7 +227,109 @@ FINAL_LIST: Final[list[int]] = [1, 2, 3]
 FINAL_LIST[0] = 4
 ```
 
-## Too many arguments
+## Overriding in subclasses
+
+When a symbol is qualified with `Final` in a class, it cannot be overridden in subclasses.
+
+```py
+from typing import Final
+
+class Base:
+    FINAL_A: Final[int] = 1
+    FINAL_B: Final[int] = 1
+    FINAL_C: Final = 1
+
+class Derived(Base):
+    # TODO: This should be an error
+    FINAL_A = 2
+    # TODO: This should be an error
+    FINAL_B: Final[int] = 2
+    # TODO: This should be an error
+    FINAL_C = 2
+```
+
+## Syntax and usage
+
+### Legal syntactical positions
+
+Final may only be used in assignments or variable annotations. Using it in any other position is an
+error.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, ClassVar, Annotated
+
+LEGAL_A: Final[int] = 1
+LEGAL_B: Final = 1
+LEGAL_C: Final[int]
+LEGAL_C = 1
+LEGAL_D: Final
+LEGAL_D = 1
+
+class C:
+    LEGAL_E: ClassVar[Final[int]] = 1
+    LEGAL_F: Final[ClassVar[int]] = 1
+    LEGAL_G: Annotated[Final[ClassVar[int]], "metadata"] = 1
+
+    def __init__(self):
+        self.LEGAL_H: Final[int] = 1
+        self.LEGAL_I: Final[int]
+        self.LEGAL_I = 1
+
+# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
+def f(ILLEGAL: Final[int]) -> None:
+    pass
+
+# error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
+def f[T](ILLEGAL: Final[T]) -> T:
+    return ILLEGAL
+
+# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
+def f() -> Final[None]: ...
+
+# error: [invalid-type-form] "`Final` is not allowed in function return type annotations"
+def f[T](x: T) -> Final[T]:
+    return x
+
+# TODO: This should be an error
+class Foo(Final[tuple[int]]): ...
+
+# TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
+# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
+reveal_type(Foo.__mro__)
+```
+
+### Attribute assignment outside `__init__`
+
+Qualifying an instance attribute with `Final` outside of `__init__` is not allowed. The instance
+attribute must be assigned only once, when the instance is created.
+
+```py
+from typing import Final
+
+class C:
+    def some_method(self):
+        # TODO: This should be an error
+        self.x: Final[int] = 1
+```
+
+### `Final` in loops
+
+Using `Final` in a loop is not allowed.
+
+```py
+from typing import Final
+
+for _ in range(10):
+    # TODO: This should be an error
+    i: Final[int] = 1
+```
+
+### Too many arguments
 
 ```py
 from typing import Final
@@ -231,20 +339,29 @@ class C:
     x: Final[int, str] = 1
 ```
 
-## Illegal `Final` in type expression
+### Illegal `Final` in type expression
 
 ```py
 from typing import Final
 
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+x: list[Final[int]] = []  # Error!
+
 class C:
-    # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+    # error: [invalid-type-form]
     x: Final | int
 
-    # error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type expressions (only in annotation expressions)"
+    # error: [invalid-type-form]
     y: int | Final[str]
 ```
 
 ## No assignment
+
+Some type checkers do not support a separate declaration and assignment for `Final` symbols, but
+it's possible to support this in ty, and is useful for code that declares symbols `Final` inside
+`if TYPE_CHECKING` blocks.
+
+### Basic
 
 ```py
 from typing import Final
@@ -253,17 +370,27 @@ DECLARED_THEN_BOUND: Final[int]
 DECLARED_THEN_BOUND = 1
 ```
 
-## No assignment for bare `Final`
+### No assignment
 
 ```py
 from typing import Final
 
 # TODO: This should be an error
-NO_RHS: Final
+NO_ASSIGNMENT_A: Final
+# TODO: This should be an error
+NO_ASSIGNMENT_B: Final[int]
 
 class C:
     # TODO: This should be an error
-    NO_RHS: Final
+    NO_ASSIGNMENT_A: Final
+    # TODO: This should be an error
+    NO_ASSIGNMENT_B: Final[int]
+
+    # This is okay. `DEFINED_IN_INIT` is defined in `__init__`.
+    DEFINED_IN_INIT: Final[int]
+
+    def __init__(self):
+        self.DEFINED_IN_INIT = 1
 ```
 
 ## Full diagnostics

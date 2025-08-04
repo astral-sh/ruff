@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -7,9 +8,9 @@ use ruff_annotate_snippets::{
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
+use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -18,14 +19,17 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig, Severity,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
     SubDiagnostic, UnifiedFile,
 };
 
 use azure::AzureRenderer;
+use concise::ConciseRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
+mod concise;
+mod full;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -104,48 +108,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.config.format {
             DiagnosticFormat::Concise => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                for diag in self.diagnostics {
-                    let (severity, severity_style) = match diag.severity() {
-                        Severity::Info => ("info", stylesheet.info),
-                        Severity::Warning => ("warning", stylesheet.warning),
-                        Severity::Error => ("error", stylesheet.error),
-                        Severity::Fatal => ("fatal", stylesheet.error),
-                    };
-                    write!(
-                        f,
-                        "{severity}[{id}]",
-                        severity = fmt_styled(severity, severity_style),
-                        id = fmt_styled(diag.id(), stylesheet.emphasis)
-                    )?;
-                    if let Some(span) = diag.primary_span() {
-                        write!(
-                            f,
-                            " {path}",
-                            path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
-                        )?;
-                        if let Some(range) = span.range() {
-                            let diagnostic_source = span.file().diagnostic_source(self.resolver);
-                            let start = diagnostic_source
-                                .as_source_code()
-                                .line_column(range.start());
-
-                            write!(
-                                f,
-                                ":{line}:{col}",
-                                line = fmt_styled(start.line, stylesheet.emphasis),
-                                col = fmt_styled(start.column, stylesheet.emphasis),
-                            )?;
-                        }
-                        write!(f, ":")?;
-                    }
-                    writeln!(f, " {message}", message = diag.concise_message())?;
-                }
+                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
                 let stylesheet = if self.config.color {
@@ -256,7 +219,7 @@ impl<'a> Resolved<'a> {
 /// both.)
 #[derive(Debug)]
 struct ResolvedDiagnostic<'a> {
-    severity: Severity,
+    level: AnnotateLevel,
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
@@ -281,7 +244,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         let id = Some(diag.inner.id.to_string());
         let message = diag.inner.message.as_str().to_string();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id,
             message,
             annotations,
@@ -304,7 +267,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             })
             .collect();
         ResolvedDiagnostic {
-            severity: diag.inner.severity,
+            level: diag.inner.severity.to_annotate(),
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
@@ -371,7 +334,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         snippets_by_input
             .sort_by(|snips1, snips2| snips1.has_primary.cmp(&snips2.has_primary).reverse());
         RenderableDiagnostic {
-            severity: self.severity,
+            level: self.level,
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
@@ -459,7 +422,7 @@ struct Renderable<'r> {
 #[derive(Debug)]
 struct RenderableDiagnostic<'r> {
     /// The severity of the diagnostic.
-    severity: Severity,
+    level: AnnotateLevel,
     /// The ID of the diagnostic. The ID can usually be used on the CLI or in a
     /// config file to change the severity of a lint.
     ///
@@ -478,7 +441,6 @@ struct RenderableDiagnostic<'r> {
 impl RenderableDiagnostic<'_> {
     /// Convert this to an "annotate" snippet.
     fn to_annotate(&self) -> AnnotateMessage<'_> {
-        let level = self.severity.to_annotate();
         let snippets = self.snippets_by_input.iter().flat_map(|snippets| {
             let path = snippets.path;
             snippets
@@ -486,7 +448,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = level.title(self.message);
+        let mut message = self.level.title(self.message);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -559,7 +521,7 @@ impl<'r> RenderableSnippets<'r> {
 #[derive(Debug)]
 struct RenderableSnippet<'r> {
     /// The actual snippet text.
-    snippet: &'r str,
+    snippet: Cow<'r, str>,
     /// The absolute line number corresponding to where this
     /// snippet begins.
     line_start: OneIndexed,
@@ -619,6 +581,12 @@ impl<'r> RenderableSnippet<'r> {
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
             .collect();
+
+        let EscapedSourceCode {
+            text: snippet,
+            annotations,
+        } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
+
         RenderableSnippet {
             snippet,
             line_start,
@@ -629,7 +597,7 @@ impl<'r> RenderableSnippet<'r> {
 
     /// Convert this to an "annotate" snippet.
     fn to_annotate<'a>(&'a self, path: &'a str) -> AnnotateSnippet<'a> {
-        AnnotateSnippet::source(self.snippet)
+        AnnotateSnippet::source(&self.snippet)
             .origin(path)
             .line_start(self.line_start.get())
             .annotations(
@@ -859,12 +827,213 @@ fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
     path
 }
 
+/// Given some source code and annotation ranges, this routine replaces
+/// unprintable characters with printable representations of them.
+///
+/// The source code and annotations returned are updated to reflect changes made
+/// to the source code (if any).
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable<'r>(
+    source: &'r str,
+    mut annotations: Vec<RenderableAnnotation<'r>>,
+) -> EscapedSourceCode<'r> {
+    // Updates the annotation ranges given by the caller whenever a single byte (at `index` in
+    // `source`) is replaced with `len` bytes.
+    //
+    // When the index occurs before the start of the range, the range is
+    // offset by `len`. When the range occurs after or at the start but before
+    // the end, then the end of the range only is offset by `len`.
+    let mut update_ranges = |index: usize, len: u32| {
+        for ann in &mut annotations {
+            if index < usize::from(ann.range.start()) {
+                ann.range += TextSize::new(len - 1);
+            } else if index < usize::from(ann.range.end()) {
+                ann.range = ann.range.add_end(TextSize::new(len - 1));
+            }
+        }
+    };
+
+    // If `c` is an unprintable character, then this returns a printable
+    // representation of it (using a fancier Unicode codepoint).
+    let unprintable_replacement = |c: char| -> Option<char> {
+        match c {
+            '\x07' => Some('␇'),
+            '\x08' => Some('␈'),
+            '\x1b' => Some('␛'),
+            '\x7f' => Some('␡'),
+            _ => None,
+        }
+    };
+
+    let mut last_end = 0;
+    let mut result = String::new();
+    for (index, c) in source.char_indices() {
+        if let Some(printable) = unprintable_replacement(c) {
+            result.push_str(&source[last_end..index]);
+
+            let len = printable.text_len().to_u32();
+            update_ranges(result.text_len().to_usize(), len);
+
+            result.push(printable);
+            last_end = index + 1;
+        }
+    }
+
+    // No tabs or unprintable chars
+    if result.is_empty() {
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Borrowed(source),
+        }
+    } else {
+        result.push_str(&source[last_end..]);
+        EscapedSourceCode {
+            annotations,
+            text: Cow::Owned(result),
+        }
+    }
+}
+
+struct EscapedSourceCode<'r> {
+    text: Cow<'r, str>,
+    annotations: Vec<RenderableAnnotation<'r>>,
+}
+
+impl<'r> EscapedSourceCode<'r> {
+    // This attempts to "fix up" the spans on each annotation  in the case where
+    // it's an empty span immediately following a line terminator.
+    //
+    // At present, `annotate-snippets` (both upstream and our vendored copy)
+    // will render annotations of such spans to point to the space immediately
+    // following the previous line. But ideally, this should point to the space
+    // immediately preceding the next line.
+    //
+    // After attempting to fix `annotate-snippets` and giving up after a couple
+    // hours, this routine takes a different tact: it adjusts the span to be
+    // non-empty and it will cover the first codepoint of the following line.
+    // This forces `annotate-snippets` to point to the right place.
+    //
+    // See also: <https://github.com/astral-sh/ruff/issues/15509> and
+    // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
+    // from which this was adapted.
+    fn fix_up_empty_spans_after_line_terminator(mut self) -> EscapedSourceCode<'r> {
+        for ann in &mut self.annotations {
+            let range = ann.range;
+            if !range.is_empty()
+                || range.start() == TextSize::from(0)
+                || range.start() >= self.text.text_len()
+            {
+                continue;
+            }
+            if !matches!(
+                self.text.as_bytes()[range.start().to_usize() - 1],
+                b'\n' | b'\r'
+            ) {
+                continue;
+            }
+            let start = range.start();
+            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            ann.range = TextRange::new(start, end);
+        }
+
+        self
+    }
+}
+
+/// Finds the closest [`TextSize`] not less than the offset given for which
+/// `is_char_boundary` is `true`. Unless the offset given is greater than
+/// the length of the underlying contents, in which case, the length of the
+/// contents is returned.
+///
+/// Can be replaced with `str::ceil_char_boundary` once it's stable.
+///
+/// # Examples
+///
+/// From `std`:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextLen, TextSize};
+///
+/// let source = "❤️🧡💛💚💙💜";
+/// assert_eq!(source.text_len(), TextSize::from(26));
+/// assert!(!source.is_char_boundary(13));
+///
+/// let closest = ceil_char_boundary(source, TextSize::from(13));
+/// assert_eq!(closest, TextSize::from(14));
+/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
+/// ```
+///
+/// Additional examples:
+///
+/// ```
+/// use ruff_db::diagnostic::ceil_char_boundary;
+/// use ruff_text_size::{Ranged, TextRange, TextSize};
+///
+/// let source = "Hello";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(5)),
+///     TextSize::from(5)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(6)),
+///     TextSize::from(5)
+/// );
+///
+/// let source = "α";
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(0)),
+///     TextSize::from(0)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(1)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(2)),
+///     TextSize::from(2)
+/// );
+///
+/// assert_eq!(
+///     ceil_char_boundary(source, TextSize::from(3)),
+///     TextSize::from(2)
+/// );
+/// ```
+pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
+    let upper_bound = offset
+        .to_u32()
+        .saturating_add(4)
+        .min(text.text_len().to_u32());
+    (offset.to_u32()..upper_bound)
+        .map(TextSize::from)
+        .find(|offset| text.is_char_boundary(offset.to_usize()))
+        .unwrap_or_else(|| TextSize::from(upper_bound))
+}
+
 #[cfg(test)]
 mod tests {
 
-    use ruff_diagnostics::{Edit, Fix};
+    use ruff_diagnostics::{Applicability, Edit, Fix};
 
-    use crate::diagnostic::{Annotation, DiagnosticId, SecondaryCode, Severity, Span};
+    use crate::diagnostic::{
+        Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
+        SubDiagnosticSeverity,
+    };
     use crate::files::system_path_to_file;
     use crate::system::{DbWithWritableSystem, SystemPath};
     use crate::tests::TestDb;
@@ -1548,7 +1717,7 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -1577,15 +1746,15 @@ watermelon
 
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(
-            env.sub_builder(Severity::Info, "this is a helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "this is a helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "another helpful note")
                 .build(),
         );
         diag.sub(
-            env.sub_builder(Severity::Info, "and another helpful note")
+            env.sub_builder(SubDiagnosticSeverity::Info, "and another helpful note")
                 .build(),
         );
         insta::assert_snapshot!(
@@ -2307,6 +2476,27 @@ watermelon
             self.config = config;
         }
 
+        /// Hide diagnostic severity when rendering.
+        pub(super) fn hide_severity(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.hide_severity(yes);
+            self.config = config;
+        }
+
+        /// Show fix availability when rendering.
+        pub(super) fn show_fix_status(&mut self, yes: bool) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.show_fix_status(yes);
+            self.config = config;
+        }
+
+        /// The lowest fix applicability to show when rendering.
+        pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
+            let mut config = std::mem::take(&mut self.config);
+            config = config.fix_applicability(applicability);
+            self.config = config;
+        }
+
         /// Add a file with the given path and contents to this environment.
         pub(super) fn add(&mut self, path: &str, contents: &str) {
             let path = SystemPath::new(path);
@@ -2370,11 +2560,11 @@ watermelon
         /// sub-diagnostic with "error" severity and canned values for
         /// its identifier and message.
         fn sub_warn(&mut self) -> SubDiagnosticBuilder<'_> {
-            self.sub_builder(Severity::Warning, "sub-diagnostic message")
+            self.sub_builder(SubDiagnosticSeverity::Warning, "sub-diagnostic message")
         }
 
         /// Returns a builder for tersely constructing diagnostics.
-        fn builder(
+        pub(super) fn builder(
             &mut self,
             identifier: &'static str,
             severity: Severity,
@@ -2391,7 +2581,11 @@ watermelon
         }
 
         /// Returns a builder for tersely constructing sub-diagnostics.
-        fn sub_builder(&mut self, severity: Severity, message: &str) -> SubDiagnosticBuilder<'_> {
+        fn sub_builder(
+            &mut self,
+            severity: SubDiagnosticSeverity,
+            message: &str,
+        ) -> SubDiagnosticBuilder<'_> {
             let subdiag = SubDiagnostic::new(severity, message);
             SubDiagnosticBuilder { env: self, subdiag }
         }
@@ -2437,7 +2631,7 @@ watermelon
         ///
         /// See the docs on `TestEnvironment::span` for the meaning of
         /// `path`, `line_offset_start` and `line_offset_end`.
-        fn primary(
+        pub(super) fn primary(
             mut self,
             path: &str,
             line_offset_start: &str,
@@ -2492,6 +2686,12 @@ watermelon
         /// Set the noqa offset on the diagnostic.
         fn noqa_offset(mut self, noqa_offset: TextSize) -> DiagnosticBuilder<'e> {
             self.diag.set_noqa_offset(noqa_offset);
+            self
+        }
+
+        /// Adds a "help" sub-diagnostic with the given message.
+        fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+            self.diag.help(message);
             self
         }
     }
@@ -2600,7 +2800,8 @@ def fibonacci(n):
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("fib.py", "1:7", "1:9", "Remove unused import: `os`")
+                .primary("fib.py", "1:7", "1:9", "")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(0),
@@ -2613,12 +2814,8 @@ def fibonacci(n):
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "fib.py",
-                "6:4",
-                "6:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("fib.py", "6:4", "6:5", "")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
@@ -2665,6 +2862,25 @@ if call(foo
     }
 
     /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    ///
+    /// The concatenated cells look like this:
+    ///
+    /// ```python
+    /// # cell 1
+    /// import os
+    /// # cell 2
+    /// import math
+    ///
+    /// print('hello world')
+    /// # cell 3
+    /// def foo():
+    ///     print()
+    ///     x = 1
+    /// ```
+    ///
+    /// The first diagnostic is on the unused `os` import with location cell 1, row 2, column 8
+    /// (`cell 1:2:8`). The second diagnostic is the unused `math` import at `cell 2:2:8`, and the
+    /// third diagnostic is an unfixable unused variable at `cell 3:4:5`.
     #[allow(
         dead_code,
         reason = "This is currently only used for JSON but will be needed soon for other formats"
@@ -2720,7 +2936,8 @@ if call(foo
 
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
-                .primary("notebook.ipynb", "2:7", "2:9", "Remove unused import: `os`")
+                .primary("notebook.ipynb", "2:7", "2:9", "")
+                .help("Remove unused import: `os`")
                 .secondary_code("F401")
                 .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                     TextSize::from(9),
@@ -2733,12 +2950,8 @@ if call(foo
                 Severity::Error,
                 "`math` imported but unused",
             )
-            .primary(
-                "notebook.ipynb",
-                "4:7",
-                "4:11",
-                "Remove unused import: `math`",
-            )
+            .primary("notebook.ipynb", "4:7", "4:11", "")
+            .help("Remove unused import: `math`")
             .secondary_code("F401")
             .fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(28),
@@ -2751,12 +2964,8 @@ if call(foo
                 Severity::Error,
                 "Local variable `x` is assigned to but never used",
             )
-            .primary(
-                "notebook.ipynb",
-                "10:4",
-                "10:5",
-                "Remove assignment to unused variable `x`",
-            )
+            .primary("notebook.ipynb", "10:4", "10:5", "")
+            .help("Remove assignment to unused variable `x`")
             .secondary_code("F841")
             .fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(94),

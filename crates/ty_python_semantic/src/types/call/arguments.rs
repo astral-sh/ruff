@@ -5,7 +5,8 @@ use ruff_python_ast as ast;
 
 use crate::Db;
 use crate::types::KnownClass;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::enums::enum_member_literals;
+use crate::types::tuple::{TupleLength, TupleSpec};
 
 use super::Type;
 
@@ -15,8 +16,8 @@ pub(crate) enum Argument<'a> {
     Synthetic,
     /// A positional argument.
     Positional,
-    /// A starred positional argument (e.g. `*args`).
-    Variadic,
+    /// A starred positional argument (e.g. `*args`) containing the specified number of elements.
+    Variadic(TupleLength),
     /// A keyword argument (e.g. `a=1`).
     Keyword(&'a str),
     /// The double-starred keywords argument (e.g. `**kwargs`).
@@ -36,24 +37,36 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         Self { arguments, types }
     }
 
-    /// Create `CallArguments` from AST arguments
-    pub(crate) fn from_arguments(arguments: &'a ast::Arguments) -> Self {
+    /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
+    /// type of each splatted argument, so that we can determine its length. All other arguments
+    /// will remain uninitialized as `Unknown`.
+    pub(crate) fn from_arguments(
+        db: &'db dyn Db,
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(&ast::Expr, &ast::Expr) -> Type<'db>,
+    ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { .. }) => Argument::Variadic,
-                    _ => Argument::Positional,
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(arg, value);
+                        let length = ty
+                            .try_iterate(db)
+                            .map(|tuple| tuple.len())
+                            .unwrap_or(TupleLength::unknown());
+                        (Argument::Variadic(length), Some(ty))
+                    }
+                    _ => (Argument::Positional, None),
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, .. }) => {
                     if let Some(arg) = arg {
-                        Argument::Keyword(&arg.id)
+                        (Argument::Keyword(&arg.id), None)
                     } else {
-                        Argument::Keywords
+                        (Argument::Keywords, None)
                     }
                 }
             })
-            .map(|argument| (argument, None))
             .collect()
     }
 
@@ -199,13 +212,22 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
-    // TODO: Expand enums to their variants
     match ty {
-        Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Bool) => {
-            Some(vec![
-                Type::BooleanLiteral(true),
-                Type::BooleanLiteral(false),
-            ])
+        Type::NominalInstance(instance) => {
+            if instance.class.is_known(db, KnownClass::Bool) {
+                return Some(vec![
+                    Type::BooleanLiteral(true),
+                    Type::BooleanLiteral(false),
+                ]);
+            }
+
+            let class_literal = instance.class.class_literal(db).0;
+
+            if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
+                return Some(enum_members.collect());
+            }
+
+            None
         }
         Type::Tuple(tuple_type) => {
             // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
@@ -224,7 +246,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                     }
                 })
                 .multi_cartesian_product()
-                .map(|types| TupleType::from_elements(db, types))
+                .map(|types| Type::heterogeneous_tuple(db, types))
                 .collect::<Vec<_>>();
             if expanded.len() == 1 {
                 // There are no elements in the tuple type that can be expanded.
@@ -284,17 +306,17 @@ mod tests {
         let false_ty = Type::BooleanLiteral(false);
 
         // Empty tuple
-        let empty_tuple = TupleType::empty(&db);
+        let empty_tuple = Type::empty_tuple(&db);
         let expanded = expand_type(&db, empty_tuple);
         assert!(expanded.is_none());
 
         // None of the elements can be expanded.
-        let tuple_type1 = TupleType::from_elements(&db, [int_ty, str_ty]);
+        let tuple_type1 = Type::heterogeneous_tuple(&db, [int_ty, str_ty]);
         let expanded = expand_type(&db, tuple_type1);
         assert!(expanded.is_none());
 
         // All elements can be expanded.
-        let tuple_type2 = TupleType::from_elements(
+        let tuple_type2 = Type::heterogeneous_tuple(
             &db,
             [
                 bool_ty,
@@ -302,18 +324,18 @@ mod tests {
             ],
         );
         let expected_types = [
-            TupleType::from_elements(&db, [true_ty, int_ty]),
-            TupleType::from_elements(&db, [true_ty, str_ty]),
-            TupleType::from_elements(&db, [true_ty, bytes_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty]),
-            TupleType::from_elements(&db, [false_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&db, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
-        let tuple_type3 = TupleType::from_elements(
+        let tuple_type3 = Type::heterogeneous_tuple(
             &db,
             [
                 bool_ty,
@@ -323,21 +345,21 @@ mod tests {
             ],
         );
         let expected_types = [
-            TupleType::from_elements(&db, [true_ty, int_ty, str_ty, str_ty]),
-            TupleType::from_elements(&db, [true_ty, int_ty, bytes_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty, str_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&db, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
-        let variable_length_tuple = TupleType::mixed(
+        let variable_length_tuple = Type::tuple(TupleType::mixed(
             &db,
             [bool_ty],
             int_ty,
             [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
-        );
+        ));
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());
     }

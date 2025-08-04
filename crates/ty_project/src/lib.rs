@@ -1,11 +1,15 @@
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
 use crate::metadata::options::{OptionDiagnostic, ToSettingsError};
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
+#[cfg(feature = "testing")]
+pub use db::tests::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_db::files::{File, FileRootKind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
@@ -123,17 +127,46 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
-    /// Report the completion of a given file.
-    fn report_file(&self, file: &File);
+    /// Report the completion of checking a given file along with its diagnostics.
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
+
+    /// Reports settings or IO related diagnostics. The diagnostics
+    /// can belong to different files or no file at all.
+    /// But it's never a file for which [`Self::report_checked_file`] gets called.
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>);
 }
 
-/// A no-op implementation of [`ProgressReporter`].
+/// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]
-pub struct DummyReporter;
+pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 
-impl ProgressReporter for DummyReporter {
+impl CollectReporter {
+    pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
+        let mut diagnostics = self.0.into_inner().unwrap();
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(db)
+                .cmp(&right.rendering_sort_key(db))
+        });
+        diagnostics
+    }
+}
+
+impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_file(&self, _file: &File) {}
+    fn report_checked_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
+        if diagnostics.is_empty() {
+            return;
+        }
+
+        self.0
+            .lock()
+            .unwrap()
+            .extend(diagnostics.iter().map(Clone::clone));
+    }
+
+    fn report_diagnostics(&mut self, _db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.0.get_mut().unwrap().extend(diagnostics);
+    }
 }
 
 #[salsa::tracked]
@@ -170,7 +203,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -221,11 +254,7 @@ impl Project {
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
-    pub(crate) fn check(
-        self,
-        db: &ProjectDatabase,
-        mut reporter: AssertUnwindSafe<&mut dyn ProgressReporter>,
-    ) -> Vec<Diagnostic> {
+    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -235,12 +264,11 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics: Vec<Diagnostic> = Vec::new();
-        diagnostics.extend(
-            self.settings_diagnostics(db)
-                .iter()
-                .map(OptionDiagnostic::to_diagnostic),
-        );
+        let mut diagnostics: Vec<Diagnostic> = self
+            .settings_diagnostics(db)
+            .iter()
+            .map(OptionDiagnostic::to_diagnostic)
+            .collect();
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -252,47 +280,58 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
+        reporter.report_diagnostics(db, diagnostics);
+
+        let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
-        let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
             let db = db.clone();
-            let file_diagnostics = &file_diagnostics;
             let project_span = &project_span;
-            let reporter = &reporter;
 
             rayon::scope(move |scope| {
                 for file in &files {
                     let db = db.clone();
+                    let reporter = &*reporter;
                     scope.spawn(move |_| {
                         let check_file_span =
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let result = check_file_impl(&db, file);
-                        file_diagnostics
-                            .lock()
-                            .unwrap()
-                            .extend(result.iter().map(Clone::clone));
+                        match check_file_impl(&db, file) {
+                            Ok(diagnostics) => {
+                                reporter.report_checked_file(&db, file, diagnostics);
 
-                        reporter.report_file(&file);
+                                // This is outside `check_file_impl` to avoid that opening or closing
+                                // a file invalidates the `check_file_impl` query of every file!
+                                if !open_files.contains(&file) {
+                                    // The module has already been parsed by `check_file_impl`.
+                                    // We only retrieve it here so that we can call `clear` on it.
+                                    let parsed = parsed_module(&db, file);
+
+                                    // Drop the AST now that we are done checking this file. It is not currently open,
+                                    // so it is unlikely to be accessed again soon. If any queries need to access the AST
+                                    // from across files, it will be re-parsed.
+                                    parsed.clear();
+                                }
+                            }
+                            Err(io_error) => {
+                                reporter.report_checked_file(
+                                    &db,
+                                    file,
+                                    std::slice::from_ref(io_error),
+                                );
+                            }
+                        }
                     });
                 }
             });
-        }
+        };
 
         tracing::debug!(
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
         );
-
-        let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
-        file_diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(db)
-                .cmp(&right.rendering_sort_key(db))
-        });
-        diagnostics.extend(file_diagnostics);
-        diagnostics
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -300,7 +339,10 @@ impl Project {
             return Vec::new();
         }
 
-        check_file_impl(db, file).iter().map(Clone::clone).collect()
+        match check_file_impl(db, file) {
+            Ok(diagnostics) => diagnostics.to_vec(),
+            Err(diagnostic) => vec![diagnostic.clone()],
+        }
     }
 
     /// Opens a file in the project.
@@ -484,22 +526,19 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
-pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
+#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
+pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
     let source = source_text(db, file);
 
     if let Some(read_error) = source.read_error() {
-        diagnostics.push(
-            IOErrorDiagnostic {
-                file: Some(file),
-                error: read_error.clone().into(),
-            }
-            .to_diagnostic(),
-        );
-        return diagnostics.into_boxed_slice();
+        return Err(IOErrorDiagnostic {
+            file: Some(file),
+            error: read_error.clone().into(),
+        }
+        .to_diagnostic());
     }
 
     let parsed = parsed_module(db, file);
@@ -529,13 +568,6 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
         }
     }
 
-    if !db.project().open_fileset(db).contains(&file) {
-        // Drop the AST now that we are done checking this file. It is not currently open,
-        // so it is unlikely to be accessed again soon. If any queries need to access the AST
-        // from across files, it will be re-parsed.
-        parsed.clear();
-    }
-
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
             .primary_span()
@@ -544,7 +576,7 @@ pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Box<[Diagnostic]> {
             .start()
     });
 
-    diagnostics.into_boxed_slice()
+    Ok(diagnostics.into_boxed_slice())
 }
 
 #[derive(Debug)]
@@ -661,14 +693,17 @@ where
 
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 "This indicates a bug in ty.",
             ));
 
             let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
-            diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
+                report_message,
+            ));
+            diagnostic.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
                 format!(
                     "Platform: {os} {arch}",
                     os = std::env::consts::OS,
@@ -677,13 +712,13 @@ where
             ));
             if let Some(version) = ruff_db::program_version() {
                 diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
+                    SubDiagnosticSeverity::Info,
                     format!("Version: {version}"),
                 ));
             }
 
             diagnostic.sub(SubDiagnostic::new(
-                Severity::Info,
+                SubDiagnosticSeverity::Info,
                 format!(
                     "Args: {args:?}",
                     args = std::env::args().collect::<Vec<_>>()
@@ -694,13 +729,13 @@ where
                 match backtrace.status() {
                     BacktraceStatus::Disabled => {
                         diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
                         ));
                     }
                     BacktraceStatus::Captured => {
                         diagnostic.sub(SubDiagnostic::new(
-                            Severity::Info,
+                            SubDiagnosticSeverity::Info,
                             format!("Backtrace:\n{backtrace}"),
                         ));
                     }
@@ -710,7 +745,10 @@ where
 
             if let Some(backtrace) = error.salsa_backtrace {
                 salsa::attach(db, || {
-                    diagnostic.sub(SubDiagnostic::new(Severity::Info, backtrace.to_string()));
+                    diagnostic.sub(SubDiagnostic::new(
+                        SubDiagnosticSeverity::Info,
+                        backtrace.to_string(),
+                    ));
                 });
             }
 
@@ -762,10 +800,11 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file_impl(&db, file)
-                .iter()
-                .map(|diagnostic| diagnostic.primary_message().to_string())
-                .collect::<Vec<_>>(),
-            vec!["Failed to read file: No such file or directory".to_string()]
+                .as_ref()
+                .unwrap_err()
+                .primary_message()
+                .to_string(),
+            "Failed to read file: No such file or directory".to_string()
         );
 
         let events = db.take_salsa_events();
@@ -778,6 +817,8 @@ mod tests {
         assert_eq!(source_text(&db, file).as_str(), "");
         assert_eq!(
             check_file_impl(&db, file)
+                .as_ref()
+                .unwrap()
                 .iter()
                 .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),

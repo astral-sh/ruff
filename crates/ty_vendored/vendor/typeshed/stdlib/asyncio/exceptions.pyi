@@ -43,7 +43,8 @@ class SendfileNotAvailableError(RuntimeError):
     """
 
 class IncompleteReadError(EOFError):
-    """Incomplete read error. Attributes:
+    """
+    Incomplete read error. Attributes:
 
     - partial: read bytes string before the end of stream was reached
     - expected: total number of expected bytes (or None if unknown)

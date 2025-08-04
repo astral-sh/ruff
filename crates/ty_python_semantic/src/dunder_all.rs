@@ -26,7 +26,7 @@ fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial, heap_size=get_size2::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
@@ -103,7 +103,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                 };
                 let Some(module_dunder_all_names) = module_literal
                     .module(self.db)
-                    .file()
+                    .file(self.db)
                     .and_then(|file| dunder_all_names(self.db, file))
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
@@ -173,7 +173,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
         let module = resolve_module(self.db, &module_name)?;
-        dunder_all_names(self.db, module.file()?)
+        dunder_all_names(self.db, module.file(self.db)?)
     }
 
     /// Infer the type of a standalone expression.

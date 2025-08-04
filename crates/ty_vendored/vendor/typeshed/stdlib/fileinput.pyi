@@ -69,7 +69,7 @@ import sys
 from _typeshed import AnyStr_co, StrOrBytesPath
 from collections.abc import Callable, Iterable
 from types import GenericAlias, TracebackType
-from typing import IO, Any, AnyStr, Generic, Literal, Protocol, overload
+from typing import IO, Any, AnyStr, Generic, Literal, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -92,6 +92,7 @@ if sys.version_info >= (3, 11):
 else:
     _TextMode: TypeAlias = Literal["r", "rU", "U"]
 
+@type_check_only
 class _HasReadlineAndFileno(Protocol[AnyStr_co]):
     def readline(self) -> AnyStr_co: ...
     def fileno(self) -> int: ...
@@ -180,7 +181,8 @@ def close() -> None:
     """Close the sequence."""
 
 def nextfile() -> None:
-    """Close the current file so that the next iteration will read the first
+    """
+    Close the current file so that the next iteration will read the first
     line from the next file (if any); lines not read from the file will
     not count towards the cumulative line count. The filename is not
     changed until after the first line of the next file has been read.
@@ -190,34 +192,40 @@ def nextfile() -> None:
     """
 
 def filename() -> str:
-    """Return the name of the file currently being read.
+    """
+    Return the name of the file currently being read.
     Before the first line has been read, returns None.
     """
 
 def lineno() -> int:
-    """Return the cumulative line number of the line that has just been read.
+    """
+    Return the cumulative line number of the line that has just been read.
     Before the first line has been read, returns 0. After the last line
     of the last file has been read, returns the line number of that line.
     """
 
 def filelineno() -> int:
-    """Return the line number in the current file. Before the first line
+    """
+    Return the line number in the current file. Before the first line
     has been read, returns 0. After the last line of the last file has
     been read, returns the line number of that line within the file.
     """
 
 def fileno() -> int:
-    """Return the file number of the current file. When no file is currently
+    """
+    Return the file number of the current file. When no file is currently
     opened, returns -1.
     """
 
 def isfirstline() -> bool:
-    """Returns true the line just read is the first line of its file,
+    """
+    Returns true the line just read is the first line of its file,
     otherwise returns false.
     """
 
 def isstdin() -> bool:
-    """Returns true if the last line was read from sys.stdin,
+    """
+    Returns true if the last line was read from sys.stdin,
     otherwise returns false.
     """
 

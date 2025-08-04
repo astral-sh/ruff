@@ -54,7 +54,7 @@ class deprecated:
 ```
 
 Only the mandatory message string is of interest to static analysis, the other two affect only
-runtime behaviour.
+runtime behavior.
 
 ```py
 from typing_extensions import deprecated

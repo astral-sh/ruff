@@ -172,17 +172,35 @@ impl Declarations {
             }
         }
     }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_declarations.shrink_to_fit();
+        for declaration in &self.live_declarations {
+            reachability_constraints.mark_used(declaration.reachability_constraint);
+        }
+    }
 }
 
-/// A snapshot of a place state that can be used to resolve a reference in a nested eager scope.
-/// If there are bindings in a (non-class) scope , they are stored in `Bindings`.
+/// A snapshot of a place state that can be used to resolve a reference in a nested scope.
+/// If there are bindings in a (non-class) scope, they are stored in `Bindings`.
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(super) enum EagerSnapshot {
+pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
+}
+
+impl EnclosingSnapshot {
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        match self {
+            Self::Constraint(_) => {}
+            Self::Bindings(bindings) => {
+                bindings.finish(reachability_constraints);
+            }
+        }
+    }
 }
 
 /// Live bindings for a single place at some point in control flow. Each live binding comes
@@ -202,6 +220,13 @@ impl Bindings {
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
+    }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.live_bindings.shrink_to_fit();
+        for binding in &self.live_bindings {
+            reachability_constraints.mark_used(binding.reachability_constraint);
+        }
     }
 }
 
@@ -421,6 +446,11 @@ impl PlaceState {
 
     pub(super) fn declarations(&self) -> &Declarations {
         &self.declarations
+    }
+
+    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        self.declarations.finish(reachability_constraints);
+        self.bindings.finish(reachability_constraints);
     }
 }
 

@@ -40,7 +40,8 @@ class CycleFoundException(Exception):
 
 def get_all_awaited_by(pid: SupportsIndex) -> list[_AwaitedInfo]: ...
 def build_async_tree(result: Iterable[_AwaitedInfo], task_emoji: str = "(T)", cor_emoji: str = "") -> list[list[str]]:
-    """Build a list of strings for pretty-print an async call tree.
+    """
+    Build a list of strings for pretty-print an async call tree.
 
     The call tree is produced by `get_all_async_stacks()`, prefixing tasks
     with `task_emoji` and coroutine frames with `cor_emoji`.

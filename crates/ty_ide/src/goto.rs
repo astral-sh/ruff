@@ -2,6 +2,8 @@ pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
 
+use std::borrow::Cow;
+
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
@@ -270,8 +272,267 @@ impl GotoTarget<'_> {
                 definitions_to_navigation_targets(db, stub_mapper, definitions)
             }
 
-            // TODO: Handle string literals that map to TypedDict fields
+            // For exception variables, they are their own definitions (like parameters)
+            GotoTarget::ExceptVariable(except_handler) => {
+                if let Some(name) = &except_handler.name {
+                    let range = name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
+                } else {
+                    None
+                }
+            }
+
+            // For pattern match rest variables, they are their own definitions
+            GotoTarget::PatternMatchRest(pattern_mapping) => {
+                if let Some(rest_name) = &pattern_mapping.rest {
+                    let range = rest_name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
+                } else {
+                    None
+                }
+            }
+
+            // For pattern match as names, they are their own definitions
+            GotoTarget::PatternMatchAsName(pattern_as) => {
+                if let Some(name) = &pattern_as.name {
+                    let range = name.range;
+                    Some(crate::NavigationTargets::single(NavigationTarget::new(
+                        file, range,
+                    )))
+                } else {
+                    None
+                }
+            }
+
             _ => None,
+        }
+    }
+
+    /// Returns the text representation of this goto target.
+    /// Returns `None` if no meaningful string representation can be provided.
+    /// This is used by the "references" feature, which looks for references
+    /// to this goto target.
+    pub(crate) fn to_string(&self) -> Option<Cow<str>> {
+        match self {
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Name(name) => Some(Cow::Borrowed(name.id.as_str())),
+                ast::ExprRef::Attribute(attr) => Some(Cow::Borrowed(attr.attr.as_str())),
+                _ => None,
+            },
+            GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
+            GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
+            GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
+            GotoTarget::ImportSymbolAlias { alias, .. } => {
+                if let Some(asname) = &alias.asname {
+                    Some(Cow::Borrowed(asname.as_str()))
+                } else {
+                    Some(Cow::Borrowed(alias.name.as_str()))
+                }
+            }
+            GotoTarget::ImportModuleComponent {
+                module_name,
+                component_index,
+                ..
+            } => {
+                let components: Vec<&str> = module_name.split('.').collect();
+                if let Some(component) = components.get(*component_index) {
+                    Some(Cow::Borrowed(*component))
+                } else {
+                    Some(Cow::Borrowed(module_name))
+                }
+            }
+            GotoTarget::ImportModuleAlias { alias } => {
+                if let Some(asname) = &alias.asname {
+                    Some(Cow::Borrowed(asname.as_str()))
+                } else {
+                    Some(Cow::Borrowed(alias.name.as_str()))
+                }
+            }
+            GotoTarget::ExceptVariable(except) => {
+                Some(Cow::Borrowed(except.name.as_ref()?.as_str()))
+            }
+            GotoTarget::KeywordArgument { keyword, .. } => {
+                Some(Cow::Borrowed(keyword.arg.as_ref()?.as_str()))
+            }
+            GotoTarget::PatternMatchRest(rest) => Some(Cow::Borrowed(rest.rest.as_ref()?.as_str())),
+            GotoTarget::PatternKeywordArgument(keyword) => {
+                Some(Cow::Borrowed(keyword.attr.as_str()))
+            }
+            GotoTarget::PatternMatchStarName(star) => {
+                Some(Cow::Borrowed(star.name.as_ref()?.as_str()))
+            }
+            GotoTarget::PatternMatchAsName(as_name) => {
+                Some(Cow::Borrowed(as_name.name.as_ref()?.as_str()))
+            }
+            GotoTarget::TypeParamTypeVarName(type_var) => {
+                Some(Cow::Borrowed(type_var.name.as_str()))
+            }
+            GotoTarget::TypeParamParamSpecName(spec) => Some(Cow::Borrowed(spec.name.as_str())),
+            GotoTarget::TypeParamTypeVarTupleName(tuple) => {
+                Some(Cow::Borrowed(tuple.name.as_str()))
+            }
+            GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
+            GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
+        }
+    }
+
+    /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
+    pub(crate) fn from_covering_node<'a>(
+        covering_node: &crate::find_node::CoveringNode<'a>,
+        offset: TextSize,
+    ) -> Option<GotoTarget<'a>> {
+        tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
+
+        match covering_node.node() {
+            AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
+                Some(AnyNodeRef::StmtFunctionDef(function)) => {
+                    Some(GotoTarget::FunctionDef(function))
+                }
+                Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
+                Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
+                Some(AnyNodeRef::Alias(alias)) => {
+                    // Find the containing import statement to determine the type
+                    let import_stmt = covering_node.ancestors().find(|node| {
+                        matches!(
+                            node,
+                            AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
+                        )
+                    });
+
+                    match import_stmt {
+                        Some(AnyNodeRef::StmtImport(_)) => {
+                            // Regular import statement like "import x.y as z"
+
+                            // Is the offset within the alias name (asname) part?
+                            if let Some(asname) = &alias.asname {
+                                if asname.range.contains_inclusive(offset) {
+                                    return Some(GotoTarget::ImportModuleAlias { alias });
+                                }
+                            }
+
+                            // Is the offset in the module name part?
+                            if alias.name.range.contains_inclusive(offset) {
+                                let full_name = alias.name.as_str();
+
+                                if let Some((component_index, component_range)) =
+                                    find_module_component(
+                                        full_name,
+                                        alias.name.range.start(),
+                                        offset,
+                                    )
+                                {
+                                    return Some(GotoTarget::ImportModuleComponent {
+                                        module_name: full_name.to_string(),
+                                        component_index,
+                                        component_range,
+                                    });
+                                }
+                            }
+
+                            None
+                        }
+                        Some(AnyNodeRef::StmtImportFrom(import_from)) => {
+                            // From import statement like "from x import y as z"
+
+                            // Is the offset within the alias name (asname) part?
+                            if let Some(asname) = &alias.asname {
+                                if asname.range.contains_inclusive(offset) {
+                                    return Some(GotoTarget::ImportSymbolAlias {
+                                        alias,
+                                        range: asname.range,
+                                        import_from,
+                                    });
+                                }
+                            }
+
+                            // Is the offset in the original name part?
+                            if alias.name.range.contains_inclusive(offset) {
+                                return Some(GotoTarget::ImportSymbolAlias {
+                                    alias,
+                                    range: alias.name.range,
+                                    import_from,
+                                });
+                            }
+
+                            None
+                        }
+                        _ => None,
+                    }
+                }
+                Some(AnyNodeRef::StmtImportFrom(from)) => {
+                    // Handle offset within module name in from import statements
+                    if let Some(module_expr) = &from.module {
+                        let full_module_name = module_expr.to_string();
+
+                        if let Some((component_index, component_range)) = find_module_component(
+                            &full_module_name,
+                            module_expr.range.start(),
+                            offset,
+                        ) {
+                            return Some(GotoTarget::ImportModuleComponent {
+                                module_name: full_module_name,
+                                component_index,
+                                component_range,
+                            });
+                        }
+                    }
+
+                    None
+                }
+                Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
+                    Some(GotoTarget::ExceptVariable(handler))
+                }
+                Some(AnyNodeRef::Keyword(keyword)) => {
+                    // Find the containing call expression from the ancestor chain
+                    let call_expression = covering_node
+                        .ancestors()
+                        .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
+                    Some(GotoTarget::KeywordArgument {
+                        keyword,
+                        call_expression,
+                    })
+                }
+                Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
+                    Some(GotoTarget::PatternMatchRest(mapping))
+                }
+                Some(AnyNodeRef::PatternKeyword(keyword)) => {
+                    Some(GotoTarget::PatternKeywordArgument(keyword))
+                }
+                Some(AnyNodeRef::PatternMatchStar(star)) => {
+                    Some(GotoTarget::PatternMatchStarName(star))
+                }
+                Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
+                    Some(GotoTarget::PatternMatchAsName(as_pattern))
+                }
+                Some(AnyNodeRef::TypeParamTypeVar(var)) => {
+                    Some(GotoTarget::TypeParamTypeVarName(var))
+                }
+                Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
+                    Some(GotoTarget::TypeParamParamSpecName(bound))
+                }
+                Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
+                    Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
+                }
+                Some(AnyNodeRef::ExprAttribute(attribute)) => {
+                    Some(GotoTarget::Expression(attribute.into()))
+                }
+                Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
+                Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
+                None => None,
+                Some(parent) => {
+                    tracing::debug!(
+                        "Missing `GoToTarget` for identifier with parent {:?}",
+                        parent.kind()
+                    );
+                    None
+                }
+            },
+
+            node => node.as_expr_ref().map(GotoTarget::Expression),
         }
     }
 }
@@ -328,11 +589,7 @@ fn convert_resolved_definitions_to_targets(
             }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
-                crate::NavigationTarget {
-                    file: file_range.file(),
-                    focus_range: file_range.range(),
-                    full_range: file_range.range(),
-                }
+                crate::NavigationTarget::new(file_range.file(), file_range.range())
             }
         })
         .collect()
@@ -375,145 +632,7 @@ pub(crate) fn find_goto_target(
         .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
-    tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
-
-    match covering_node.node() {
-        AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
-            Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
-            Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
-            Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
-            Some(AnyNodeRef::Alias(alias)) => {
-                // Find the containing import statement to determine the type
-                let import_stmt = covering_node.ancestors().find(|node| {
-                    matches!(
-                        node,
-                        AnyNodeRef::StmtImport(_) | AnyNodeRef::StmtImportFrom(_)
-                    )
-                });
-
-                match import_stmt {
-                    Some(AnyNodeRef::StmtImport(_)) => {
-                        // Regular import statement like "import x.y as z"
-
-                        // Is the offset within the alias name (asname) part?
-                        if let Some(asname) = &alias.asname {
-                            if asname.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportModuleAlias { alias });
-                            }
-                        }
-
-                        // Is the offset in the module name part?
-                        if alias.name.range.contains_inclusive(offset) {
-                            let full_name = alias.name.as_str();
-
-                            if let Some((component_index, component_range)) =
-                                find_module_component(full_name, alias.name.range.start(), offset)
-                            {
-                                return Some(GotoTarget::ImportModuleComponent {
-                                    module_name: full_name.to_string(),
-                                    component_index,
-                                    component_range,
-                                });
-                            }
-                        }
-
-                        None
-                    }
-                    Some(AnyNodeRef::StmtImportFrom(import_from)) => {
-                        // From import statement like "from x import y as z"
-
-                        // Is the offset within the alias name (asname) part?
-                        if let Some(asname) = &alias.asname {
-                            if asname.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportSymbolAlias {
-                                    alias,
-                                    range: asname.range,
-                                    import_from,
-                                });
-                            }
-                        }
-
-                        // Is the offset in the original name part?
-                        if alias.name.range.contains_inclusive(offset) {
-                            return Some(GotoTarget::ImportSymbolAlias {
-                                alias,
-                                range: alias.name.range,
-                                import_from,
-                            });
-                        }
-
-                        None
-                    }
-                    _ => None,
-                }
-            }
-            Some(AnyNodeRef::StmtImportFrom(from)) => {
-                // Handle offset within module name in from import statements
-                if let Some(module_expr) = &from.module {
-                    let full_module_name = module_expr.to_string();
-
-                    if let Some((component_index, component_range)) =
-                        find_module_component(&full_module_name, module_expr.range.start(), offset)
-                    {
-                        return Some(GotoTarget::ImportModuleComponent {
-                            module_name: full_module_name,
-                            component_index,
-                            component_range,
-                        });
-                    }
-                }
-
-                None
-            }
-            Some(AnyNodeRef::ExceptHandlerExceptHandler(handler)) => {
-                Some(GotoTarget::ExceptVariable(handler))
-            }
-            Some(AnyNodeRef::Keyword(keyword)) => {
-                // Find the containing call expression from the ancestor chain
-                let call_expression = covering_node
-                    .ancestors()
-                    .find_map(ruff_python_ast::AnyNodeRef::expr_call)?;
-                Some(GotoTarget::KeywordArgument {
-                    keyword,
-                    call_expression,
-                })
-            }
-            Some(AnyNodeRef::PatternMatchMapping(mapping)) => {
-                Some(GotoTarget::PatternMatchRest(mapping))
-            }
-            Some(AnyNodeRef::PatternKeyword(keyword)) => {
-                Some(GotoTarget::PatternKeywordArgument(keyword))
-            }
-            Some(AnyNodeRef::PatternMatchStar(star)) => {
-                Some(GotoTarget::PatternMatchStarName(star))
-            }
-            Some(AnyNodeRef::PatternMatchAs(as_pattern)) => {
-                Some(GotoTarget::PatternMatchAsName(as_pattern))
-            }
-            Some(AnyNodeRef::TypeParamTypeVar(var)) => Some(GotoTarget::TypeParamTypeVarName(var)),
-            Some(AnyNodeRef::TypeParamParamSpec(bound)) => {
-                Some(GotoTarget::TypeParamParamSpecName(bound))
-            }
-            Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
-                Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
-            }
-            Some(AnyNodeRef::ExprAttribute(attribute)) => {
-                Some(GotoTarget::Expression(attribute.into()))
-            }
-            Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
-            Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
-            None => None,
-            Some(parent) => {
-                tracing::debug!(
-                    "Missing `GoToTarget` for identifier with parent {:?}",
-                    parent.kind()
-                );
-                None
-            }
-        },
-
-        node => node.as_expr_ref().map(GotoTarget::Expression),
-    }
+    GotoTarget::from_covering_node(&covering_node, offset)
 }
 
 /// Helper function to resolve a module name and create a navigation target.
@@ -525,12 +644,10 @@ fn resolve_module_to_navigation_target(
 
     if let Some(module_name) = ModuleName::new(module_name_str) {
         if let Some(resolved_module) = resolve_module(db, &module_name) {
-            if let Some(module_file) = resolved_module.file() {
-                return Some(crate::NavigationTargets::single(crate::NavigationTarget {
-                    file: module_file,
-                    focus_range: TextRange::default(),
-                    full_range: TextRange::default(),
-                }));
+            if let Some(module_file) = resolved_module.file(db) {
+                return Some(crate::NavigationTargets::single(
+                    crate::NavigationTarget::new(module_file, TextRange::default()),
+                ));
             }
         }
     }

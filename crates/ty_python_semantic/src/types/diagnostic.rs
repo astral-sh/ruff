@@ -15,12 +15,11 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -1671,18 +1670,26 @@ impl TypeCheckDiagnostics {
         self.diagnostics.shrink_to_fit();
     }
 
-    pub(crate) fn into_vec(self) -> Vec<Diagnostic> {
+    pub(crate) fn into_diagnostics(self) -> Vec<Diagnostic> {
         self.diagnostics
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
-        self.diagnostics.iter()
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.diagnostics.as_slice()
     }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.diagnostics.fmt(f)
+        self.diagnostics().fmt(f)
     }
 }
 
@@ -1691,7 +1698,7 @@ impl IntoIterator for TypeCheckDiagnostics {
     type IntoIter = std::vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.into_iter()
+        self.into_diagnostics().into_iter()
     }
 }
 
@@ -1699,8 +1706,9 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
     type Item = &'a Diagnostic;
     type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.diagnostics.iter()
+        self.iter()
     }
 }
 
@@ -1920,7 +1928,7 @@ pub(super) fn report_implicit_return_type(
         ));
 
         let mut sub_diagnostic = SubDiagnostic::new(
-            Severity::Info,
+            SubDiagnosticSeverity::Info,
             "Only classes that directly inherit from `typing.Protocol` \
             or `typing_extensions.Protocol` are considered protocol classes",
         );
@@ -2028,7 +2036,7 @@ pub(crate) fn report_instance_layout_conflict(
     ));
 
     let mut subdiagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         "Two classes cannot coexist in a class's MRO if their instances \
         have incompatible memory layouts",
     );
@@ -2221,7 +2229,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{}` is declared here, but it is not a protocol class:",
             class.name(db)
@@ -2240,6 +2248,41 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     // years ago rather than up-to-date documentation). We should either write our own docs
     // describing this well or contribute to type-checker-agnostic docs somewhere and link to those.
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
+}
+
+pub(crate) fn report_bad_argument_to_protocol_interface(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    param_type: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `reveal_protocol_interface`");
+    diagnostic
+        .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
+
+    if let Some(class) = param_type.to_class_type(context.db()) {
+        let mut class_def_diagnostic = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{}` is declared here, but it is not a protocol class:",
+                class.name(db)
+            ),
+        );
+        class_def_diagnostic.annotate(Annotation::primary(
+            class.class_literal(db).0.header_span(db),
+        ));
+        diagnostic.sub(class_def_diagnostic);
+    }
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // See TODO in `report_bad_argument_to_get_protocol_members` above
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html");
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
@@ -2283,7 +2326,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "`{class_name}` is declared as a protocol class, \
                 but it is not declared as runtime-checkable"
@@ -2317,7 +2360,7 @@ pub(crate) fn report_attempted_protocol_instantiation(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
@@ -2351,7 +2394,7 @@ pub(crate) fn report_duplicate_bases(
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
 
     let mut sub_diagnostic = SubDiagnostic::new(
-        Severity::Info,
+        SubDiagnosticSeverity::Info,
         format_args!(
             "The definition of class `{}` will raise `TypeError` at runtime",
             class.name(db)
@@ -2386,7 +2429,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = TupleType::homogeneous(db, instance_of_type);
+    let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(
@@ -2513,9 +2556,9 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
     mut diagnostic: LintDiagnosticGuard,
     full_submodule_name: &ModuleName,
-    parent_module: &Module,
+    parent_module: Module,
 ) {
-    let Some(search_path) = parent_module.search_path() else {
+    let Some(search_path) = parent_module.search_path(db) else {
         return;
     };
 
@@ -2538,7 +2581,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     diagnostic.info(format_args!(
         "The stdlib module `{module_name}` only has a `{name}` \
             submodule on Python {version_range}",
-        module_name = parent_module.name(),
+        module_name = parent_module.name(db),
         name = full_submodule_name
             .components()
             .next_back()

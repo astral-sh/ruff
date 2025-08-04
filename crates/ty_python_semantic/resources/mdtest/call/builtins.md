@@ -105,3 +105,60 @@ str("Müsli", "utf-8")
 # error: [invalid-argument-type] "Argument to class `str` is incorrect: Expected `str`, found `Literal[b"utf-8"]`"
 str(b"M\xc3\xbcsli", b"utf-8")
 ```
+
+## Calls to `isinstance`
+
+We infer `Literal[True]` for a limited set of cases where we can be sure that the answer is correct,
+but fall back to `bool` otherwise.
+
+```py
+from enum import Enum
+from types import FunctionType
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+
+reveal_type(isinstance(True, bool))  # revealed: Literal[True]
+reveal_type(isinstance(True, int))  # revealed: Literal[True]
+reveal_type(isinstance(True, object))  # revealed: Literal[True]
+reveal_type(isinstance("", str))  # revealed: Literal[True]
+reveal_type(isinstance(1, int))  # revealed: Literal[True]
+reveal_type(isinstance(b"", bytes))  # revealed: Literal[True]
+reveal_type(isinstance(Answer.NO, Answer))  # revealed: Literal[True]
+
+reveal_type(isinstance((1, 2), tuple))  # revealed: Literal[True]
+
+def f(): ...
+
+reveal_type(isinstance(f, FunctionType))  # revealed: Literal[True]
+
+reveal_type(isinstance("", int))  # revealed: bool
+
+class A: ...
+class SubclassOfA(A): ...
+class B: ...
+
+reveal_type(isinstance(A, type))  # revealed: Literal[True]
+
+a = A()
+
+reveal_type(isinstance(a, A))  # revealed: Literal[True]
+reveal_type(isinstance(a, object))  # revealed: Literal[True]
+reveal_type(isinstance(a, SubclassOfA))  # revealed: bool
+reveal_type(isinstance(a, B))  # revealed: bool
+
+s = SubclassOfA()
+reveal_type(isinstance(s, SubclassOfA))  # revealed: Literal[True]
+reveal_type(isinstance(s, A))  # revealed: Literal[True]
+
+def _(x: A | B, y: list[int]):
+    reveal_type(isinstance(y, list))  # revealed: Literal[True]
+    reveal_type(isinstance(x, A))  # revealed: bool
+
+    if isinstance(x, A):
+        pass
+    else:
+        reveal_type(x)  # revealed: B & ~A
+        reveal_type(isinstance(x, B))  # revealed: Literal[True]
+```

@@ -62,13 +62,13 @@ use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::generics::{GenericContext, walk_generic_context};
@@ -76,8 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Parameter, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, DeprecatedInstance, DynamicType, KnownClass, Type, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder, walk_type_mapping,
+    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
+    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -339,12 +340,17 @@ impl<'db> OverloadLiteral<'db> {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         });
+
+        let index = semantic_index(db, scope.file(db));
+        let is_generator = scope.file_scope_id(db).is_generator_function(index);
+
         Signature::from_function(
             db,
             generic_context,
             inherited_generic_context,
             definition,
             function_stmt_node,
+            is_generator,
         )
     }
 
@@ -504,7 +510,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -799,7 +805,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
@@ -897,6 +903,101 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+/// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
+/// this will return `True` at runtime, `Truthiness::AlwaysFalse` if we can definitely infer
+/// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
+/// instead.
+fn is_instance_truthiness<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    class: ClassLiteral<'db>,
+) -> Truthiness {
+    let is_instance = |ty: &Type<'_>| {
+        if let Type::NominalInstance(instance) = ty {
+            if instance
+                .class
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|c| match c {
+                    ClassType::Generic(c) => c.origin(db) == class,
+                    ClassType::NonGeneric(c) => c == class,
+                })
+            {
+                return true;
+            }
+        }
+        false
+    };
+
+    let always_true_if = |test: bool| {
+        if test {
+            Truthiness::AlwaysTrue
+        } else {
+            Truthiness::Ambiguous
+        }
+    };
+
+    match ty {
+        Type::Union(..) => {
+            // We do not handle unions specifically here, because something like `A | SubclassOfA` would
+            // have been simplified to `A` anyway
+            Truthiness::Ambiguous
+        }
+        Type::Intersection(intersection) => always_true_if(
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| is_instance_truthiness(db, *element, class).is_always_true()),
+        ),
+
+        Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
+
+        Type::BooleanLiteral(..)
+        | Type::BytesLiteral(..)
+        | Type::IntLiteral(..)
+        | Type::StringLiteral(..)
+        | Type::LiteralString
+        | Type::ModuleLiteral(..)
+        | Type::EnumLiteral(..) => always_true_if(
+            ty.literal_fallback_instance(db)
+                .as_ref()
+                .is_some_and(is_instance),
+        ),
+
+        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
+
+        Type::FunctionLiteral(..) => {
+            always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
+        }
+
+        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
+
+        Type::BoundMethod(..)
+        | Type::MethodWrapper(..)
+        | Type::WrapperDescriptor(..)
+        | Type::DataclassDecorator(..)
+        | Type::DataclassTransformer(..)
+        | Type::GenericAlias(..)
+        | Type::SubclassOf(..)
+        | Type::ProtocolInstance(..)
+        | Type::SpecialForm(..)
+        | Type::KnownInstance(..)
+        | Type::PropertyInstance(..)
+        | Type::AlwaysTruthy
+        | Type::AlwaysFalsy
+        | Type::TypeVar(..)
+        | Type::BoundSuper(..)
+        | Type::TypeIs(..)
+        | Type::Callable(..)
+        | Type::Dynamic(..)
+        | Type::Never => {
+            // We could probably try to infer more precise types in some of these cases, but it's unclear
+            // if it's worth the effort.
+            Truthiness::Ambiguous
+        }
+    }
+}
+
 fn signature_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &CallableSignature<'db>,
@@ -973,6 +1074,8 @@ pub enum KnownFunction {
 
     /// `dataclasses.dataclass`
     Dataclass,
+    /// `dataclasses.field`
+    Field,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -999,10 +1102,14 @@ pub enum KnownFunction {
     EnumMembers,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.has_member`
+    HasMember,
     /// `ty_extensions.top_materialization`
     TopMaterialization,
     /// `ty_extensions.bottom_materialization`
     BottomMaterialization,
+    /// `ty_extensions.reveal_protocol_interface`
+    RevealProtocolInterface,
 }
 
 impl KnownFunction {
@@ -1021,7 +1128,7 @@ impl KnownFunction {
     ) -> Option<Self> {
         let candidate = Self::from_str(name).ok()?;
         candidate
-            .check_module(file_to_module(db, definition.file(db))?.known()?)
+            .check_module(file_to_module(db, definition.file(db))?.known(db)?)
             .then_some(candidate)
     }
 
@@ -1051,7 +1158,7 @@ impl KnownFunction {
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
             }
-            Self::Dataclass => {
+            Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
@@ -1067,6 +1174,8 @@ impl KnownFunction {
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
+            | Self::HasMember
+            | Self::RevealProtocolInterface
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1101,6 +1210,16 @@ impl KnownFunction {
                             .message(format_args!("`{}`", revealed_type.display(db))),
                     );
                 }
+            }
+
+            KnownFunction::HasMember => {
+                let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
+                    return;
+                };
+                let ty_members = all_members(db, *ty);
+                overload.set_return_type(Type::BooleanLiteral(
+                    ty_members.iter().any(|m| m.name == member.value(db)),
+                ));
             }
 
             KnownFunction::AssertType => {
@@ -1188,28 +1307,35 @@ impl KnownFunction {
                     if truthiness.is_always_true() {
                         return;
                     }
-                    if let Some(message) = message
+                    let mut diagnostic = if let Some(message) = message
                         .and_then(Type::into_string_literal)
                         .map(|s| s.value(db))
                     {
-                        builder.into_diagnostic(format_args!("Static assertion error: {message}"));
+                        builder.into_diagnostic(format_args!("Static assertion error: {message}"))
                     } else if *parameter_ty == Type::BooleanLiteral(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
-                        );
+                        )
                     } else if truthiness.is_always_false() {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             is statically known to be falsy",
                             parameter_ty = parameter_ty.display(db)
-                        ));
+                        ))
                     } else {
                         builder.into_diagnostic(format_args!(
                             "Static assertion error: argument of type `{parameter_ty}` \
                             has an ambiguous static truthiness",
                             parameter_ty = parameter_ty.display(db)
-                        ));
-                    }
+                        ))
+                    };
+                    diagnostic.annotate(
+                        Annotation::secondary(context.span(&call_expression.arguments.args[0]))
+                            .message(format_args!(
+                                "Inferred type of argument is `{}`",
+                                parameter_ty.display(db)
+                            )),
+                    );
                 }
             }
 
@@ -1242,22 +1368,54 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
 
-            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [_, Some(Type::ClassLiteral(class))] = parameter_types else {
+            KnownFunction::RevealProtocolInterface => {
+                let [Some(param_type)] = parameter_types else {
                     return;
                 };
-                let Some(protocol_class) = class.into_protocol_class(db) else {
+                let Some(protocol_class) = param_type
+                    .into_class_literal()
+                    .and_then(|class| class.into_protocol_class(db))
+                else {
+                    report_bad_argument_to_protocol_interface(
+                        context,
+                        call_expression,
+                        *param_type,
+                    );
                     return;
                 };
-                if protocol_class.is_runtime_checkable(db) {
-                    return;
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed protocol interface");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        protocol_class.interface(db).display(db)
+                    )));
                 }
-                report_runtime_check_against_non_runtime_checkable_protocol(
-                    context,
-                    call_expression,
-                    protocol_class,
-                    self,
-                );
+            }
+
+            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+                let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
+                    return;
+                };
+
+                if let Some(protocol_class) = class.into_protocol_class(db) {
+                    if !protocol_class.is_runtime_checkable(db) {
+                        report_runtime_check_against_non_runtime_checkable_protocol(
+                            context,
+                            call_expression,
+                            protocol_class,
+                            self,
+                        );
+                    }
+                }
+
+                if self == KnownFunction::IsInstance {
+                    overload.set_return_type(
+                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                    );
+                }
             }
 
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
@@ -1287,7 +1445,7 @@ impl KnownFunction {
                     return;
                 };
 
-                overload.set_return_type(Type::module_literal(db, file, &module));
+                overload.set_return_type(Type::module_literal(db, file, module));
             }
 
             _ => {}
@@ -1320,7 +1478,7 @@ pub(crate) mod tests {
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
 
-                KnownFunction::Dataclass => KnownModule::Dataclasses,
+                KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
@@ -1349,6 +1507,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
+                | KnownFunction::HasMember
+                | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

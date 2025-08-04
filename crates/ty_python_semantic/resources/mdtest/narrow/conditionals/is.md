@@ -78,8 +78,16 @@ def _(answer: Answer):
     if answer is Answer.NO:
         reveal_type(answer)  # revealed: Literal[Answer.NO]
     else:
-        # TODO: This should be `Literal[Answer.YES]`
-        reveal_type(answer)  # revealed: Answer & ~Literal[Answer.NO]
+        reveal_type(answer)  # revealed: Literal[Answer.YES]
+
+class Single(Enum):
+    VALUE = 1
+
+def _(x: Single | int):
+    if x is Single.VALUE:
+        reveal_type(x)  # revealed: Single
+    else:
+        reveal_type(x)  # revealed: int
 ```
 
 ## `is` for `EllipsisType` (Python 3.10+)

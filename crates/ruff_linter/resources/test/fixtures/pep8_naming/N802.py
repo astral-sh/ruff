@@ -84,3 +84,25 @@ class MyRequestHandler(BaseHTTPRequestHandler):
     def dont_GET(self):
         pass
 
+
+from http.server import CGIHTTPRequestHandler
+
+
+class MyCGIRequestHandler(CGIHTTPRequestHandler):
+    def do_OPTIONS(self):
+        pass
+
+    def dont_OPTIONS(self):
+        pass
+
+
+from http.server import SimpleHTTPRequestHandler
+
+
+class MySimpleRequestHandler(SimpleHTTPRequestHandler):
+    def do_OPTIONS(self):
+        pass
+
+    def dont_OPTIONS(self):
+        pass
+

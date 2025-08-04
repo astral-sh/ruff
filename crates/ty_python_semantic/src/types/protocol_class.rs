@@ -1,13 +1,16 @@
+use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
 use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
 
+use super::TypeVarVariance;
+use crate::semantic_index::place_table;
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
-    semantic_index::{place_table, use_def_map},
+    semantic_index::use_def_map,
     types::{
         CallArguments, CallableType, ClassBase, ClassLiteral, KnownFunction, PairVisitor,
         PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
@@ -15,8 +18,6 @@ use crate::{
         signatures::{Parameter, Parameters},
     },
 };
-
-use super::TypeVarVariance;
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -215,6 +216,31 @@ impl<'db> ProtocolInterface<'db> {
             data.find_legacy_typevars(db, typevars);
         }
     }
+
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolInterfaceDisplay<'db> {
+            db: &'db dyn Db,
+            interface: ProtocolInterface<'db>,
+        }
+
+        impl std::fmt::Display for ProtocolInterfaceDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_char('{')?;
+                for (i, (name, data)) in self.interface.inner(self.db).iter().enumerate() {
+                    write!(f, "\"{name}\": {data}", data = data.display(self.db))?;
+                    if i < self.interface.inner(self.db).len() - 1 {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_char('}')
+            }
+        }
+
+        ProtocolInterfaceDisplay {
+            db,
+            interface: self,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -254,6 +280,41 @@ impl<'db> ProtocolMemberData<'db> {
         Self {
             kind: self.kind.materialize(db, variance),
             qualifiers: self.qualifiers,
+        }
+    }
+
+    fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
+        struct ProtocolMemberDataDisplay<'db> {
+            db: &'db dyn Db,
+            data: ProtocolMemberKind<'db>,
+        }
+
+        impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.data {
+                    ProtocolMemberKind::Method(callable) => {
+                        write!(f, "MethodMember(`{}`)", callable.display(self.db))
+                    }
+                    ProtocolMemberKind::Property(property) => {
+                        let mut d = f.debug_struct("PropertyMember");
+                        if let Some(getter) = property.getter(self.db) {
+                            d.field("getter", &format_args!("`{}`", &getter.display(self.db)));
+                        }
+                        if let Some(setter) = property.setter(self.db) {
+                            d.field("setter", &format_args!("`{}`", &setter.display(self.db)));
+                        }
+                        d.finish()
+                    }
+                    ProtocolMemberKind::Other(ty) => {
+                        write!(f, "AttributeMember(`{}`)", ty.display(self.db))
+                    }
+                }
+            }
+        }
+
+        ProtocolMemberDataDisplay {
+            db,
+            data: self.kind,
         }
     }
 }
@@ -406,21 +467,25 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
-        instance: Type<'db>,
+        other: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
-        let Place::Type(attribute_type, Boundness::Bound) = instance.member(db, self.name).place
-        else {
-            return false;
-        };
-
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => true,
+            ProtocolMemberKind::Method(_) => matches!(
+                other.to_meta_type(db).member(db, self.name).place,
+                Place::Type(_, Boundness::Bound)
+            ),
+            // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(property) => {
+                let Place::Type(attribute_type, Boundness::Bound) =
+                    other.member(db, self.name).place
+                else {
+                    return false;
+                };
                 let read_ok = if let Some(getter) = property.getter(db) {
                     if let Ok(member_type) = getter
-                        .try_call(db, &CallArguments::positional([instance]))
+                        .try_call(db, &CallArguments::positional([other]))
                         .map(|binding| binding.return_type(db))
                     {
                         attribute_type.has_relation_to(db, member_type, relation)
@@ -432,7 +497,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 };
                 let write_ok = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
                     let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
-                    instance
+                    other
                         .validate_attribute_assignment(db, self.name, setter_value_type)
                         .is_not_err()
                 } else {
@@ -441,6 +506,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 read_ok && write_ok
             }
             ProtocolMemberKind::Other(member_type) => {
+                let Place::Type(attribute_type, Boundness::Bound) =
+                    other.member(db, self.name).place
+                else {
+                    return false;
+                };
                 member_type.has_relation_to(db, attribute_type, relation)
                     && attribute_type.has_relation_to(db, *member_type, relation)
             }
@@ -494,7 +564,7 @@ enum BoundOnClass {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=get_size2::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -512,15 +582,15 @@ fn cached_protocol_interface<'db>(
 
         members.extend(
             use_def_map
-                .all_end_of_scope_declarations()
-                .flat_map(|(place_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|place| (place_id, place))
+                .all_end_of_scope_symbol_declarations()
+                .flat_map(|(symbol_id, declarations)| {
+                    place_from_declarations(db, declarations).map(|place| (symbol_id, place))
                 })
-                .filter_map(|(place_id, place)| {
+                .filter_map(|(symbol_id, place)| {
                     place
                         .place
                         .ignore_possibly_unbound()
-                        .map(|ty| (place_id, ty, place.qualifiers, BoundOnClass::No))
+                        .map(|ty| (symbol_id, ty, place.qualifiers, BoundOnClass::No))
                 })
                 // Bindings in the class body that are not declared in the class body
                 // are not valid protocol members, and we plan to emit diagnostics for them
@@ -530,20 +600,20 @@ fn cached_protocol_interface<'db>(
                 // members at runtime, and it's important that we accurately understand
                 // type narrowing that uses `isinstance()` or `issubclass()` with
                 // runtime-checkable protocols.
-                .chain(use_def_map.all_end_of_scope_bindings().filter_map(
-                    |(place_id, bindings)| {
+                .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+                    |(symbol_id, bindings)| {
                         place_from_bindings(db, bindings)
                             .ignore_possibly_unbound()
-                            .map(|ty| (place_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
+                            .map(|ty| (symbol_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
                     },
                 ))
-                .filter_map(|(place_id, member, qualifiers, bound_on_class)| {
-                    Some((
-                        place_table.place_expr(place_id).as_name()?,
+                .map(|(symbol_id, member, qualifiers, bound_on_class)| {
+                    (
+                        place_table.symbol(symbol_id).name(),
                         member,
                         qualifiers,
                         bound_on_class,
-                    ))
+                    )
                 })
                 .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers, bound_on_class)| {

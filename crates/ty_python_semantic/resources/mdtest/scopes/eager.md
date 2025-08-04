@@ -299,7 +299,7 @@ def _():
     x = 1
 
     def f():
-        # revealed: Unknown | Literal[1, 2]
+        # revealed: Literal[1, 2]
         [reveal_type(x) for a in range(1)]
     x = 2
 ```
@@ -316,7 +316,7 @@ def _():
 
     class A:
         def f():
-            # revealed: Unknown | Literal[1, 2]
+            # revealed: Literal[1, 2]
             reveal_type(x)
 
     x = 2
@@ -333,7 +333,7 @@ def _():
 
     def f():
         def g():
-            # revealed: Unknown | Literal[1, 2]
+            # revealed: Literal[1, 2]
             reveal_type(x)
     x = 2
 ```
@@ -351,7 +351,7 @@ def _():
 
     class A:
         def f():
-            # revealed: Unknown | Literal[1, 2]
+            # revealed: Literal[1, 2]
             [reveal_type(x) for a in range(1)]
 
     x = 2

@@ -123,6 +123,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::PathConstructorCurrentDirectory, Path::new("PTH201.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202.py"))]
     #[test_case(Rule::OsPathGetsize, Path::new("PTH202_2.py"))]
     #[test_case(Rule::OsPathGetatime, Path::new("PTH203.py"))]

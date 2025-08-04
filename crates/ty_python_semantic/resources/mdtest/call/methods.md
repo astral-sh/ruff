@@ -204,7 +204,7 @@ reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or
 ## Method calls on types not disjoint from `None`
 
 Very few methods are defined on `object`, `None`, and other types not disjoint from `None`. However,
-descriptor-binding behaviour works on these types in exactly the same way as descriptor binding on
+descriptor-binding behavior works on these types in exactly the same way as descriptor binding on
 other types. This is despite the fact that `None` is used as a sentinel internally by the descriptor
 protocol to indicate that a method was accessed on the class itself rather than an instance of the
 class:

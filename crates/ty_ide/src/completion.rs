@@ -66,9 +66,9 @@ enum CompletionTargetTokens<'t> {
     /// A token was found under the cursor, but it didn't
     /// match any of our anticipated token patterns.
     Generic { token: &'t Token },
-    /// No token was found, but we have the offset of the
-    /// cursor.
-    Unknown { offset: TextSize },
+    /// No token was found. We generally treat this like
+    /// `Generic` (i.e., offer scope based completions).
+    Unknown,
 }
 
 impl<'t> CompletionTargetTokens<'t> {
@@ -78,7 +78,7 @@ impl<'t> CompletionTargetTokens<'t> {
         static OBJECT_DOT_NON_EMPTY: [TokenKind; 2] = [TokenKind::Dot, TokenKind::Name];
 
         let offset = match parsed.tokens().at_offset(offset) {
-            TokenAt::None => return Some(CompletionTargetTokens::Unknown { offset }),
+            TokenAt::None => return Some(CompletionTargetTokens::Unknown),
             TokenAt::Single(tok) => tok.end(),
             TokenAt::Between(_, tok) => tok.start(),
         };
@@ -122,7 +122,7 @@ impl<'t> CompletionTargetTokens<'t> {
                 return None;
             } else {
                 let Some(last) = before.last() else {
-                    return Some(CompletionTargetTokens::Unknown { offset });
+                    return Some(CompletionTargetTokens::Unknown);
                 };
                 CompletionTargetTokens::Generic { token: last }
             },
@@ -171,7 +171,7 @@ impl<'t> CompletionTargetTokens<'t> {
                     node: covering_node.node(),
                 })
             }
-            CompletionTargetTokens::Unknown { offset } => {
+            CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(offset);
                 let covering_node = covering_node(parsed.syntax().into(), range);
                 Some(CompletionTargetAst::Scoped {
@@ -1247,7 +1247,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method object.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self
+        __new__ :: bound method object.__new__() -> Self@object
         __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method object.__repr__() -> str
@@ -1292,7 +1292,7 @@ quux.b<CURSOR>
         __init_subclass__ :: bound method object.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self
+        __new__ :: bound method object.__new__() -> Self@object
         __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method object.__repr__() -> str
@@ -1346,7 +1346,7 @@ C.<CURSOR>
         __mro__ :: tuple[<class 'C'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self
+        __new__ :: def __new__(cls) -> Self@object
         __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1522,7 +1522,7 @@ Quux.<CURSOR>
         __mro__ :: tuple[<class 'Quux'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self
+        __new__ :: def __new__(cls) -> Self@object
         __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1574,8 +1574,8 @@ Answer.<CURSOR>
                 __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
                 __class__ :: <class 'EnumMeta'>
                 __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
-                __copy__ :: def __copy__(self) -> Self
-                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self
+                __copy__ :: def __copy__(self) -> Self@Enum
+                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@Enum
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
                 __dict__ :: MappingProxyType[str, Any]
                 __dictoffset__ :: int
@@ -1585,28 +1585,28 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> _EnumMemberT
+                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> _EnumMemberT@__getitem__
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: def __init_subclass__(cls) -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[_EnumMemberT]
+                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[_EnumMemberT@__iter__]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Unknown]
                 __module__ :: str
                 __mro__ :: tuple[<class 'Answer'>, <class 'Enum'>, <class 'object'>]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __new__ :: def __new__(cls, value: object) -> Self
+                __new__ :: def __new__(cls, value: object) -> Self@Enum
                 __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[_EnumMemberT]
+                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[_EnumMemberT@__reversed__]
                 __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __signature__ :: bound method <class 'Answer'>.__signature__() -> str

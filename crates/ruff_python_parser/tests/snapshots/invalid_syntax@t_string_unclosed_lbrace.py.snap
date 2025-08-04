@@ -20,36 +20,34 @@ Module(
                             range: 44..48,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 44..48,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 46..47,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 47..47,
-                                                                id: Name(""),
-                                                                ctx: Invalid,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                    TString {
+                                        range: 44..48,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..47,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 47..47,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -66,36 +64,34 @@ Module(
                             range: 49..58,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 49..58,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 51..58,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 52..55,
-                                                                id: Name("foo"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                    TString {
+                                        range: 49..58,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 51..58,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 52..55,
+                                                            id: Name("foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -112,41 +108,39 @@ Module(
                             range: 59..67,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 59..67,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 61..66,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 62..65,
-                                                                id: Name("foo"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        debug_text: Some(
-                                                            DebugText {
-                                                                leading: "",
-                                                                trailing: "=",
-                                                            },
-                                                        ),
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                    TString {
+                                        range: 59..67,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 61..66,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 62..65,
+                                                            id: Name("foo"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: Some(
+                                                        DebugText {
+                                                            leading: "",
+                                                            trailing: "=",
+                                                        },
+                                                    ),
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },
@@ -164,66 +158,62 @@ Module(
                             value: TStringValue {
                                 inner: Concatenated(
                                     [
-                                        TString(
-                                            TString {
-                                                range: 68..72,
-                                                node_index: AtomicNodeIndex(..),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 70..71,
-                                                            node_index: AtomicNodeIndex(..),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: AtomicNodeIndex(..),
-                                                                    range: 71..71,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: TStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                },
+                                        TString {
+                                            range: 68..72,
+                                            node_index: AtomicNodeIndex(..),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 70..71,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: AtomicNodeIndex(..),
+                                                                range: 71..71,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
                                             },
-                                        ),
-                                        TString(
-                                            TString {
-                                                range: 73..81,
-                                                node_index: AtomicNodeIndex(..),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 77..78,
-                                                            node_index: AtomicNodeIndex(..),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: AtomicNodeIndex(..),
-                                                                    range: 78..78,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: TStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: true,
-                                                },
+                                        },
+                                        TString {
+                                            range: 73..81,
+                                            node_index: AtomicNodeIndex(..),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 77..78,
+                                                        node_index: AtomicNodeIndex(..),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: AtomicNodeIndex(..),
+                                                                range: 78..78,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
                                             },
-                                        ),
+                                        },
                                     ],
                                 ),
                             },

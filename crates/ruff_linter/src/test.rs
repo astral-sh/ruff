@@ -272,7 +272,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             }
 
             assert!(
-                !(fixable && diagnostic.suggestion().is_none()),
+                !(fixable && diagnostic.first_help_text().is_none()),
                 "Diagnostic emitted by {rule:?} is fixable but \
                 `Violation::fix_title` returns `None`"
             );
@@ -380,7 +380,7 @@ macro_rules! assert_diagnostics {
     }};
     ($value:expr, @$snapshot:literal) => {{
         insta::with_settings!({ omit_expression => true }, {
-            insta::assert_snapshot!($crate::test::print_messages(&$value), $snapshot);
+            insta::assert_snapshot!($crate::test::print_messages(&$value), @$snapshot);
         });
     }};
     ($name:expr, $value:expr) => {{

@@ -5,11 +5,11 @@ use crate::place::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
-use crate::types::call::CallArguments;
+use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::Signature;
 use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::{Db, HasType, NameKind, SemanticModel};
@@ -20,7 +20,7 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-pub use resolve_definition::ResolvedDefinition;
+pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -31,35 +31,33 @@ pub(crate) fn all_declarations_and_bindings<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_end_of_scope_declarations()
+        .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
                 .ok()
                 .and_then(|result| {
-                    result.place.ignore_possibly_unbound().and_then(|ty| {
-                        table
-                            .place_expr(symbol_id)
-                            .as_name()
-                            .cloned()
-                            .map(|name| Member { name, ty })
+                    result.place.ignore_possibly_unbound().map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
                     })
                 })
         })
-        .chain(
-            use_def_map
-                .all_end_of_scope_bindings()
-                .filter_map(move |(symbol_id, bindings)| {
-                    place_from_bindings(db, bindings)
-                        .ignore_possibly_unbound()
-                        .and_then(|ty| {
-                            table
-                                .place_expr(symbol_id)
-                                .as_name()
-                                .cloned()
-                                .map(|name| Member { name, ty })
-                        })
-                }),
-        )
+        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+            move |(symbol_id, bindings)| {
+                place_from_bindings(db, bindings)
+                    .ignore_possibly_unbound()
+                    .map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
+                    })
+            },
+        ))
 }
 
 struct AllMembers<'db> {
@@ -145,6 +143,11 @@ impl<'db> AllMembers<'db> {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
+                Type::SubclassOf(subclass_of) => {
+                    if let Some(class) = subclass_of.subclass_of().into_class() {
+                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                    }
+                }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, class_literal);
@@ -156,7 +159,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
                 let module = literal.module(db);
 
-                let Some(file) = module.file() else {
+                let Some(file) = module.file(db) else {
                     return;
                 };
 
@@ -164,10 +167,8 @@ impl<'db> AllMembers<'db> {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_end_of_scope_declarations() {
-                    let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
-                        continue;
-                    };
+                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
+                    let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
@@ -204,7 +205,7 @@ impl<'db> AllMembers<'db> {
                     }
 
                     self.members.insert(Member {
-                        name: place_table.place_expr(symbol_id).expect_name().clone(),
+                        name: symbol_name.clone(),
                         ty,
                     });
                 }
@@ -276,7 +277,7 @@ impl<'db> AllMembers<'db> {
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                for place_expr in place_table.places() {
+                for place_expr in place_table.members() {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
@@ -376,11 +377,11 @@ pub fn definition_kind_for_name<'db>(
     let place_table = index.place_table(file_scope);
 
     // Look up the place by name
-    let place_id = place_table.place_id_by_name(name_str)?;
+    let symbol_id = place_table.symbol_id(name_str)?;
 
     // Get the use-def map and look up definitions for this place
     let use_def_map = index.use_def_map(file_scope);
-    let declarations = use_def_map.all_reachable_declarations(place_id);
+    let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
     // Find the first valid definition and return its kind
     for declaration in declarations {
@@ -412,14 +413,14 @@ pub fn definitions_for_name<'db>(
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
-        let Some(place_id) = place_table.place_id_by_name(name_str) else {
+        let Some(symbol_id) = place_table.symbol_id(name_str) else {
             continue; // Name not found in this scope, try parent scope
         };
 
         // Check if this place is marked as global or nonlocal
-        let place_expr = place_table.place_expr(place_id);
-        let is_global = place_expr.is_marked_global();
-        let is_nonlocal = place_expr.is_marked_nonlocal();
+        let place_expr = place_table.symbol(symbol_id);
+        let is_global = place_expr.is_global();
+        let is_nonlocal = place_expr.is_nonlocal();
 
         // TODO: The current algorithm doesn't return definintions or bindings
         // for other scopes that are outside of this scope hierarchy that target
@@ -432,11 +433,12 @@ pub fn definitions_for_name<'db>(
             let global_scope_id = global_scope(db, file);
             let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
 
-            if let Some(global_place_id) = global_place_table.place_id_by_name(name_str) {
+            if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
-                let global_bindings = global_use_def_map.all_reachable_bindings(global_place_id);
+                let global_bindings =
+                    global_use_def_map.all_reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.all_reachable_declarations(global_place_id);
+                    global_use_def_map.all_reachable_symbol_declarations(global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
@@ -462,8 +464,8 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -544,7 +546,7 @@ pub fn definitions_for_attribute<'db>(
     for ty in expanded_tys {
         // Handle modules
         if let Type::ModuleLiteral(module_literal) = ty {
-            if let Some(module_file) = module_literal.module(db).file() {
+            if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
                     resolved.extend(resolve_definition(db, def, Some(name_str)));
@@ -577,11 +579,11 @@ pub fn definitions_for_attribute<'db>(
             let class_place_table = crate::semantic_index::place_table(db, class_scope);
 
             // Look for class-level declarations and bindings
-            if let Some(place_id) = class_place_table.place_id_by_name(name_str) {
+            if let Some(place_id) = class_place_table.symbol_id(name_str) {
                 let use_def = use_def_map(db, class_scope);
 
                 // Check declarations first
-                for decl in use_def.all_reachable_declarations(place_id) {
+                for decl in use_def.all_reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(db, def, Some(name_str)));
                         break 'scopes;
@@ -589,7 +591,7 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.all_reachable_bindings(place_id) {
+                for binding in use_def.all_reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(db, def, Some(name_str)));
                         break 'scopes;
@@ -604,11 +606,11 @@ pub fn definitions_for_attribute<'db>(
             for function_scope_id in attribute_scopes(db, class_scope) {
                 let place_table = index.place_table(function_scope_id);
 
-                if let Some(place_id) = place_table.place_id_by_instance_attribute_name(name_str) {
+                if let Some(place_id) = place_table.member_id_by_instance_attribute_name(name_str) {
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
-                    for decl in use_def.all_reachable_declarations(place_id) {
+                    for decl in use_def.all_reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
                             resolved.extend(resolve_definition(db, def, Some(name_str)));
                             break 'scopes;
@@ -616,7 +618,7 @@ pub fn definitions_for_attribute<'db>(
                     }
 
                     // If no declarations found, check bindings
-                    for binding in use_def.all_reachable_bindings(place_id) {
+                    for binding in use_def.all_reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
                             resolved.extend(resolve_definition(db, def, Some(name_str)));
                             break 'scopes;
@@ -724,8 +726,8 @@ pub struct CallSignatureDetails<'db> {
     pub definition: Option<Definition<'db>>,
 
     /// Mapping from argument indices to parameter indices. This helps
-    /// identify which argument corresponds to which parameter.
-    pub argument_to_parameter_mapping: Vec<Option<usize>>,
+    /// determine which parameter corresponds to which argument position.
+    pub argument_to_parameter_mapping: Vec<MatchedArgument>,
 }
 
 /// Extract signature details from a function call expression.
@@ -742,7 +744,10 @@ pub fn call_signature_details<'db>(
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
-        let call_arguments = CallArguments::from_arguments(&call_expr.arguments);
+        let call_arguments =
+            CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
+                splatted_value.inferred_type(&model)
+            });
         let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
 
         // Extract signature details from all callable bindings
@@ -761,7 +766,7 @@ pub fn call_signature_details<'db>(
                     parameter_label_offsets,
                     parameter_names,
                     definition: signature.definition(),
-                    argument_to_parameter_mapping: binding.argument_to_parameter_mapping().to_vec(),
+                    argument_to_parameter_mapping: binding.argument_matches().to_vec(),
                 }
             })
             .collect()
@@ -788,16 +793,19 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
+    use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange};
-    use ruff_db::parsed::parsed_module;
+    use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
-    use ruff_text_size::TextRange;
+    use ruff_text_size::{Ranged, TextRange};
     use rustc_hash::FxHashSet;
+    use tracing::trace;
 
+    use crate::module_resolver::file_to_module;
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::ScopeId;
-    use crate::semantic_index::{global_scope, place_table, use_def_map};
-    use crate::{Db, ModuleName, resolve_module};
+    use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
+    use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
+    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -810,6 +818,15 @@ mod resolve_definition {
         Definition(Definition<'db>),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
+    }
+
+    impl<'db> ResolvedDefinition<'db> {
+        fn file(&self, db: &'db dyn Db) -> File {
+            match self {
+                ResolvedDefinition::Definition(definition) => definition.file(db),
+                ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+            }
+        }
     }
 
     /// Resolve import definitions to their targets.
@@ -863,7 +880,7 @@ mod resolve_definition {
                     return Vec::new(); // Module not found, return empty list
                 };
 
-                let Some(module_file) = resolved_module.file() else {
+                let Some(module_file) = resolved_module.file(db) else {
                     return Vec::new(); // No file for module, return empty list
                 };
 
@@ -924,7 +941,7 @@ mod resolve_definition {
             let Some(resolved_module) = resolve_module(db, &module_name) else {
                 return Vec::new();
             };
-            resolved_module.file()
+            resolved_module.file(db)
         };
 
         let Some(module_file) = module_file else {
@@ -954,31 +971,238 @@ mod resolve_definition {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
         symbol_name: &str,
-    ) -> Vec<Definition<'db>> {
+    ) -> IndexSet<Definition<'db>> {
         let place_table = place_table(db, scope);
-        let Some(place_id) = place_table.place_id_by_name(symbol_name) else {
-            return Vec::new();
+        let Some(symbol_id) = place_table.symbol_id(symbol_name) else {
+            return IndexSet::new();
         };
 
         let use_def_map = use_def_map(db, scope);
-        let mut definitions = Vec::new();
+        let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                definitions.push(def);
+                definitions.insert(def);
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                definitions.push(def);
+                definitions.insert(def);
             }
         }
 
         definitions
+    }
+
+    /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
+    #[tracing::instrument(skip_all)]
+    pub fn map_stub_definition<'db>(
+        db: &'db dyn Db,
+        def: &ResolvedDefinition<'db>,
+    ) -> Option<Vec<ResolvedDefinition<'db>>> {
+        trace!("Stub mapping definition...");
+        // If the file isn't a stub, this is presumably the real definition
+        let stub_file = def.file(db);
+        if !stub_file.is_stub(db) {
+            trace!("File isn't a stub, no stub mapping to do");
+            return None;
+        }
+
+        // It's definitely a stub, so now rerun module resolution but with stubs disabled.
+        let stub_module = file_to_module(db, stub_file)?;
+        trace!("Found stub module: {}", stub_module.name(db));
+        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        trace!("Found real module: {}", real_module.name(db));
+        let real_file = real_module.file(db)?;
+        trace!("Found real file: {}", real_file.path(db));
+
+        // A definition has a "Definition Path" in a file made of nested definitions (~scopes):
+        //
+        // ```
+        // class myclass:  # ./myclass
+        //     def some_func(args: bool):  # ./myclass/some_func
+        //                 # ^~~~ ./myclass/other_func/args/
+        // ```
+        //
+        // So our heuristic goal here is to compute a Definition Path in the stub file
+        // and then resolve the same Definition Path in the real file.
+        //
+        // NOTE: currently a path component is just a str, but in the future additional
+        // disambiguators (like "is a class def") could be added if needed.
+        let mut path = Vec::new();
+        let stub_parsed;
+        let stub_ref;
+        match *def {
+            ResolvedDefinition::Definition(definition) => {
+                stub_parsed = parsed_module(db, stub_file);
+                stub_ref = stub_parsed.load(db);
+
+                // Get the leaf of the path (the definition itself)
+                let leaf = definition_path_component_for_leaf(db, &stub_ref, definition)
+                    .map_err(|()| {
+                        trace!("Found unsupported DefinitionKind while stub mapping, giving up");
+                    })
+                    .ok()?;
+                path.push(leaf);
+
+                // Get the ancestors of the path (all the definitions we're nested under)
+                let index = semantic_index(db, stub_file);
+                for (_scope_id, scope) in index.ancestor_scopes(definition.file_scope(db)) {
+                    let node = scope.node();
+                    let component = definition_path_component_for_node(&stub_ref, node)
+                        .map_err(|()| {
+                            trace!("Found unsupported NodeScopeKind while stub mapping, giving up");
+                        })
+                        .ok()?;
+                    if let Some(component) = component {
+                        path.push(component);
+                    }
+                }
+                trace!("Built Definition Path: {path:?}");
+            }
+            ResolvedDefinition::FileWithRange(file_range) => {
+                return if file_range.range() == TextRange::default() {
+                    trace!(
+                        "Found module mapping: {} => {}",
+                        stub_file.path(db),
+                        real_file.path(db)
+                    );
+                    // This is just a reference to a module, no need to do paths
+                    Some(vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                        real_file,
+                        TextRange::default(),
+                    ))])
+                } else {
+                    // Not yet implemented -- in this case we want to recover something like a Definition
+                    // and build a Definition Path, but this input is a bit too abstract for now.
+                    trace!("Found arbitrary FileWithRange by stub mapping, giving up");
+                    None
+                };
+            }
+        }
+
+        // Walk down the Definition Path in the real file
+        let mut definitions = Vec::new();
+        let index = semantic_index(db, real_file);
+        let real_parsed = parsed_module(db, real_file);
+        let real_ref = real_parsed.load(db);
+        // Start our search in the module (global) scope
+        let mut scopes = vec![global_scope(db, real_file)];
+        while let Some(component) = path.pop() {
+            trace!("Traversing definition path component: {}", component);
+            // We're doing essentially a breadth-first traversal of the definitions.
+            // If ever we find multiple matching scopes for a component, we need to continue
+            // walking down each of them to try to resolve the path. Here we loop over
+            // all the scopes at the current level of search.
+            for scope in std::mem::take(&mut scopes) {
+                if path.is_empty() {
+                    // We're at the end of the path, everything we find here is the final result
+                    definitions.extend(
+                        find_symbol_in_scope(db, scope, component)
+                            .into_iter()
+                            .map(ResolvedDefinition::Definition),
+                    );
+                } else {
+                    // We're in the middle of the path, look for scopes that match the current component
+                    for (child_scope_id, child_scope) in index.child_scopes(scope.file_scope_id(db))
+                    {
+                        let scope_node = child_scope.node();
+                        if let Ok(Some(real_component)) =
+                            definition_path_component_for_node(&real_ref, scope_node)
+                        {
+                            if real_component == component {
+                                scopes.push(child_scope_id.to_scope_id(db, real_file));
+                            }
+                        }
+                        scope.node(db);
+                    }
+                }
+            }
+            trace!(
+                "Found {} scopes and {} definitions",
+                scopes.len(),
+                definitions.len()
+            );
+        }
+        if definitions.is_empty() {
+            trace!("No definitions found in real file, stub mapping failed");
+            None
+        } else {
+            trace!("Found {} definitions from stub mapping", definitions.len());
+            Some(definitions)
+        }
+    }
+
+    /// Computes a "Definition Path" component for an internal node of the definition path.
+    ///
+    /// See [`map_stub_definition`][] for details.
+    fn definition_path_component_for_node<'parse>(
+        parsed: &'parse ParsedModuleRef,
+        node: &NodeWithScopeKind,
+    ) -> Result<Option<&'parse str>, ()> {
+        let component = match node {
+            NodeWithScopeKind::Module => {
+                // This is just implicit, so has no component
+                return Ok(None);
+            }
+            NodeWithScopeKind::Class(class) => class.node(parsed).name.as_str(),
+            NodeWithScopeKind::Function(func) => func.node(parsed).name.as_str(),
+            NodeWithScopeKind::TypeAlias(_)
+            | NodeWithScopeKind::ClassTypeParameters(_)
+            | NodeWithScopeKind::FunctionTypeParameters(_)
+            | NodeWithScopeKind::TypeAliasTypeParameters(_)
+            | NodeWithScopeKind::Lambda(_)
+            | NodeWithScopeKind::ListComprehension(_)
+            | NodeWithScopeKind::SetComprehension(_)
+            | NodeWithScopeKind::DictComprehension(_)
+            | NodeWithScopeKind::GeneratorExpression(_) => {
+                // Not yet implemented
+                return Err(());
+            }
+        };
+        Ok(Some(component))
+    }
+
+    /// Computes a "Definition Path" component for a leaf node of the definition path.
+    ///
+    /// See [`map_stub_definition`][] for details.
+    fn definition_path_component_for_leaf<'parse>(
+        db: &dyn Db,
+        parsed: &'parse ParsedModuleRef,
+        definition: Definition,
+    ) -> Result<&'parse str, ()> {
+        let component = match definition.kind(db) {
+            DefinitionKind::Function(func) => func.node(parsed).name.as_str(),
+            DefinitionKind::Class(class) => class.node(parsed).name.as_str(),
+            DefinitionKind::TypeAlias(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
+            | DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AnnotatedAssignment(_)
+            | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::VariadicPositionalParameter(_)
+            | DefinitionKind::VariadicKeywordParameter(_)
+            | DefinitionKind::Parameter(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::TypeVar(_)
+            | DefinitionKind::ParamSpec(_)
+            | DefinitionKind::TypeVarTuple(_) => {
+                // Not yet implemented
+                return Err(());
+            }
+        };
+
+        Ok(component)
     }
 }

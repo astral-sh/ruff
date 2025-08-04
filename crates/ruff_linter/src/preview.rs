@@ -134,6 +134,26 @@ pub(crate) const fn is_fix_os_path_dirname_enabled(settings: &LinterSettings) ->
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/19404
+pub(crate) const fn is_fix_os_chmod_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19404
+pub(crate) const fn is_fix_os_rename_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19404
+pub(crate) const fn is_fix_os_replace_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19404
+pub(crate) const fn is_fix_os_path_samefile_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/19245
 pub(crate) const fn is_fix_os_getcwd_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -203,5 +223,10 @@ pub(crate) const fn is_assert_raises_exception_call_enabled(settings: &LinterSet
 
 // https://github.com/astral-sh/ruff/pull/19100
 pub(crate) const fn is_add_future_annotations_imports_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/19390
+pub(crate) const fn is_trailing_comma_type_params_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

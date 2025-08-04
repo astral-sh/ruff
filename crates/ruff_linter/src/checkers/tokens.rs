@@ -16,7 +16,6 @@ use crate::rules::{
     eradicate, flake8_commas, flake8_executable, flake8_fixme, flake8_implicit_str_concat,
     flake8_pyi, flake8_todos, pycodestyle, pygrep_hooks, pylint, pyupgrade, ruff,
 };
-use crate::settings::LinterSettings;
 
 use super::ast::LintContext;
 
@@ -27,7 +26,6 @@ pub(crate) fn check_tokens(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-    settings: &LinterSettings,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     context: &mut LintContext,
@@ -42,15 +40,8 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesAfterFunctionOrClass,
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
-        BlankLinesChecker::new(
-            locator,
-            stylist,
-            settings,
-            source_type,
-            cell_offsets,
-            context,
-        )
-        .check_lines(tokens);
+        BlankLinesChecker::new(locator, stylist, source_type, cell_offsets, context)
+            .check_lines(tokens);
     }
 
     if context.is_rule_enabled(Rule::BlanketTypeIgnore) {
@@ -58,17 +49,17 @@ pub(crate) fn check_tokens(
     }
 
     if context.is_rule_enabled(Rule::EmptyComment) {
-        pylint::rules::empty_comments(context, comment_ranges, locator);
+        pylint::rules::empty_comments(context, comment_ranges, locator, indexer);
     }
 
     if context.is_rule_enabled(Rule::AmbiguousUnicodeCharacterComment) {
         for range in comment_ranges {
-            ruff::rules::ambiguous_unicode_character_comment(context, locator, range, settings);
+            ruff::rules::ambiguous_unicode_character_comment(context, locator, range);
         }
     }
 
     if context.is_rule_enabled(Rule::CommentedOutCode) {
-        eradicate::rules::commented_out_code(context, locator, comment_ranges, settings);
+        eradicate::rules::commented_out_code(context, locator, comment_ranges);
     }
 
     if context.is_rule_enabled(Rule::UTF8EncodingDeclaration) {
@@ -110,7 +101,7 @@ pub(crate) fn check_tokens(
         Rule::SingleLineImplicitStringConcatenation,
         Rule::MultiLineImplicitStringConcatenation,
     ]) {
-        flake8_implicit_str_concat::rules::implicit(context, tokens, locator, indexer, settings);
+        flake8_implicit_str_concat::rules::implicit(context, tokens, locator, indexer);
     }
 
     if context.any_rule_enabled(&[

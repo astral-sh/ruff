@@ -11,7 +11,7 @@
 Most types in Python are *nominal* types: a fully static nominal type `X` is only a subtype of
 another fully static nominal type `Y` if the class `X` is a subclass of the class `Y`.
 `typing.Protocol` (or its backport, `typing_extensions.Protocol`) can be used to define *structural*
-types, on the other hand: a type which is defined by its properties and behaviour.
+types, on the other hand: a type which is defined by its properties and behavior.
 
 ## Defining a protocol
 
@@ -160,9 +160,9 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
-# but mypy does (and has an explicit test for this behaviour). Mypy was the
-# reference implementation for PEP-544, and its behaviour also matches the CPython
-# runtime, so we choose to follow its behaviour here rather than that of the other
+# but mypy does (and has an explicit test for this behavior). Mypy was the
+# reference implementation for PEP-544, and its behavior also matches the CPython
+# runtime, so we choose to follow its behavior here rather than that of the other
 # type checkers.
 class Fine(Protocol, object): ...
 
@@ -382,6 +382,31 @@ class Foo(Protocol):
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_member", "x", "y", "z"]]
 ```
 
+To see the kinds and types of the protocol members, you can use the debugging aid
+`ty_extensions.reveal_protocol_interface`, meanwhile:
+
+```py
+from ty_extensions import reveal_protocol_interface
+from typing import SupportsIndex, SupportsAbs
+
+# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+reveal_protocol_interface(Foo)
+# error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(SupportsIndex)
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co@SupportsAbs`)}`"
+reveal_protocol_interface(SupportsAbs)
+
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(int)
+# error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type`, found `Literal["foo"]`"
+reveal_protocol_interface("foo")
+
+# TODO: this should be a `revealed-type` diagnostic rather than `invalid-argument-type`, and it should reveal `{"__abs__": MethodMember(`(self) -> int`)}` for the protocol interface
+#
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(SupportsAbs[int])
+```
+
 Certain special attributes and methods are not considered protocol members at runtime, and should
 not be considered protocol members by type checkers either:
 
@@ -468,7 +493,7 @@ class AlsoNotAProtocol(NotAProtocol, object): ...
 get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
 ```
 
-The original class object must be passed to the function; a specialised version of a generic version
+The original class object must be passed to the function; a specialized version of a generic version
 does not suffice:
 
 ```py
@@ -886,7 +911,7 @@ class AlsoHasX(Protocol):
 static_assert(is_equivalent_to(HasX, AlsoHasX))
 ```
 
-And unions containing equivalent protocols are recognised as equivalent, even when the order is not
+And unions containing equivalent protocols are recognized as equivalent, even when the order is not
 identical:
 
 ```py
@@ -1316,14 +1341,14 @@ getter, can be satisfied by a mutable attribute of any type bounded by the upper
 getter-returned type and the lower bound of the setter-accepted type.
 
 This follows from the principle that a type `X` can only be a subtype of a given protocol if the
-`X`'s behaviour is a superset of the behaviour specified by the interface declared by the protocol.
-In the below example, the behaviour of an instance of `XAttr` is a superset of the behaviour
-specified by the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x`
-attribute on the instance must resolve to an instance of `int` or a subclass thereof, and `XAttr`
-satisfies this requirement. The protocol also specifies that you must be able to assign instances of
-`MyInt` to the `x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you
-can assign *any* instance of `int` to the `x` attribute, and thus by extension you can assign any
-instance of `IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
+`X`'s behavior is a superset of the behavior specified by the interface declared by the protocol. In
+the below example, the behavior of an instance of `XAttr` is a superset of the behavior specified by
+the protocol `HasAsymmetricXProperty`. The protocol specifies that reading an `x` attribute on the
+instance must resolve to an instance of `int` or a subclass thereof, and `XAttr` satisfies this
+requirement. The protocol also specifies that you must be able to assign instances of `MyInt` to the
+`x` attribute, and again this is satisfied by `XAttr`: on instances of `XAttr`, you can assign *any*
+instance of `int` to the `x` attribute, and thus by extension you can assign any instance of
+`IntSub` to the `x` attribute, since any instance of `IntSub` is an instance of `int`:
 
 ```py
 class HasAsymmetricXProperty(Protocol):
@@ -1464,6 +1489,68 @@ static_assert(is_subtype_of(NominalSubtype, P))
 static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
 ```
 
+A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
+member: a method member specified by a protocol `P` must exist on the *meta-type* of `T` for `T` to
+be a subtype of `P`:
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import static_assert, is_assignable_to
+
+class SupportsFooMethod(Protocol):
+    def foo(self): ...
+
+class SupportsFooAttr(Protocol):
+    foo: Callable[..., object]
+
+class Foo:
+    def __init__(self):
+        self.foo: Callable[..., object] = lambda *args, **kwargs: None
+
+static_assert(not is_assignable_to(Foo, SupportsFooMethod))
+static_assert(is_assignable_to(Foo, SupportsFooAttr))
+```
+
+The reason for this is that some methods, such as dunder methods, are always looked up on the class
+directly. If a class with an `__iter__` instance attribute satisfied the `Iterable` protocol, for
+example, the `Iterable` protocol would not accurately describe the requirements Python has for a
+class to be iterable at runtime. Allowing callable instance attributes to satisfy method members of
+protocols would also make `issubclass()` narrowing of runtime-checkable protocols unsound, as the
+`issubclass()` mechanism at runtime for protocols only checks whether a method is accessible on the
+class object, not the instance. (Protocols with non-method members cannot be passed to
+`issubclass()` at all at runtime.)
+
+```py
+from typing import Iterable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+class Foo:
+    def __init__(self):
+        self.__iter__: Callable[..., object] = lambda *args, **kwargs: None
+
+static_assert(not is_assignable_to(Foo, Iterable[Any]))
+```
+
+Because method members must always be available on the class, it is safe to access a method on
+`type[P]`, where `P` is a protocol class, just like it is generally safe to access a method on
+`type[C]` where `C` is a nominal class:
+
+```py
+from typing import Protocol
+
+class Foo(Protocol):
+    def method(self) -> str: ...
+
+def f(x: Foo):
+    reveal_type(type(x).method)  # revealed: def method(self) -> str
+
+class Bar:
+    def __init__(self):
+        self.method = lambda: "foo"
+
+f(Bar())  # error: [invalid-argument-type]
+```
+
 ## Equivalence of protocols with method members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
@@ -1499,7 +1586,7 @@ static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
 
 By default, a protocol class cannot be used as the second argument to `isinstance()` or
 `issubclass()`, and a type checker must emit an error on such calls. However, we still narrow the
-type inside these branches (this matches the behaviour of other type checkers):
+type inside these branches (this matches the behavior of other type checkers):
 
 ```py
 from typing_extensions import Protocol, reveal_type
@@ -1678,7 +1765,7 @@ static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
 It *might* be possible to have a singleton protocol-instance type...?
 
 For example, `WeirdAndWacky` in the following snippet only has a single possible inhabitant: `None`!
-It is thus a singleton type. However, going out of our way to recognise it as such is probably not
+It is thus a singleton type. However, going out of our way to recognize it as such is probably not
 worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
@@ -1836,8 +1923,7 @@ def _(r: Recursive):
     reveal_type(r.direct)  # revealed: Recursive
     reveal_type(r.union)  # revealed: None | Recursive
     reveal_type(r.intersection1)  # revealed: C & Recursive
-    # revealed: @Todo(map_with_boundness: intersections with negative contributions) | (C & ~Recursive)
-    reveal_type(r.intersection2)
+    reveal_type(r.intersection2)  # revealed: C
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
