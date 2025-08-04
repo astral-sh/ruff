@@ -4918,6 +4918,7 @@ impl<'db> Type<'db> {
                     None
                 }
             }
+            ty @ Type::Dynamic(_) => Some(ty),
             _ => None,
         }
     }
