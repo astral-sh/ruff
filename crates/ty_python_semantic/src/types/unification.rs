@@ -123,4 +123,32 @@ impl<'db> ConstraintSetSet<'db> {
         }
         self.sets.push(constraint_set);
     }
+
+    /// Intersects two sets of constraint sets.
+    ///
+    /// This is the ⊓ operator from [[POPL15][]], Definition 3.5.
+    ///
+    /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+    fn intersect(&self, db: &'db dyn Db, other: &Self) -> Self {
+        let mut result = Self::none();
+        for self_set in &self.sets {
+            for other_set in &other.sets {
+                let mut new_set = self_set.clone();
+                new_set.combine(db, other_set);
+                result.add(db, new_set);
+            }
+        }
+        result
+    }
+
+    /// union two sets of constraint sets.
+    ///
+    /// This is the ⊔ operator from [[POPL15][]], Definition 3.5.
+    ///
+    /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+    fn union(&mut self, db: &'db dyn Db, other: Self) {
+        for set in other.sets {
+            self.add(db, set);
+        }
+    }
 }
