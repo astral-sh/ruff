@@ -38,6 +38,10 @@ impl<'db> Constraint<'db> {
 
 /// A set of merged constraints. We guarantee that no constraint in the set subsumes another, and
 /// that no two constraints in the set have the same typevar.
+///
+/// This is denoted _C_ in [[POPL2015][]].
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConstraintSet<'db> {
     constraints: Vec<Constraint<'db>>,
@@ -82,6 +86,10 @@ impl<'db> ConstraintSet<'db> {
 }
 
 /// A set of constraint sets.
+///
+/// This is denoted _𝒮_ in [[POPL2015][]].
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ConstraintSetSet<'db> {
     sets: Vec<ConstraintSet<'db>>,
