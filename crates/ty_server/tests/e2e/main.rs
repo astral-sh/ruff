@@ -275,6 +275,7 @@ impl TestServer {
     /// This should be called before the test server is dropped to ensure that all server messages
     /// have been properly consumed by the test. If there are any pending messages, this will panic
     /// with detailed information about what was left unconsumed.
+    #[track_caller]
     fn assert_no_pending_messages(&self) {
         let mut errors = Vec::new();
 
@@ -682,16 +683,13 @@ impl TestServer {
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
     pub(crate) fn workspace_diagnostic_request(
         &mut self,
+        work_done_token: Option<lsp_types::NumberOrString>,
         previous_result_ids: Option<Vec<PreviousResultId>>,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
-            work_done_progress_params: WorkDoneProgressParams {
-                work_done_token: Some(lsp_types::NumberOrString::String(
-                    "test-progress-token".to_string(),
-                )),
-            },
+            work_done_progress_params: WorkDoneProgressParams { work_done_token },
             partial_result_params: PartialResultParams::default(),
         };
 
@@ -785,9 +783,6 @@ impl TestServerBuilder {
                 configuration: Some(true),
                 ..Default::default()
             }),
-            experimental: Some(json!({
-                "ty_test_server": true
-            })),
             ..Default::default()
         };
 
