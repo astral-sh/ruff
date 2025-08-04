@@ -199,7 +199,7 @@ fn open_files_diagnostic_registration() -> Result<()> {
 
 /// Tests that the server can disable language services for a workspace via initialization options.
 #[test]
-fn disable_language_services_set_on_intialization() -> Result<()> {
+fn disable_language_services_set_on_initialization() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
