@@ -2,10 +2,10 @@
   "name": "api",
   "version": "0.0.0",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20230801.0",
-    "miniflare": "^4.0.0",
-    "typescript": "^5.1.6",
-    "wrangler": "^4.1.0"
+    "@cloudflare/workers-types": "^4.20250803.0",
+    "miniflare": "^4.20250730.0",
+    "typescript": "^5.9.2",
+    "wrangler": "^4.27.0"
   },
   "private": true,
   "scripts": {
@@ -13,8 +13,8 @@
     "deploy": "wrangler publish"
   },
   "dependencies": {
-    "@miniflare/kv": "^2.14.0",
-    "@miniflare/storage-memory": "^2.14.0",
-    "uuid": "^11.0.0"
+    "@miniflare/kv": "^2.14.4",
+    "@miniflare/storage-memory": "^2.14.4",
+    "uuid": "^11.1.0"
   }
 }
