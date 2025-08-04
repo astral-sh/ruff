@@ -242,7 +242,7 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a tuple type of the typevars introduced by this generic context.
     pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        TupleType::from_elements(
+        Type::heterogeneous_tuple(
             db,
             self.variables(db)
                 .iter()

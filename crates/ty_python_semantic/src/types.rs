@@ -3801,7 +3801,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     KnownClass::Str.to_instance(db),
-                                    TupleType::homogeneous(db, KnownClass::Str.to_instance(db)),
+                                    Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
                                 ],
                             )),
                         Parameter::positional_only(Some(Name::new_static("start")))
@@ -4114,7 +4114,7 @@ impl<'db> Type<'db> {
                                     Parameter::positional_only(Some(Name::new_static("name")))
                                         .with_annotated_type(str_instance),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
-                                        .with_annotated_type(TupleType::homogeneous(
+                                        .with_annotated_type(Type::homogeneous_tuple(
                                             db,
                                             type_instance,
                                         )),
@@ -4304,7 +4304,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any())
                                     .type_form(),
                                 Parameter::keyword_only(Name::new_static("type_params"))
-                                    .with_annotated_type(TupleType::homogeneous(
+                                    .with_annotated_type(Type::homogeneous_tuple(
                                         db,
                                         UnionType::from_elements(
                                             db,
@@ -4315,7 +4315,7 @@ impl<'db> Type<'db> {
                                             ],
                                         ),
                                     ))
-                                    .with_default_type(TupleType::empty(db)),
+                                    .with_default_type(Type::empty_tuple(db)),
                             ]),
                             None,
                         ),
@@ -4401,7 +4401,7 @@ impl<'db> Type<'db> {
                     CallableBinding::from_overloads(
                         self,
                         [
-                            Signature::new(Parameters::empty(), Some(TupleType::empty(db))),
+                            Signature::new(Parameters::empty(), Some(Type::empty_tuple(db))),
                             Signature::new(
                                 Parameters::new([Parameter::positional_only(Some(
                                     Name::new_static("iterable"),
@@ -4409,7 +4409,7 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(
                                     KnownClass::Iterable.to_specialized_instance(db, [object]),
                                 )]),
-                                Some(TupleType::homogeneous(db, object)),
+                                Some(Type::homogeneous_tuple(db, object)),
                             ),
                         ],
                     )
@@ -5267,7 +5267,7 @@ impl<'db> Type<'db> {
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
                 SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(TupleType::homogeneous(db, Type::unknown())),
+                SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
 
                 // Legacy `typing` aliases
                 SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
@@ -5458,7 +5458,7 @@ impl<'db> Type<'db> {
             Type::Union(UnionType::new(db, elements))
         };
 
-        TupleType::from_elements(
+        Type::heterogeneous_tuple(
             db,
             [
                 Type::IntLiteral(python_version.major.into()),
