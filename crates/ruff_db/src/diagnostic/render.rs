@@ -456,7 +456,6 @@ impl<'a> ResolvedAnnotation<'a> {
                 (range, line_start, line_end)
             }
         };
-
         Some(ResolvedAnnotation {
             path,
             diagnostic_source: diagnostic_source.clone(),
