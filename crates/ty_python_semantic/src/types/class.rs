@@ -112,6 +112,20 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
+fn is_typed_dict_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _self: ClassLiteral<'db>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self_: ClassLiteral<'db>) -> bool {
+    false
+}
+
 fn try_metaclass_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>>,
@@ -392,6 +406,11 @@ impl<'db> ClassType<'db> {
     pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal.iter_mro(db, specialization)
+    }
+
+    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        let (class_literal, _) = self.class_literal(db);
+        class_literal.is_typed_dict(db)
     }
 
     /// Iterate over the method resolution order ("MRO") of the class, optionally applying an
@@ -1448,6 +1467,17 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
+    }
+
+    /// Return `true` if this class constitutes a typed dict specification.
+    #[salsa::tracked(
+        cycle_fn=is_typed_dict_cycle_recover,
+        cycle_initial=is_typed_dict_cycle_initial,
+        heap_size=get_size2::heap_size
+    )]
+    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db, None)
+            .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.

@@ -5207,10 +5207,7 @@ impl<'db> Type<'db> {
                         ],
                     ),
                     _ => {
-                        if class
-                            .iter_mro(db, None)
-                            .any(|base| matches!(base, ClassBase::TypedDict))
-                        {
+                        if class.is_typed_dict(db) {
                             todo_type!("Support for `TypedDict`")
                         } else {
                             Type::instance(db, class.default_specialization(db))
@@ -5221,10 +5218,7 @@ impl<'db> Type<'db> {
             }
             Type::GenericAlias(alias) => {
                 let class_type = ClassType::from(*alias);
-                if class_type
-                    .iter_mro(db)
-                    .any(|base| matches!(base, ClassBase::TypedDict))
-                {
+                if class_type.is_typed_dict(db) {
                     Ok(todo_type!("Support for `TypedDict`"))
                 } else {
                     Ok(Type::instance(db, class_type))
