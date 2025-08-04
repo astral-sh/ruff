@@ -22,8 +22,8 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -229,11 +229,6 @@ impl<'db> TupleType<'db> {
                         .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
                 ),
             })
-    }
-
-    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.to_class_type(db)
-            .map(|class| SubclassOfType::from(db, class))
     }
 
     /// Return a normalized version of `self`.
@@ -963,6 +958,7 @@ impl<T> Tuple<T> {
     pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Tuple<T> {
         FixedLengthTuple::from_elements(elements).into()
     }
+
     pub(crate) fn with_capacity(capacity: usize) -> Self {
         Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
@@ -1122,25 +1118,23 @@ impl<'db> Tuple<Type<'db>> {
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'db>(
+        fn any_disjoint<'s, 'db>(
             db: &'db dyn Db,
-            a: impl IntoIterator<Item = Type<'db>>,
-            b: impl IntoIterator<Item = Type<'db>>,
+            a: impl IntoIterator<Item = &'s Type<'db>>,
+            b: impl IntoIterator<Item = &'s Type<'db>>,
             visitor: &mut PairVisitor<'db>,
-        ) -> bool {
+        ) -> bool
+        where
+            'db: 's,
+        {
             a.into_iter().zip(b).any(|(self_element, other_element)| {
-                self_element.is_disjoint_from_impl(db, other_element, visitor)
+                self_element.is_disjoint_from_impl(db, *other_element, visitor)
             })
         }
 
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(
-                    db,
-                    self_tuple.elements().copied(),
-                    other_tuple.elements().copied(),
-                    visitor,
-                ) {
+                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
                     return true;
                 }
             }
@@ -1148,16 +1142,16 @@ impl<'db> Tuple<Type<'db>> {
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
                 if any_disjoint(
                     db,
-                    self_tuple.prefix_elements().copied(),
-                    other_tuple.prefix_elements().copied(),
+                    self_tuple.prefix_elements(),
+                    other_tuple.prefix_elements(),
                     visitor,
                 ) {
                     return true;
                 }
                 if any_disjoint(
                     db,
-                    self_tuple.suffix_elements().rev().copied(),
-                    other_tuple.suffix_elements().rev().copied(),
+                    self_tuple.suffix_elements().rev(),
+                    other_tuple.suffix_elements().rev(),
                     visitor,
                 ) {
                     return true;
@@ -1166,18 +1160,13 @@ impl<'db> Tuple<Type<'db>> {
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(
-                    db,
-                    fixed.elements().copied(),
-                    variable.prefix_elements().copied(),
-                    visitor,
-                ) {
+                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
                     return true;
                 }
                 if any_disjoint(
                     db,
-                    fixed.elements().rev().copied(),
-                    variable.suffix_elements().rev().copied(),
+                    fixed.elements().rev(),
+                    variable.suffix_elements().rev(),
                     visitor,
                 ) {
                     return true;
