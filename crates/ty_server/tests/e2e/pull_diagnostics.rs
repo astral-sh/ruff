@@ -324,6 +324,7 @@ def foo() -> str:
 }
 
 #[test]
+#[cfg(unix)]
 fn workspace_diagnostic_caching_unchanged_with_colon_in_path() -> Result<()> {
     let _filter = filter_result_id();
 
