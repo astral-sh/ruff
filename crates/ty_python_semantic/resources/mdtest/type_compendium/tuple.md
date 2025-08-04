@@ -477,4 +477,23 @@ class NotAlwaysTruthyTuple(tuple[int]):
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
 ```
 
+## Unspecialized
+
+An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ...]`.
+
+```py
+from typing_extensions import Any, assert_type
+from ty_extensions import Unknown, is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
+def f(x: tuple, y: tuple[Unknown, ...]):
+    reveal_type(x)  # revealed: tuple[Unknown, ...]
+    assert_type(x, tuple[Any, ...])
+    assert_type(x, tuple[Unknown, ...])
+    reveal_type(y)  # revealed: tuple[Unknown, ...]
+    assert_type(y, tuple[Any, ...])
+    assert_type(y, tuple[Unknown, ...])
+```
+
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

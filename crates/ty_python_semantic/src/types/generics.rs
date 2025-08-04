@@ -13,8 +13,9 @@ use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
+    KnownClass, KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
+    declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -72,6 +73,8 @@ fn bound_legacy_typevars<'db>(
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
+    // If this is the generic context for a class, is it a known class?
+    known_class: Option<KnownClass>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -93,12 +96,13 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
         type_params_node: &ast::TypeParams,
+        known_class: Option<KnownClass>,
     ) -> Self {
         let variables: FxOrderSet<_> = type_params_node
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, known_class)
     }
 
     fn variable_from_type_param(
@@ -156,7 +160,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(db, variables, None))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -164,6 +168,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
         bases: impl Iterator<Item = Type<'db>>,
+        known_class: Option<KnownClass>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
@@ -172,7 +177,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(db, variables, known_class))
     }
 
     pub(crate) fn with_binding_context(
@@ -185,7 +190,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .map(|typevar| typevar.with_binding_context(db, binding_context))
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, self.known_class(db))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -223,7 +228,17 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialize_partial(db, &vec![None; self.variables(db).len()])
+        let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
+        if matches!(self.known_class(db), Some(KnownClass::Tuple)) {
+            Specialization::new(
+                db,
+                self,
+                partial.types(db),
+                TupleType::homogeneous(db, Type::unknown()),
+            )
+        } else {
+            partial
+        }
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -347,7 +362,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .map(|ty| ty.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, self.known_class(db))
     }
 }
 
@@ -403,18 +418,8 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
-        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
-            return tuple;
-        }
-        if let [element_type] = self.types(db) {
-            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
-                return tuple.tuple(db);
-            }
-        }
-        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
-            .expect("tuple[Unknown, ...] should never contain Never")
-            .tuple(db)
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
+        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
