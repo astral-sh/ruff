@@ -611,6 +611,7 @@ from ty_extensions import static_assert
 static_assert()
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `static_assert`: expected 2, got 3"
+# error: 21 [invalid-argument-type] "Argument to function `static_assert` is incorrect: Expected `LiteralString | None`, found `Literal[2]`"
 static_assert(True, 2, 3)
 ```
 
