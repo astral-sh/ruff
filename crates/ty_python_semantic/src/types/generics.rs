@@ -11,7 +11,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
     TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
@@ -397,7 +397,7 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
         visitor.visit_type(db, *ty);
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        walk_tuple_type(db, tuple, visitor);
     }
 }
 
