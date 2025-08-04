@@ -345,6 +345,12 @@ print()
                 .secondary("notebook.ipynb", "10:4", "10:5", "second cell")
                 .help("Remove unused import: `os`")
                 .build(),
+            // adjacent context windows in the same cell
+            env.err()
+                .primary("notebook.ipynb", "4:7", "4:11", "second cell")
+                .secondary("notebook.ipynb", "6:0", "6:5", "print statement")
+                .help("Remove `print` statement")
+                .build(),
         ];
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
@@ -380,6 +386,18 @@ print()
           |     - second cell
           |
         help: Remove unused import: `os`
+
+        error[test-diagnostic]: main diagnostic message
+         --> notebook.ipynb:cell 2:2:8
+          |
+        1 | # cell 2
+        2 | import math
+          |        ^^^^ second cell
+        3 |
+        4 | print('hello world')
+          | ----- print statement
+          |
+        help: Remove `print` statement
         ");
     }
 }
