@@ -22,12 +22,13 @@ use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::watch::ProjectWatcher;
-use ty_project::{Db, watch};
+use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
@@ -268,10 +269,13 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let reporter = IndicatifReporter::from(self.printer);
+                        let mut reporter = IndicatifReporter::from(self.printer);
+                        let bar = reporter.bar.clone();
+
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = reporter.clone();
-                            db.check_with_reporter(&mut reporter)
+                            db.check_with_reporter(&mut reporter);
+                            reporter.bar.finish();
+                            reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
                                 // Send the result back to the main loop for printing.
@@ -280,7 +284,7 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
-                                reporter.bar.finish_and_clear();
+                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -390,8 +394,9 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-#[derive(Clone)]
 struct IndicatifReporter {
+    collector: CollectReporter,
+
     /// A reporter that is ready, containing a progress bar to report to.
     ///
     /// Initialization of the bar is deferred to [`ty_project::ProgressReporter::set_files`] so we
@@ -406,6 +411,7 @@ impl From<Printer> for IndicatifReporter {
     fn from(printer: Printer) -> Self {
         Self {
             bar: indicatif::ProgressBar::hidden(),
+            collector: CollectReporter::default(),
             printer,
         }
     }
@@ -413,6 +419,8 @@ impl From<Printer> for IndicatifReporter {
 
 impl ty_project::ProgressReporter for IndicatifReporter {
     fn set_files(&mut self, files: usize) {
+        self.collector.set_files(files);
+
         self.bar.set_length(files as u64);
         self.bar.set_message("Checking");
         self.bar.set_style(
@@ -425,8 +433,13 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_file(&self, _file: &ruff_db::files::File) {
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        self.collector.report_checked_file(db, file, diagnostics);
         self.bar.inc(1);
+    }
+
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.collector.report_diagnostics(db, diagnostics);
     }
 }
 

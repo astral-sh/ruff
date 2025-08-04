@@ -227,11 +227,9 @@ impl Server {
             );
 
         let fs_watcher = self
-            .client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default();
+            .session
+            .client_capabilities()
+            .supports_did_change_watched_files_dynamic_registration();
 
         if fs_watcher {
             let registration = lsp_types::Registration {

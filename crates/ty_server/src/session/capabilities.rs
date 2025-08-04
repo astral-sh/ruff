@@ -18,6 +18,7 @@ bitflags::bitflags! {
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
+        const DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION= 1 << 12;
     }
 }
 
@@ -80,6 +81,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports work done progress.
     pub(crate) const fn supports_work_done_progress(self) -> bool {
         self.contains(Self::WORK_DONE_PROGRESS)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for watched files changes.
+    pub(crate) const fn supports_did_change_watched_files_dynamic_registration(self) -> bool {
+        self.contains(Self::DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -204,6 +210,15 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::WORK_DONE_PROGRESS;
+        }
+
+        if client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION;
         }
 
         flags

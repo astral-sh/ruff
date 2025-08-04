@@ -1,9 +1,12 @@
 use anyhow::Result;
+use insta::assert_debug_snapshot;
+use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    PreviousResultId, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    PartialResultParams, PreviousResultId, Url, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
 };
 use ruff_db::system::SystemPath;
-use ty_server::{ClientOptions, DiagnosticMode};
+use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
 use crate::{TestServer, TestServerBuilder};
 
@@ -233,7 +236,8 @@ def foo() -> str:
     server.open_text_document(file_a, &file_a_content, 1);
 
     // First request with no previous result IDs
-    let first_response = server.workspace_diagnostic_request(None)?;
+    let mut first_response = server.workspace_diagnostic_request(None)?;
+    sort_workspace_diagnostic_response(&mut first_response);
 
     insta::assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
 
@@ -320,7 +324,8 @@ def foo() -> str:
     // - File C: Full report with empty diagnostics (diagnostic was removed)
     // - File D: Full report (diagnostic content changed)
     // - File E: Full report (the range changes)
-    let second_response = server.workspace_diagnostic_request(Some(previous_result_ids))?;
+    let mut second_response = server.workspace_diagnostic_request(Some(previous_result_ids))?;
+    sort_workspace_diagnostic_response(&mut second_response);
 
     // Consume all progress notifications sent during the second workspace diagnostics
     consume_all_progress_notifications(&mut server)?;
@@ -363,4 +368,276 @@ fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Tests that the server sends partial results for workspace diagnostics
+/// if a client sets the `partial_result_token` in the request.
+///
+/// Note: In production, the server throttles the partial results to one every 50ms. However,
+/// this behavior makes testing very hard. That's why the server, in tests, sends a partial response
+/// as soon as it batched at least 2 diagnostics together.
+#[test]
+fn workspace_diagnostic_streaming() -> Result<()> {
+    const NUM_FILES: usize = 5;
+
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+
+    // Create 60 files with the same error to trigger streaming batching (server batches at 50 files)
+    let error_content = "\
+def foo() -> str:
+    return 42  # Type error: expected str, got int
+";
+
+    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
+
+    let mut builder = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )?
+        .with_initialization_options(global_options);
+
+    for i in 0..NUM_FILES {
+        let file_path_string = format!("src/file_{i:03}.py");
+        let file_path = SystemPath::new(&file_path_string);
+        builder = builder.with_file(file_path, error_content)?;
+    }
+
+    let mut server = builder
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let partial_token = lsp_types::ProgressToken::String("streaming-diagnostics".to_string());
+    let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        identifier: None,
+        previous_result_ids: Vec::new(),
+        work_done_progress_params: WorkDoneProgressParams {
+            work_done_token: None,
+        },
+        partial_result_params: PartialResultParams {
+            partial_result_token: Some(partial_token.clone()),
+        },
+    });
+
+    let mut received_results = 0usize;
+
+    // First, read the response of the workspace diagnostic request.
+    // Note: This response comes after the progress notifications but it simplifies the test to read it first.
+    let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(request_id)?;
+
+    // Process the final report.
+    // This should always be a partial report. However, the type definition in the LSP specification
+    // is broken in the sense that both `Report` and `Partial` have the exact same shape
+    // and deserializing a previously serialized `Partial` result will yield a `Report` type.
+    let response_items = match final_response {
+        WorkspaceDiagnosticReportResult::Report(report) => report.items,
+        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
+    };
+
+    // The last batch should contain 1 item because the server sends a partial result with
+    // 2 items each.
+    assert_eq!(response_items.len(), 1);
+    received_results += response_items.len();
+
+    // Collect any partial results sent via progress notifications
+    while let Ok(params) = server.await_notification::<PartialWorkspaceProgress>() {
+        if params.token == partial_token {
+            let streamed_items = match params.value {
+                // Ideally we'd assert that only the first response is a full report
+                // However, the type definition in the LSP specification is broken
+                // in the sense that both `Report` and `Partial` have the exact same structure
+                // but it also doesn't use a tag to tell them apart...
+                // That means, a client can never tell if it's a full report or a partial report
+                WorkspaceDiagnosticReportResult::Report(report) => report.items,
+                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
+            };
+
+            // All streamed batches should contain 2 items (test behavior).
+            assert_eq!(streamed_items.len(), 2);
+            received_results += streamed_items.len();
+
+            if received_results == NUM_FILES {
+                break;
+            }
+        }
+    }
+
+    assert_eq!(received_results, NUM_FILES);
+
+    Ok(())
+}
+
+/// Tests that the server's diagnostic streaming (partial results) work correctly
+/// with result ids.
+#[test]
+fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
+    const NUM_FILES: usize = 7;
+
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let error_content = "def foo() -> str:\n    return 42  # Error";
+    let changed_content = "def foo() -> str:\n    return true  # Error";
+
+    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
+
+    let mut builder = TestServerBuilder::new()?
+        .with_workspace(workspace_root, global_options.clone())?
+        .with_initialization_options(global_options);
+
+    for i in 0..NUM_FILES {
+        let file_path_string = format!("src/error_{i}.py");
+        let file_path = SystemPath::new(&file_path_string);
+        builder = builder.with_file(file_path, error_content)?; // All files have errors initially
+    }
+
+    let mut server = builder
+        .enable_pull_diagnostics(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(SystemPath::new("src/error_0.py"), &error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_1.py"), &error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_2.py"), &error_content, 1);
+
+    // First request to get result IDs (non-streaming for simplicity)
+    let first_response = server.workspace_diagnostic_request(None)?;
+
+    // Consume progress notifications from first request
+    consume_all_progress_notifications(&mut server)?;
+
+    let result_ids = match first_response {
+        WorkspaceDiagnosticReportResult::Report(report) => report
+            .items
+            .into_iter()
+            .filter_map(|item| {
+                if let WorkspaceDocumentDiagnosticReport::Full(full) = item {
+                    full.full_document_diagnostic_report
+                        .result_id
+                        .map(|id| PreviousResultId {
+                            uri: full.uri,
+                            value: id,
+                        })
+                } else {
+                    panic!("Expected Full report in initial response");
+                }
+            })
+            .collect::<Vec<_>>(),
+        WorkspaceDiagnosticReportResult::Partial(_) => {
+            panic!("Request without a partial response token should not use streaming")
+        }
+    };
+
+    assert_eq!(result_ids.len(), NUM_FILES);
+
+    // Fix three errors
+    server.change_text_document(
+        SystemPath::new("src/error_0.py"),
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: changed_content.to_string(),
+        }],
+        2,
+    );
+
+    server.change_text_document(
+        SystemPath::new("src/error_1.py"),
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: changed_content.to_string(),
+        }],
+        2,
+    );
+
+    server.change_text_document(
+        SystemPath::new("src/error_2.py"),
+        vec![lsp_types::TextDocumentContentChangeEvent {
+            range: None,
+            range_length: None,
+            text: changed_content.to_string(),
+        }],
+        2,
+    );
+
+    // Second request with caching - use streaming to test the caching behavior
+    let partial_token = lsp_types::ProgressToken::String("streaming-diagnostics".to_string());
+    let request2_id =
+        server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+            identifier: None,
+            previous_result_ids: result_ids,
+            work_done_progress_params: WorkDoneProgressParams {
+                work_done_token: None,
+            },
+            partial_result_params: PartialResultParams {
+                partial_result_token: Some(partial_token.clone()),
+            },
+        });
+
+    let final_response2 = server.await_response::<WorkspaceDiagnosticReportResult>(request2_id)?;
+
+    let mut all_items = Vec::new();
+
+    // The final response should contain one fixed file and all unchanged files
+    let items = match final_response2 {
+        WorkspaceDiagnosticReportResult::Report(report) => report.items,
+        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
+    };
+
+    assert_eq!(items.len(), NUM_FILES - 3 + 1); // 3 fixed, 4 unchanged, 1 full report for fixed file
+
+    all_items.extend(items);
+
+    // Collect any partial results sent via progress notifications
+    while let Ok(params) = server.await_notification::<PartialWorkspaceProgress>() {
+        if params.token == partial_token {
+            let streamed_items = match params.value {
+                // Ideally we'd assert that only the first response is a full report
+                // However, the type definition in the LSP specification is broken
+                // in the sense that both `Report` and `Partial` have the exact same structure
+                // but it also doesn't use a tag to tell them apart...
+                // That means, a client can never tell if it's a full report or a partial report
+                WorkspaceDiagnosticReportResult::Report(report) => report.items,
+                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
+            };
+
+            // All streamed batches should contain 2 items.
+            assert_eq!(streamed_items.len(), 2);
+            all_items.extend(streamed_items);
+
+            if all_items.len() == NUM_FILES {
+                break;
+            }
+        }
+    }
+
+    sort_workspace_report_items(&mut all_items);
+
+    assert_debug_snapshot!(all_items);
+
+    Ok(())
+}
+
+fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReportResult) {
+    let items = match response {
+        WorkspaceDiagnosticReportResult::Report(report) => &mut report.items,
+        WorkspaceDiagnosticReportResult::Partial(partial) => &mut partial.items,
+    };
+
+    sort_workspace_report_items(items);
+}
+
+fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) {
+    fn item_uri(item: &WorkspaceDocumentDiagnosticReport) -> &Url {
+        match item {
+            WorkspaceDocumentDiagnosticReport::Full(full_report) => &full_report.uri,
+            WorkspaceDocumentDiagnosticReport::Unchanged(unchanged_report) => &unchanged_report.uri,
+        }
+    }
+
+    items.sort_unstable_by(|a, b| item_uri(a).cmp(item_uri(b)));
 }

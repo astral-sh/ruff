@@ -77,6 +77,9 @@ pub(crate) struct Session {
     /// Has the client requested the server to shutdown.
     shutdown_requested: bool,
 
+    /// Is the connected client a `TestServer` instance.
+    in_test: bool,
+
     deferred_messages: VecDeque<Message>,
 }
 
@@ -113,6 +116,7 @@ impl Session {
         global_options: GlobalOptions,
         workspace_folders: Vec<(Url, ClientOptions)>,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        in_test: bool,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new(global_options.into_settings()));
 
@@ -132,6 +136,7 @@ impl Session {
             resolved_client_capabilities: ResolvedClientCapabilities::new(client_capabilities),
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
+            in_test,
         })
     }
 
@@ -458,6 +463,7 @@ impl Session {
                 .collect(),
             index: self.index.clone().unwrap(),
             position_encoding: self.position_encoding,
+            in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
         }
     }
@@ -649,6 +655,7 @@ pub(crate) struct SessionSnapshot {
     index: Arc<Index>,
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
+    in_test: bool,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -677,6 +684,10 @@ impl SessionSnapshot {
 
     pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
         self.resolved_client_capabilities
+    }
+
+    pub(crate) const fn in_test(&self) -> bool {
+        self.in_test
     }
 }
 
