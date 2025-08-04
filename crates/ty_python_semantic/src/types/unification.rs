@@ -62,19 +62,57 @@ impl<'db> ConstraintSet<'db> {
         }
         self.constraints.push(constraint);
     }
+
+    /// Combines two constraint sets, merging any constraints that share the same typevar.
+    fn combine(&mut self, db: &'db dyn Db, other: &Self) {
+        for constraint in &other.constraints {
+            self.add(db, *constraint);
+        }
+    }
+
+    /// Returns whether this constraint set subsumes `other` — if every constraint in `other` is
+    /// subsumed by some constraint in `self`.
+    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
+        other.constraints.iter().all(|other_constraint| {
+            self.constraints
+                .iter()
+                .any(|self_constraint| self_constraint.subsumes(db, *other_constraint))
+        })
+    }
 }
 
+/// A set of constraint sets.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ConstraintSetSet<'db>(Vec<ConstraintSet<'db>>);
+pub(crate) struct ConstraintSetSet<'db> {
+    sets: Vec<ConstraintSet<'db>>,
+}
 
 impl<'db> ConstraintSetSet<'db> {
     /// Returns the set of constraint sets that is unsolvable.
     pub(crate) fn none() -> Self {
-        Self(vec![])
+        Self { sets: vec![] }
     }
 
     /// Returns the set of constraints set that is always satisfied.
     pub(crate) fn always() -> Self {
-        Self(vec![ConstraintSet::empty()])
+        Self {
+            sets: vec![ConstraintSet::empty()],
+        }
+    }
+
+    /// Adds a new constraint set to this set, ensuring that no constraint set in the set subsumes
+    /// another.
+    fn add(&mut self, db: &'db dyn Db, constraint_set: ConstraintSet<'db>) {
+        for existing in &mut self.sets {
+            // If there is an existing constraint set that subsumes (or is subsumed by) the new
+            // one, we want to keep the _subsumed_ constraint set.
+            if constraint_set.subsumes(db, existing) {
+                return;
+            } else if existing.subsumes(db, &constraint_set) {
+                *existing = constraint_set;
+                return;
+            }
+        }
+        self.sets.push(constraint_set);
     }
 }
