@@ -371,7 +371,7 @@ impl<'a> ResponseWriter<'a> {
             .map(|(_url, id)| id);
 
         let report = match result_id {
-            Some(new_id) if Some(&new_id) == previous_result_id.as_ref()  => {
+            Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
                 WorkspaceDocumentDiagnosticReport::Unchanged(
                     WorkspaceUnchangedDocumentDiagnosticReport {
                         uri: url,
