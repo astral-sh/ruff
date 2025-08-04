@@ -755,7 +755,8 @@ impl TestServerBuilder {
         // These are common capabilities that all clients support:
         // - Supports publishing diagnostics
         //
-        // These are enabled by default but can be disabled using the builder methods:
+        // These are enabled by default for convenience but can be disabled using the builder
+        // methods:
         // - Supports pulling workspace configuration
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
@@ -787,6 +788,9 @@ impl TestServerBuilder {
     ///
     /// This option will be used to respond to the `workspace/configuration` request that the
     /// server will send to the client.
+    ///
+    /// If `options` is `None`, the test server will respond with `null` for this workspace
+    /// when the server sends a `workspace/configuration` request.
     pub(crate) fn with_workspace(
         mut self,
         workspace_root: &SystemPath,
@@ -838,7 +842,6 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable workspace configuration capability
-    #[expect(dead_code)]
     pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace

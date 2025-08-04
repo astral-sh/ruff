@@ -199,7 +199,7 @@ impl Server {
             .supports_workspace_configuration()
         {
             tracing::info!(
-                "Client does not support workspace configuration, initializing workspaces with \
+                "Client does not support workspace configuration, initializing workspaces \
                 using the initialization options"
             );
             client.queue_action(Action::InitializeWorkspaces(

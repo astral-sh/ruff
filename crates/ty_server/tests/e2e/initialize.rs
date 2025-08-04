@@ -34,6 +34,118 @@ fn single_workspace_folder() -> Result<()> {
 }
 
 /// Tests that the server sends a registration request for diagnostics if workspace diagnostics
+/// are enabled via initialization options and dynamic registration is enabled, even if the
+/// workspace configuration is not supported by the client.
+#[test]
+fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_workspace(workspace_root, None)?
+        .enable_workspace_configuration(false)
+        .enable_diagnostic_dynamic_registration(true)
+        .build()?;
+
+    // No need to wait for workspaces to initialize as the client does not support workspace
+    // configuration.
+
+    let (_, params) = server.await_request::<RegisterCapability>()?;
+    let [registration] = params.registrations.as_slice() else {
+        panic!(
+            "Expected a single registration, got: {:#?}",
+            params.registrations
+        );
+    };
+
+    insta::assert_json_snapshot!(registration);
+    Ok(())
+}
+
+/// Tests that the server sends a registration request for diagnostics if open files diagnostics
+/// are enabled via initialization options and dynamic registration is enabled, even if the
+/// workspace configuration is not supported by the client.
+#[test]
+fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_workspace(workspace_root, None)?
+        .enable_workspace_configuration(false)
+        .enable_diagnostic_dynamic_registration(true)
+        .build()?;
+
+    // No need to wait for workspaces to initialize as the client does not support workspace
+    // configuration.
+
+    let (_, params) = server.await_request::<RegisterCapability>()?;
+    let [registration] = params.registrations.as_slice() else {
+        panic!(
+            "Expected a single registration, got: {:#?}",
+            params.registrations
+        );
+    };
+
+    insta::assert_json_snapshot!(registration);
+    Ok(())
+}
+
+/// Tests that the server sends a registration request for diagnostics if workspace diagnostics
+/// are enabled via initialization options and dynamic registration is enabled.
+#[test]
+fn workspace_diagnostic_registration_via_initialization() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_workspace(workspace_root, None)?
+        .enable_diagnostic_dynamic_registration(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let (_, params) = server.await_request::<RegisterCapability>()?;
+    let [registration] = params.registrations.as_slice() else {
+        panic!(
+            "Expected a single registration, got: {:#?}",
+            params.registrations
+        );
+    };
+
+    insta::assert_json_snapshot!(registration);
+    Ok(())
+}
+
+/// Tests that the server sends a registration request for diagnostics if open files diagnostics
+/// are enabled via initialization options and dynamic registration is enabled.
+#[test]
+fn open_files_diagnostic_registration_via_initialization() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::OpenFilesOnly),
+        )
+        .with_workspace(workspace_root, None)?
+        .enable_diagnostic_dynamic_registration(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let (_, params) = server.await_request::<RegisterCapability>()?;
+    let [registration] = params.registrations.as_slice() else {
+        panic!(
+            "Expected a single registration, got: {:#?}",
+            params.registrations
+        );
+    };
+
+    insta::assert_json_snapshot!(registration);
+    Ok(())
+}
+
+/// Tests that the server sends a registration request for diagnostics if workspace diagnostics
 /// are enabled and dynamic registration is enabled.
 #[test]
 fn workspace_diagnostic_registration() -> Result<()> {
@@ -56,7 +168,6 @@ fn workspace_diagnostic_registration() -> Result<()> {
     };
 
     insta::assert_json_snapshot!(registration);
-
     Ok(())
 }
 
@@ -83,6 +194,5 @@ fn open_files_diagnostic_registration() -> Result<()> {
     };
 
     insta::assert_json_snapshot!(registration);
-
     Ok(())
 }

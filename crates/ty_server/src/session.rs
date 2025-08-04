@@ -70,8 +70,10 @@ pub(crate) struct Session {
     /// That's what we use the default project for.
     default_project: DefaultProject,
 
+    /// Initialization options that were provided by the client during server initialization.
     initialization_options: InitializationOptions,
 
+    /// Resolved global settings that are shared across all workspaces.
     global_settings: Arc<GlobalSettings>,
 
     /// The global position encoding, negotiated during LSP initialization.
