@@ -5199,11 +5199,30 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => Type::instance(db, class.default_specialization(db)),
+                    _ => {
+                        if class
+                            .iter_mro(db, None)
+                            .any(|base| matches!(base, ClassBase::TypedDict))
+                        {
+                            todo_type!("Support for `TypedDict`")
+                        } else {
+                            Type::instance(db, class.default_specialization(db))
+                        }
+                    }
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
+            Type::GenericAlias(alias) => {
+                let class_type = ClassType::from(*alias);
+                if class_type
+                    .iter_mro(db)
+                    .any(|base| matches!(base, ClassBase::TypedDict))
+                {
+                    Ok(todo_type!("Support for `TypedDict`"))
+                } else {
+                    Ok(Type::instance(db, class_type))
+                }
+            }
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
@@ -6250,9 +6269,6 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
-    /// A special Todo-variant for classes inheriting from `TypedDict`.
-    /// A temporary variant to avoid false positives while we wait for full support.
-    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -6280,13 +6296,6 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
-            DynamicType::TodoTypedDict => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(Support for `TypedDict`)")
                 } else {
                     f.write_str("@Todo")
                 }

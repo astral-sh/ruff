@@ -23,9 +23,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, DynamicType, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
+    DeprecatedInstance, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -419,15 +419,6 @@ impl<'db> ClassType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
-        // TODO: remove this branch once we have proper support for TypedDicts.
-        if self.is_known(db, KnownClass::Dict)
-            && other
-                .iter_mro(db)
-                .any(|b| matches!(b, ClassBase::Dynamic(DynamicType::TodoTypedDict)))
-        {
-            return true;
-        }
-
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
@@ -451,6 +442,8 @@ impl<'db> ClassType<'db> {
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
                 },
+
+                ClassBase::TypedDict => true,
             }
         })
     }
@@ -1687,6 +1680,10 @@ impl<'db> ClassLiteral<'db> {
                         )
                     });
                 }
+                ClassBase::TypedDict => {
+                    return Place::bound(todo_type!("Support for `TypedDict`"))
+                        .with_qualifiers(TypeQualifiers::empty());
+                }
             }
             if lookup_result.is_ok() {
                 break;
@@ -2141,6 +2138,9 @@ impl<'db> ClassLiteral<'db> {
                         // higher up in the MRO.
                         union = union.add(ty);
                     }
+                }
+                ClassBase::TypedDict => {
+                    return Place::bound(todo_type!("Support for `TypedDict`")).into();
                 }
             }
         }
