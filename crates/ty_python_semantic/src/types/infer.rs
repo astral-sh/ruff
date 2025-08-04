@@ -6555,6 +6555,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
+        let local_is_unbound = local_scope_place.is_unbound();
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match place_table.place_id(place_expr) {
@@ -6573,7 +6574,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut is_nonlocal_binding = false;
             if let Some(symbol) = place_expr.as_symbol() {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
-                    if self.skip_non_global_scopes(file_scope_id, symbol_id) {
+                    // If we try to access a variable in a class before it has been defined,
+                    // the lookup will fall back to global.
+                    let fallback_to_global = local_is_unbound
+                        && has_bindings_in_this_scope
+                        && scope.node(db).scope_kind().is_class();
+                    if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
                         return global_symbol(self.db(), self.file(), symbol.name()).map_type(
                             |ty| {
                                 self.narrow_place_with_applicable_constraints(

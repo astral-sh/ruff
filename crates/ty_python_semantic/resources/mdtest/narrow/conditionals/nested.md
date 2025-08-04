@@ -346,7 +346,10 @@ l: list[str | Literal[1] | None] = [None]
 
 def f(x: str | Literal[1] | None):
     class C:
-        if x is not None:  # TODO: should be an unresolved-reference error
+        # If we try to access a variable in a class before it has been defined,
+        # the lookup will fall back to global.
+        # error: [unresolved-reference]
+        if x is not None:
             def _():
                 if x != 1:
                     reveal_type(x)  # revealed: str | None
