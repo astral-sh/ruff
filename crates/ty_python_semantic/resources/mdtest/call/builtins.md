@@ -152,7 +152,8 @@ s = SubclassOfA()
 reveal_type(isinstance(s, SubclassOfA))  # revealed: Literal[True]
 reveal_type(isinstance(s, A))  # revealed: Literal[True]
 
-def _(x: A | B):
+def _(x: A | B, y: list[int]):
+    reveal_type(isinstance(y, list))  # revealed: Literal[True]
     reveal_type(isinstance(x, A))  # revealed: bool
 
     if isinstance(x, A):

@@ -26,6 +26,9 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// ## Example
 /// ```python
+/// from decimal import Decimal
+/// from fractions import Fraction
+///
 /// Decimal.from_float(4.2)
 /// Decimal.from_float(float("inf"))
 /// Fraction.from_float(4.2)
@@ -34,10 +37,13 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// Use instead:
 /// ```python
+/// from decimal import Decimal
+/// from fractions import Fraction
+///
 /// Decimal(4.2)
 /// Decimal("inf")
 /// Fraction(4.2)
-/// Fraction(Decimal(4.2))
+/// Fraction(Decimal("4.2"))
 /// ```
 ///
 /// ## Fix safety

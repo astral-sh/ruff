@@ -30,6 +30,7 @@ pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
+pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 
 pub struct Server {
     connection: Connection,
@@ -45,7 +46,7 @@ impl Server {
         worker_threads: NonZeroUsize,
         connection: Connection,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
-        initialize_logging: bool,
+        in_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
 
@@ -59,7 +60,7 @@ impl Server {
         let (initialization_options, deserialization_error) =
             InitializationOptions::from_value(initialization_options);
 
-        if initialize_logging {
+        if !in_test {
             crate::logging::init_logging(
                 initialization_options.log_level.unwrap_or_default(),
                 initialization_options.log_file.as_deref(),
@@ -155,6 +156,7 @@ impl Server {
                 workspace_urls,
                 initialization_options,
                 native_system,
+                in_test,
             )?,
             resolved_client_capabilities,
         })

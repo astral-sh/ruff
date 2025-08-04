@@ -12,14 +12,6 @@ pub(crate) struct Printer {
 
 impl Printer {
     #[must_use]
-    pub(crate) fn with_no_progress(self) -> Self {
-        Self {
-            verbosity: self.verbosity,
-            no_progress: true,
-        }
-    }
-
-    #[must_use]
     pub(crate) fn with_verbosity(self, verbosity: VerbosityLevel) -> Self {
         Self {
             verbosity,

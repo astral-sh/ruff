@@ -89,12 +89,14 @@ pub(crate) struct Session {
     /// Whether the server has dynamically registered the diagnostic capability with the client.
     diagnostic_capability_registered: bool,
 
+    /// Is the connected client a `TestServer` instance.
+    in_test: bool,
+
     deferred_messages: VecDeque<Message>,
 }
 
 /// LSP State for a Project
 pub(crate) struct ProjectState {
-    pub(crate) db: ProjectDatabase,
     /// Files that we have outstanding otherwise-untracked pushed diagnostics for.
     ///
     /// In `CheckMode::OpenFiles` we still read some files that the client hasn't
@@ -109,6 +111,14 @@ pub(crate) struct ProjectState {
     /// for so that we can clear the diagnostics for all of them before we go
     /// to update any of them.
     pub(crate) untracked_files_with_pushed_diagnostics: Vec<Url>,
+
+    // Note: This field should be last to ensure the `db` gets dropped last.
+    // The db drop order matters because we call `Arc::into_inner` on some Arc's
+    // and we use Salsa's cancellation to guarantee that there's only a single reference to the `Arc`.
+    // However, this requires that the db drops last.
+    // This shouldn't matter here because the db's stored in the session are the
+    // only reference we want to hold on, but better be safe than sorry ;).
+    pub(crate) db: ProjectDatabase,
 }
 
 impl Session {
@@ -118,6 +128,7 @@ impl Session {
         workspace_urls: Vec<Url>,
         initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        in_test: bool,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
 
@@ -142,6 +153,7 @@ impl Session {
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
             diagnostic_capability_registered: false,
+            in_test,
         })
     }
 
@@ -573,6 +585,7 @@ impl Session {
             index: self.index.clone().unwrap(),
             global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
+            in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
         }
     }
@@ -761,11 +774,22 @@ impl DocumentSnapshot {
 
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
-    projects: Vec<ProjectDatabase>,
     index: Arc<Index>,
     global_settings: Arc<GlobalSettings>,
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
+    in_test: bool,
+
+    /// IMPORTANT: It's important that the databases come last, or at least,
+    /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
+    /// and that relies on Salsa's cancellation to guarantee that there's now only a
+    /// single reference to it (e.g. see [`Session::index_mut`]).
+    ///
+    /// Making this field come last guarantees that the db's `Drop` handler is
+    /// dropped after all other fields, which ensures that
+    /// Salsa's cancellation blocks until all fields are dropped (and not only
+    /// waits for the db to be dropped while we still hold on to the `Index`).
+    projects: Vec<ProjectDatabase>,
 }
 
 impl SessionSnapshot {
@@ -787,6 +811,10 @@ impl SessionSnapshot {
 
     pub(crate) fn resolved_client_capabilities(&self) -> ResolvedClientCapabilities {
         self.resolved_client_capabilities
+    }
+
+    pub(crate) const fn in_test(&self) -> bool {
+        self.in_test
     }
 }
 

@@ -360,6 +360,14 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::object(db), Some(Type::Never))
     }
 
+    pub(crate) fn with_inherited_generic_context(
+        mut self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        self.inherited_generic_context = inherited_generic_context;
+        self
+    }
+
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
             generic_context: self.generic_context,
@@ -1790,7 +1798,7 @@ mod tests {
             a_annotated_ty.unwrap().display(&db).to_string(),
             "Unknown | A | B"
         );
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]
@@ -1835,7 +1843,7 @@ mod tests {
         assert_eq!(b_name, "b");
         // Parameter resolution deferred:
         assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]

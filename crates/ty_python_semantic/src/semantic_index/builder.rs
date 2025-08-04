@@ -49,7 +49,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::{ArcUseDefMap, ExpressionsScopeMap, SemanticIndex};
 use crate::semantic_model::HasTrackedScope;
-use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
+use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;
@@ -2804,9 +2804,17 @@ impl<'ast> Unpackable<'ast> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
+            Unpackable::For(ast::StmtFor { is_async, .. }) => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(*is_async),
+            },
+            Unpackable::Comprehension {
+                node: ast::Comprehension { is_async, .. },
+                ..
+            } => UnpackKind::Iterable {
+                mode: EvaluationMode::from_is_async(*is_async),
+            },
             Unpackable::WithItem { is_async, .. } => UnpackKind::ContextManager {
-                is_async: *is_async,
+                mode: EvaluationMode::from_is_async(*is_async),
             },
         }
     }

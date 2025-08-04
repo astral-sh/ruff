@@ -9,6 +9,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
@@ -27,7 +28,7 @@ use crate::types::{
     infer_definition_types,
 };
 use crate::{
-    Db, FxOrderSet, KnownModule, Program,
+    Db, FxIndexMap, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Boundness, LookupError, LookupResult, Place, PlaceAndQualifiers, class_symbol,
@@ -53,7 +54,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
+use rustc_hash::{FxHashSet, FxHasher};
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
@@ -570,10 +571,20 @@ impl<'db> ClassType<'db> {
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as ClassVars are considered.
     ///
+    /// You must provide the `inherited_generic_context` that we should use for the `__new__` or
+    /// `__init__` member. This is inherited from the containing class -­but importantly, from the
+    /// class that the lookup is being performed on, and not the class containing the (possibly
+    /// inherited) member.
+    ///
     /// Returns [`Place::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
         fn synthesize_getitem_overload_signature<'db>(
             index_annotation: Type<'db>,
             return_annotation: Type<'db>,
@@ -589,7 +600,7 @@ impl<'db> ClassType<'db> {
 
         let fallback_member_lookup = || {
             class_literal
-                .own_class_member(db, specialization, name)
+                .own_class_member(db, inherited_generic_context, specialization, name)
                 .map_type(|ty| ty.apply_optional_specialization(db, specialization))
         };
 
@@ -628,8 +639,8 @@ impl<'db> ClassType<'db> {
                     .map(|spec| {
                         let tuple = spec.tuple(db);
 
-                        let mut element_type_to_indices: FxHashMap<Type<'db>, Vec<i64>> =
-                            FxHashMap::default();
+                        let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
+                            FxIndexMap::default();
 
                         match tuple {
                             // E.g. for `tuple[int, str]`, we will generate the following overloads:
@@ -839,8 +850,11 @@ impl<'db> ClassType<'db> {
                     iterable_parameter,
                 ]);
 
-                let synthesized_dunder =
-                    CallableType::function_like(db, Signature::new(parameters, None));
+                let synthesized_dunder = CallableType::function_like(
+                    db,
+                    Signature::new(parameters, None)
+                        .with_inherited_generic_context(inherited_generic_context),
+                );
 
                 Place::bound(synthesized_dunder).into()
             }
@@ -1150,7 +1164,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let parsed = parsed_module(db, scope.file(db)).load(db);
@@ -1260,7 +1274,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1272,7 +1286,21 @@ impl<'db> ClassLiteral<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(|base_node| definition_expression_type(db, class_definition, base_node))
+            .map(
+                |base_node| match definition_expression_type(db, class_definition, base_node) {
+                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(generic_context)) => {
+                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
+                            generic_context.with_binding_context(db, class_definition),
+                        ))
+                    }
+                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
+                        generic_context,
+                    )) => Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
+                        generic_context.with_binding_context(db, class_definition),
+                    )),
+                    ty => ty,
+                },
+            )
             .collect()
     }
 
@@ -1336,7 +1364,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -1385,7 +1413,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1465,7 +1493,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=try_metaclass_cycle_recover,
         cycle_initial=try_metaclass_cycle_initial,
-        heap_size=get_size2::GetSize::get_heap_size,
+        heap_size=get_size2::heap_size,
     )]
     pub(super) fn try_metaclass(
         self,
@@ -1653,7 +1681,10 @@ impl<'db> ClassLiteral<'db> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                        lookup_error.or_fall_back_to(
+                            db,
+                            class.own_class_member(db, self.generic_context(db), name),
+                        )
                     });
                 }
             }
@@ -1701,6 +1732,7 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn own_class_member(
         self,
         db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
@@ -1729,7 +1761,7 @@ impl<'db> ClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (self.generic_context(db), ty, specialization, name) {
+            match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
                     Type::FunctionLiteral(function),
@@ -1911,7 +1943,7 @@ impl<'db> ClassLiteral<'db> {
                 KnownClass::NamedTupleFallback
                     .to_class_literal(db)
                     .into_class_literal()?
-                    .own_class_member(db, None, name)
+                    .own_class_member(db, self.generic_context(db), None, name)
                     .place
                     .ignore_possibly_unbound()
             }
@@ -2577,7 +2609,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
@@ -4097,11 +4129,15 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
+                // A freshly created legacy TypeVar does not have a binding context until it is
+                // used in a base class list, function parameter list, or type alias.
+                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
+                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,
@@ -4213,14 +4249,14 @@ pub(crate) struct SliceLiteral {
     pub(crate) step: Option<i32>,
 }
 
-impl<'db> Type<'db> {
-    /// If this type represents a valid slice literal, returns a [`SliceLiteral`] describing it.
+impl<'db> ClassType<'db> {
+    /// If this class is a specialization of `slice`, returns a [`SliceLiteral`] describing it.
     /// Otherwise returns `None`.
     ///
-    /// The type must be a specialization of the `slice` builtin type, where the specialized
-    /// typevars are statically known integers or `None`.
+    /// The specialization must be one in which the typevars are solved as being statically known
+    /// integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self.into_nominal_instance()?.class else {
+        let ClassType::Generic(alias) = self else {
             return None;
         };
         if !alias.origin(db).is_known(db, KnownClass::Slice) {
@@ -4302,7 +4338,9 @@ enum SlotsKind {
 
 impl SlotsKind {
     fn from(db: &dyn Db, base: ClassLiteral) -> Self {
-        let Place::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").place
+        let Place::Type(slots_ty, bound) = base
+            .own_class_member(db, base.generic_context(db), None, "__slots__")
+            .place
         else {
             return Self::NotSpecified;
         };

@@ -38,7 +38,7 @@ mod tests {
 
     impl CursorTest {
         fn references(&self) -> String {
-            let Some(reference_results) =
+            let Some(mut reference_results) =
                 goto_references(&self.db, self.cursor.file, self.cursor.offset, true)
             else {
                 return "No references found".to_string();
@@ -47,6 +47,8 @@ mod tests {
             if reference_results.is_empty() {
                 return "No references found".to_string();
             }
+
+            reference_results.sort_by_key(ReferenceTarget::file);
 
             self.render_diagnostics(reference_results.into_iter().enumerate().map(
                 |(i, ref_item)| -> ReferenceResult {

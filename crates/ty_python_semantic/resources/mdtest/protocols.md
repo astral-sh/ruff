@@ -382,6 +382,31 @@ class Foo(Protocol):
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_member", "x", "y", "z"]]
 ```
 
+To see the kinds and types of the protocol members, you can use the debugging aid
+`ty_extensions.reveal_protocol_interface`, meanwhile:
+
+```py
+from ty_extensions import reveal_protocol_interface
+from typing import SupportsIndex, SupportsAbs
+
+# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+reveal_protocol_interface(Foo)
+# error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(SupportsIndex)
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co@SupportsAbs`)}`"
+reveal_protocol_interface(SupportsAbs)
+
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(int)
+# error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type`, found `Literal["foo"]`"
+reveal_protocol_interface("foo")
+
+# TODO: this should be a `revealed-type` diagnostic rather than `invalid-argument-type`, and it should reveal `{"__abs__": MethodMember(`(self) -> int`)}` for the protocol interface
+#
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(SupportsAbs[int])
+```
+
 Certain special attributes and methods are not considered protocol members at runtime, and should
 not be considered protocol members by type checkers either:
 

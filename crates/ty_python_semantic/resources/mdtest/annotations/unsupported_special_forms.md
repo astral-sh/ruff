@@ -26,7 +26,7 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
 
 class Foo:
     def method(self, x: Self):
-        reveal_type(x)  # revealed: Self
+        reveal_type(x)  # revealed: Self@Foo
 ```
 
 ## Type expressions

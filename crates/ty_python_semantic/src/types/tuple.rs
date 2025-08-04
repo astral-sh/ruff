@@ -71,6 +71,33 @@ impl TupleLength {
         }
     }
 
+    /// Given two [`TupleLength`]s, return the more precise instance,
+    /// if it makes sense to consider one more precise than the other.
+    pub(crate) fn most_precise(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            // A fixed-length tuple is equally as precise as another fixed-length tuple if they
+            // have the same length. For two differently sized fixed-length tuples, however,
+            // neither tuple length is more precise than the other: the two tuple lengths are
+            // entirely disjoint.
+            (TupleLength::Fixed(left), TupleLength::Fixed(right)) => {
+                (left == right).then_some(self)
+            }
+
+            // A fixed-length tuple is more precise than a variable-length one.
+            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(..))
+            | (TupleLength::Variable(..), fixed @ TupleLength::Fixed(_)) => Some(fixed),
+
+            // For two variable-length tuples, the tuple with the larger number
+            // of required items is more precise.
+            (TupleLength::Variable(..), TupleLength::Variable(..)) => {
+                Some(match self.minimum().cmp(&other.minimum()) {
+                    Ordering::Less => other,
+                    Ordering::Equal | Ordering::Greater => self,
+                })
+            }
+        }
+    }
+
     pub(crate) fn display_minimum(self) -> String {
         let minimum_length = self.minimum();
         match self {
@@ -473,12 +500,12 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_slice(
-        &'db self,
+        &self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         self.0.py_slice(db, start, stop, step)
     }
 }

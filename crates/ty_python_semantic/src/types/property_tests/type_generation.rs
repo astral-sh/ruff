@@ -6,7 +6,7 @@ use crate::types::{
     BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
     Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, KnownModule};
+use crate::{Db, module_resolver::KnownModule};
 use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
@@ -115,7 +115,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,

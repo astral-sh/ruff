@@ -60,6 +60,35 @@ impl<'db> Definition<'db> {
         FileRange::new(self.file(db), self.kind(db).target_range(module))
     }
 
+    /// Returns the name of the item being defined, if applicable.
+    pub fn name(self, db: &'db dyn Db) -> Option<String> {
+        let file = self.file(db);
+        let module = parsed_module(db, file).load(db);
+        let kind = self.kind(db);
+        match kind {
+            DefinitionKind::Function(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::Class(def) => {
+                let node = def.node(&module);
+                Some(node.name.as_str().to_string())
+            }
+            DefinitionKind::TypeAlias(def) => {
+                let node = def.node(&module);
+                Some(
+                    node.name
+                        .as_name_expr()
+                        .expect("type alias name should be a NameExpr")
+                        .id
+                        .as_str()
+                        .to_string(),
+                )
+            }
+            _ => None,
+        }
+    }
+
     /// Extract a docstring from this definition, if applicable.
     /// This method returns a docstring for function and class definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
