@@ -1304,7 +1304,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Proper assignability and subtyping for TypedDicts
+                // TODO: Implement assignability and subtyping for TypedDict
                 relation.is_assignability()
             }
 
@@ -1773,7 +1773,7 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement disjointness for TypedDicts
+                // TODO: Implement disjointness for TypedDict
                 false
             }
 
