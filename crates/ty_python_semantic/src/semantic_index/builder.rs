@@ -356,7 +356,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
                 // For the same reason, symbols declared as nonlocal or global are not recorded.
                 // Also, if the enclosing scope allows its members to be modified from elsewhere, the snapshot will not be recorded.
-                if self.scopes[enclosing_scope_id].visibility().is_public() {
+                // (In the case of class scopes, class variables can be modified from elsewhere, but this has no effect in nested scopes,
+                // as class variables are not visible to them)
+                if self.scopes[enclosing_scope_id].kind().is_module() {
                     continue;
                 }
 
