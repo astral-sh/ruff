@@ -790,6 +790,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub const fn into_subclass_of(self) -> Option<SubclassOfType<'db>> {
+        match self {
+            Type::SubclassOf(subclass_of) => Some(subclass_of),
+            _ => None,
+        }
+    }
+
     #[track_caller]
     pub fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.into_class_literal()
@@ -5496,10 +5503,8 @@ impl<'db> Type<'db> {
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(tuple) => tuple
-                .to_class_type(db)
-                .map(Type::from)
-                .unwrap_or_else(Type::unknown),
-
+                .to_subclass_of(db)
+                .unwrap_or_else(SubclassOfType::subclass_of_unknown),
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => KnownClass::Type.to_instance(db),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),

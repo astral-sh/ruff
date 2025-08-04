@@ -143,6 +143,11 @@ impl<'db> AllMembers<'db> {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
+                Type::SubclassOf(subclass_of) => {
+                    if let Some(class) = subclass_of.subclass_of().into_class() {
+                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                    }
+                }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, class_literal);
