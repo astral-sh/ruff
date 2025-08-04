@@ -387,14 +387,11 @@ def foo() -> str:
     return 42  # Type error: expected str, got int
 ";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut builder = TestServerBuilder::new()?
-        .with_workspace(
-            workspace_root,
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
             ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
-        )?
-        .with_initialization_options(global_options);
+        );
 
     for i in 0..NUM_FILES {
         let file_path_string = format!("src/file_{i:03}.py");
@@ -479,11 +476,11 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let error_content = "def foo() -> str:\n    return 42  # Error";
     let changed_content = "def foo() -> str:\n    return true  # Error";
 
-    let global_options = ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace);
-
     let mut builder = TestServerBuilder::new()?
-        .with_workspace(workspace_root, global_options.clone())?
-        .with_initialization_options(global_options);
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
+            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        );
 
     for i in 0..NUM_FILES {
         let file_path_string = format!("src/error_{i}.py");

@@ -766,9 +766,6 @@ impl TestServerBuilder {
                 configuration: Some(true),
                 ..Default::default()
             }),
-            experimental: Some(json!({
-                "ty_test_server": true
-            })),
             ..Default::default()
         };
 

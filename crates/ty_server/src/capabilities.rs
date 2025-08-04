@@ -245,15 +245,6 @@ impl ResolvedClientCapabilities {
             flags |= Self::WORK_DONE_PROGRESS;
         }
 
-        if client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default()
-        {
-            flags |= Self::DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION;
-        }
-
         flags
     }
 }
