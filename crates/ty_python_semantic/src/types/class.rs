@@ -123,7 +123,7 @@ fn is_typed_dict_cycle_recover<'db>(
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self_: ClassLiteral<'db>) -> bool {
+fn is_typed_dict_cycle_initial<'db>(_db: &'db dyn Db, _self: ClassLiteral<'db>) -> bool {
     false
 }
 

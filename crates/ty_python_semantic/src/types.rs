@@ -1304,7 +1304,7 @@ impl<'db> Type<'db> {
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Assignability and subtyping for TypedDicts
-                true
+                relation.is_assignability()
             }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
