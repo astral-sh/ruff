@@ -79,6 +79,7 @@ impl Display for DisplayRepresentation<'_> {
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
                         .specialization(self.db)
                         .tuple(self.db)
+                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display(self.db)
                         .fmt(f),
                     (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
@@ -401,8 +402,8 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.origin.is_known(self.db, KnownClass::Tuple) {
-            self.specialization.tuple(self.db).display(self.db).fmt(f)
+        if let Some(tuple) = self.specialization.tuple(self.db) {
+            tuple.display(self.db).fmt(f)
         } else {
             write!(
                 f,
