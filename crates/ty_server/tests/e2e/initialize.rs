@@ -220,8 +220,7 @@ def foo() -> str:
 
     assert!(
         hover.is_none(),
-        "Expected no hover information, got: {:?}",
-        hover
+        "Expected no hover information, got: {hover:?}"
     );
 
     Ok(())
@@ -253,8 +252,7 @@ def foo() -> str:
 
     assert!(
         hover.is_none(),
-        "Expected no hover information, got: {:?}",
-        hover
+        "Expected no hover information, got: {hover:?}"
     );
 
     Ok(())
@@ -294,16 +292,14 @@ def bar() -> str:
     let hover_foo = server.hover_request(foo, Position::new(0, 5))?;
     assert!(
         hover_foo.is_none(),
-        "Expected no hover information for workspace A, got: {:?}",
-        hover_foo
+        "Expected no hover information for workspace A, got: {hover_foo:?}"
     );
 
     server.open_text_document(bar, &bar_content, 1);
     let hover_bar = server.hover_request(bar, Position::new(0, 5))?;
     assert!(
         hover_bar.is_some(),
-        "Expected hover information for workspace B, got: {:?}",
-        hover_bar
+        "Expected hover information for workspace B, got: {hover_bar:?}"
     );
 
     Ok(())

@@ -26,7 +26,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: GotoTypeDefinitionParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {

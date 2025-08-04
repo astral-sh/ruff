@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: DocumentSymbolParams,
     ) -> crate::server::Result<Option<lsp_types::DocumentSymbolResponse>> {

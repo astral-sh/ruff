@@ -1,7 +1,7 @@
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
-use crate::session::ClientOptions;
 use crate::session::client::{Client, ClientResponseHandler};
+use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
@@ -49,7 +49,8 @@ impl Server {
 
                             if self.session.is_shutdown_requested() {
                                 tracing::warn!(
-                                    "Received request after server shutdown was requested, discarding"
+                                    "Received request `{}` after server shutdown was requested, discarding",
+                                    &req.method
                                 );
                                 client.respond_err(
                                     req.id,
@@ -130,7 +131,8 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            api::request(request);
+                            let task = api::request(request);
+                            scheduler.dispatch(task, &mut self.session, client);
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -141,6 +143,13 @@ impl Server {
                     }
 
                     Action::SendRequest(request) => client.send_request_raw(&self.session, request),
+
+                    Action::SuspendWorkspaceDiagnostics(suspended_request) => {
+                        self.session.set_suspended_workspace_diagnostics_request(
+                            *suspended_request,
+                            &client,
+                        );
+                    }
 
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
@@ -340,6 +349,8 @@ pub(crate) enum Action {
 
     /// Send a request from the server to the client.
     SendRequest(SendRequest),
+
+    SuspendWorkspaceDiagnostics(Box<SuspendedWorkspaceDiagnosticRequest>),
 
     /// Initialize the workspace after the server received
     /// the options from the client.

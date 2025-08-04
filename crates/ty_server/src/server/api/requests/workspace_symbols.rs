@@ -19,7 +19,7 @@ impl RequestHandler for WorkspaceSymbolRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
     fn run(
-        snapshot: SessionSnapshot,
+        snapshot: &SessionSnapshot,
         _client: &Client,
         params: WorkspaceSymbolParams,
     ) -> crate::server::Result<Option<WorkspaceSymbolResponse>> {

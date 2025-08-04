@@ -56,12 +56,12 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, PartialResultParams, Position,
-    PreviousResultId, PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceFolder,
+    InitializeParams, InitializeResult, InitializedParams, NumberOrString, PartialResultParams,
+    Position, PreviousResultId, PublishDiagnosticsClientCapabilities,
+    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -147,6 +147,10 @@ pub(crate) struct TestServer {
 
     /// Workspace configurations for `workspace/configuration` requests
     workspace_configurations: HashMap<Url, ClientOptions>,
+
+    /// Whether a Shutdown request has been sent by the test
+    /// and the exit sequence should be skipped during `Drop`
+    shutdown_requested: bool,
 }
 
 impl TestServer {
@@ -202,6 +206,7 @@ impl TestServer {
             requests: VecDeque::new(),
             initialize_response: None,
             workspace_configurations,
+            shutdown_requested: false,
         }
         .initialize(workspace_folders, capabilities, initialization_options)
     }
@@ -226,7 +231,7 @@ impl TestServer {
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<Initialize>(init_request_id)?);
+        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id)?);
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
@@ -327,6 +332,11 @@ impl TestServer {
     where
         R: Request,
     {
+        // Track if an Exit notification is being sent
+        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+            self.shutdown_requested = true;
+        }
+
         let id = self.next_request_id();
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
@@ -351,12 +361,12 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<R>(&mut self, id: RequestId) -> Result<R::Result>
+    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> Result<R::Result>
     where
         R: Request,
     {
         loop {
-            if let Some(response) = self.responses.remove(&id) {
+            if let Some(response) = self.responses.remove(id) {
                 match response {
                     Response {
                         error: None,
@@ -373,7 +383,11 @@ impl TestServer {
                         return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, Box::new(response)).into());
+                        return Err(TestServerError::InvalidResponse(
+                            id.clone(),
+                            Box::new(response),
+                        )
+                        .into());
                     }
                 }
             }
@@ -531,6 +545,16 @@ impl TestServer {
         panic!("Server dropped client receiver while still running");
     }
 
+    pub(crate) fn cancel(&mut self, request_id: &RequestId) {
+        let id_string = request_id.to_string();
+        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+            id: match id_string.parse() {
+                Ok(id) => NumberOrString::Number(id),
+                Err(_) => NumberOrString::String(id_string),
+            },
+        });
+    }
+
     /// Handle workspace configuration requests from the server.
     ///
     /// Use the [`get_request`] method to wait for the server to send this request.
@@ -659,7 +683,7 @@ impl TestServer {
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
-        self.await_response::<DocumentDiagnosticRequest>(id)
+        self.await_response::<DocumentDiagnosticRequest>(&id)
     }
 
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
@@ -679,7 +703,7 @@ impl TestServer {
         };
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
-        self.await_response::<WorkspaceDiagnosticRequest>(id)
+        self.await_response::<WorkspaceDiagnosticRequest>(&id)
     }
 
     /// Send a `textDocument/hover` request for the document at the given path and position.
@@ -698,7 +722,7 @@ impl TestServer {
             work_done_progress_params: WorkDoneProgressParams::default(),
         };
         let id = self.send_request::<HoverRequest>(params);
-        self.await_response::<HoverRequest>(id)
+        self.await_response::<HoverRequest>(&id)
     }
 }
 
@@ -724,9 +748,9 @@ impl Drop for TestServer {
         //
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
-        let shutdown_error = if self.server_thread.is_some() {
+        let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<Shutdown>(shutdown_id) {
+            match self.await_response::<Shutdown>(&shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
                     None

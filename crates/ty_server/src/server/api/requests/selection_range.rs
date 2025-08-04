@@ -26,7 +26,7 @@ impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: SelectionRangeParams,
     ) -> crate::server::Result<Option<Vec<LspSelectionRange>>> {
