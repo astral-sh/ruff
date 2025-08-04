@@ -127,12 +127,12 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
-    /// Report the completion of a given file.
-    fn report_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
+    /// Report the completion of checking a given file along with its diagnostics.
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
 
     /// Reports settings or IO related diagnostics. The diagnostics
     /// can belong to different files or no file at all.
-    /// But it's never a file for which [`Self::report_file`] gets called.
+    /// But it's never a file for which [`Self::report_checked_file`] gets called.
     fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>);
 }
 
@@ -153,7 +153,7 @@ impl CollectReporter {
 
 impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
         if diagnostics.is_empty() {
             return;
         }
@@ -300,7 +300,7 @@ impl Project {
 
                         match check_file_impl(&db, file) {
                             Ok(diagnostics) => {
-                                reporter.report_file(&db, file, diagnostics);
+                                reporter.report_checked_file(&db, file, diagnostics);
 
                                 // This is outside `check_file_impl` to avoid that opening or closing
                                 // a file invalidates the `check_file_impl` query of every file!
@@ -316,7 +316,11 @@ impl Project {
                                 }
                             }
                             Err(io_error) => {
-                                reporter.report_file(&db, file, std::slice::from_ref(io_error));
+                                reporter.report_checked_file(
+                                    &db,
+                                    file,
+                                    std::slice::from_ref(io_error),
+                                );
                             }
                         }
                     });

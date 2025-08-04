@@ -274,6 +274,7 @@ impl MainLoop {
 
                         match salsa::Cancelled::catch(|| {
                             db.check_with_reporter(&mut reporter);
+                            reporter.bar.finish();
                             reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
@@ -432,8 +433,8 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
-        self.collector.report_file(db, file, diagnostics);
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+        self.collector.report_checked_file(db, file, diagnostics);
         self.bar.inc(1);
     }
 

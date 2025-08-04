@@ -137,7 +137,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         self.report_progress();
     }
 
-    fn report_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
         let checked = self.checked_files.fetch_add(1, Ordering::Relaxed) + 1;
 
         if checked % 100 == 0 || checked == self.total_files {
