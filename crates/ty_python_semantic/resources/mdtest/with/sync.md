@@ -167,7 +167,7 @@ with Manager():
     ...
 ```
 
-## Incorrect signatures 
+## Incorrect signatures
 
 The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match
 the expected signatures for a context manager:

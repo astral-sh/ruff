@@ -6885,9 +6885,9 @@ impl<'db> ContextManagerError<'db> {
         };
 
         let mode = match self {
-            Self::Exit { mode, .. }
-            | Self::Enter(_, mode)
-            | Self::EnterAndExit { mode, .. } => *mode,
+            Self::Exit { mode, .. } | Self::Enter(_, mode) | Self::EnterAndExit { mode, .. } => {
+                *mode
+            }
         };
 
         let (enter_method, exit_method) = match mode {
@@ -6939,27 +6939,15 @@ impl<'db> ContextManagerError<'db> {
                 enter_return_type: _,
                 exit_error,
                 mode: _,
-            } => format_call_dunder_error(
-                exit_error,
-                exit_method,
-            ),
-            Self::Enter(enter_error, _) => format_call_dunder_error(
-                enter_error,
-                enter_method,
-            ),
+            } => format_call_dunder_error(exit_error, exit_method),
+            Self::Enter(enter_error, _) => format_call_dunder_error(enter_error, enter_method),
             Self::EnterAndExit {
                 enter_error,
                 exit_error,
                 mode: _,
-            } => format_call_dunder_errors(
-                enter_error,
-                enter_method,
-                exit_error,
-                exit_method,
-            ),
+            } => format_call_dunder_errors(enter_error, enter_method, exit_error, exit_method),
         };
 
-        
         // Suggest using `async with` if only async methods are available in a sync context,
         // or suggest using `with` if only sync methods are available in an async context.
         let with_kw = match mode {
@@ -6975,25 +6963,12 @@ impl<'db> ContextManagerError<'db> {
         ));
 
         let (alt_mode, alt_enter_method, alt_exit_method, alt_with_kw) = match mode {
-            EvaluationMode::Sync => (
-                "async",
-                "__aenter__",
-                "__aexit__",
-                "async with",
-            ),
-            EvaluationMode::Async => (
-                "sync",
-                "__enter__",
-                "__exit__",
-                "with",
-            ),
+            EvaluationMode::Sync => ("async", "__aenter__", "__aexit__", "async with"),
+            EvaluationMode::Async => ("sync", "__enter__", "__exit__", "with"),
         };
 
-        let alt_enter = context_expression_type.try_call_dunder(
-            db,
-            alt_enter_method,
-            CallArguments::none(),
-        );
+        let alt_enter =
+            context_expression_type.try_call_dunder(db, alt_enter_method, CallArguments::none());
         let alt_exit = context_expression_type.try_call_dunder(
             db,
             alt_exit_method,
@@ -7010,7 +6985,6 @@ impl<'db> ContextManagerError<'db> {
             ));
             diag.info(format!("Consider using `{alt_with_kw}` here"));
         }
-
     }
 }
 

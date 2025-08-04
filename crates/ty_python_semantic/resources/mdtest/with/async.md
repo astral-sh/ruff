@@ -155,8 +155,8 @@ async def main():
 
 <!-- snapshot-diagnostics -->
 
-If a asynchronous `async with` statement is used on a type with `__enter__` and `__exit__`, we show a
-diagnostic hint that the user might have intended to use `with` instead.
+If a asynchronous `async with` statement is used on a type with `__enter__` and `__exit__`, we show
+a diagnostic hint that the user might have intended to use `with` instead.
 
 ```py
 class Manager:
@@ -169,7 +169,7 @@ async def main():
         ...
 ```
 
-## Incorrect signatures 
+## Incorrect signatures
 
 The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match the
 expected signatures for a context manager:
