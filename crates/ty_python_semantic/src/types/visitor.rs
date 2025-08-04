@@ -9,7 +9,6 @@ use crate::{
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
-        tuple::{TupleType, walk_tuple_type},
         walk_bound_method_type, walk_bound_super_type, walk_callable_type, walk_intersection_type,
         walk_known_instance_type, walk_method_wrapper_type, walk_property_instance_type,
         walk_type_alias_type, walk_type_var_type, walk_typed_dict_type, walk_typeis_type,
@@ -31,10 +30,6 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_intersection_type(&mut self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
         walk_intersection_type(db, intersection, self);
-    }
-
-    fn visit_tuple_type(&mut self, db: &'db dyn Db, tuple: TupleType<'db>) {
-        walk_tuple_type(db, tuple, self);
     }
 
     fn visit_callable_type(&mut self, db: &'db dyn Db, callable: CallableType<'db>) {
