@@ -91,6 +91,10 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> Cow<Url>;
 
+    /// Processes the request parameters and returns the LSP request result.
+    ///
+    /// This is the main method that handlers implement. It takes the request parameters
+    /// from the client and computes the appropriate response data for the LSP request.
     fn run_with_snapshot(
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
@@ -98,7 +102,10 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 
-    fn process(
+    /// Handles the entire request lifecycle and sends the response to the client.
+    ///
+    /// It allows handlers to customize how the server sends the response to the client.
+    fn handle_request(
         id: &RequestId,
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
@@ -123,7 +130,20 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// operations that require access to the entire session state, such as fetching workspace
 /// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
-    fn process(
+    /// Processes the request parameters and returns the LSP request result.
+    ///
+    /// This is the main method that handlers implement. It takes the request parameters
+    /// from the client and computes the appropriate response data for the LSP request.
+    fn run(
+        snapshot: &SessionSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+
+    /// Handles the request lifecycle and sends the response to the client.
+    ///
+    /// It allows handlers to customize how the server sends the response to the client.
+    fn handle_request(
         id: &RequestId,
         snapshot: SessionSnapshot,
         client: &Client,
@@ -138,12 +158,6 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
 
         client.respond(id, result);
     }
-
-    fn run(
-        snapshot: &SessionSnapshot,
-        client: &Client,
-        params: <<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
 }
 
 /// A supertrait for any server notification handler.

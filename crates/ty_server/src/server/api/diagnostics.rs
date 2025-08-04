@@ -26,6 +26,9 @@ pub(super) struct Diagnostics<'a> {
 }
 
 impl Diagnostics<'_> {
+    /// Computes the result ID for `diagnostics`.
+    ///
+    /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
     ) -> Option<String> {
@@ -42,6 +45,9 @@ impl Diagnostics<'_> {
         Some(format!("{:x}", hasher.finish()))
     }
 
+    /// Computes the result ID for the diagnostics.
+    ///
+    /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id(&self) -> Option<String> {
         Self::result_id_from_hash(&self.items)
     }

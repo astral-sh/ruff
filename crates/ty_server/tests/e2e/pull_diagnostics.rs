@@ -31,7 +31,7 @@ def foo() -> str:
     server.open_text_document(foo, &foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None)?;
 
-    insta::assert_debug_snapshot!(diagnostics);
+    assert_debug_snapshot!(diagnostics);
 
     Ok(())
 }
@@ -239,7 +239,7 @@ def foo() -> str:
     let mut first_response = server.workspace_diagnostic_request(None)?;
     sort_workspace_diagnostic_response(&mut first_response);
 
-    insta::assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
+    assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
 
     // Consume all progress notifications sent during workspace diagnostics
     consume_all_progress_notifications(&mut server)?;
@@ -311,7 +311,7 @@ def foo() -> str:
     // Consume all progress notifications sent during the second workspace diagnostics
     consume_all_progress_notifications(&mut server)?;
 
-    insta::assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
+    assert_debug_snapshot!("workspace_diagnostic_after_changes", second_response);
 
     Ok(())
 }
@@ -603,6 +603,10 @@ fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) 
     items.sort_unstable_by(|a, b| item_uri(a).cmp(item_uri(b)));
 }
 
+/// The LSP specification requires that the server sends a response for every request.
+///
+/// This test verifies that the server responds to a long-polling workspace diagnostic request
+/// when the server is shut down.
 #[test]
 fn workspace_diagnostic_long_polling_responds_on_shutdown() -> Result<()> {
     let _filter = filter_result_id();
@@ -635,7 +639,7 @@ def hello() -> str:
     server.send_notification::<lsp_types::notification::Exit>(());
 
     // Verify we got an empty report (default response during shutdown)
-    insta::assert_debug_snapshot!(
+    assert_debug_snapshot!(
         "workspace_diagnostic_long_polling_shutdown_response",
         workspace_response
     );
@@ -643,6 +647,8 @@ def hello() -> str:
     Ok(())
 }
 
+/// Tests that the server responds to a long-polling workspace diagnostic request
+/// after a change introduced a new diagnostic.
 #[test]
 fn workspace_diagnostic_long_polling_responds_on_change() -> Result<()> {
     let _filter = filter_result_id();
@@ -688,7 +694,7 @@ def hello() -> str:
         server.await_response::<WorkspaceDiagnosticReportResult>(&request_id)?;
 
     // Verify we got a report with one file containing the new diagnostic
-    insta::assert_debug_snapshot!(
+    assert_debug_snapshot!(
         "workspace_diagnostic_long_polling_change_response",
         workspace_response
     );
@@ -696,6 +702,10 @@ def hello() -> str:
     Ok(())
 }
 
+/// The LSP specification requires that the server responds to each request with exactly one response.
+///
+/// This test verifies that the server sends one response (and not two) if a long polling workspace diagnostic request
+/// is cancelled.
 #[test]
 fn workspace_diagnostic_long_polling_responds_on_cancellation() -> Result<()> {
     let _filter = filter_result_id();
@@ -709,9 +719,6 @@ def hello() -> str:
 
     // Create a project with one file but no diagnostics
     let mut server = create_workspace_server_with_file(workspace_root, file_path, file_content)?;
-
-    // Open the file first
-    server.open_text_document(file_path, &file_content, 1);
 
     // Make a workspace diagnostic request to a project with one file but no diagnostics
     // This should trigger long-polling since the project has no diagnostics
@@ -727,7 +734,7 @@ def hello() -> str:
 
     // The workspace diagnostic request should now respond with a cancellation response (Err).
     let result = server.await_response::<WorkspaceDiagnosticReportResult>(&request_id);
-    insta::assert_debug_snapshot!(
+    assert_debug_snapshot!(
         "workspace_diagnostic_long_polling_cancellation_result",
         result
     );
@@ -737,6 +744,11 @@ def hello() -> str:
     Ok(())
 }
 
+/// This test verifies an entire workspace diagnostic cycle with long-polling:
+/// * Initial suspend with no diagnostics
+/// * Change the file to introduce a diagnostic, server should respond with the new diagnostics
+/// * Send a second workspace diagnostic request, which should suspend again because the diagnostics haven't changed
+/// * Change the file again to fix the diagnostic, server should respond with no diagnostics
 #[test]
 fn workspace_diagnostic_long_polling_suspend_change_suspend_cycle() -> Result<()> {
     let _filter = filter_result_id();
@@ -816,11 +828,11 @@ def hello() -> str:
         server.await_response::<WorkspaceDiagnosticReportResult>(&request_id_2)?;
 
     // Snapshot both responses to verify the full cycle
-    insta::assert_debug_snapshot!(
+    assert_debug_snapshot!(
         "workspace_diagnostic_suspend_change_suspend_first_response",
         first_response
     );
-    insta::assert_debug_snapshot!(
+    assert_debug_snapshot!(
         "workspace_diagnostic_suspend_change_suspend_second_response",
         second_response
     );
@@ -845,6 +857,9 @@ fn create_workspace_server_with_file(
         .wait_until_workspaces_are_initialized()
 }
 
+/// Sends a workspace diagnostic request to the server.
+///
+/// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
 fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
     server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,

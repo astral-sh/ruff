@@ -35,7 +35,7 @@ use ty_project::{Db, ProgressReporter};
 /// ## Partial results
 ///
 /// Many clients support partial results. They allow a server
-/// to send multiple responses (in the form of `$/progress `notifications) for
+/// to send multiple responses (in the form of `$/progress` notifications) for
 /// the same request. We use partial results to stream the results for
 /// changed files. This has the obvious benefit is that users
 /// don't need to wait for the entire check to complete before they see any diagnostics.
@@ -75,12 +75,12 @@ use ty_project::{Db, ProgressReporter};
 /// That's why we implement long polling (as recommended in the LSP) for workspace diagnostics.
 ///
 /// The basic idea of long-polling is that the server doesn't respond if there are no diagnostics
-/// or all diagnostics are unchanged. Instead, the server keeps the response open (it doesn't reply)
+/// or all diagnostics are unchanged. Instead, the server keeps the request open (it doesn't respond)
 /// and only responses when the diagnostics change. This puts the server in full control of when
 /// to recheck a workspace and a client can simply wait for the response to come in.
 ///
 /// One challenge with long polling for ty's server architecture is that we can't just keep
-/// the background thread running because holding on to the [`ProjectDatabase]` references
+/// the background thread running because holding on to the [`ProjectDatabase`] references
 /// prevents notifications from acquiring the exclusive db lock (or the long polling background thread
 /// panics if a notification tries to do so). What we do instead is that this request handler
 /// doesn't send a response if there are no diagnostics or all are unchanged and it
@@ -137,21 +137,18 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         Ok(reporter.into_final_report())
     }
 
-    fn process(
+    fn handle_request(
         id: &RequestId,
         snapshot: SessionSnapshot,
         client: &Client,
         params: WorkspaceDiagnosticParams,
     ) {
-        // if streaming: it's a partial result if we did send any changes to the client but a regular report otherwise.
-        // for non-streaming, it's always a full report.
-        // We can simply test if all items are unchanged
         let result = Self::run(&snapshot, client, params.clone());
 
         // Test if this is a no-op result, in which case we should long-poll the request and
         // only respond once some diagnostics have changed to get the latest result ids.
         //
-        // Bull response: This the simple case. Simply test if all diagnostics are unchanged (or empty)
+        // Bulk response: This the simple case. Simply test if all diagnostics are unchanged (or empty)
         // Streaming: This trickier but follows the same principle.
         // * If the server sent any partial results, then `result` is a `Partial` result (in which
         //   case we shouldn't do any long polling because some diagnostics changed).
@@ -176,7 +173,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                     },
                 )));
 
-                // Don't respond, keep the response open (long polling).
+                // Don't respond, keep the request open (long polling).
                 return;
             }
         }

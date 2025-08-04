@@ -172,8 +172,11 @@ impl Session {
         request: SuspendedWorkspaceDiagnosticRequest,
         client: &Client,
     ) {
-        self.suspended_workspace_diagnostics_request =
-            request.resume_if_revision_changed(self.revision, client);
+        self.suspended_workspace_diagnostics_request = Some(request);
+        // Run the suspended workspace diagnostic request immediately in case there
+        // were changes since the workspace diagnostics background thread queued
+        // the action to suspend the workspace diagnostic request.
+        self.resume_suspended_workspace_diagnostic_request(client);
     }
 
     pub(crate) fn take_suspended_workspace_diagnostic_request(
@@ -195,6 +198,7 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
+                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
                     return None;
                 }
 
@@ -202,6 +206,13 @@ impl Session {
             });
     }
 
+    /// Bumps the revision.
+    ///
+    /// The revision is used to track when workspace diagnostics may have changed and need to be re-run.
+    /// It's okay if a bump doesn't necessarily result in new workspace diagnostics.
+    ///
+    /// In general, any change to a project database should bump the revision and so should
+    /// any change to the document states (but also when the open workspaces change etc.).
     fn bump_revision(&mut self) {
         self.revision += 1;
     }
@@ -571,7 +582,6 @@ impl Session {
     /// Calling this multiple times for the same document is a logic error.
     pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
         self.index_mut().close_document(key)?;
-        self.bump_revision();
         Ok(())
     }
 

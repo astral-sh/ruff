@@ -221,7 +221,7 @@ where
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
                 let snapshot = snapshot;
-                R::process(&id, snapshot.0, client, params);
+                R::handle_request(&id, snapshot.0, client, params);
             }) {
                 panic_response::<R>(&id, client, &error, retry);
             }
@@ -286,9 +286,9 @@ where
                 return;
             }
 
-            if let Err(error) =
-                ruff_db::panic::catch_unwind(|| R::process(&id, &db, snapshot, client, params))
-            {
+            if let Err(error) = ruff_db::panic::catch_unwind(|| {
+                R::handle_request(&id, &db, snapshot, client, params);
+            }) {
                 panic_response::<R>(&id, client, &error, retry);
             }
         })
@@ -346,8 +346,8 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
             return;
         }
 
-        // if there's any pending workspace diagnostic long-polling request.
-        // Continue it if the session revision changed (e.g. because some document changed).
+        // If there's a pending workspace diagnostic long-polling request,
+        // resume it, but only if the session revision changed (e.g. because some document changed).
         session.resume_suspended_workspace_diagnostic_request(client);
     }))
 }
