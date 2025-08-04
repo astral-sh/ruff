@@ -354,11 +354,14 @@ print()
         1 | # cell 1
         2 | import os
           |        ^^
-        3 | # cell 2
-        4 | import math
+          |
+         ::: notebook.ipynb:cell 2:2:8
+          |
+        1 | # cell 2
+        2 | import math
           |        ---- second cell
-        5 |
-        6 | print('hello world')
+        3 |
+        4 | print('hello world')
           |
         help: Remove unused import: `os`
 

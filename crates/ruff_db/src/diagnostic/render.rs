@@ -330,20 +330,49 @@ impl<'a> ResolvedDiagnostic<'a> {
                     &prev.diagnostic_source.as_source_code(),
                     context,
                     prev.line_end,
+                    prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
                     context,
                     ann.line_start,
+                    ann.notebook_index.as_ref(),
                 )
                 .get();
+
+                // For notebooks, check whether the end of the
+                // previous annotation and the start of the current
+                // annotation are in different cells.
+                let prev_cell_index = prev.notebook_index.as_ref().map(|notebook_index| {
+                    let prev_end = prev
+                        .diagnostic_source
+                        .as_source_code()
+                        .line_column(prev.range.end());
+                    notebook_index.cell(prev_end.line).unwrap_or_default().get()
+                });
+                let this_cell_index = ann.notebook_index.as_ref().map(|notebook_index| {
+                    let this_start = ann
+                        .diagnostic_source
+                        .as_source_code()
+                        .line_column(ann.range.start());
+                    notebook_index
+                        .cell(this_start.line)
+                        .unwrap_or_default()
+                        .get()
+                });
+                let in_different_cells = prev_cell_index != this_cell_index;
+
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
                 // that case, the context windows are adjacent and we
                 // should fall through below to add this annotation to
                 // the existing snippet.
-                if this_context_begins.saturating_sub(prev_context_ends) > 1 {
+                //
+                // For notebooks, also check that the context windows
+                // are in the same cell. Windows from different cells
+                // should never be considered adjacent.
+                if in_different_cells || this_context_begins.saturating_sub(prev_context_ends) > 1 {
                     snippet_by_path
                         .entry(path)
                         .or_default()
@@ -607,38 +636,14 @@ impl<'r> RenderableSnippet<'r> {
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
         let content_start_index = anns.iter().map(|ann| ann.line_start).min().unwrap();
-        let mut line_start = context_before(&source, context, content_start_index);
+        let line_start = context_before(&source, context, content_start_index, notebook_index);
 
         let start = source.line_column(anns[0].range.start());
         let cell_index = notebook_index
             .map(|notebook_index| notebook_index.cell(start.line).unwrap_or_default().get());
 
-        // If we're working with a Jupyter Notebook, skip the lines which are
-        // outside of the cell containing the diagnostic.
-        if let Some(index) = notebook_index {
-            let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
-            while line_start < content_start_index {
-                if index.cell(line_start).unwrap_or(OneIndexed::MIN) == content_start_cell {
-                    break;
-                }
-                line_start = line_start.saturating_add(1);
-            }
-        }
-
         let content_end_index = anns.iter().map(|ann| ann.line_end).max().unwrap();
-        let mut line_end = context_after(&source, context, content_end_index);
-
-        // If we're working with a Jupyter Notebook, skip the lines which are
-        // outside of the cell containing the diagnostic.
-        if let Some(index) = notebook_index {
-            let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
-            while line_end > content_end_index {
-                if index.cell(line_end).unwrap_or(OneIndexed::MIN) == content_end_cell {
-                    break;
-                }
-                line_end = line_end.saturating_sub(1);
-            }
-        }
+        let line_end = context_after(&source, context, content_end_index, notebook_index);
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
@@ -868,7 +873,15 @@ pub struct Input {
 ///
 /// The line number returned is guaranteed to be less than
 /// or equal to `start`.
-fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> OneIndexed {
+///
+/// In Jupyter notebooks, lines outside the cell containing
+/// `start` will be omitted.
+fn context_before(
+    source: &SourceCode<'_, '_>,
+    len: usize,
+    start: OneIndexed,
+    notebook_index: Option<&NotebookIndex>,
+) -> OneIndexed {
     let mut line = start.saturating_sub(len);
     // Trim leading empty lines.
     while line < start {
@@ -877,6 +890,17 @@ fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) ->
         }
         line = line.saturating_add(1);
     }
+
+    if let Some(index) = notebook_index {
+        let content_start_cell = index.cell(start).unwrap_or(OneIndexed::MIN);
+        while line < start {
+            if index.cell(line).unwrap_or(OneIndexed::MIN) == content_start_cell {
+                break;
+            }
+            line = line.saturating_add(1);
+        }
+    }
+
     line
 }
 
@@ -886,7 +910,15 @@ fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) ->
 /// The line number returned is guaranteed to be greater
 /// than or equal to `start` and no greater than the
 /// number of lines in `source`.
-fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> OneIndexed {
+///
+/// In Jupyter notebooks, lines outside the cell containing
+/// `start` will be omitted.
+fn context_after(
+    source: &SourceCode<'_, '_>,
+    len: usize,
+    start: OneIndexed,
+    notebook_index: Option<&NotebookIndex>,
+) -> OneIndexed {
     let max_lines = OneIndexed::from_zero_indexed(source.line_count());
     let mut line = start.saturating_add(len).min(max_lines);
     // Trim trailing empty lines.
@@ -896,6 +928,17 @@ fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> 
         }
         line = line.saturating_sub(1);
     }
+
+    if let Some(index) = notebook_index {
+        let content_end_cell = index.cell(start).unwrap_or(OneIndexed::MIN);
+        while line > start {
+            if index.cell(line).unwrap_or(OneIndexed::MIN) == content_end_cell {
+                break;
+            }
+            line = line.saturating_sub(1);
+        }
+    }
+
     line
 }
 
