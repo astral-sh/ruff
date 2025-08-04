@@ -23,8 +23,8 @@
   "devDependencies": {
     "@eslint/js": "^9.21.0",
     "@tailwindcss/vite": "^4.0.14",
-    "@types/react": "^19.1.9",
-    "@types/react-dom": "^19.1.7",
+    "@types/react": "^19.0.11",
+    "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react-swc": "^3.0.0",
     "eslint": "^9.22.0",
     "eslint-plugin-import": "^2.31.0",
@@ -32,7 +32,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "prettier": "^3.5.3",
     "tailwindcss": "^4.0.14",
-    "typescript": "^5.9.2",
+    "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.1",
     "vite": "^7.0.0",
     "wasm-pack": "^0.13.1"
