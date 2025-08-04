@@ -36,9 +36,6 @@ bob = Person(name="Bob", age=25)
 Methods that are available on `dict`s are also available on `TypedDict`s:
 
 ```py
-# TODO: this should not be an error. The stubs for `TypedDictFallback.update` seem insufficient?
-# error: [missing-argument]
-# error: [unknown-argument]
 bob.update(age=26)
 ```
 

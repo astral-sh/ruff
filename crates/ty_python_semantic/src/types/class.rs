@@ -2092,6 +2092,20 @@ impl<'db> ClassLiteral<'db> {
 
                 Some(CallableType::function_like(db, signature))
             }
+            (CodeGeneratorKind::TypedDict, "update") => {
+                // TODO: synthesize a set of overloads with precise types
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::variadic(Name::new_static("args")),
+                        Parameter::keyword_variadic(Name::new_static("kwargs")),
+                    ]),
+                    Some(Type::none(db)),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
             _ => None,
         }
     }
