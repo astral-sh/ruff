@@ -2054,6 +2054,24 @@ impl<'db> ClassLiteral<'db> {
                         Parameter::positional_only(Some(Name::new_static("self")))
                             .with_annotated_type(instance_ty),
                         Parameter::positional_only(Some(Name::new_static("key"))),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_default_type(Type::unknown()),
+                    ]),
+                    Some(todo_type!("Support for `TypedDict`")),
+                );
+
+                Some(CallableType::function_like(db, signature))
+            }
+            (CodeGeneratorKind::TypedDict, "pop") => {
+                // TODO: synthesize a set of overloads with precise types.
+                // Required keys should be forbidden to be popped.
+                let signature = Signature::new(
+                    Parameters::new([
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key"))),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_default_type(Type::unknown()),
                     ]),
                     Some(todo_type!("Support for `TypedDict`")),
                 );

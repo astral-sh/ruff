@@ -144,6 +144,9 @@ def _(p: Person) -> None:
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
     reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+
+    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
+    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
 ```
 
 ## Unlike normal classes
