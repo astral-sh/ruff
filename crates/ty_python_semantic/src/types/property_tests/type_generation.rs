@@ -195,13 +195,13 @@ impl Ty {
             }
             Ty::FixedLengthTuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                TupleType::from_elements(db, elements)
+                Type::heterogeneous_tuple(db, elements)
             }
             Ty::VariableLengthTuple(prefix, variable, suffix) => {
                 let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
                 let variable = variable.into_type(db);
                 let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
-                TupleType::mixed(db, prefix, variable, suffix)
+                Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
