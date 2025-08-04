@@ -2444,6 +2444,17 @@
             }
           ]
         },
+        "refurb": {
+          "description": "Options for the `refurb` plugin",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/RefurbOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ruff": {
           "description": "Options for the `ruff` plugin",
           "anyOf": [
@@ -2893,6 +2904,35 @@
         "double",
         "preserve"
       ]
+    },
+    "RefurbOptions": {
+      "description": "Options for the `refurb` plugin",
+      "type": "object",
+      "properties": {
+        "allowed-abc-meta-bases": {
+          "description": "Define a list of classes. If a class `C` is a subclass of at least one class in this list, `refurb` will allow `C` to explicitly set its metaclass to `abc.ABCMeta`, instead of insisting on inheriting from `abc.ABC` instead.\n\nThis is useful for classes that validate their base-classes at runtime.\n\nFor example, if `SpecialBaseClass` is in the list, while `OtherBaseClass` is not:\n\n```python class MyClass1(SpecialBaseClass, metaclass=abc.ABCMeta):  # this is allowed pass\n\nclass MyClass2(OtherBaseClass, metaclass=abc.ABCMeta):  # this will be linted pass\n\nclass MyClass2(OtherBaseClass, abc.ABC):  # instead this is the way to go pass ```\n\nExpects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than `Protocol`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "extend-allowed-abc-meta-bases": {
+          "description": "A list of additional classes to [`allowed_abc_meta_bases`](#lint_refurb_allowed-abc-meta-bases).\n\nExpects to receive a list of fully-qualified names (e.g., `typing.Protocol`, rather than `Protocol`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
     },
     "RelativeImportsOrder": {
       "oneOf": [

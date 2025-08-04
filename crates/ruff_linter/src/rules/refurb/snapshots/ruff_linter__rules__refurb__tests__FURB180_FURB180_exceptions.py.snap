@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB180_exceptions.py:19:14: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+17 | # Errors
+18 |
+19 | class B0(A1, metaclass=abc.ABCMeta):
+   |              ^^^^^^^^^^^^^^^^^^^^^ FURB180
+20 |     @abstractmethod
+21 |     def foo(self): pass
+   |
+   = help: Replace with `abc.ABC`
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | # Errors
+18 18 | 
+19    |-class B0(A1, metaclass=abc.ABCMeta):
+   19 |+class B0(A1, abc.ABC):
+20 20 |     @abstractmethod
+21 21 |     def foo(self): pass
+22 22 | 
+
+FURB180_exceptions.py:24:21: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+24 | class B1(ast.Param, metaclass=abc.ABCMeta):
+   |                     ^^^^^^^^^^^^^^^^^^^^^ FURB180
+25 |     @abstractmethod
+26 |     def foo(self): pass
+   |
+   = help: Replace with `abc.ABC`
+
+ℹ Unsafe fix
+21 21 |     def foo(self): pass
+22 22 | 
+23 23 | 
+24    |-class B1(ast.Param, metaclass=abc.ABCMeta):
+   24 |+class B1(ast.Param, abc.ABC):
+25 25 |     @abstractmethod
+26 26 |     def foo(self): pass
+27 27 | 
+
+FURB180_exceptions.py:29:25: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+   |
+29 | class B2(A1, ast.Param, metaclass=abc.ABCMeta):
+   |                         ^^^^^^^^^^^^^^^^^^^^^ FURB180
+30 |     @abstractmethod
+31 |     def foo(self): pass
+   |
+   = help: Replace with `abc.ABC`
+
+ℹ Unsafe fix
+26 26 |     def foo(self): pass
+27 27 | 
+28 28 | 
+29    |-class B2(A1, ast.Param, metaclass=abc.ABCMeta):
+   29 |+class B2(A1, ast.Param, abc.ABC):
+30 30 |     @abstractmethod
+31 31 |     def foo(self): pass
+32 32 |

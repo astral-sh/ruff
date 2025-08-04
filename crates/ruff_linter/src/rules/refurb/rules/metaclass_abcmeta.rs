@@ -43,6 +43,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// be validating the class's other base classes (e.g., `typing.Protocol` does this) or otherwise
 /// alter runtime behavior if more base classes are added.
 ///
+/// ## Options
+/// - `lint.refurb.allowed-abc-meta-bases`
+/// - `lint.refurb.extend-allowed-abc-meta-bases`
+///
 /// ## References
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
@@ -78,6 +82,20 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         .resolve_qualified_name(&keyword.value)
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["abc", "ABCMeta"]))
     {
+        return;
+    }
+
+    // Determine if base classes contain an exempted class per configuration
+    let allowed_abc_meta_bases = &checker.settings.refurb.allowed_abc_meta_bases;
+    let has_exempt_base = class_def.bases().iter().any(|base| {
+        checker
+            .semantic()
+            .resolve_qualified_name(base)
+            .map(|qualified_name| qualified_name.to_string())
+            .is_some_and(|name| allowed_abc_meta_bases.contains(&name))
+    });
+
+    if has_exempt_base {
         return;
     }
 
