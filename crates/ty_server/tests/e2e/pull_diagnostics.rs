@@ -420,7 +420,7 @@ def foo() -> str:
 
     // First, read the response of the workspace diagnostic request.
     // Note: This response comes after the progress notifications but it simplifies the test to read it first.
-    let final_response = server.await_response::<WorkspaceDiagnosticReportResult>(request_id)?;
+    let final_response = server.await_response::<WorkspaceDiagnosticRequest>(request_id)?;
 
     // Process the final report.
     // This should always be a partial report. However, the type definition in the LSP specification
@@ -572,7 +572,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
             },
         });
 
-    let final_response2 = server.await_response::<WorkspaceDiagnosticReportResult>(request2_id)?;
+    let final_response2 = server.await_response::<WorkspaceDiagnosticRequest>(request2_id)?;
 
     let mut all_items = Vec::new();
 

@@ -89,6 +89,12 @@ impl ClientOptions {
         self.global.diagnostic_mode = Some(diagnostic_mode);
         self
     }
+
+    #[must_use]
+    pub fn with_disable_language_services(mut self, disable_language_services: bool) -> Self {
+        self.workspace.disable_language_services = Some(disable_language_services);
+        self
+    }
 }
 
 impl Combine for ClientOptions {

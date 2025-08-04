@@ -48,23 +48,23 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
+    DocumentDiagnosticRequest, HoverRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
-    InitializeResult, InitializedParams, PartialResultParams, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Url,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceFolder,
+    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, PartialResultParams, Position,
+    PreviousResultId, PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
-use serde::de::DeserializeOwned;
 use tempfile::TempDir;
 
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -226,7 +226,7 @@ impl TestServer {
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<InitializeResult>(init_request_id)?);
+        self.initialize_response = Some(self.await_response::<Initialize>(init_request_id)?);
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
@@ -351,7 +351,10 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
+    pub(crate) fn await_response<R>(&mut self, id: RequestId) -> Result<R::Result>
+    where
+        R: Request,
+    {
         loop {
             if let Some(response) = self.responses.remove(&id) {
                 match response {
@@ -360,7 +363,7 @@ impl TestServer {
                         result: Some(result),
                         ..
                     } => {
-                        return Ok(serde_json::from_value::<T>(result)?);
+                        return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
                     Response {
                         error: Some(err),
@@ -656,7 +659,7 @@ impl TestServer {
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
-        self.await_response::<DocumentDiagnosticReportResult>(id)
+        self.await_response::<DocumentDiagnosticRequest>(id)
     }
 
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
@@ -676,7 +679,26 @@ impl TestServer {
         };
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
-        self.await_response::<WorkspaceDiagnosticReportResult>(id)
+        self.await_response::<WorkspaceDiagnosticRequest>(id)
+    }
+
+    /// Send a `textDocument/hover` request for the document at the given path and position.
+    pub(crate) fn hover_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        position: Position,
+    ) -> Result<Option<Hover>> {
+        let params = HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        let id = self.send_request::<HoverRequest>(params);
+        self.await_response::<HoverRequest>(id)
     }
 }
 
@@ -704,7 +726,7 @@ impl Drop for TestServer {
         // it dropped the client connection.
         let shutdown_error = if self.server_thread.is_some() {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<()>(shutdown_id) {
+            match self.await_response::<Shutdown>(shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
                     None

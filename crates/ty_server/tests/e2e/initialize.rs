@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::request::RegisterCapability;
+use lsp_types::{Position, request::RegisterCapability};
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode};
 
@@ -194,5 +194,117 @@ fn open_files_diagnostic_registration() -> Result<()> {
     };
 
     insta::assert_json_snapshot!(registration);
+    Ok(())
+}
+
+/// Tests that the server can disable language services for a workspace via initialization options.
+#[test]
+fn disable_language_services_set_on_intialization() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_disable_language_services(true))
+        .with_workspace(workspace_root, None)?
+        .enable_pull_diagnostics(true)
+        .with_file(foo, foo_content)?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(foo, &foo_content, 1);
+    let hover = server.hover_request(foo, Position::new(0, 5))?;
+
+    assert!(
+        hover.is_none(),
+        "Expected no hover information, got: {:?}",
+        hover
+    );
+
+    Ok(())
+}
+
+/// Tests that the server can disable language services for a workspace via workspace configuration
+/// request.
+#[test]
+fn disable_language_services_set_on_workspace() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_disable_language_services(true)),
+        )?
+        .enable_pull_diagnostics(true)
+        .with_file(foo, foo_content)?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(foo, &foo_content, 1);
+    let hover = server.hover_request(foo, Position::new(0, 5))?;
+
+    assert!(
+        hover.is_none(),
+        "Expected no hover information, got: {:?}",
+        hover
+    );
+
+    Ok(())
+}
+
+/// Tests that the server can disable language services for one workspace while keeping them
+/// enabled for another.
+#[test]
+#[ignore = "Requires multiple workspace support in the server and test server"]
+fn disable_language_services_for_one_workspace() -> Result<()> {
+    let workspace_a = SystemPath::new("src/a");
+    let workspace_b = SystemPath::new("src/b");
+    let foo = SystemPath::new("src/a/foo.py");
+    let bar = SystemPath::new("src/b/bar.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+    let bar_content = "\
+def bar() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_a,
+            Some(ClientOptions::default().with_disable_language_services(true)),
+        )?
+        .with_workspace(workspace_b, None)?
+        .enable_pull_diagnostics(true)
+        .with_file(foo, foo_content)?
+        .with_file(bar, bar_content)?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    server.open_text_document(foo, &foo_content, 1);
+    let hover_foo = server.hover_request(foo, Position::new(0, 5))?;
+    assert!(
+        hover_foo.is_none(),
+        "Expected no hover information for workspace A, got: {:?}",
+        hover_foo
+    );
+
+    server.open_text_document(bar, &bar_content, 1);
+    let hover_bar = server.hover_request(bar, Position::new(0, 5))?;
+    assert!(
+        hover_bar.is_some(),
+        "Expected hover information for workspace B, got: {:?}",
+        hover_bar
+    );
+
     Ok(())
 }
