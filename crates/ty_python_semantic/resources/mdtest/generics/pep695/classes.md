@@ -355,6 +355,25 @@ class C[T, U](tuple[T, U]): ...
 reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
 
+### Upcasting a `tuple` to its `Sequence` supertype
+
+This test is taken from the
+[typing spec conformance suite](https://github.com/python/typing/blob/c141cdfb9d7085c1aafa76726c8ce08362837e8b/conformance/tests/tuples_type_compat.py#L133-L153)
+
+```py
+from typing import Sequence, Never
+
+def test_seq[T](x: Sequence[T]) -> Sequence[T]:
+    return x
+
+def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
+    # TODO: this should be `Sequence[Never]`
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
+```
+
 ### `__init__` is itself generic
 
 ```py
