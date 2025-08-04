@@ -298,22 +298,15 @@ impl DisplaySet<'_> {
                 let lineno_color = stylesheet.line_no();
                 buffer.puts(line_offset, lineno_width, header_sigil, *lineno_color);
                 buffer.puts(line_offset, lineno_width + 4, path, stylesheet.none);
-                match pos {
-                    Some(Position::RowCol(row, col)) => {
-                        buffer.append(line_offset, ":", stylesheet.none);
-                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
-                        buffer.append(line_offset, ":", stylesheet.none);
-                        buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
-                    }
-                    Some(Position::Cell(cell, row, col)) => {
+                if let Some(Position { row, col, cell }) = pos {
+                    if let Some(cell) = cell {
                         buffer.append(line_offset, ":", stylesheet.none);
                         buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
-                        buffer.append(line_offset, ":", stylesheet.none);
-                        buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
-                        buffer.append(line_offset, ":", stylesheet.none);
-                        buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                     }
-                    None => {}
+                    buffer.append(line_offset, ":", stylesheet.none);
+                    buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    buffer.append(line_offset, ":", stylesheet.none);
+                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                 }
                 Ok(())
             }
@@ -895,9 +888,10 @@ impl DisplaySourceAnnotation<'_> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum Position {
-    RowCol(usize, usize),
-    Cell(usize, usize, usize),
+pub(crate) struct Position {
+    row: usize,
+    col: usize,
+    cell: Option<usize>,
 }
 
 /// Raw line - a line which does not have the `lineno` part and is not considered
@@ -1286,15 +1280,13 @@ fn format_header<'a>(
             }
         }
 
-        let pos = if let Some(cell) = cell_index {
-            Position::Cell(cell, line_offset, col)
-        } else {
-            Position::RowCol(line_offset, col)
-        };
-
         return Some(DisplayLine::Raw(DisplayRawLine::Origin {
             path,
-            pos: Some(pos),
+            pos: Some(Position {
+                row: line_offset,
+                col,
+                cell: cell_index,
+            }),
             header_type: display_header,
         }));
     }
