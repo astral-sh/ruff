@@ -7121,7 +7121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn narrow_expr_with_applicable_constraints<'r>(
-        &self,
+        &mut self,
         target: impl Into<ast::ExprRef<'r>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
@@ -7155,7 +7155,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
-            let (resolved, keys) = self.record_place_load(
+            let (resolved, keys) = self.infer_place_load(
                 PlaceExprRef::from(&place_expr),
                 ast::ExprRef::Attribute(attribute),
             );
@@ -7165,10 +7165,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let resolved_type = value_type
-            .member(db, &attr.id)
-            .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+        let fallback_place = value_type.member(db, &attr.id);
+        if !fallback_place.place.is_definitely_bound() {
+            self.all_definitely_bound = false;
+            eprintln!("attribute: {:?} was not bound", attribute);
+        }
+
+        let resolved_type =
+            fallback_place.map_type(|ty| {
+            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+        }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
 
@@ -11561,8 +11567,8 @@ mod tests {
 
             class Toggle:
                 def __init__(self: "Toggle"):
-                    if self.x:
-                        self.x: Literal[False] = False
+                    if not self.x:
+                        self.x: Literal[True] = True
             "#,
         )
         .unwrap();
@@ -11588,6 +11594,73 @@ mod tests {
                 .collect::<Vec<_>>()
         });
         assert_eq!(cycles.len(), 1);
+    }
+
+    #[test]
+    fn analyze_cycles_gridout() {
+        let mut db = setup_db();
+        let filename = "src/gridout.py";
+        db.write_dedented(
+            filename,
+            r#"
+            EMPTY = b""
+            class GridOut:
+                def __init__(self: "GridOut") -> None:
+                    self._buffer_pos = 0
+                    self._buffer = b""
+                def readchunk(self: "GridOut") -> bytes:
+                    if not len(self._buffer) - self._buffer_pos:
+                        raise Exception("truncated chunk")
+                    self._buffer_pos = 0
+                    return EMPTY
+                def _read_size_or_line(self: "GridOut", size: int = -1) -> bytes:
+                    if size > self._position:
+                        size = self._position
+                    if size == 0:
+                        return bytes()
+                    received = 0
+                    needed = size - received
+                    while received < size:
+                        if self._buffer:
+                            buf = self._buffer
+                            chunk_start = self._buffer_pos
+                            chunk_data = buf[self._buffer_pos :]
+                            self._buffer = EMPTY
+                        else:
+                            buf = self.readchunk()
+                            chunk_start = 0
+                            chunk_data = buf
+                        needed = buf.find(EMPTY, chunk_start, chunk_start + needed)
+                        if len(chunk_data) > needed:
+                            self._buffer = buf
+                            self._buffer_pos = chunk_start + needed
+                            self._position -= len(self._buffer) - self._buffer_pos
+                    return b""
+            "#,
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, filename, &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle {
+                        database_key,
+                        iteration_count,
+                        fell_back: _,
+                    } = event.kind
+                    {
+                        Some(format!("{database_key:?}, {iteration_count:?}"))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(cycles.len(), 2414);
     }
 
     #[test]
