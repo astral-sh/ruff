@@ -171,7 +171,7 @@ async def main():
 
 ## Incorrect signatures 
 
-The sub-diagnostic is also provided if the signatures of `__aenter__` and `__aexit__` do not match the
+The sub-diagnostic is also provided if the signatures of `__enter__` and `__exit__` do not match the
 expected signatures for a context manager:
 
 ```py
