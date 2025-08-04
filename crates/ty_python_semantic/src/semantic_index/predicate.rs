@@ -9,7 +9,7 @@
 
 use ruff_db::files::File;
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast::Singleton;
+use ruff_python_ast::{Singleton, name::Name};
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
@@ -136,6 +136,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
+    As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }
 
