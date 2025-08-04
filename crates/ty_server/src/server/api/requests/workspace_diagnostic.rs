@@ -203,7 +203,7 @@ impl<'a> ResponseWriter<'a> {
                 first: true,
                 client: client.clone(),
                 token,
-                is_test: snapshot.resolved_client_capabilities().is_test_server(),
+                is_test: snapshot.in_test(),
                 last_flush: Instant::now(),
                 batched: Vec::new(),
                 unchanged: Vec::with_capacity(previous_result_ids.len()),

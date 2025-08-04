@@ -18,7 +18,7 @@ bitflags::bitflags! {
         const SIGNATURE_ACTIVE_PARAMETER_SUPPORT = 1 << 9;
         const HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT = 1 << 10;
         const WORK_DONE_PROGRESS = 1 << 11;
-        const TEST_SERVER = 1 << 12;
+        const DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION= 1 << 12;
     }
 }
 
@@ -83,8 +83,9 @@ impl ResolvedClientCapabilities {
         self.contains(Self::WORK_DONE_PROGRESS)
     }
 
-    pub(crate) const fn is_test_server(self) -> bool {
-        self.contains(Self::TEST_SERVER)
+    /// Returns `true` if the client supports dynamic registration for watched files changes.
+    pub(crate) const fn supports_did_change_watched_files_dynamic_registration(self) -> bool {
+        self.contains(Self::DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -212,12 +213,12 @@ impl ResolvedClientCapabilities {
         }
 
         if client_capabilities
-            .experimental
+            .workspace
             .as_ref()
-            .and_then(|experimental| experimental.get("ty_test_server"))
-            .is_some()
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default()
         {
-            flags |= Self::TEST_SERVER;
+            flags |= Self::DID_CHANGE_WATCHED_FILES_DYNAMIC_REGISTRATION;
         }
 
         flags

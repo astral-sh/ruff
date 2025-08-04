@@ -269,9 +269,10 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        let reporter = IndicatifReporter::from(self.printer);
+                        let mut reporter = IndicatifReporter::from(self.printer);
+                        let bar = reporter.bar.clone();
+
                         match salsa::Cancelled::catch(|| {
-                            let mut reporter = reporter.clone();
                             db.check_with_reporter(&mut reporter);
                             reporter.collector.into_sorted(&db)
                         }) {
@@ -282,7 +283,7 @@ impl MainLoop {
                                     .unwrap();
                             }
                             Err(cancelled) => {
-                                reporter.bar.finish_and_clear();
+                                bar.finish_and_clear();
                                 tracing::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
@@ -392,7 +393,6 @@ impl MainLoop {
 }
 
 /// A progress reporter for `ty check`.
-#[derive(Clone)]
 struct IndicatifReporter {
     collector: CollectReporter,
 

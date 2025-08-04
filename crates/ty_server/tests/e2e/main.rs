@@ -174,7 +174,7 @@ impl TestServer {
             let worker_threads = NonZeroUsize::new(1).unwrap();
             let test_system = Arc::new(TestSystem::new(os_system));
 
-            match Server::new(worker_threads, server_connection, test_system, false) {
+            match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
