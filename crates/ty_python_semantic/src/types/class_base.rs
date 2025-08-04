@@ -159,7 +159,8 @@ impl<'db> ClassBase<'db> {
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::TypeIs(_) => None,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),

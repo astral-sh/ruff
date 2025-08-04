@@ -215,9 +215,10 @@ impl<'db> Completion<'db> {
                 | Type::Callable(_) => CompletionKind::Function,
                 Type::BoundMethod(_) | Type::MethodWrapper(_) => CompletionKind::Method,
                 Type::ModuleLiteral(_) => CompletionKind::Module,
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    CompletionKind::Class
-                }
+                Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)
+                | Type::TypedDict(_) => CompletionKind::Class,
                 // This is a little weird for "struct." I'm mostly interpreting
                 // "struct" here as a more general "object." ---AG
                 Type::NominalInstance(_)

@@ -139,7 +139,9 @@ impl<'db> AllMembers<'db> {
             | Type::KnownInstance(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_) => match ty.to_meta_type(db) {
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) // TODO: we could do better by using typeddictfallback
+            => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }

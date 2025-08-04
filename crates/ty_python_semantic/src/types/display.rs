@@ -234,6 +234,9 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::TypedDict(typed_dict) => {
+                f.write_str(typed_dict.defining_class(self.db).name(self.db))
+            }
         }
     }
 }
