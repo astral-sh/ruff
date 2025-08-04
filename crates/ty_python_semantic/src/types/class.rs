@@ -1478,11 +1478,8 @@ impl<'db> ClassLiteral<'db> {
         heap_size=get_size2::heap_size
     )]
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        if self
-            .known(db)
-            .is_some_and(KnownClass::is_typed_dict_subclass)
-        {
-            return true;
+        if let Some(known) = self.known(db) {
+            return known.is_typed_dict_subclass();
         }
 
         self.iter_mro(db, None)
