@@ -694,12 +694,18 @@ enum IntersectionOn {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DeclaredAndInferredType<'db> {
     /// We know that both the declared and inferred types are the same.
-    AreTheSame(Type<'db>),
+    AreTheSame(TypeAndQualifiers<'db>),
     /// Declared and inferred types might be different, we need to check assignability.
     MightBeDifferent {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
+}
+
+impl<'db> DeclaredAndInferredType<'db> {
+    fn are_the_same_type(ty: Type<'db>) -> Self {
+        Self::AreTheSame(ty.into())
+    }
 }
 
 /// Builder to infer all types in a region.
@@ -2132,7 +2138,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let (declared_ty, inferred_ty) = match *declared_and_inferred_ty {
-            DeclaredAndInferredType::AreTheSame(ty) => (ty.into(), ty),
+            DeclaredAndInferredType::AreTheSame(type_and_qualifiers) => {
+                (type_and_qualifiers, type_and_qualifiers.inner_type())
+            }
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
@@ -2191,7 +2199,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             node,
             definition,
-            &DeclaredAndInferredType::AreTheSame(Type::unknown()),
+            &DeclaredAndInferredType::are_the_same_type(Type::unknown()),
         );
     }
 
@@ -2658,7 +2666,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             function.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(inferred_ty),
+            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
         );
     }
 
@@ -2818,7 +2826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
                 {
-                    DeclaredAndInferredType::AreTheSame(declared_ty)
+                    DeclaredAndInferredType::are_the_same_type(declared_ty)
                 } else {
                     if let Some(builder) = self
                         .context
@@ -2831,10 +2839,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             declared_ty.display(self.db())
                         ));
                     }
-                    DeclaredAndInferredType::AreTheSame(declared_ty)
+                    DeclaredAndInferredType::are_the_same_type(declared_ty)
                 }
             } else {
-                DeclaredAndInferredType::AreTheSame(declared_ty)
+                DeclaredAndInferredType::are_the_same_type(declared_ty)
             };
             self.add_declaration_with_binding(
                 parameter.into(),
@@ -2874,7 +2882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                &DeclaredAndInferredType::AreTheSame(ty),
+                &DeclaredAndInferredType::are_the_same_type(ty),
             );
         } else {
             self.add_binding(
@@ -2906,7 +2914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
-                &DeclaredAndInferredType::AreTheSame(ty),
+                &DeclaredAndInferredType::are_the_same_type(ty),
             );
         } else {
             self.add_binding(
@@ -3004,7 +3012,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(class_ty),
+            &DeclaredAndInferredType::are_the_same_type(class_ty),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -3078,7 +3086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             type_alias.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(type_alias_ty),
+            &DeclaredAndInferredType::are_the_same_type(type_alias_ty),
         );
     }
 
@@ -3433,7 +3441,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(ty),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
     }
 
@@ -3453,7 +3461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
         );
     }
 
@@ -3473,7 +3481,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             node.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(pep_695_todo),
+            &DeclaredAndInferredType::are_the_same_type(pep_695_todo),
         );
     }
 
@@ -4558,7 +4566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(declared.inner_type()),
+                    &DeclaredAndInferredType::AreTheSame(declared),
                 );
             } else {
                 self.add_declaration(target.into(), definition, declared);
@@ -4876,7 +4884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.add_declaration_with_binding(
             alias.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(binding_ty),
+            &DeclaredAndInferredType::are_the_same_type(binding_ty),
         );
     }
 
@@ -5125,7 +5133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
-                &DeclaredAndInferredType::AreTheSame(submodule_type),
+                &DeclaredAndInferredType::are_the_same_type(submodule_type),
             );
             return;
         }
