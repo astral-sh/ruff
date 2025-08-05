@@ -219,17 +219,26 @@ class Person(TypedDict):
     age: int | None
 
 static_assert(not has_member(Person, "name"))
-static_assert(not has_member(Person, "age"))
-
+static_assert(has_member(Person, "keys"))
 static_assert(has_member(Person, "__total__"))
-static_assert(has_member(Person, "__required_keys__"))
 
 def _(person: Person):
     static_assert(not has_member(person, "name"))
-    static_assert(not has_member(person, "age"))
-
+    static_assert(not has_member(person, "__total__"))
     static_assert(has_member(person, "keys"))
+
+    # type(person) is `dict` at runtime, so `__total__` is not available:
+    static_assert(not has_member(type(person), "name"))
+    static_assert(not has_member(type(person), "__total__"))
+    static_assert(has_member(type(person), "keys"))
+
+def _(t_person: type[Person]):
+    static_assert(not has_member(t_person, "name"))
+    static_assert(has_member(t_person, "__total__"))
+    static_assert(has_member(t_person, "keys"))
 ```
+
+### Unions
 
 For unions, `ide_support::all_members` only returns members that are available on all elements of
 the union.

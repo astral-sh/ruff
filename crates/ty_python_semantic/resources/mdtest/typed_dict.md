@@ -148,8 +148,8 @@ def _(p: Person) -> None:
 
 ## Unlike normal classes
 
-`TypedDict` types are not like normal classes. The "attributes" can not be accessed. Neither on the
-class itself, nor on inhabitants of the type defined by the class:
+`TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
+of a `TypedDict` type will return `dict`:
 
 ```py
 from typing import TypedDict
@@ -158,6 +158,16 @@ class Person(TypedDict):
     name: str
     age: int | None
 
+def _(p: Person) -> None:
+    reveal_type(type(p))  # revealed: <class 'dict[str, object]'>
+
+    reveal_type(p.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
+Also, the "attributes" on the class definition can not be accessed. Neither on the class itself, nor
+on inhabitants of the type defined by the class:
+
+```py
 # error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
 Person.name
 
@@ -168,6 +178,8 @@ def _(P: type[Person]):
 def _(p: Person) -> None:
     # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
     p.name
+
+    type(p).name  # error: [unresolved-attribute] "Type `<class 'dict[str, object]'>` has no attribute `name`"
 ```
 
 ## Special properties
@@ -190,20 +202,30 @@ These attributes can not be accessed on inhabitants:
 
 ```py
 def _(person: Person) -> None:
-    # TODO: these should be errors
-    person.__total__
-    person.__required_keys__
-    person.__optional_keys__
+    person.__total__  # error: [unresolved-attribute]
+    person.__required_keys__  # error: [unresolved-attribute]
+    person.__optional_keys__  # error: [unresolved-attribute]
 ```
 
 Also, they can not be accessed on `type(person)`, as that would be `dict` at runtime:
 
 ```py
-def _(t_person: type[Person]) -> None:
-    # TODO: these should be errors
-    t_person.__total__
-    t_person.__required_keys__
-    t_person.__optional_keys__
+def _(person: Person) -> None:
+    type(person).__total__  # error: [unresolved-attribute]
+    type(person).__required_keys__  # error: [unresolved-attribute]
+    type(person).__optional_keys__  # error: [unresolved-attribute]
+```
+
+But they *can* be accessed on `type[Person]`, because this function would accept the class object
+`Person` as an argument:
+
+```py
+def accepts_typed_dict_class(t_person: type[Person]) -> None:
+    reveal_type(t_person.__total__)  # revealed: bool
+    reveal_type(t_person.__required_keys__)  # revealed: frozenset[str]
+    reveal_type(t_person.__optional_keys__)  # revealed: frozenset[str]
+
+accepts_typed_dict_class(Person)
 ```
 
 ## Subclassing
