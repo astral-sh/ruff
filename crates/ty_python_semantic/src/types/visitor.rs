@@ -203,7 +203,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
     }
 }
 
-impl<'db> Type<'db> {
+impl Type<'_> {
     pub(crate) fn is_atomic(self) -> bool {
         matches!(TypeKind::from(self), TypeKind::Atomic)
     }

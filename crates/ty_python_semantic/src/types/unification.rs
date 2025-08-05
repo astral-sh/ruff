@@ -152,7 +152,7 @@ impl<'db> ConstraintSetSet<'db> {
                 // (or the coinductive base case).
                 if self.results.contains_key(&ty) {
                     return;
-                };
+                }
 
                 // Figure 3, step 1: Insert the coinductive base case for this type into the result
                 // set. That ensures that if we encounter this type again recursively while we are
