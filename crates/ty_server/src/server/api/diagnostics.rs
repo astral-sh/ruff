@@ -42,7 +42,7 @@ impl Diagnostics<'_> {
         // Hash the length first to ensure different numbers of diagnostics produce different hashes
         diagnostics.hash(&mut hasher);
 
-        Some(format!("{:x}", hasher.finish()))
+        Some(format!("{:016x}", hasher.finish()))
     }
 
     /// Computes the result ID for the diagnostics.
