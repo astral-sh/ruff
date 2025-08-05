@@ -125,15 +125,17 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
-        self.class.known(db).is_some_and(KnownClass::is_singleton)
-            || is_single_member_enum(db, self.class.class_literal(db).0)
+        self.class
+            .known(db)
+            .map(KnownClass::is_singleton)
+            .unwrap_or_else(|| is_single_member_enum(db, self.class.class_literal(db).0))
     }
 
     pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.class
             .known(db)
-            .is_some_and(KnownClass::is_single_valued)
-            || is_single_member_enum(db, self.class.class_literal(db).0)
+            .map(KnownClass::is_single_valued)
+            .unwrap_or_else(|| is_single_member_enum(db, self.class.class_literal(db).0))
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
