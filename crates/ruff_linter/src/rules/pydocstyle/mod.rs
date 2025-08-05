@@ -113,6 +113,26 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UndocumentedPublicFunction, Path::new("__init__.py"))]
+    #[test_case(Rule::UndocumentedPublicFunction, Path::new("markers/__init__.py"))]
+    fn ignore_local_decorators(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D103").join(path).as_path(),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    ignore_decorators: ["D103.markers.no_docs_needed".to_string()]
+                        .into_iter()
+                        .collect(),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn bom() -> Result<()> {
         let diagnostics = test_path(

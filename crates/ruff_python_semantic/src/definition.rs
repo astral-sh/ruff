@@ -59,9 +59,12 @@ pub struct Module<'a> {
 }
 
 impl<'a> Module<'a> {
-    /// Return the fully-qualified path of the module.
-    pub const fn qualified_name(&self) -> Option<&'a [String]> {
-        if let ModuleSource::Path(path) = self.source {
+    /// Return the fully-qualified name of the module.
+    pub fn qualified_name(&self) -> Option<&'a [String]> {
+        if let ModuleSource::Path(mut path) = self.source {
+            if self.kind.is_package() {
+                path = &path[..path.len() - 1];
+            }
             Some(path)
         } else {
             None
