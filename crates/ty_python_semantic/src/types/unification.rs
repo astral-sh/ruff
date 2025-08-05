@@ -6,17 +6,14 @@
 // XXX
 #![allow(dead_code)]
 
-use rustc_hash::FxHashMap;
-
 use crate::Db;
-use crate::types::visitor::TypeVisitor;
 use crate::types::{
     IntersectionBuilder, IntersectionType, Type, TypeVarInstance, UnionBuilder, UnionType,
 };
 
 /// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
 /// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Constraint<'db> {
     pub(crate) lower: Type<'db>,
     pub(crate) typevar: TypeVarInstance<'db>,
@@ -47,7 +44,7 @@ impl<'db> Constraint<'db> {
 /// This is denoted _C_ in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ConstraintSet<'db> {
     constraints: Vec<Constraint<'db>>,
 }
@@ -102,7 +99,7 @@ impl<'db> ConstraintSet<'db> {
 /// This is denoted _𝒮_ in [[POPL2015][]].
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ConstraintSetSet<'db> {
     sets: Vec<ConstraintSet<'db>>,
 }
@@ -123,197 +120,6 @@ impl<'db> ConstraintSetSet<'db> {
     /// Returns the set of constraint sets that is always satisfied.
     pub(crate) fn always() -> Self {
         Self::singleton(ConstraintSet::empty())
-    }
-
-    /// Returns a set of constraint sets that is equivalent to the constraint that `ty` is (a
-    /// subtype of) `Never`.
-    ///
-    /// This is a combination of the "Constraint normalization" and "Constraint merging" steps from
-    /// [[POPL2015][]], §3.2.1.
-    ///
-    /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-    pub(crate) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
-        struct NormVisitor<'db> {
-            results: FxHashMap<Type<'db>, ConstraintSetSet<'db>>,
-        }
-
-        impl<'db> NormVisitor<'db> {
-            fn result(&self, ty: Type<'db>) -> &ConstraintSetSet<'db> {
-                self.results
-                    .get(&ty)
-                    .expect("should have computed a result for this type")
-            }
-        }
-
-        impl<'db> TypeVisitor<'db> for NormVisitor<'db> {
-            fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-                // Figure 3, step 1, plus a memoization optimization: If we've already visited (or
-                // started visiting) this type, return the result that we already calculated for it
-                // (or the coinductive base case).
-                if self.results.contains_key(&ty) {
-                    return;
-                }
-
-                // Figure 3, step 1: Insert the coinductive base case for this type into the result
-                // set. That ensures that if we encounter this type again recursively while we are
-                // in the middle of calculating a result for it, we use the coinductive base case
-                // for it at the point of recursion.
-                self.results.insert(ty, ConstraintSetSet::always());
-
-                match ty {
-                    // These atomic types are always inhabited by at least one value, and can
-                    // therefore never be a subtype of `Never`.
-                    Type::AlwaysFalsy
-                    | Type::AlwaysTruthy
-                    | Type::Never
-                    | Type::LiteralString
-                    | Type::IntLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
-                    | Type::EnumLiteral(_)
-                    | Type::DataclassDecorator(_)
-                    | Type::DataclassTransformer(_)
-                    | Type::WrapperDescriptor(_)
-                    | Type::ModuleLiteral(_)
-                    | Type::ClassLiteral(_)
-                    | Type::SpecialForm(_) => {
-                        let result = ConstraintSetSet::never();
-                        self.results.insert(ty, result);
-                        return;
-                    }
-
-                    Type::Union(union) => {
-                        // Figure 3, step 6
-                        // A union is a subtype of Never only if every element is.
-                        self.visit_union_type(db, union);
-                        let result = (union.iter(db))
-                            .fold(ConstraintSetSet::always(), |sets, element| {
-                                self.result(*element).intersect(db, &sets)
-                            });
-                        self.results.insert(ty, result);
-                        return;
-                    }
-
-                    Type::Intersection(intersection) => {
-                        // Figure 3, step 2
-                        // If an intersection contains any (positive or negative) top-level type
-                        // variables, extract out and isolate the smallest one (according to our
-                        // arbitrary ordering).
-                        let smallest_positive =
-                            find_smallest_typevar(intersection.iter_positive(db));
-                        let smallest_negative =
-                            find_smallest_typevar(intersection.iter_negative(db));
-                        let constraint = match (smallest_positive, smallest_negative) {
-                            (Some(typevar), None) => Some(Constraint {
-                                lower: Type::Never,
-                                typevar,
-                                upper: remove_positive_typevar(db, intersection, typevar)
-                                    .negate(db),
-                            }),
-
-                            (Some(typevar), Some(negative)) if typevar < negative => {
-                                Some(Constraint {
-                                    lower: Type::Never,
-                                    typevar,
-                                    upper: remove_positive_typevar(db, intersection, typevar)
-                                        .negate(db),
-                                })
-                            }
-
-                            (_, Some(typevar)) => Some(Constraint {
-                                lower: remove_negative_typevar(db, intersection, typevar),
-                                typevar,
-                                upper: Type::object(db),
-                            }),
-
-                            (None, None) => None,
-                        };
-                        if let Some(constraint) = constraint {
-                            self.results.insert(ty, constraint.into());
-                            return;
-                        }
-
-                        // Figure 3, step 3
-                        // If all (positive and negative) elements of the intersection are atomic
-                        // types (and therefore cannot contain any typevars), fall back on an
-                        // assignability check: if the intersection of the positive elements is
-                        // assignable to the union of the negative elements, then the overall
-                        // intersection is empty.
-                        let mut all_atomic = true;
-                        let mut positive_atomic = IntersectionBuilder::new(db);
-                        let mut negative_atomic = UnionBuilder::new(db);
-                        for positive in intersection.iter_positive(db) {
-                            if !all_atomic {
-                                break;
-                            }
-                            if !positive.is_atomic() {
-                                all_atomic = false;
-                                break;
-                            }
-                            positive_atomic = positive_atomic.add_positive(positive);
-                        }
-                        for negative in intersection.iter_negative(db) {
-                            if !all_atomic {
-                                break;
-                            }
-                            if !negative.is_atomic() {
-                                all_atomic = false;
-                                break;
-                            }
-                            negative_atomic = negative_atomic.add(negative);
-                        }
-                        if all_atomic {
-                            let positive_atomic = positive_atomic.build();
-                            let negative_atomic = negative_atomic.build();
-                            let result = if positive_atomic.is_assignable_to(db, negative_atomic) {
-                                ConstraintSetSet::always()
-                            } else {
-                                ConstraintSetSet::never()
-                            };
-                            self.results.insert(ty, result);
-                            return;
-                        }
-
-                        // TODO: Do we need to handle non-uniform intersections? For now, assume
-                        // the intersection is not empty.
-                        let result = ConstraintSetSet::never();
-                        self.results.insert(ty, result);
-                        return;
-                    }
-
-                    Type::TypeVar(typevar) => {
-                        // Figure 3, step 2
-                        // (special case where P' = {typevar}, and P = N = N' = ø)
-                        let constraint = Constraint {
-                            lower: Type::Never,
-                            typevar,
-                            upper: Type::object(db),
-                        };
-                        self.results.insert(ty, constraint.into());
-                        return;
-                    }
-
-                    _ => todo!(),
-                }
-
-                // Every match arm should explicitly return once it has calculated and memoized a
-                // result.
-                #[expect(unreachable_code)]
-                {
-                    unreachable!();
-                }
-            }
-        }
-
-        let mut visitor = NormVisitor {
-            results: FxHashMap::default(),
-        };
-        visitor.visit_type(db, ty);
-        visitor
-            .results
-            .remove(&ty)
-            .expect("should have computed a result for the input type")
     }
 
     /// Adds a new constraint set to this set, ensuring that no constraint set in the set subsumes
@@ -371,6 +177,168 @@ impl<'db> From<ConstraintSet<'db>> for ConstraintSetSet<'db> {
     fn from(constraint_set: ConstraintSet<'db>) -> ConstraintSetSet<'db> {
         ConstraintSetSet::singleton(constraint_set)
     }
+}
+
+/// Returns a set of normalized constraint sets that is equivalent to the constraint that `ty` is
+/// (a subtype of) `Never`.
+///
+/// This is a combination of the "Constraint normalization" and "Constraint merging" steps from
+/// [[POPL2015][]], §3.2.1.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+pub(crate) fn normalized_constraints_from_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> ConstraintSetSet<'db> {
+    normalized_constraints_from_type_inner(db, ty, ())
+}
+
+#[salsa::tracked(
+    cycle_fn=normalized_constraints_from_type_recover,
+    cycle_initial=normalized_constraints_from_type_initial,
+    heap_size=get_size2::heap_size,
+)]
+fn normalized_constraints_from_type_inner<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    _unused: (),
+) -> ConstraintSetSet<'db> {
+    match ty {
+        // These atomic types are always inhabited by at least one value, and can
+        // therefore never be a subtype of `Never`.
+        Type::AlwaysFalsy
+        | Type::AlwaysTruthy
+        | Type::Never
+        | Type::LiteralString
+        | Type::IntLiteral(_)
+        | Type::BooleanLiteral(_)
+        | Type::StringLiteral(_)
+        | Type::BytesLiteral(_)
+        | Type::EnumLiteral(_)
+        | Type::DataclassDecorator(_)
+        | Type::DataclassTransformer(_)
+        | Type::WrapperDescriptor(_)
+        | Type::ModuleLiteral(_)
+        | Type::ClassLiteral(_)
+        | Type::SpecialForm(_) => ConstraintSetSet::never(),
+
+        Type::Union(union) => {
+            // Figure 3, step 6
+            // A union is a subtype of Never only if every element is.
+            (union.iter(db)).fold(ConstraintSetSet::always(), |sets, element| {
+                normalized_constraints_from_type(db, *element).intersect(db, &sets)
+            })
+        }
+
+        Type::Intersection(intersection) => {
+            // Figure 3, step 2
+            // If an intersection contains any (positive or negative) top-level type
+            // variables, extract out and isolate the smallest one (according to our
+            // arbitrary ordering).
+            let smallest_positive = find_smallest_typevar(intersection.iter_positive(db));
+            let smallest_negative = find_smallest_typevar(intersection.iter_negative(db));
+            let constraint = match (smallest_positive, smallest_negative) {
+                (Some(typevar), None) => Some(Constraint {
+                    lower: Type::Never,
+                    typevar,
+                    upper: remove_positive_typevar(db, intersection, typevar).negate(db),
+                }),
+
+                (Some(typevar), Some(negative)) if typevar < negative => Some(Constraint {
+                    lower: Type::Never,
+                    typevar,
+                    upper: remove_positive_typevar(db, intersection, typevar).negate(db),
+                }),
+
+                (_, Some(typevar)) => Some(Constraint {
+                    lower: remove_negative_typevar(db, intersection, typevar),
+                    typevar,
+                    upper: Type::object(db),
+                }),
+
+                (None, None) => None,
+            };
+            if let Some(constraint) = constraint {
+                return constraint.into();
+            }
+
+            // Figure 3, step 3
+            // If all (positive and negative) elements of the intersection are atomic
+            // types (and therefore cannot contain any typevars), fall back on an
+            // assignability check: if the intersection of the positive elements is
+            // assignable to the union of the negative elements, then the overall
+            // intersection is empty.
+            let mut all_atomic = true;
+            let mut positive_atomic = IntersectionBuilder::new(db);
+            let mut negative_atomic = UnionBuilder::new(db);
+            for positive in intersection.iter_positive(db) {
+                if !all_atomic {
+                    break;
+                }
+                if !positive.is_atomic() {
+                    all_atomic = false;
+                    break;
+                }
+                positive_atomic = positive_atomic.add_positive(positive);
+            }
+            for negative in intersection.iter_negative(db) {
+                if !all_atomic {
+                    break;
+                }
+                if !negative.is_atomic() {
+                    all_atomic = false;
+                    break;
+                }
+                negative_atomic = negative_atomic.add(negative);
+            }
+            if all_atomic {
+                let positive_atomic = positive_atomic.build();
+                let negative_atomic = negative_atomic.build();
+                if positive_atomic.is_assignable_to(db, negative_atomic) {
+                    return ConstraintSetSet::always();
+                } else {
+                    return ConstraintSetSet::never();
+                };
+            }
+
+            // TODO: Do we need to handle non-uniform intersections? For now, assume
+            // the intersection is not empty.
+            ConstraintSetSet::never()
+        }
+
+        Type::TypeVar(typevar) => {
+            // Figure 3, step 2
+            // (special case where P' = {typevar}, and P = N = N' = ø)
+            let constraint = Constraint {
+                lower: Type::Never,
+                typevar,
+                upper: Type::object(db),
+            };
+            constraint.into()
+        }
+
+        _ => todo!(),
+    }
+}
+
+fn normalized_constraints_from_type_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &ConstraintSetSet<'db>,
+    _count: u32,
+    _ty: Type<'db>,
+    _unused: (),
+) -> salsa::CycleRecoveryAction<ConstraintSetSet<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn normalized_constraints_from_type_initial<'db>(
+    _db: &'db dyn Db,
+    _ty: Type<'db>,
+    _unused: (),
+) -> ConstraintSetSet<'db> {
+    // Figure 3, step 1: The coinductive base case, for if we encounter this type again recursively
+    // while we are in the middle of calculating a result for it.
+    ConstraintSetSet::always()
 }
 
 /// Returns the “smallest” top-level typevar in an iterator of types.
