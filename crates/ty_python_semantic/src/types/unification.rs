@@ -107,7 +107,7 @@ pub(crate) struct ConstraintSetSet<'db> {
 
 impl<'db> ConstraintSetSet<'db> {
     /// Returns the set of constraint sets that is unsolvable.
-    pub(crate) fn none() -> Self {
+    pub(crate) fn never() -> Self {
         Self { sets: vec![] }
     }
 
@@ -123,7 +123,8 @@ impl<'db> ConstraintSetSet<'db> {
         Self::singleton(ConstraintSet::empty())
     }
 
-    /// Returns a normalized set of constraint sets for all of the polymorphic typevars in a type.
+    /// Returns a set of constraint sets that is equivalent to the constraint that `ty` is (a
+    /// subtype of) `Never`.
     ///
     /// This is a combination of the "Constraint normalization" and "Constraint merging" steps from
     /// [[POPL2015][]], §3.2.1.
@@ -158,6 +159,27 @@ impl<'db> ConstraintSetSet<'db> {
                 self.results.insert(ty, ConstraintSetSet::always());
 
                 match ty {
+                    // These atomic types are always inhabited by at least one value, and can
+                    // therefore never be a subtype of `Never`.
+                    Type::AlwaysFalsy
+                    | Type::AlwaysTruthy
+                    | Type::Never
+                    | Type::LiteralString
+                    | Type::IntLiteral(_)
+                    | Type::BooleanLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::BytesLiteral(_)
+                    | Type::EnumLiteral(_)
+                    | Type::DataclassDecorator(_)
+                    | Type::DataclassTransformer(_)
+                    | Type::WrapperDescriptor(_)
+                    | Type::ModuleLiteral(_)
+                    | Type::ClassLiteral(_)
+                    | Type::SpecialForm(_) => {
+                        let result = ConstraintSetSet::never();
+                        self.results.insert(ty, result);
+                    }
+
                     Type::Union(union) => {
                         // Figure 3, step 6
                         self.visit_union_type(db, union);
@@ -259,7 +281,7 @@ impl<'db> ConstraintSetSet<'db> {
     ///
     /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Self {
-        let mut result = Self::none();
+        let mut result = Self::never();
         for self_set in &self.sets {
             for other_set in &other.sets {
                 let mut new_set = self_set.clone();
