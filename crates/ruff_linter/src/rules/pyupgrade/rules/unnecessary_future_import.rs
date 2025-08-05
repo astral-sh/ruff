@@ -130,7 +130,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
                     };
                     process_unused_future_import(checker, stmt, alias, node_id);
                 }
-            };
+            }
         }
     }
 }
