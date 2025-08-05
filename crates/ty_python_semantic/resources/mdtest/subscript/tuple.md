@@ -39,13 +39,9 @@ class HeterogeneousSubclass0(tuple[()]): ...
 reveal_type(HeterogeneousSubclass0.__getitem__)
 
 def f0(h0: HeterogeneousSubclass0, i: int):
-    # error: [index-out-of-bounds]
     reveal_type(h0[0])  # revealed: Never
-    # error: [index-out-of-bounds]
     reveal_type(h0[1])  # revealed: Never
-    # error: [index-out-of-bounds]
     reveal_type(h0[-1])  # revealed: Never
-    # error: [index-out-of-bounds]
     reveal_type(h0[i])  # revealed: Never
 
 class HeterogeneousSubclass1(tuple[I0]): ...

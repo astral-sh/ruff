@@ -38,8 +38,8 @@ bob = Person(name="Bob", age=25)
 reveal_type(bob["name"])  # revealed: str
 reveal_type(bob["age"])  # revealed: int | None
 
-# error: [invalid-key] "The `Person` TypedDict does not define the key 'non_existing'"
-reveal_type(bob["non_existing"])  # revealed: Never
+# error: [invalid-key] "The `Person` TypedDict does not define a key named 'non_existing'"
+reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
 Methods that are available on `dict`s are also available on `TypedDict`s:
@@ -145,21 +145,25 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-A_KEY: Final = "name"
+NAME_FINAL: Final = "name"
+AGE_FINAL: Final[Literal["age"]] = "age"
 
-def _(person: Person, another_key: Literal["age"], union_of_keys: Literal["age", "name"]) -> None:
+def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age", "name"], unknown_key: str) -> None:
     reveal_type(person["name"])  # revealed: str
     reveal_type(person["age"])  # revealed: int | None
 
-    reveal_type(person[A_KEY])  # revealed: str
-    reveal_type(person[another_key])  # revealed: int | None
+    reveal_type(person[NAME_FINAL])  # revealed: str
+    reveal_type(person[AGE_FINAL])  # revealed: int | None
 
-    # TODO: this should be `int | None | str`; no error
-    # error: [invalid-key] "The `Person` TypedDict does not define a key of type `Literal["age", "name"]"
-    reveal_type(person[union_of_keys])  # revealed: Never
+    reveal_type(person[literal_key])  # revealed: int | None
 
-    # error: [invalid-key] "The `Person` TypedDict does not define the key 'non_existing'"
-    reveal_type(person["non_existing"])  # revealed: Never
+    reveal_type(person[union_of_keys])  # revealed: int | None | str
+
+    # error: [invalid-key] "The `Person` TypedDict does not define a key named 'non_existing'"
+    reveal_type(person["non_existing"])  # revealed: Unknown
+
+    # error: [invalid-key] "The `Person` TypedDict can not be indexed with a key of type `str`"
+    reveal_type(person[unknown_key])  # revealed: Unknown
 ```
 
 ## Methods on `TypedDict`

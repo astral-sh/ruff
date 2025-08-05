@@ -2055,18 +2055,6 @@ impl<'db> ClassLiteral<'db> {
                     )
                 });
 
-                // Add a (LiteralString -> Never) overload to signal that trying to access
-                // unknown keys will fail.
-                let overloads = overloads.chain(std::iter::once(Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key")))
-                            .with_annotated_type(Type::LiteralString),
-                    ]),
-                    Some(Type::Never),
-                )));
-
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),

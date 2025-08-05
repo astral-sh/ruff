@@ -94,17 +94,17 @@ use crate::types::class::{CodeGeneratorKind, DataclassField, MetaclassErrorKind,
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INDEX_OUT_OF_BOUNDS, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
-    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
-    report_implicit_return_type, report_instance_layout_conflict,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_PARAMETER_DEFAULT,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1918,8 +1918,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let value_ty = self.infer_expression(value);
                             let slice_ty = self.infer_expression(slice);
-                            let result_ty = self
-                                .infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
+                            let result_ty = self.infer_subscript_expression_types(
+                                value, slice, value_ty, slice_ty, *ctx,
+                            );
                             return (result_ty, is_modifiable);
                         }
                     }
@@ -8450,7 +8451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Store => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
+                self.infer_subscript_expression_types(value, slice, value_ty, slice_ty, *ctx);
                 Type::Never
             }
             ExprContext::Del => {
@@ -8460,7 +8461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExprContext::Invalid => {
                 let value_ty = self.infer_expression(value);
                 let slice_ty = self.infer_expression(slice);
-                self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
+                self.infer_subscript_expression_types(value, slice, value_ty, slice_ty, *ctx);
                 Type::unknown()
             }
         }
@@ -8489,7 +8490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice);
-                    self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
+                    self.infer_subscript_expression_types(value, slice, value_ty, slice_ty, *ctx);
                     return ty;
                 }
             }
@@ -8528,7 +8529,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty, *ctx);
+        let result_ty =
+            self.infer_subscript_expression_types(value, slice, value_ty, slice_ty, *ctx);
         self.narrow_expr_with_applicable_constraints(subscript, result_ty, &constraint_keys)
     }
 
@@ -8580,6 +8582,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_subscript_expression_types(
         &self,
         value_node: &'ast ast::Expr,
+        slice_node: &'ast ast::Expr,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         expr_context: ExprContext,
@@ -8593,6 +8596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 Some(self.infer_subscript_expression_types(
                     value_node,
+                    slice_node,
                     Type::version_info_tuple(db),
                     slice_ty,
                     expr_context,
@@ -8600,7 +8604,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::Union(union), _) => Some(union.map(db, |element| {
-                self.infer_subscript_expression_types(value_node, *element, slice_ty, expr_context)
+                self.infer_subscript_expression_types(
+                    value_node,
+                    slice_node,
+                    *element,
+                    slice_ty,
+                    expr_context,
+                )
             })),
 
             // TODO: we can map over the intersection and fold the results back into an intersection,
@@ -8732,6 +8742,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::BooleanLiteral(bool),
             ) => Some(self.infer_subscript_expression_types(
                 value_node,
+                slice_node,
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
                 expr_context,
@@ -8823,37 +8834,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
         match value_ty.try_call_dunder(db, "__getitem__", CallArguments::positional([slice_ty])) {
             Ok(outcome) => {
-                let return_type = outcome.return_type(db);
-
-                if return_type.is_never() && !value_ty.is_never() {
-                    let key = match slice_ty {
-                        Type::IntLiteral(i) => format!("the key `{i}`"),
-                        Type::StringLiteral(s) => format!("the key '{}'", s.value(db)),
-                        _ => format!("a key of type `{}`", slice_ty.display(db)),
-                    };
-
-                    let lint_type = if slice_ty.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
-                        &INDEX_OUT_OF_BOUNDS
-                    } else {
-                        &INVALID_KEY
-                    };
-
-                    if let Some(builder) = context.report_lint(lint_type, value_node) {
-                        if value_ty.is_typed_dict() {
-                            builder.into_diagnostic(format_args!(
-                                "The `{}` TypedDict does not define {key}",
-                                value_ty.display(db),
-                            ));
-                        } else {
-                            builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` returned `Never` for {key}",
-                                value_ty.display(db),
-                            ));
-                        }
-                    }
-                }
-
-                return return_type;
+                return outcome.return_type(db);
             }
             Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                 if let Some(builder) =
@@ -8880,16 +8861,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                     CallErrorKind::BindingError => {
-                        if let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "Method `__getitem__` of type `{}` cannot be called with key of \
-                                type `{}` on object of type `{}`",
-                                bindings.callable_type().display(db),
-                                slice_ty.display(db),
-                                value_ty.display(db),
-                            ));
+                        if value_ty.is_typed_dict() {
+                            if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
+                                match slice_ty {
+                                    Type::StringLiteral(s) => builder.into_diagnostic(format_args!(
+                                        "The `{}` TypedDict does not define a key named '{key}'",
+                                        value_ty.display(db),
+                                        key = s.value(db),
+                                    )),
+                                    _ => builder.into_diagnostic(format_args!(
+                                        "The `{}` TypedDict can not be indexed with a key of type `{}`",
+                                        value_ty.display(db),
+                                        slice_ty.display(db),
+                                    )),
+                                };
+                            }
+                        } else {
+                            if let Some(builder) =
+                                context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Method `__getitem__` of type `{}` cannot be called with key of \
+                                    type `{}` on object of type `{}`",
+                                    bindings.callable_type().display(db),
+                                    slice_ty.display(db),
+                                    value_ty.display(db),
+                                ));
+                            }
                         }
                     }
                     CallErrorKind::PossiblyNotCallable => {
