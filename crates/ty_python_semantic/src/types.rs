@@ -7837,7 +7837,10 @@ impl<'db> BoundMethodType<'db> {
             .any(|deco| deco == KnownFunction::Final)
     }
 
-    pub(crate) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn base_signature_and_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(Signature<'db>, Option<Type<'db>>)> {
         let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
         let name = self.function(db).name(db);
 
@@ -7848,11 +7851,14 @@ impl<'db> BoundMethodType<'db> {
         let base_member = base.class_member(db, name, MemberLookupPolicy::default());
         if let Place::Type(Type::FunctionLiteral(base_func), _) = base_member.place {
             if let [signature] = base_func.signature(db).overloads.as_slice() {
-                signature.return_ty.or_else(|| {
-                    let base_method_ty =
-                        base_func.into_bound_method_type(db, Type::instance(db, class));
-                    base_method_ty.infer_return_type(db)
-                })
+                Some((
+                    signature.clone(),
+                    signature.return_ty.or_else(|| {
+                        let base_method_ty =
+                            base_func.into_bound_method_type(db, Type::instance(db, class));
+                        base_method_ty.infer_return_type(db)
+                    }),
+                ))
             } else {
                 // TODO: Handle overloaded base methods.
                 None

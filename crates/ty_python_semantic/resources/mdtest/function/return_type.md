@@ -422,6 +422,12 @@ class C:
     def g[T](self, x: T) -> T:
         return x
 
+    def h[T: int](self, x: T) -> T:
+        return x
+
+    def i[T: int](self, x: T) -> list[T]:
+        return [x]
+
 class D(C):
     def f(self):
         return 2
@@ -429,6 +435,15 @@ class D(C):
     # If the override is invalid, the type of the method should be that of the base class method.
     def g(self, x: int):
         return 2
+    # A strict application of the Liskov Substitution Principle would consider
+    # this an invalid override because it violates the guarantee that the method returns
+    # the same type as its input type (any type smaller than int),
+    # but neither mypy nor pyright will throw an error for this.
+    def h(self, x: int):
+        return 2
+
+    def i(self, x: int):
+        return [2]
 
 class E(D):
     def f(self):
@@ -438,8 +453,13 @@ reveal_type(C().f())  # revealed: int
 reveal_type(D().f())  # revealed: int
 reveal_type(E().f())  # revealed: int
 reveal_type(C().g(1))  # revealed: Literal[1]
-# TODO: should be `Literal[1]`
-reveal_type(D().g(1))  # revealed: Literal[2] | T@g
+reveal_type(D().g(1))  # revealed: Literal[2] | Unknown
+reveal_type(C().h(1))  # revealed: Literal[1]
+reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
+reveal_type(C().h(True))  # revealed: Literal[True]
+reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
+reveal_type(C().i(1))  # revealed: list[Literal[1]]
+reveal_type(D().i(1))  # revealed: list[Unknown]
 
 class F:
     def f(self) -> Literal[1, 2]:
