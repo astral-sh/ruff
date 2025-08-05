@@ -222,9 +222,7 @@ impl<'db> ConstraintSetSet<'db> {
                             (None, None) => None,
                         };
                         if let Some(constraint) = constraint {
-                            let constraint_set = ConstraintSet::singleton(constraint);
-                            let result = ConstraintSetSet::singleton(constraint_set);
-                            self.results.insert(ty, result);
+                            self.results.insert(ty, constraint.into());
                             return;
                         }
 
@@ -239,9 +237,7 @@ impl<'db> ConstraintSetSet<'db> {
                             typevar,
                             upper: Type::object(db),
                         };
-                        let constraint_set = ConstraintSet::singleton(constraint);
-                        let result = ConstraintSetSet::singleton(constraint_set);
-                        self.results.insert(ty, result);
+                        self.results.insert(ty, constraint.into());
                     }
 
                     _ => todo!(),
@@ -301,6 +297,18 @@ impl<'db> ConstraintSetSet<'db> {
         for set in other.sets {
             self.add(db, set);
         }
+    }
+}
+
+impl<'db> From<Constraint<'db>> for ConstraintSetSet<'db> {
+    fn from(constraint: Constraint<'db>) -> ConstraintSetSet<'db> {
+        ConstraintSetSet::singleton(ConstraintSet::singleton(constraint))
+    }
+}
+
+impl<'db> From<ConstraintSet<'db>> for ConstraintSetSet<'db> {
+    fn from(constraint_set: ConstraintSet<'db>) -> ConstraintSetSet<'db> {
+        ConstraintSetSet::singleton(constraint_set)
     }
 }
 
