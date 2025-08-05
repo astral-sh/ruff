@@ -317,6 +317,24 @@ fn normalized_constraints_from_type_inner<'db>(
                 };
             }
 
+            // Figure 3, step 4
+            // If all (positive and negative) elements of the intersection are callable, decompose
+            // the corresponding arrow type.
+            let positive_callable: Option<Vec<_>> = (intersection.iter_positive(db))
+                .map(|ty| ty.into_callable(db))
+                .collect();
+            let negative_callable: Option<Vec<_>> = (intersection.iter_negative(db))
+                .map(|ty| ty.into_callable(db))
+                .collect();
+            if let (Some(positive), Some(negative)) = (positive_callable, negative_callable) {
+                ConstraintSetSet::distributed_union(
+                    db,
+                    negative.into_iter().map(|negative| {
+                        let norm_negative = normalized_constraints_from_type(db);
+                    }),
+                )
+            }
+
             // TODO: Do we need to handle non-uniform intersections? For now, assume
             // the intersection is not empty.
             ConstraintSetSet::never()
