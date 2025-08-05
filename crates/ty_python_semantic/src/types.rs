@@ -5264,15 +5264,15 @@ impl<'db> Type<'db> {
                         ],
                     ),
                     _ if class.is_typed_dict(db) => {
-                        Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
+                        TypedDictType::from(db, ClassType::NonGeneric(*class))
                     }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::TypedDict(
-                TypedDictType::new(db, ClassType::from(*alias)),
-            )),
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Ok(TypedDictType::from(db, ClassType::from(*alias)))
+            }
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -5619,6 +5619,7 @@ impl<'db> Type<'db> {
             return KnownClass::Dict
                 .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object(db)])
                 .map(Type::from)
+                // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
         }
 
@@ -8928,6 +8929,10 @@ pub struct TypedDictType<'db> {
 impl get_size2::GetSize for TypedDictType<'_> {}
 
 impl<'db> TypedDictType<'db> {
+    pub(crate) fn from(db: &'db dyn Db, defining_class: ClassType<'db>) -> Type<'db> {
+        Type::TypedDict(Self::new(db, defining_class))
+    }
+
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,

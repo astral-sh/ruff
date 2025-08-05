@@ -94,17 +94,17 @@ use crate::types::class::{CodeGeneratorKind, DataclassField, MetaclassErrorKind,
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
-    POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_return_type,
-    report_possibly_unbound_attribute,
+    INDEX_OUT_OF_BOUNDS, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_instance_layout_conflict,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -8822,7 +8822,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // See: https://docs.python.org/3/reference/datamodel.html#class-getitem-versus-getitem
         match value_ty.try_call_dunder(db, "__getitem__", CallArguments::positional([slice_ty])) {
-            Ok(outcome) => return outcome.return_type(db),
+            Ok(outcome) => {
+                let return_type = outcome.return_type(db);
+
+                if return_type.is_never() {
+                    let key = match slice_ty {
+                        Type::IntLiteral(i) => format!("key `{i}`"),
+                        Type::StringLiteral(s) => format!("key '{}'", s.value(db)),
+                        _ => format!("key of type `{}`", slice_ty.display(db)),
+                    };
+
+                    let lint_type = if slice_ty.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
+                        &INDEX_OUT_OF_BOUNDS
+                    } else {
+                        &INVALID_KEY
+                    };
+
+                    if let Some(builder) = context.report_lint(lint_type, value_node) {
+                        if value_ty.is_typed_dict() {
+                            builder.into_diagnostic(format_args!(
+                                "The `{}` TypedDict does not define a {key}",
+                                value_ty.display(db),
+                            ));
+                        } else {
+                            builder.into_diagnostic(format_args!(
+                                "Method `__getitem__` of type `{}` returned `Never` for {key}",
+                                value_ty.display(db),
+                            ));
+                        }
+                    }
+                }
+
+                return return_type;
+            }
             Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
                 if let Some(builder) =
                     context.report_lint(&POSSIBLY_UNBOUND_IMPLICIT_CALL, value_node)

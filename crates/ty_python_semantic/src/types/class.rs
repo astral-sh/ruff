@@ -23,9 +23,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -2038,17 +2038,40 @@ impl<'db> ClassLiteral<'db> {
                 Some(CallableType::function_like(db, signature))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Add (key -> value type) overloads for all TypedDict items ("fields"):
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                        ]),
+                        Some(field.field_ty),
+                    )
+                });
+
+                // Add a (LiteralString -> Never) overload to signal that trying to access
+                // unknown keys will fail.
+                let overloads = overloads.chain(std::iter::once(Signature::new(
                     Parameters::new([
                         Parameter::positional_only(Some(Name::new_static("self")))
                             .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(Type::LiteralString),
                     ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                    Some(Type::Never),
+                )));
 
-                Some(CallableType::function_like(db, signature))
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
                 // TODO: synthesize a set of overloads with precise types

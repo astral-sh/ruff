@@ -40,6 +40,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
+    registry.register_lint(&INVALID_KEY);
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
@@ -484,6 +485,31 @@ declare_lint! {
     /// ```
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for subscript accesses with invalid keys.
+    ///
+    /// ## Why is this bad?
+    /// Using an invalid key will raise a `KeyError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Person(TypedDict):
+    ///     name: str
+    ///     age: int
+    ///
+    /// alice = Person(name="Alice", age=30)
+    /// alice["height"]  # KeyError: 'height'
+    /// ```
+    pub(crate) static INVALID_KEY = {
+        summary: "detects invalid subscript accesses",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

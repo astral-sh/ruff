@@ -25,12 +25,21 @@ alice: Person = {"name": "Alice", "age": 30}
 reveal_type(alice["name"])  # revealed: Unknown
 # TODO: this should be `int | None`
 reveal_type(alice["age"])  # revealed: Unknown
+
+# TODO: this should reveal `Never`, and it should emit an error
+reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
 Inhabitants can also be created through a constructor call:
 
 ```py
 bob = Person(name="Bob", age=25)
+
+reveal_type(bob["name"])  # revealed: str
+reveal_type(bob["age"])  # revealed: int | None
+
+# error: [invalid-key] "TypedDict `Person` does not have a key 'non_existing'"
+reveal_type(bob["non_existing"])  # revealed: Never
 ```
 
 Methods that are available on `dict`s are also available on `TypedDict`s:
