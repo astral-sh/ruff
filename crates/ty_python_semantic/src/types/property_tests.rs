@@ -79,49 +79,49 @@ mod stable {
     // Symmetry: If `S` is equivalent to `T`, then `T` must be equivalent to `S`.
     type_property_test!(
         equivalent_to_is_symmetric, db,
-        forall types s, t. s.is_equivalent_to(db, t) => t.is_equivalent_to(db, s)
+        forall types s, t. s.is_equivalent_to::<bool>(db, t) => t.is_equivalent_to::<bool>(db, s)
     );
 
     // Transitivity: If `S` is equivalent to `T` and `T` is equivalent to `U`, then `S` must be equivalent to `U`.
     type_property_test!(
         equivalent_to_is_transitive, db,
-        forall types s, t, u. s.is_equivalent_to(db, t) && t.is_equivalent_to(db, u) => s.is_equivalent_to(db, u)
+        forall types s, t, u. s.is_equivalent_to::<bool>(db, t) && t.is_equivalent_to::<bool>(db, u) => s.is_equivalent_to::<bool>(db, u)
     );
 
     // `S <: T` and `T <: U` implies that `S <: U`.
     type_property_test!(
         subtype_of_is_transitive, db,
-        forall types s, t, u. s.is_subtype_of(db, t) && t.is_subtype_of(db, u) => s.is_subtype_of(db, u)
+        forall types s, t, u. s.is_subtype_of::<bool>(db, t) && t.is_subtype_of::<bool>(db, u) => s.is_subtype_of::<bool>(db, u)
     );
 
     // `S <: T` and `T <: S` implies that `S` is equivalent to `T`.
     type_property_test!(
         subtype_of_is_antisymmetric, db,
-        forall types s, t. s.is_subtype_of(db, t) && t.is_subtype_of(db, s) => s.is_equivalent_to(db, t)
+        forall types s, t. s.is_subtype_of::<bool>(db, t) && t.is_subtype_of::<bool>(db, s) => s.is_equivalent_to::<bool>(db, t)
     );
 
     // `T` is not disjoint from itself, unless `T` is `Never`.
     type_property_test!(
         disjoint_from_is_irreflexive, db,
-        forall types t. t.is_disjoint_from(db, t) => t.is_never()
+        forall types t. t.is_disjoint_from::<bool>(db, t) => t.is_never()
     );
 
     // `S` is disjoint from `T` implies that `T` is disjoint from `S`.
     type_property_test!(
         disjoint_from_is_symmetric, db,
-        forall types s, t. s.is_disjoint_from(db, t) == t.is_disjoint_from(db, s)
+        forall types s, t. s.is_disjoint_from::<bool>(db, t) == t.is_disjoint_from::<bool>(db, s)
     );
 
     // `S <: T` implies that `S` is not disjoint from `T`, unless `S` is `Never`.
     type_property_test!(
         subtype_of_implies_not_disjoint_from, db,
-        forall types s, t. s.is_subtype_of(db, t) => !s.is_disjoint_from(db, t) || s.is_never()
+        forall types s, t. s.is_subtype_of::<bool>(db, t) => !s.is_disjoint_from::<bool>(db, t) || s.is_never()
     );
 
     // `S <: T` implies that `S` can be assigned to `T`.
     type_property_test!(
         subtype_of_implies_assignable_to, db,
-        forall types s, t. s.is_subtype_of(db, t) => s.is_assignable_to(db, t)
+        forall types s, t. s.is_subtype_of::<bool>(db, t) => s.is_assignable_to::<bool>(db, t)
     );
 
     // If `T` is a singleton, it is also single-valued.
@@ -133,69 +133,69 @@ mod stable {
     // All types should be assignable to `object`
     type_property_test!(
         all_types_assignable_to_object, db,
-        forall types t. t.is_assignable_to(db, Type::object(db))
+        forall types t. t.is_assignable_to::<bool>(db, Type::object(db))
     );
 
     // And all types should be subtypes of `object`
     type_property_test!(
         all_types_subtype_of_object, db,
-        forall types t. t.is_subtype_of(db, Type::object(db))
+        forall types t. t.is_subtype_of::<bool>(db, Type::object(db))
     );
 
     // Never should be assignable to every type
     type_property_test!(
         never_assignable_to_every_type, db,
-        forall types t. Type::Never.is_assignable_to(db, t)
+        forall types t. Type::Never.is_assignable_to::<bool>(db, t)
     );
 
     // And it should be a subtype of all types
     type_property_test!(
         never_subtype_of_every_type, db,
-        forall types t. Type::Never.is_subtype_of(db, t)
+        forall types t. Type::Never.is_subtype_of::<bool>(db, t)
     );
 
     // Similar to `Never`, a "bottom" callable type should be a subtype of all callable types
     type_property_test!(
         bottom_callable_is_subtype_of_all_callable, db,
         forall types t. t.is_callable_type()
-            => CallableType::bottom(db).is_subtype_of(db, t)
+            => CallableType::bottom(db).is_subtype_of::<bool>(db, t)
     );
 
     // `T` can be assigned to itself.
     type_property_test!(
         assignable_to_is_reflexive, db,
-        forall types t. t.is_assignable_to(db, t)
+        forall types t. t.is_assignable_to::<bool>(db, t)
     );
 
     // For *any* pair of types, each of the pair should be assignable to the union of the two.
     type_property_test!(
         all_type_pairs_are_assignable_to_their_union, db,
-        forall types s, t. s.is_assignable_to(db, union(db, [s, t])) && t.is_assignable_to(db, union(db, [s, t]))
+        forall types s, t. s.is_assignable_to::<bool>(db, union(db, [s, t])) && t.is_assignable_to::<bool>(db, union(db, [s, t]))
     );
 
     // Only `Never` is a subtype of `Any`.
     type_property_test!(
         only_never_is_subtype_of_any, db,
-        forall types s. !s.is_equivalent_to(db, Type::Never) => !s.is_subtype_of(db, Type::any())
+        forall types s. !s.is_equivalent_to::<bool>(db, Type::Never) => !s.is_subtype_of::<bool>(db, Type::any())
     );
 
     // Only `object` is a supertype of `Any`.
     type_property_test!(
         only_object_is_supertype_of_any, db,
-        forall types t. !t.is_equivalent_to(db, Type::object(db)) => !Type::any().is_subtype_of(db, t)
+        forall types t. !t.is_equivalent_to::<bool>(db, Type::object(db)) => !Type::any().is_subtype_of::<bool>(db, t)
     );
 
     // Equivalence is commutative.
     type_property_test!(
         equivalent_to_is_commutative, db,
-        forall types s, t. s.is_equivalent_to(db, t) == t.is_equivalent_to(db, s)
+        forall types s, t. s.is_equivalent_to::<bool>(db, t) == t.is_equivalent_to::<bool>(db, s)
     );
 
     // A fully static type `T` is a subtype of itself. (This is not true for non-fully-static
     // types; `Any` is not a subtype of `Any`, only `Never` is.)
     type_property_test!(
         subtype_of_is_reflexive_for_fully_static_types, db,
-        forall fully_static_types t. t.is_subtype_of(db, t)
+        forall fully_static_types t. t.is_subtype_of::<bool>(db, t)
     );
 
     // For any two fully static types, each type in the pair must be a subtype of their union.
@@ -203,7 +203,7 @@ mod stable {
     // reflexive.)
     type_property_test!(
         all_fully_static_type_pairs_are_subtype_of_their_union, db,
-        forall fully_static_types s, t. s.is_subtype_of(db, union(db, [s, t])) && t.is_subtype_of(db, union(db, [s, t]))
+        forall fully_static_types s, t. s.is_subtype_of::<bool>(db, union(db, [s, t])) && t.is_subtype_of::<bool>(db, union(db, [s, t]))
     );
 }
 
@@ -224,21 +224,21 @@ mod flaky {
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
         double_negation_is_identity, db,
-        forall types t. t.negate(db).negate(db).is_equivalent_to(db, t)
+        forall types t. t.negate(db).negate(db).is_equivalent_to::<bool>(db, t)
     );
 
     // For any fully static type `T`, `T` should be disjoint from `~T`.
     // https://github.com/astral-sh/ty/issues/216
     type_property_test!(
         negation_of_fully_static_types_is_disjoint, db,
-        forall fully_static_types t. t.negate(db).is_disjoint_from(db, t)
+        forall fully_static_types t. t.negate(db).is_disjoint_from::<bool>(db, t)
     );
 
     // For two types, their intersection must be a subtype of each type in the pair.
     type_property_test!(
         all_type_pairs_are_supertypes_of_their_intersection, db,
         forall types s, t.
-            intersection(db, [s, t]).is_subtype_of(db, s) && intersection(db, [s, t]).is_subtype_of(db, t)
+            intersection(db, [s, t]).is_subtype_of::<bool>(db, s) && intersection(db, [s, t]).is_subtype_of::<bool>(db, t)
     );
 
     // And the intersection of a pair of types
@@ -246,7 +246,7 @@ mod flaky {
     // Currently fails due to https://github.com/astral-sh/ruff/issues/14899
     type_property_test!(
         all_type_pairs_can_be_assigned_from_their_intersection, db,
-        forall types s, t. intersection(db, [s, t]).is_assignable_to(db, s) && intersection(db, [s, t]).is_assignable_to(db, t)
+        forall types s, t. intersection(db, [s, t]).is_assignable_to::<bool>(db, s) && intersection(db, [s, t]).is_assignable_to::<bool>(db, t)
     );
 
     // Equal element sets of intersections implies equivalence
@@ -280,7 +280,7 @@ mod flaky {
     type_property_test!(
         constituent_members_of_union_is_not_disjoint_from_that_union, db,
         forall types s, t.
-            !s.is_disjoint_from(db, union(db, [s, t])) && !t.is_disjoint_from(db, union(db, [s, t]))
+            !s.is_disjoint_from::<bool>(db, union(db, [s, t])) && !t.is_disjoint_from::<bool>(db, union(db, [s, t]))
     );
 
     // If `S <: T`, then `~T <: ~S`.
@@ -295,7 +295,7 @@ mod flaky {
     // not always reliably reproduce the flake).
     type_property_test!(
         negation_reverses_subtype_order, db,
-        forall types s, t. s.is_subtype_of(db, t) => t.negate(db).is_subtype_of(db, s.negate(db))
+        forall types s, t. s.is_subtype_of::<bool>(db, t) => t.negate(db).is_subtype_of::<bool>(db, s.negate(db))
     );
 
     // Both the top and bottom materialization tests are flaky in part due to various failures that
@@ -323,6 +323,6 @@ mod flaky {
     // Currently flaky due to <https://github.com/astral-sh/ty/issues/889>
     type_property_test!(
         all_type_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object(db)])) => t.try_iterate(db).is_ok()
+        forall types t. t.is_assignable_to::<bool>(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object(db)])) => t.try_iterate(db).is_ok()
     );
 }

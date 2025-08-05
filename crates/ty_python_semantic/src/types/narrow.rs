@@ -502,7 +502,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 left_ty: Type<'db>,
                 right_ty: Type<'db>,
             ) -> bool {
-                if !left_ty.is_disjoint_from(db, right_ty) {
+                if !left_ty.is_disjoint_from::<bool>(db, right_ty) {
                     // If types overlap, they have inhabitants in common; it's definitely possible
                     // for an object to compare equal to itself.
                     return true;

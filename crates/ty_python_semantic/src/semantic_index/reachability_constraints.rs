@@ -698,7 +698,7 @@ impl ReachabilityConstraints {
                 let value_ty = infer_expression_type(db, *value);
 
                 if subject_ty.is_single_valued(db) {
-                    Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
+                    Truthiness::from(subject_ty.is_equivalent_to::<bool>(db, value_ty))
                 } else {
                     Truthiness::Ambiguous
                 }

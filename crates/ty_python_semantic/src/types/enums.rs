@@ -66,10 +66,10 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+    if !Type::ClassLiteral(class).is_subtype_of::<bool>(db, KnownClass::Enum.to_subclass_of(db))
         && !class
             .metaclass(db)
-            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+            .is_subtype_of::<bool>(db, KnownClass::EnumType.to_subclass_of(db))
     {
         return None;
     }

@@ -13,6 +13,9 @@ use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::types::constraints::{
+    Constraints, IteratorConstraintExtension, OptionConstraintExtension,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -442,59 +445,70 @@ impl<'db> ClassType<'db> {
         self.has_relation_to(db, other, TypeRelation::Subtyping)
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
-        self.iter_mro(db).any(|base| {
+    ) -> C {
+        self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => C::from_bool(db, other.is_object(db)),
+                    TypeRelation::Assignability => C::from_bool(db, !other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => C::never(db),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        C::from_bool(db, base == other)
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to(
+                        if base.origin(db) == other.origin(db) {
+                            base.specialization(db).has_relation_to(
                                 db,
                                 other.specialization(db),
                                 relation,
                             )
+                        } else {
+                            C::never(db)
+                        }
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::never(db),
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    true
+                    C::always(db)
                 }
             }
         })
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_equivalent_to<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
 
         match (self, other) {
             // A non-generic class is never equivalent to a generic class.
             // Two non-generic classes are only equivalent if they are equal (handled above).
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => false,
+            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => C::never(db),
 
             (ClassType::Generic(this), ClassType::Generic(other)) => {
-                this.origin(db) == other.origin(db)
-                    && this
-                        .specialization(db)
+                if this.origin(db) == other.origin(db) {
+                    this.specialization(db)
                         .is_equivalent_to(db, other.specialization(db))
+                } else {
+                    C::never(db)
+                }
             }
         }
     }
@@ -957,8 +971,8 @@ impl<'db> ClassType<'db> {
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
             let returns_non_subclass = dunder_new_signature.overloads.iter().any(|signature| {
-                signature.return_ty.is_some_and(|return_ty| {
-                    !return_ty.is_assignable_to(
+                signature.return_ty.when_some_and(db, |return_ty| {
+                    !return_ty.is_assignable_to::<bool>(
                         db,
                         self_ty
                             .to_instance(db)

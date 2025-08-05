@@ -24,6 +24,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::constraints::{Constraints, IteratorConstraintExtension};
 use crate::types::{
     BoundTypeVarInstance, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -278,26 +279,26 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars(db, binding_context, typevars);
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         self.tuple(db)
             .has_relation_to(db, other.tuple(db), relation)
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
 
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         visitor: &mut PairVisitor<'db>,
-    ) -> bool {
+    ) -> C {
         self.tuple(db)
             .is_disjoint_from_impl(db, other.tuple(db), visitor)
     }
@@ -444,53 +445,63 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         match other {
-            Tuple::Fixed(other) => {
-                self.0.len() == other.0.len()
-                    && (self.0.iter())
-                        .zip(&other.0)
-                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
-            }
+            Tuple::Fixed(other) => C::from_bool(db, self.0.len() == other.0.len()).and(db, || {
+                (self.0.iter())
+                    .zip(&other.0)
+                    .when_all(db, |(self_ty, other_ty)| {
+                        self_ty.has_relation_to(db, *other_ty, relation)
+                    })
+            }),
 
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut result = C::always(db);
                 let mut self_iter = self.0.iter();
                 for other_ty in &other.prefix {
                     let Some(self_ty) = self_iter.next() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    if result.intersect(db, self_ty.has_relation_to(db, *other_ty, relation)) {
+                        return C::never(db);
                     }
                 }
                 for other_ty in other.suffix.iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
-                        return false;
+                    if result.intersect(db, self_ty.has_relation_to(db, *other_ty, relation)) {
+                        return C::never(db);
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                result.and(db, || {
+                    self_iter.when_all(db, |self_ty| {
+                        self_ty.has_relation_to(db, other.variable, relation)
+                    })
+                })
             }
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && (self.0.iter())
-                .zip(&other.0)
-                .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
+    fn is_equivalent_to<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
+        if self.0.len() != other.0.len() {
+            return C::never(db);
+        }
+        (self.0.iter())
+            .zip(&other.0)
+            .when_all(db, |(self_ty, other_ty)| {
+                self_ty.is_equivalent_to(db, *other_ty)
+            })
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -788,12 +799,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         match other {
             Tuple::Fixed(other) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -808,35 +819,38 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // length.
                 if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
                 {
-                    return false;
+                    return C::never(db);
                 }
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
+                let mut result = C::always(db);
                 let mut other_iter = other.elements().copied();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    if result.intersect(db, self_ty.has_relation_to(db, other_ty, relation)) {
+                        return C::never(db);
                     }
                 }
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
-                        return false;
+                    if result.intersect(db, self_ty.has_relation_to(db, other_ty, relation)) {
+                        return C::never(db);
                     }
                 }
 
-                true
+                result
             }
 
             Tuple::Variable(other) => {
+                let mut result = C::always(db);
+
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
                 // one tuple materializes to the variable-length portion of the other tuple.
                 let self_prenormalize_variable = match self.variable {
@@ -851,26 +865,27 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !self
-                    .prenormalized_prefix_elements(db, self_prenormalize_variable)
-                    .zip_longest(
-                        other.prenormalized_prefix_elements(db, other_prenormalize_variable),
-                    )
-                    .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
-                        EitherOrBoth::Right(_) => {
-                            // The rhs has a required element that the lhs is not guaranteed to
-                            // provide.
-                            false
-                        }
-                    })
-                {
-                    return false;
+                if result.intersect(
+                    db,
+                    self.prenormalized_prefix_elements(db, self_prenormalize_variable)
+                        .zip_longest(
+                            other.prenormalized_prefix_elements(db, other_prenormalize_variable),
+                        )
+                        .when_all(db, |pair| match pair {
+                            EitherOrBoth::Both(self_ty, other_ty) => {
+                                self_ty.has_relation_to(db, other_ty, relation)
+                            }
+                            EitherOrBoth::Left(self_ty) => {
+                                self_ty.has_relation_to(db, other.variable, relation)
+                            }
+                            EitherOrBoth::Right(_) => {
+                                // The rhs has a required element that the lhs is not guaranteed to
+                                // provide.
+                                C::never(db)
+                            }
+                        }),
+                ) {
+                    return C::never(db);
                 }
 
                 let self_suffix: Vec<_> = self
@@ -879,45 +894,57 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let other_suffix: Vec<_> = other
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
-                if !(self_suffix.iter().rev())
-                    .zip_longest(other_suffix.iter().rev())
-                    .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
-                        EitherOrBoth::Right(_) => {
-                            // The rhs has a required element that the lhs is not guaranteed to
-                            // provide.
-                            false
-                        }
-                    })
-                {
-                    return false;
+                if result.intersect(
+                    db,
+                    (self_suffix.iter().rev())
+                        .zip_longest(other_suffix.iter().rev())
+                        .when_all(db, |pair| match pair {
+                            EitherOrBoth::Both(self_ty, other_ty) => {
+                                self_ty.has_relation_to(db, *other_ty, relation)
+                            }
+                            EitherOrBoth::Left(self_ty) => {
+                                self_ty.has_relation_to(db, other.variable, relation)
+                            }
+                            EitherOrBoth::Right(_) => {
+                                // The rhs has a required element that the lhs is not guaranteed to
+                                // provide.
+                                C::never(db)
+                            }
+                        }),
+                ) {
+                    return C::never(db);
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                result.and(db, || {
+                    self.variable.has_relation_to(db, other.variable, relation)
+                })
             }
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.variable.is_equivalent_to(db, other.variable)
-            && (self.prenormalized_prefix_elements(db, None))
-                .zip_longest(other.prenormalized_prefix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
-            && (self.prenormalized_suffix_elements(db, None))
-                .zip_longest(other.prenormalized_suffix_elements(db, None))
-                .all(|pair| match pair {
-                    EitherOrBoth::Both(self_ty, other_ty) => self_ty.is_equivalent_to(db, other_ty),
-                    EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => false,
-                })
+    fn is_equivalent_to<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
+        (self.variable.is_equivalent_to::<C>(db, other.variable))
+            .and(db, || {
+                (self.prenormalized_prefix_elements(db, None))
+                    .zip_longest(other.prenormalized_prefix_elements(db, None))
+                    .when_all(db, |pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.is_equivalent_to(db, other_ty)
+                        }
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => C::never(db),
+                    })
+            })
+            .and(db, || {
+                (self.prenormalized_suffix_elements(db, None))
+                    .zip_longest(other.prenormalized_suffix_elements(db, None))
+                    .when_all(db, |pair| match pair {
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.is_equivalent_to(db, other_ty)
+                        }
+                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => C::never(db),
+                    })
+            })
     }
 }
 
@@ -1133,14 +1160,19 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        relation: TypeRelation,
+    ) -> C {
         match self {
             Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
             Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),
         }
     }
 
-    fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    fn is_equivalent_to<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
                 self_tuple.is_equivalent_to(db, other_tuple)
@@ -1148,85 +1180,103 @@ impl<'db> Tuple<Type<'db>> {
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
                 self_tuple.is_equivalent_to(db, other_tuple)
             }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => false,
+            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
+                C::never(db)
+            }
         }
     }
 
-    fn is_disjoint_from_impl(
+    fn is_disjoint_from_impl<C: Constraints<'db>>(
         &'db self,
         db: &'db dyn Db,
         other: &'db Self,
         visitor: &mut PairVisitor<'db>,
-    ) -> bool {
+    ) -> C {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
         let (other_min, other_max) = other.len().size_hint();
         if self_max.is_some_and(|max| max < other_min) {
-            return true;
+            return C::always(db);
         }
         if other_max.is_some_and(|max| max < self_min) {
-            return true;
+            return C::always(db);
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'db>(
+        fn any_disjoint<'db, C: Constraints<'db>>(
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'db Type<'db>>,
             b: impl IntoIterator<Item = &'db Type<'db>>,
             visitor: &mut PairVisitor<'db>,
-        ) -> bool {
-            a.into_iter().zip(b).any(|(self_element, other_element)| {
+        ) -> C {
+            (a.into_iter().zip(b)).when_any(db, |(self_element, other_element)| {
                 self_element.is_disjoint_from_impl(db, *other_element, visitor)
             })
         }
 
+        let mut result = C::never(db);
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
-                    return true;
+                if result.union(
+                    db,
+                    any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor),
+                ) {
+                    return C::always(db);
                 }
             }
 
             (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                if any_disjoint(
+                // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
+                // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
+                // both.
+                if result.union(
                     db,
-                    self_tuple.prefix_elements(),
-                    other_tuple.prefix_elements(),
-                    visitor,
+                    any_disjoint(
+                        db,
+                        self_tuple.prefix_elements(),
+                        other_tuple.prefix_elements(),
+                        visitor,
+                    ),
                 ) {
-                    return true;
+                    return C::always(db);
                 }
-                if any_disjoint(
+                if result.union(
                     db,
-                    self_tuple.suffix_elements().rev(),
-                    other_tuple.suffix_elements().rev(),
-                    visitor,
+                    any_disjoint(
+                        db,
+                        self_tuple.suffix_elements().rev(),
+                        other_tuple.suffix_elements().rev(),
+                        visitor,
+                    ),
                 ) {
-                    return true;
+                    return C::always(db);
                 }
             }
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
-                    return true;
-                }
-                if any_disjoint(
+                if result.union(
                     db,
-                    fixed.elements().rev(),
-                    variable.suffix_elements().rev(),
-                    visitor,
+                    any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor),
                 ) {
-                    return true;
+                    return C::always(db);
+                }
+                if result.union(
+                    db,
+                    any_disjoint(
+                        db,
+                        fixed.elements().rev(),
+                        variable.suffix_elements().rev(),
+                        visitor,
+                    ),
+                ) {
+                    return C::always(db);
                 }
             }
         }
 
-        // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
-        // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
-        // both.
-        false
+        result
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
