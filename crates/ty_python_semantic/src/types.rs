@@ -6698,9 +6698,9 @@ impl<'db> FieldInstance<'db> {
 /// or an implicit typevar like `Self` was used.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeVarKind {
-    /// T = TypeVar("T")
+    /// `T = TypeVar("T")`
     Legacy,
-    /// def foo[T](x: T) -> T: ...
+    /// `def foo[T](x: T) -> T: ...`
     Pep695,
     /// `typing.Self`
     Implicit,
