@@ -180,6 +180,7 @@ impl<'db> ConstraintSetSet<'db> {
                     | Type::SpecialForm(_) => {
                         let result = ConstraintSetSet::never();
                         self.results.insert(ty, result);
+                        return;
                     }
 
                     Type::Union(union) => {
@@ -191,6 +192,7 @@ impl<'db> ConstraintSetSet<'db> {
                                 self.result(*element).intersect(db, &sets)
                             });
                         self.results.insert(ty, result);
+                        return;
                     }
 
                     Type::Intersection(intersection) => {
@@ -273,7 +275,11 @@ impl<'db> ConstraintSetSet<'db> {
                             return;
                         }
 
-                        // TODO: other intersection clauses
+                        // TODO: Do we need to handle non-uniform intersections? For now, assume
+                        // the intersection is not empty.
+                        let result = ConstraintSetSet::never();
+                        self.results.insert(ty, result);
+                        return;
                     }
 
                     Type::TypeVar(typevar) => {
@@ -285,9 +291,17 @@ impl<'db> ConstraintSetSet<'db> {
                             upper: Type::object(db),
                         };
                         self.results.insert(ty, constraint.into());
+                        return;
                     }
 
                     _ => todo!(),
+                }
+
+                // Every match arm should explicitly return once it has calculated and memoized a
+                // result.
+                #[expect(unreachable_code)]
+                {
+                    unreachable!();
                 }
             }
         }
