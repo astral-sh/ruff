@@ -58,6 +58,9 @@ pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'
 
     visitor.visit_body(ast.suite());
 
+    // Sort hints by position to ensure correct insertion order
+    visitor.hints.sort_by_key(|hint| hint.position);
+
     visitor.hints
 }
 
@@ -144,9 +147,8 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                         let ty = expr.inferred_type(&self.model);
                         self.add_type_hint(expr.range().end(), ty);
                     }
-                } else {
-                    source_order::walk_expr(self, expr);
                 }
+                source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
                 if let Some(details) =
@@ -156,6 +158,13 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                         self.add_function_argument_name(position, name);
                     }
                 }
+                for arg in &call.arguments.args {
+                    self.visit_expr(arg);
+                }
+                for kw in &call.arguments.keywords {
+                    self.visit_expr(&kw.value);
+                }
+                self.visit_expr(&call.func);
             }
             _ => {
                 source_order::walk_expr(self, expr);
@@ -546,6 +555,230 @@ mod tests {
         def foo(x: int): pass
         foo([x=]1)
         bar(2)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_union_type() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int | str): pass
+            foo(1)
+            foo('abc')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int | str): pass
+        foo([x=]1)
+        foo([x=]'abc')
+        ");
+    }
+
+    #[test]
+    fn test_function_call_multiple_positional_arguments() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, y: str, z: bool): pass
+            foo(1, 'hello', True)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, y: str, z: bool): pass
+        foo([x=]1, [y=]'hello', [z=]True)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_mixed_positional_and_keyword() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, y: str, z: bool): pass
+            foo(1, z=True, y='hello')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, y: str, z: bool): pass
+        foo([x=]1, z=True, y='hello')
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_default_parameters() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: int, y: str = 'default', z: bool = False): pass
+            foo(1)
+            foo(1, 'custom')
+            foo(1, 'custom', True)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int, y: str = 'default', z: bool = False): pass
+        foo([x=]1)
+        foo([x=]1, [y=]'custom')
+        foo([x=]1, [y=]'custom', [z=]True)
+        ");
+    }
+
+    #[test]
+    fn test_nested_function_calls() {
+        let test = inlay_hint_test(
+            "
+            def outer(x: int) -> int:
+                return x * 2
+
+            def inner(y: str) -> str:
+                return y.upper()
+
+            def process(a: int, b: str): pass
+
+            process(outer(5), inner(inner('test')))",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def outer(x: int) -> int:
+            return x * 2
+
+        def inner(y: str) -> str:
+            return y.upper()
+
+        def process(a: int, b: str): pass
+
+        process([a=]outer([x=]5), [b=]inner([y=]inner([y=]'test')))
+        ");
+    }
+
+    #[test]
+    fn test_method_chaining() {
+        let test = inlay_hint_test(
+            "
+            class Builder:
+                def with_value(self, value: int) -> 'Builder':
+                    return self
+                def with_name(self, name: str) -> 'Builder':
+                    return self
+                def build(self): pass
+            Builder().with_value(42).with_name('test').build()",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        class Builder:
+            def with_value(self, value: int) -> 'Builder':
+                return self
+            def with_name(self, name: str) -> 'Builder':
+                return self
+            def build(self): pass
+        Builder().with_value([value=]42).with_name([name=]'test').build()
+        ");
+    }
+
+    #[test]
+    fn test_lambda_function_calls() {
+        let test = inlay_hint_test(
+            "
+            f = lambda x: x * 2
+            g = lambda a, b: a + b
+            f(5)
+            g(1, 2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        f[: (x) -> Unknown] = lambda x: x * 2
+        g[: (a, b) -> Unknown] = lambda a, b: a + b
+        f([x=]5)
+        g([a=]1, [b=]2)
+        ");
+    }
+
+    #[test]
+    fn test_builtin_function_calls() {
+        let test = inlay_hint_test(
+            "
+            len([1, 2, 3])
+            max(1, 2, 3)
+            print('hello', 'world', sep=' ')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        len([1, 2, 3])
+        max(1, 2, 3)
+        print('hello', 'world', sep=' ')
+        ");
+    }
+
+    #[test]
+    fn test_complex_parameter_combinations() {
+        let test = inlay_hint_test(
+            "
+            def complex_func(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+            complex_func(1, 'pos', 3.14, False, e=42)
+            complex_func(1, 'pos', 3.14, e=42, f='custom')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def complex_func(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+        complex_func(1, 'pos', [c=]3.14, [d=]False, e=42)
+        complex_func(1, 'pos', [c=]3.14, e=42, f='custom')
+        ");
+    }
+
+    #[test]
+    fn test_generic_function_calls() {
+        let test = inlay_hint_test(
+            "
+            from typing import TypeVar, Generic
+
+            T = TypeVar('T')
+
+            def identity(x: T) -> T:
+                return x
+
+            identity(42)
+            identity('hello')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import TypeVar, Generic
+
+        T[: typing.TypeVar] = TypeVar([name=]'T')
+
+        def identity(x: T) -> T:
+            return x
+
+        identity([x=]42)
+        identity([x=]'hello')
+        ");
+    }
+
+    #[test]
+    fn test_overloaded_function_calls() {
+        let test = inlay_hint_test(
+            "
+            from typing import overload
+
+            @overload
+            def process(x: int) -> str: ...
+            @overload
+            def process(x: str) -> int: ...
+            def process(x):
+                return x
+            
+            process(42)
+            process('hello')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import overload
+
+        @overload
+        def process(x: int) -> str: ...
+        @overload
+        def process(x: str) -> int: ...
+        def process(x):
+            return x
+
+        process([x=]42)
+        process([x=]'hello')
         ");
     }
 }

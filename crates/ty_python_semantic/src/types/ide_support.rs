@@ -863,20 +863,34 @@ pub fn inlay_hint_function_argument_details<'db>(
 
     let signature = signature_details.get(active_signature_index)?;
 
-    let argument_names = signature
-        .signature
-        .parameters()
-        .into_iter()
-        .zip(&call_expr.arguments.args)
-        .filter_map(|(param, expr)| {
-            if param.is_positional_only() || param.is_variadic() || param.is_keyword_variadic() {
-                return None;
-            }
-            param
-                .name()
-                .map(|name| (expr.range().start(), name.to_string()))
-        })
-        .collect();
+    let parameters = signature.signature.parameters();
+    let mut argument_names = Vec::new();
+
+    for (arg_index, arg_expr) in call_expr.arguments.args.iter().enumerate() {
+        let Some(arg_mapping) = signature.argument_to_parameter_mapping.get(arg_index) else {
+            continue;
+        };
+
+        if !arg_mapping.matched {
+            continue;
+        }
+
+        let Some(param_index) = arg_mapping.parameters.first() else {
+            continue;
+        };
+
+        let Some(param) = parameters.get(*param_index) else {
+            continue;
+        };
+
+        // Only add hints for parameters that can be specified by name
+        if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
+            let Some(name) = param.name() else {
+                continue;
+            };
+            argument_names.push((arg_expr.range().start(), name.to_string()));
+        }
+    }
 
     Some(InlayHintFunctionArgumentDetails { argument_names })
 }
