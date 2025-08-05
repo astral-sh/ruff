@@ -3236,12 +3236,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         context_expression_type: Type<'db>,
         is_async: bool,
     ) -> Type<'db> {
-        if is_async {
-            return context_expression_type.aenter(self.db());
-        }
+        let eval_mode = if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        };
 
         context_expression_type
-            .try_enter(self.db())
+            .try_enter_with_mode(self.db(), eval_mode)
             .unwrap_or_else(|err| {
                 err.report_diagnostic(
                     &self.context,
