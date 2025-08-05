@@ -1,10 +1,11 @@
+use ruff_python_ast::PythonVersion;
 use ruff_python_semantic::{Binding, ScopeKind};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pep8_naming,
-    pyflakes, pylint, ruff,
+    pyflakes, pylint, pyupgrade, ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -45,6 +46,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedUnpackedVariable,
         Rule::UnusedVariable,
+        Rule::UnnecessaryFutureImport,
     ]) {
         return;
     }
@@ -223,6 +225,11 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
             if checker.is_rule_enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope);
+            }
+            if checker.is_rule_enabled(Rule::UnnecessaryFutureImport) {
+                if checker.target_version() >= PythonVersion::PY37 {
+                    pyupgrade::rules::unnecessary_future_import(checker, scope);
+                }
             }
 
             if checker.is_rule_enabled(Rule::ImportPrivateName) {
