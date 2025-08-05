@@ -73,7 +73,8 @@ _NameArgsKwargs: TypeAlias = tuple[str, tuple[Any, ...], Mapping[str, Any]]
 _CallValue: TypeAlias = str | tuple[Any, ...] | Mapping[str, Any] | _ArgsKwargs | _NameArgsKwargs
 
 class _Call(tuple[Any, ...]):
-    """A tuple for holding the results of a call to a mock, either in the form
+    """
+    A tuple for holding the results of a call to a mock, either in the form
     `(args, kwargs)` or `(name, args, kwargs)`.
 
     If args or kwargs are empty then a call tuple will compare equal to
@@ -198,7 +199,8 @@ class NonCallableMock(Base, Any):
 
     def _extract_mock_name(self) -> str: ...
     def _get_call_signature_from_name(self, name: str) -> Any:
-        """* If call objects are asserted against a method/function like obj.meth1
+        """
+        * If call objects are asserted against a method/function like obj.meth1
         then there could be no name for the call object to lookup. Hence just
         return the spec_signature of the method/function being asserted against.
         * If the name is not empty then remove () and split by '.' to get
@@ -238,7 +240,8 @@ class NonCallableMock(Base, Any):
 
     def _mock_add_spec(self, spec: Any, spec_set: bool, _spec_as_instance: bool = False, _eat_self: bool = False) -> None: ...
     def attach_mock(self, mock: NonCallableMock, attribute: str) -> None:
-        """Attach a mock as an attribute of this one, replacing its name and
+        """
+        Attach a mock as an attribute of this one, replacing its name and
         parent. Calls to the attached mock will be recorded in the
         `method_calls` and `mock_calls` attributes of this one.
         """
@@ -262,7 +265,8 @@ class NonCallableMock(Base, Any):
     mock_calls: _CallList
     def _format_mock_call_signature(self, args: Any, kwargs: Any) -> str: ...
     def _call_matcher(self, _call: tuple[_Call, ...]) -> _Call:
-        """Given a call (or simply an (args, kwargs) tuple), return a
+        """
+        Given a call (or simply an (args, kwargs) tuple), return a
         comparison key suitable for matching with other calls.
         This is a best effort method which relies on the spec's signature,
         if available, or falls back on the arguments themselves.
@@ -317,7 +321,8 @@ class CallableMixin(Base):
     def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
 
 class Mock(CallableMixin, NonCallableMock):
-    """Create a new `Mock` object. `Mock` takes several optional arguments
+    """
+    Create a new `Mock` object. `Mock` takes several optional arguments
     that specify the behaviour of the Mock object:
 
     * `spec`: This can be either a list of strings or an existing object (a
@@ -460,7 +465,8 @@ class _patch_pass_arg(_patch[_T]):
     def __call__(self, func: Callable[..., _R]) -> Callable[..., _R]: ...
 
 class _patch_dict:
-    """Patch a dictionary, or dictionary like object, and restore the dictionary
+    """
+    Patch a dictionary, or dictionary like object, and restore the dictionary
     to its original state after the test, where the restored dictionary is
     a copy of the dictionary as it was before the test.
 
@@ -611,7 +617,8 @@ class NonCallableMagicMock(MagicMixin, NonCallableMock):
     """A version of `MagicMock` that isn't callable."""
 
 class MagicMock(MagicMixin, Mock):
-    """MagicMock is a subclass of Mock with default implementations
+    """
+    MagicMock is a subclass of Mock with default implementations
     of most of the magic methods. You can use MagicMock without having to
     configure the magic methods yourself.
 
@@ -625,24 +632,34 @@ class AsyncMockMixin(Base):
     def __init__(self, *args: Any, **kwargs: Any) -> None: ...
     async def _execute_mock_call(self, *args: Any, **kwargs: Any) -> Any: ...
     def assert_awaited(self) -> None:
-        """Assert that the mock was awaited at least once."""
+        """
+        Assert that the mock was awaited at least once.
+        """
 
     def assert_awaited_once(self) -> None:
-        """Assert that the mock was awaited exactly once."""
+        """
+        Assert that the mock was awaited exactly once.
+        """
 
     def assert_awaited_with(self, *args: Any, **kwargs: Any) -> None:
-        """Assert that the last await was with the specified arguments."""
+        """
+        Assert that the last await was with the specified arguments.
+        """
 
     def assert_awaited_once_with(self, *args: Any, **kwargs: Any) -> None:
-        """Assert that the mock was awaited exactly once and with the specified
+        """
+        Assert that the mock was awaited exactly once and with the specified
         arguments.
         """
 
     def assert_any_await(self, *args: Any, **kwargs: Any) -> None:
-        """Assert the mock has ever been awaited with the specified arguments."""
+        """
+        Assert the mock has ever been awaited with the specified arguments.
+        """
 
     def assert_has_awaits(self, calls: Iterable[_Call], any_order: bool = False) -> None:
-        """Assert the mock has been awaited with the specified calls.
+        """
+        Assert the mock has been awaited with the specified calls.
         The :attr:`await_args_list` list is checked for the awaits.
 
         If `any_order` is False (the default) then the awaits must be
@@ -654,10 +671,14 @@ class AsyncMockMixin(Base):
         """
 
     def assert_not_awaited(self) -> None:
-        """Assert that the mock was never awaited."""
+        """
+        Assert that the mock was never awaited.
+        """
 
     def reset_mock(self, *args: Any, **kwargs: Any) -> None:
-        """See :func:`.Mock.reset_mock()`"""
+        """
+        See :func:`.Mock.reset_mock()`
+        """
     await_count: int
     await_args: _Call | None
     await_args_list: _CallList
@@ -666,7 +687,8 @@ class AsyncMagicMixin(MagicMixin):
     def __init__(self, *args: Any, **kw: Any) -> None: ...
 
 class AsyncMock(AsyncMockMixin, AsyncMagicMixin, Mock):
-    """Enhance :class:`Mock` with features allowing to mock
+    """
+    Enhance :class:`Mock` with features allowing to mock
     an async function.
 
     The :class:`AsyncMock` object will behave so the object is
@@ -710,7 +732,9 @@ class AsyncMock(AsyncMockMixin, AsyncMagicMixin, Mock):
     # It is defined on `AsyncMockMixin` with `*args, **kwargs`, which is not ideal.
     # But, `NonCallableMock` super-class has the better version.
     def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None:
-        """See :func:`.Mock.reset_mock()`"""
+        """
+        See :func:`.Mock.reset_mock()`
+        """
 
 class MagicProxy(Base):
     name: str
@@ -808,7 +832,8 @@ class _SpecState:
     ) -> None: ...
 
 def mock_open(mock: Any | None = None, read_data: Any = "") -> Any:
-    """A helper function to create a mock to replace the use of `open`. It works
+    """
+    A helper function to create a mock to replace the use of `open`. It works
     for `open` called directly or used as a context manager.
 
     The `mock` argument is the mock object to configure. If `None` (the
@@ -820,7 +845,8 @@ def mock_open(mock: Any | None = None, read_data: Any = "") -> Any:
     """
 
 class PropertyMock(Mock):
-    """A mock intended to be used as a property, or other descriptor, on a class.
+    """
+    A mock intended to be used as a property, or other descriptor, on a class.
     `PropertyMock` provides `__get__` and `__set__` methods so you can specify
     a return value when it is fetched.
 
@@ -838,7 +864,9 @@ if sys.version_info >= (3, 13):
         def __init__(self, /, *args: Any, timeout: float | None | _SentinelObject = ..., **kwargs: Any) -> None: ...
         # Same as `NonCallableMock.reset_mock.`
         def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None:
-            """See :func:`.Mock.reset_mock()`"""
+            """
+            See :func:`.Mock.reset_mock()`
+            """
 
         def wait_until_called(self, *, timeout: float | None | _SentinelObject = ...) -> None:
             """Wait until the mock object is called.
@@ -855,7 +883,8 @@ if sys.version_info >= (3, 13):
             """
 
     class ThreadingMock(ThreadingMixin, MagicMixin, Mock):
-        """A mock that can be used to wait until on calls happening
+        """
+        A mock that can be used to wait until on calls happening
         in a different thread.
 
         The constructor can take a `timeout` argument which

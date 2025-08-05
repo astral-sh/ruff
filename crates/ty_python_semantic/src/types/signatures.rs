@@ -18,7 +18,7 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -320,14 +320,18 @@ impl<'db> Signature<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
+        is_generator: bool,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
-            if function_node.is_async {
-                todo_type!("generic types.CoroutineType")
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
+
+            if function_node.is_async && !is_generator {
+                KnownClass::CoroutineType
+                    .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
             } else {
-                definition_expression_type(db, definition, returns.as_ref())
+                plain_return_ty
             }
         });
         let legacy_generic_context =
@@ -354,6 +358,14 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom(db: &'db dyn Db) -> Self {
         Self::new(Parameters::object(db), Some(Type::Never))
+    }
+
+    pub(crate) fn with_inherited_generic_context(
+        mut self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        self.inherited_generic_context = inherited_generic_context;
+        self
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -383,7 +395,9 @@ impl<'db> Signature<'db> {
             inherited_generic_context: self
                 .inherited_generic_context
                 .map(|ctx| ctx.normalized_impl(db, visitor)),
-            definition: self.definition,
+            // Discard the definition when normalizing, so that two equivalent signatures
+            // with different `Definition`s share the same Salsa ID when normalized
+            definition: None,
             parameters: self
                 .parameters
                 .iter()
@@ -1784,7 +1798,7 @@ mod tests {
             a_annotated_ty.unwrap().display(&db).to_string(),
             "Unknown | A | B"
         );
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]
@@ -1829,7 +1843,7 @@ mod tests {
         assert_eq!(b_name, "b");
         // Parameter resolution deferred:
         assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
+        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 
     #[test]

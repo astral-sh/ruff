@@ -1,7 +1,7 @@
 use crate::server::schedule::Scheduler;
 use crate::server::{Server, api};
-use crate::session::ClientOptions;
-use crate::session::client::Client;
+use crate::session::client::{Client, ClientResponseHandler};
+use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
@@ -49,7 +49,8 @@ impl Server {
 
                             if self.session.is_shutdown_requested() {
                                 tracing::warn!(
-                                    "Received request after server shutdown was requested, discarding"
+                                    "Received request `{}` after server shutdown was requested, discarding",
+                                    &req.method
                                 );
                                 client.respond_err(
                                     req.id,
@@ -87,7 +88,7 @@ impl Server {
                                 .outgoing_mut()
                                 .complete(&response.id)
                             {
-                                handler(&client, response);
+                                handler.handle_response(&client, response);
                             } else {
                                 tracing::error!(
                                     "Received a response with ID {}, which was not expected",
@@ -130,7 +131,8 @@ impl Server {
                             .incoming()
                             .is_pending(&request.id)
                         {
-                            api::request(request);
+                            let task = api::request(request);
+                            scheduler.dispatch(task, &mut self.session, client);
                         } else {
                             tracing::debug!(
                                 "Request {}/{} was cancelled, not retrying",
@@ -139,6 +141,16 @@ impl Server {
                             );
                         }
                     }
+
+                    Action::SendRequest(request) => client.send_request_raw(&self.session, request),
+
+                    Action::SuspendWorkspaceDiagnostics(suspended_request) => {
+                        self.session.set_suspended_workspace_diagnostics_request(
+                            *suspended_request,
+                            &client,
+                        );
+                    }
+
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
                             .initialize_workspaces(workspaces_with_options, &client);
@@ -224,11 +236,9 @@ impl Server {
             );
 
         let fs_watcher = self
-            .client_capabilities
-            .workspace
-            .as_ref()
-            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
-            .unwrap_or_default();
+            .session
+            .client_capabilities()
+            .supports_did_change_watched_files_dynamic_registration();
 
         if fs_watcher {
             let registration = lsp_types::Registration {
@@ -300,6 +310,11 @@ pub(crate) enum Action {
     /// Retry a request that previously failed due to a salsa cancellation.
     RetryRequest(lsp_server::Request),
 
+    /// Send a request from the server to the client.
+    SendRequest(SendRequest),
+
+    SuspendWorkspaceDiagnostics(Box<SuspendedWorkspaceDiagnosticRequest>),
+
     /// Initialize the workspace after the server received
     /// the options from the client.
     InitializeWorkspaces(Vec<(Url, ClientOptions)>),
@@ -311,4 +326,19 @@ pub(crate) enum Event {
     Message(lsp_server::Message),
 
     Action(Action),
+}
+
+pub(crate) struct SendRequest {
+    pub(crate) method: String,
+    pub(crate) params: serde_json::Value,
+    pub(crate) response_handler: ClientResponseHandler,
+}
+
+impl std::fmt::Debug for SendRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SendRequest")
+            .field("method", &self.method)
+            .field("params", &self.params)
+            .finish_non_exhaustive()
+    }
 }

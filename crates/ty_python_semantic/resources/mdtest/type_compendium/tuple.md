@@ -119,6 +119,28 @@ def _(empty: EmptyTupleSubclass, single_element: SingleElementTupleSubclass, mix
     mixed.__class__()
 ```
 
+## Meta-type of tuple instances
+
+The type `tuple[str, int]` does not only have exact instances of `tuple` as its inhabitants: its
+inhabitants also include any instances of subclasses of `tuple[str, int]`. As such, the meta-type of
+`tuple[str, int]` should be `type[tuple[str, int]]` rather than `<class 'tuple[str, int]'>`. The
+former accurately reflects the fact that given an instance of `tuple[str, int]`, we do not know
+exactly what the `__class__` of that instance will be: we only know that it will be a subclass of
+`tuple[str, int]`. The latter would be incorrectly precise: it would imply that all instances of
+`tuple[str, int]` have the runtime object `tuple` as their `__class__`, which isn't true.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def f(x: tuple[int, ...], y: tuple[str, str], z: tuple[int, *tuple[str, ...], bytes]):
+    reveal_type(type(x))  # revealed: type[tuple[int, ...]]
+    reveal_type(type(y))  # revealed: type[tuple[str, str]]
+    reveal_type(type(z))  # revealed: type[tuple[int, *tuple[str, ...], bytes]]
+```
+
 ## Subtyping relationships
 
 The type `tuple[S1, S2]` is a subtype of `tuple[T1, T2]` if and only if `S1` is a subtype of `T1`

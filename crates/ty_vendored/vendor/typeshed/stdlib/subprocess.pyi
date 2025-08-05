@@ -2503,7 +2503,8 @@ else:
         """
 
 def list2cmdline(seq: Iterable[StrOrBytesPath]) -> str:  # undocumented
-    """Translate a sequence of arguments into a command line
+    """
+    Translate a sequence of arguments into a command line
     string, using the same rules as the MS C runtime:
 
     1) Arguments are delimited by white space, which is either a

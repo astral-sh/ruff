@@ -95,7 +95,19 @@ impl<'db> AllMembers<'db> {
 
             Type::NominalInstance(instance) => {
                 let (class_literal, _specialization) = instance.class.class_literal(db);
-                self.extend_with_instance_members(db, class_literal);
+                self.extend_with_instance_members(db, ty, class_literal);
+            }
+
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
             Type::ClassLiteral(class_literal) => {
@@ -143,12 +155,29 @@ impl<'db> AllMembers<'db> {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
+                Type::SubclassOf(subclass_of) => {
+                    if let Some(class) = subclass_of.subclass_of().into_class() {
+                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                    }
+                }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, class_literal);
                 }
                 _ => {}
             },
+
+            Type::TypedDict(_) => {
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                    self.extend_with_class_members(db, ty, class_literal);
+                }
+
+                if let Type::ClassLiteral(class) =
+                    KnownClass::TypedDictFallback.to_class_literal(db)
+                {
+                    self.extend_with_instance_members(db, ty, class);
+                }
+            }
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
@@ -260,13 +289,17 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    fn extend_with_instance_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
+    fn extend_with_instance_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
-            let parent_instance = Type::instance(db, parent.default_specialization(db));
             let class_body_scope = parent.body_scope(db);
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
@@ -276,7 +309,7 @@ impl<'db> AllMembers<'db> {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
-                    let result = parent_instance.member(db, name.as_str());
+                    let result = ty.member(db, name.as_str());
                     let Some(ty) = result.place.ignore_possibly_unbound() else {
                         continue;
                     };
@@ -293,7 +326,7 @@ impl<'db> AllMembers<'db> {
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
             for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = parent_instance.member(db, name.as_str());
+                let result = ty.member(db, name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };

@@ -64,8 +64,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable => value_type
-                .try_iterate(self.db())
+            UnpackKind::Iterable { mode } => value_type
+                .try_iterate_with_mode(self.db(), mode)
                 .map(|tuple| tuple.homogeneous_element_type(self.db()))
                 .unwrap_or_else(|err| {
                     err.report_diagnostic(
@@ -75,14 +75,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     );
                     err.fallback_element_type(self.db())
                 }),
-            UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(
-                    &self.context,
-                    value_type,
-                    value.as_any_node_ref(self.db(), self.module()),
-                );
-                err.fallback_enter_type(self.db())
-            }),
+            UnpackKind::ContextManager { mode } => value_type
+                .try_enter_with_mode(self.db(), mode)
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_enter_type(self.db())
+                }),
         };
 
         self.unpack_inner(

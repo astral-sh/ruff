@@ -66,7 +66,8 @@ if sys.version_info < (3, 11):
         _handshake_cb: Callable[[BaseException | None], None] | None
         _shutdown_cb: Callable[[], None] | None
         def __init__(self, context: ssl.SSLContext, server_side: bool, server_hostname: str | None = None) -> None:
-            """The *context* argument specifies the ssl.SSLContext to use.
+            """
+            The *context* argument specifies the ssl.SSLContext to use.
 
             The *server_side* argument indicates whether this is a server side or
             client side transport.
@@ -95,7 +96,8 @@ if sys.version_info < (3, 11):
 
         @property
         def wrapped(self) -> bool:
-            """Whether a security layer is currently in effect.
+            """
+            Whether a security layer is currently in effect.
 
             Return False during handshake.
             """

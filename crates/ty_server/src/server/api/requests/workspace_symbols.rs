@@ -1,5 +1,3 @@
-use std::panic::AssertUnwindSafe;
-
 use lsp_types::request::WorkspaceSymbolRequest;
 use lsp_types::{WorkspaceSymbolParams, WorkspaceSymbolResponse};
 use ty_ide::{WorkspaceSymbolInfo, workspace_symbols};
@@ -21,7 +19,7 @@ impl RequestHandler for WorkspaceSymbolRequestHandler {
 
 impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
     fn run(
-        snapshot: AssertUnwindSafe<SessionSnapshot>,
+        snapshot: &SessionSnapshot,
         _client: &Client,
         params: WorkspaceSymbolParams,
     ) -> crate::server::Result<Option<WorkspaceSymbolResponse>> {

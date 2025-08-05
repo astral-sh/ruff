@@ -251,6 +251,10 @@ impl ScopeKind {
         matches!(self, ScopeKind::Class)
     }
 
+    pub(crate) const fn is_module(self) -> bool {
+        matches!(self, ScopeKind::Module)
+    }
+
     pub(crate) const fn is_type_parameter(self) -> bool {
         matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
     }

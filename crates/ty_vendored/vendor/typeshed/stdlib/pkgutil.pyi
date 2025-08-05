@@ -191,7 +191,8 @@ def get_data(package: str, resource: str) -> bytes | None:
     """
 
 def resolve_name(name: str) -> Any:
-    """Resolve a name to an object.
+    """
+    Resolve a name to an object.
 
     It is expected that `name` will be a string in one of the following
     formats, where W is shorthand for a valid Python identifier and dot stands

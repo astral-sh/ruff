@@ -14,13 +14,13 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
 /// Returns an iterator of any generic context introduced by the given scope or any enclosing
 /// scope.
-fn enclosing_generic_contexts<'db>(
+pub(crate) fn enclosing_generic_contexts<'db>(
     db: &'db dyn Db,
     module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
@@ -175,6 +175,19 @@ impl<'db> GenericContext<'db> {
         Some(Self::new(db, variables))
     }
 
+    pub(crate) fn with_binding_context(
+        self,
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+    ) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|typevar| typevar.with_binding_context(db, binding_context))
+            .collect();
+        Self::new(db, variables)
+    }
+
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
         self.variables(db).len()
     }
@@ -229,7 +242,7 @@ impl<'db> GenericContext<'db> {
 
     /// Returns a tuple type of the typevars introduced by this generic context.
     pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
-        TupleType::from_elements(
+        Type::heterogeneous_tuple(
             db,
             self.variables(db)
                 .iter()
@@ -239,6 +252,22 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         self.variables(db).is_subset(other.variables(db))
+    }
+
+    pub(crate) fn binds_legacy_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<TypeVarInstance<'db>> {
+        assert!(typevar.kind(db) == TypeVarKind::Legacy);
+        let typevar_def = typevar.definition(db);
+        self.variables(db)
+            .iter()
+            .find(|self_typevar| {
+                self_typevar.kind(db) == TypeVarKind::Legacy
+                    && self_typevar.definition(db) == typevar_def
+            })
+            .copied()
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -761,17 +790,19 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_tuple = formal_tuple.tuple(self.db);
                 let actual_tuple = actual_tuple.tuple(self.db);
-                match (formal_tuple, actual_tuple) {
-                    (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
-                        if formal_tuple.len() == actual_tuple.len() {
-                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                                self.infer(*formal_element, *actual_element)?;
-                            }
-                        }
-                    }
-
-                    // TODO: Infer specializations of variable-length tuples
-                    (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_)) => {}
+                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+                    return Ok(());
+                };
+                let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                    return Ok(());
+                };
+                let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                    return Ok(());
+                };
+                for (formal_element, actual_element) in
+                    formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                {
+                    self.infer(*formal_element, *actual_element)?;
                 }
             }
 

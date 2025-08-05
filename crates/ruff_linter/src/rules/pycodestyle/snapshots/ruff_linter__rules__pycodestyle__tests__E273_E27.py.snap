@@ -8,7 +8,7 @@ E27.py:11:9: E273 [*] Tab after keyword
 11 | True and        False
    |         ^^^^^^^^ E273
 12 | #: E273 E274
-13 | True        and False
+13 | True        and    False
    |
    = help: Replace with single space
 
@@ -26,7 +26,7 @@ E27.py:13:5: E273 [*] Tab after keyword
    |
 11 | True and        False
 12 | #: E273 E274
-13 | True        and False
+13 | True        and    False
    |     ^^^^^^^^ E273
 14 | #: E271
 15 | a and  b
@@ -47,8 +47,8 @@ E27.py:13:10: E273 [*] Tab after keyword
    |
 11 | True and        False
 12 | #: E273 E274
-13 | True        and False
-   |                ^ E273
+13 | True        and    False
+   |                ^^^^ E273
 14 | #: E271
 15 | a and  b
    |
@@ -68,10 +68,10 @@ E27.py:27:6: E273 [*] Tab after keyword
    |
 25 | this  and False
 26 | #: E273
-27 | a and   b
-   |      ^^^ E273
+27 | a and    b
+   |      ^^^^ E273
 28 | #: E274
-29 | a       and b
+29 | a        and b
    |
    = help: Replace with single space
 
@@ -87,10 +87,10 @@ E27.py:27:6: E273 [*] Tab after keyword
 
 E27.py:31:10: E273 [*] Tab after keyword
    |
-29 | a       and b
+29 | a        and b
 30 | #: E273 E274
-31 | this        and False
-   |                ^ E273
+31 | this        and    False
+   |                ^^^^ E273
 32 | #: Okay
 33 | from u import (a, b)
    |

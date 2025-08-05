@@ -72,7 +72,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -85,7 +85,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=get_size2::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -100,7 +100,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=get_size2::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -111,7 +111,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=get_size2::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -256,7 +256,8 @@ impl ClassInfoConstraintFunction {
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_) => None,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => None,
         }
     }
 }
@@ -410,6 +411,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }

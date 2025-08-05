@@ -1,7 +1,7 @@
 use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::file_to_module;
+use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
@@ -13,7 +13,7 @@ use crate::types::{
     DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
     UnionType, binding_type, declaration_type, todo_type,
 };
-use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
+use crate::{Db, FxOrderSet, Program, resolve_module};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -641,7 +641,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=get_size2::heap_size)]
 fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -1368,7 +1368,7 @@ mod implicit_globals {
     /// Conceptually this function could be a `Set` rather than a list,
     /// but the number of symbols declared in this scope is likely to be very small,
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)
