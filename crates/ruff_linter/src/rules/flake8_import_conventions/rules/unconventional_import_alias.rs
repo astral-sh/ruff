@@ -74,10 +74,6 @@ pub(crate) fn unconventional_import_alias(
         return;
     }
 
-    if expected_alias == "__debug__" {
-        return;
-    }
-
     let mut diagnostic = checker.report_diagnostic(
         UnconventionalImportAlias {
             name: qualified_name,

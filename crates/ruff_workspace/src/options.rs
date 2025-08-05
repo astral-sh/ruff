@@ -4104,4 +4104,45 @@ mod tests {
             vec![Name::new_static("_foo"), Name::new_static("_bar")]
         );
     }
+
+    #[test]
+    fn flake8_import_conventions_nfkc_normalization() {
+        use crate::options::{Alias, Flake8ImportConventionsOptions, ModuleName};
+        use rustc_hash::FxHashMap;
+
+        // Test that aliases that normalize to __debug__ are rejected
+        let options = Flake8ImportConventionsOptions {
+            aliases: Some(FxHashMap::from_iter([(
+                ModuleName("test.module".to_string()),
+                Alias("＿＿ｄｅｂｕｇ＿＿".to_string()),
+            )])),
+            extend_aliases: None,
+            banned_aliases: None,
+            banned_from: None,
+        };
+
+        let result = options.try_into_settings();
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("alias normalizes to '__debug__'")
+        );
+        assert!(error.to_string().contains("test.module"));
+
+        // Test that normal aliases are accepted
+        let options = Flake8ImportConventionsOptions {
+            aliases: Some(FxHashMap::from_iter([(
+                ModuleName("test.module".to_string()),
+                Alias("test_alias".to_string()),
+            )])),
+            extend_aliases: None,
+            banned_aliases: None,
+            banned_from: None,
+        };
+
+        let result = options.try_into_settings();
+        assert!(result.is_ok());
+    }
 }
