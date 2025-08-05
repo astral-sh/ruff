@@ -113,7 +113,7 @@ use crate::types::function::{
 use crate::types::generics::{GenericContext, enclosing_generic_contexts};
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
@@ -8743,30 +8743,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 expr_context,
             )),
 
-            (
-                Type::SpecialForm(SpecialFormType::Protocol),
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-            ) => {
-                class.tuple_spec(db).map(|typevars| match &*typevars {
-                    TupleSpec::Fixed(typevars) => self
-                        .legacy_generic_class_context(
-                            value_node,
-                            typevars.elements_slice(),
-                            LegacyGenericBase::Protocol,
-                        )
-                        .map(|context| {
-                            Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context))
-                        })
-                        .unwrap_or_else(GenericContextError::into_type),
-                    // TODO: emit a diagnostic
-                    TupleSpec::Variable(_) => Type::unknown(),
-                })
-            }
-
-            (Type::SpecialForm(SpecialFormType::Protocol), typevar) => Some(
+            (Type::SpecialForm(SpecialFormType::Protocol), typevars) => Some(
                 self.legacy_generic_class_context(
                     value_node,
-                    std::slice::from_ref(&typevar),
+                    typevars,
                     LegacyGenericBase::Protocol,
                 )
                 .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(context)))
@@ -8778,34 +8758,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(todo_type!("doubly-specialized typing.Protocol"))
             }
 
-            (
-                Type::SpecialForm(SpecialFormType::Generic),
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-            ) => {
-                class.tuple_spec(db).map(|typevars| match &*typevars {
-                    TupleSpec::Fixed(typevars) => self
-                        .legacy_generic_class_context(
-                            value_node,
-                            typevars.elements_slice(),
-                            LegacyGenericBase::Generic,
-                        )
-                        .map(|context| {
-                            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
-                        })
-                        .unwrap_or_else(GenericContextError::into_type),
-                    // TODO: emit a diagnostic
-                    TupleSpec::Variable(_) => Type::unknown(),
-                })
-            }
-
-            (Type::SpecialForm(SpecialFormType::Generic), typevar) => Some(
-                self.legacy_generic_class_context(
-                    value_node,
-                    std::slice::from_ref(&typevar),
-                    LegacyGenericBase::Generic,
-                )
-                .map(|context| Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context)))
-                .unwrap_or_else(GenericContextError::into_type),
+            (Type::SpecialForm(SpecialFormType::Generic), typevars) => Some(
+                self.legacy_generic_class_context(value_node, typevars, LegacyGenericBase::Generic)
+                    .map(|context| {
+                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(context))
+                    })
+                    .unwrap_or_else(GenericContextError::into_type),
             ),
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
@@ -9023,9 +8981,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn legacy_generic_class_context(
         &self,
         value_node: &ast::Expr,
-        typevars: &[Type<'db>],
+        typevars: Type<'db>,
         origin: LegacyGenericBase,
     ) -> Result<GenericContext<'db>, GenericContextError> {
+        let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(self.db());
+
+        let typevars = if let Some(tuple_spec) = typevars_class_tuple_spec.as_deref() {
+            match tuple_spec {
+                Tuple::Fixed(typevars) => typevars.elements_slice(),
+                // TODO: emit a diagnostic
+                Tuple::Variable(_) => return Err(GenericContextError::VariadicTupleArguments),
+            }
+        } else {
+            std::slice::from_ref(&typevars)
+        };
+
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
@@ -10956,6 +10926,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 enum GenericContextError {
     /// It's invalid to subscript `Generic` or `Protocol` with this type
     InvalidArgument,
+    /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
+    /// We should emit a diagnostic for this, but we don't yet.
+    VariadicTupleArguments,
     /// It's valid to subscribe `Generic` or `Protocol` with this type,
     /// but the type is not yet supported.
     NotYetSupported,
@@ -10964,7 +10937,9 @@ enum GenericContextError {
 impl GenericContextError {
     const fn into_type<'db>(self) -> Type<'db> {
         match self {
-            GenericContextError::InvalidArgument => Type::unknown(),
+            GenericContextError::InvalidArgument | GenericContextError::VariadicTupleArguments => {
+                Type::unknown()
+            }
             GenericContextError::NotYetSupported => todo_type!("ParamSpecs and TypeVarTuples"),
         }
     }
