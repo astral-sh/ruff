@@ -32,6 +32,7 @@ class Parser(Generic[_MessageT]):
         The policy keyword specifies a policy object that controls a number of
         aspects of the parser's operation.  The default policy maintains
         backward compatibility.
+
         """
 
     @overload

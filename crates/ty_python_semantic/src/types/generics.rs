@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
-use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
@@ -11,9 +14,50 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, declaration_type,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
+
+/// Returns an iterator of any generic context introduced by the given scope or any enclosing
+/// scope.
+pub(crate) fn enclosing_generic_contexts<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = GenericContext<'db>> {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(class) => {
+                binding_type(db, index.expect_single_definition(class.node(module)))
+                    .into_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                binding_type(db, index.expect_single_definition(function.node(module)))
+                    .into_function_literal()?
+                    .signature(db)
+                    .iter()
+                    .last()
+                    .expect("function should have at least one overload")
+                    .generic_context
+            }
+            _ => None,
+        })
+}
+
+/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
+fn bound_legacy_typevars<'db>(
+    db: &'db dyn Db,
+    module: &ParsedModuleRef,
+    index: &'db SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = TypeVarInstance<'db>> {
+    enclosing_generic_contexts(db, module, index, scope)
+        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
+        .filter(|typevar| typevar.is_legacy(db))
+}
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -82,9 +126,11 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
+        definition: Definition<'db>,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
     ) -> Option<Self> {
+        // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
@@ -97,6 +143,16 @@ impl<'db> GenericContext<'db> {
         if let Some(ty) = return_type {
             ty.find_legacy_typevars(db, &mut variables);
         }
+
+        // Then remove any that were bound in enclosing scopes.
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let index = semantic_index(db, file);
+        let containing_scope = definition.file_scope(db);
+        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
+            variables.remove(&typevar);
+        }
+
         if variables.is_empty() {
             return None;
         }
@@ -117,6 +173,19 @@ impl<'db> GenericContext<'db> {
             return None;
         }
         Some(Self::new(db, variables))
+    }
+
+    pub(crate) fn with_binding_context(
+        self,
+        db: &'db dyn Db,
+        binding_context: Definition<'db>,
+    ) -> Self {
+        let variables: FxOrderSet<_> = self
+            .variables(db)
+            .iter()
+            .map(|typevar| typevar.with_binding_context(db, binding_context))
+            .collect();
+        Self::new(db, variables)
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -171,8 +240,34 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
+    /// Returns a tuple type of the typevars introduced by this generic context.
+    pub(crate) fn as_tuple(self, db: &'db dyn Db) -> Type<'db> {
+        Type::heterogeneous_tuple(
+            db,
+            self.variables(db)
+                .iter()
+                .map(|typevar| Type::TypeVar(*typevar)),
+        )
+    }
+
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         self.variables(db).is_subset(other.variables(db))
+    }
+
+    pub(crate) fn binds_legacy_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<TypeVarInstance<'db>> {
+        assert!(typevar.kind(db) == TypeVarKind::Legacy);
+        let typevar_def = typevar.definition(db);
+        self.variables(db)
+            .iter()
+            .find(|self_typevar| {
+                self_typevar.kind(db) == TypeVarKind::Legacy
+                    && self_typevar.definition(db) == typevar_def
+            })
+            .copied()
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -695,17 +790,19 @@ impl<'db> SpecializationBuilder<'db> {
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_tuple = formal_tuple.tuple(self.db);
                 let actual_tuple = actual_tuple.tuple(self.db);
-                match (formal_tuple, actual_tuple) {
-                    (TupleSpec::Fixed(formal_tuple), TupleSpec::Fixed(actual_tuple)) => {
-                        if formal_tuple.len() == actual_tuple.len() {
-                            for (formal_element, actual_element) in formal_tuple.elements().zip(actual_tuple.elements()) {
-                                self.infer(*formal_element, *actual_element)?;
-                            }
-                        }
-                    }
-
-                    // TODO: Infer specializations of variable-length tuples
-                    (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_)) => {}
+                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+                    return Ok(());
+                };
+                let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                    return Ok(());
+                };
+                let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                    return Ok(());
+                };
+                for (formal_element, actual_element) in
+                    formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                {
+                    self.infer(*formal_element, *actual_element)?;
                 }
             }
 

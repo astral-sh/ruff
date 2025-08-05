@@ -7,16 +7,30 @@ At its simplest, to define a generic class using the legacy syntax, you inherit 
 
 ```py
 from ty_extensions import generic_context
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
 
 T = TypeVar("T")
 S = TypeVar("S")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
 
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
+class SingleParamSpec(Generic[P]): ...
+class TypeVarAndParamSpec(Generic[P, T]): ...
+class SingleTypeVarTuple(Generic[Unpack[Ts]]): ...
+class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
 
-reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
-reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
+# revealed: tuple[T@SingleTypevar]
+reveal_type(generic_context(SingleTypevar))
+# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly (these should not reveal `None`)
+reveal_type(generic_context(SingleParamSpec))  # revealed: None
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: None
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -49,9 +63,12 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[T, S]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[T]
-reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
+# revealed: tuple[T@InheritedGeneric, S@InheritedGeneric]
+reveal_type(generic_context(InheritedGeneric))
+# revealed: tuple[T@InheritedGenericPartiallySpecialized]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))
+# revealed: None
+reveal_type(generic_context(InheritedGenericFullySpecialized))
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -78,9 +95,12 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-reveal_type(generic_context(ExplicitInheritedGeneric))  # revealed: tuple[T, S]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))  # revealed: tuple[T]
-reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))  # revealed: tuple[T, S]
+# revealed: tuple[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
+reveal_type(generic_context(ExplicitInheritedGeneric))
+# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecialized]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
+# revealed: tuple[T@ExplicitInheritedGenericPartiallySpecializedExtraTypevar, S@ExplicitInheritedGenericPartiallySpecializedExtraTypevar]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
 ## Specializing generic classes explicitly
@@ -321,6 +341,57 @@ class D(C[V, int]):
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+### Generic class inherits `__init__` from generic base class
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(Generic[T, U]):
+    def __init__(self, t: T, u: U) -> None: ...
+
+class D(C[T, U]):
+    pass
+
+reveal_type(C(1, "str"))  # revealed: C[int, str]
+reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+### Generic class inherits `__init__` from `dict`
+
+This is a specific example of the above, since it was reported specifically by a user.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class D(dict[T, U]):
+    pass
+
+reveal_type(D(key=1))  # revealed: D[str, int]
+```
+
+### Generic class inherits `__new__` from `tuple`
+
+(Technically, we synthesize a `__new__` method that is more precise than the one defined in typeshed
+for `tuple`, so we use a different mechanism to make sure it has the right inherited generic
+context. But from the user's point of view, this is another example of the above.)
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(tuple[T, U]): ...
+
+reveal_type(C((1, 2)))  # revealed: C[int, int]
+```
+
 ### `__init__` is itself generic
 
 ```py
@@ -433,17 +504,31 @@ the typevars of the enclosing generic class, and introduce new (distinct) typeva
 scope for the method.
 
 ```py
+from ty_extensions import generic_context
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
 
 class C(Generic[T]):
-    def method(self, u: U) -> U:
+    def method(self, u: int) -> int:
         return u
 
+    def generic_method(self, t: T, u: U) -> U:
+        return u
+
+reveal_type(generic_context(C))  # revealed: tuple[T@C]
+reveal_type(generic_context(C.method))  # revealed: None
+reveal_type(generic_context(C.generic_method))  # revealed: tuple[U@generic_method]
+reveal_type(generic_context(C[int]))  # revealed: None
+reveal_type(generic_context(C[int].method))  # revealed: None
+reveal_type(generic_context(C[int].generic_method))  # revealed: tuple[U@generic_method]
+
 c: C[int] = C[int]()
-reveal_type(c.method("string"))  # revealed: Literal["string"]
+reveal_type(c.generic_method(1, "string"))  # revealed: Literal["string"]
+reveal_type(generic_context(c))  # revealed: None
+reveal_type(generic_context(c.method))  # revealed: None
+reveal_type(generic_context(c.generic_method))  # revealed: tuple[U@generic_method]
 ```
 
 ## Specializations propagate
@@ -526,7 +611,8 @@ class WithOverloadedMethod(Generic[T]):
     def method(self, x: S | T) -> S | T:
         return x
 
-reveal_type(WithOverloadedMethod[int].method)  # revealed: Overload[(self, x: int) -> int, (self, x: S) -> S | int]
+# revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
+reveal_type(WithOverloadedMethod[int].method)
 ```
 
 ## Cyclic class definitions

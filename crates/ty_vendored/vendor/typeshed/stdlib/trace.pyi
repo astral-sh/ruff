@@ -58,7 +58,8 @@ class CoverageResults:
             *,
             ignore_missing_files: bool = False,
         ) -> None:
-            """Write the coverage results.
+            """
+            Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
@@ -71,7 +72,8 @@ class CoverageResults:
             """
     else:
         def write_results(self, show_missing: bool = True, summary: bool = False, coverdir: StrPath | None = None) -> None:
-            """Write the coverage results.
+            """
+            Write the coverage results.
 
             :param show_missing: Show lines that had no hits.
             :param summary: Include coverage summary per module.
@@ -117,7 +119,8 @@ class Trace:
         outfile: StrPath | None = None,
         timing: bool = False,
     ) -> None:
-        """@param count true iff it should count number of times each
+        """
+        @param count true iff it should count number of times each
                      line is executed
         @param trace true iff it should print out each line that is
                      being counted

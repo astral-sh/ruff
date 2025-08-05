@@ -16,6 +16,7 @@ def findmatch(
     used; (None, None) if no match is found.  This may invoke the
     'test' command of several matching entries before deciding which
     entry to use.
+
     """
 
 def getcaps() -> dict[str, list[_Cap]]:
@@ -26,4 +27,5 @@ def getcaps() -> dict[str, list[_Cap]]:
     collects all the entries for that MIME type from all available mailcap
     files.  Each dictionary contains key-value pairs for that MIME type,
     where the viewing command is stored with the key "view".
+
     """

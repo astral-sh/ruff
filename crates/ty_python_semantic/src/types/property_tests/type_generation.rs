@@ -6,7 +6,7 @@ use crate::types::{
     BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
     Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, KnownModule};
+use crate::{Db, module_resolver::KnownModule};
 use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
@@ -115,7 +115,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(heap_size=get_size2::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -195,13 +195,13 @@ impl Ty {
             }
             Ty::FixedLengthTuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
-                TupleType::from_elements(db, elements)
+                Type::heterogeneous_tuple(db, elements)
             }
             Ty::VariableLengthTuple(prefix, variable, suffix) => {
                 let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
                 let variable = variable.into_type(db);
                 let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
-                TupleType::mixed(db, prefix, variable, suffix)
+                Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(

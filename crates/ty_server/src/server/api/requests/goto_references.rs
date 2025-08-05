@@ -26,7 +26,7 @@ impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: ReferenceParams,
     ) -> crate::server::Result<Option<Vec<Location>>> {

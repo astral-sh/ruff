@@ -29,6 +29,7 @@ def get_host_platform() -> str:
        win32 (all others - specifically, sys.platform is returned)
 
     For other non-POSIX platforms, currently just returns 'sys.platform'.
+
     """
 
 def get_platform() -> str: ...

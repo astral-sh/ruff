@@ -109,9 +109,12 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                // Only show the bare class name here; ClassBase::display would render this as
-                // type[<class 'Foo'>] instead of type[Foo].
-                SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                    write!(f, "type[{}]", class.name(self.db))
+                }
+                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                    write!(f, "type[{}]", alias.display(self.db))
+                }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
@@ -202,7 +205,16 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
+            Type::TypeVar(typevar) => {
+                f.write_str(typevar.name(self.db))?;
+                if let Some(binding_context) = typevar
+                    .binding_context(self.db)
+                    .and_then(|def| def.name(self.db))
+                {
+                    write!(f, "@{binding_context}")?;
+                }
+                Ok(())
+            }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -221,6 +233,9 @@ impl Display for DisplayRepresentation<'_> {
                     f.write_str(&name)?;
                 }
                 f.write_str("]")
+            }
+            Type::TypedDict(typed_dict) => {
+                f.write_str(typed_dict.defining_class(self.db).name(self.db))
             }
         }
     }
@@ -433,21 +448,6 @@ impl Display for DisplayGenericContext<'_> {
 }
 
 impl<'db> Specialization<'db> {
-    /// Renders the specialization in full, e.g. `{T = int, U = str}`.
-    pub fn display(
-        &'db self,
-        db: &'db dyn Db,
-        tuple_specialization: TupleSpecialization,
-    ) -> DisplaySpecialization<'db> {
-        DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
-            types: self.types(db),
-            db,
-            full: true,
-            tuple_specialization,
-        }
-    }
-
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
     pub fn display_short(
         &'db self,
@@ -458,7 +458,6 @@ impl<'db> Specialization<'db> {
             typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
-            full: false,
             tuple_specialization,
         }
     }
@@ -468,34 +467,22 @@ pub struct DisplaySpecialization<'db> {
     typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
-    full: bool,
     tuple_specialization: TupleSpecialization,
 }
 
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.full {
-            f.write_char('{')?;
-            for (idx, (var, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                write!(f, "{} = {}", var.name(self.db), ty.display(self.db))?;
+        f.write_char('[')?;
+        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
             }
-            f.write_char('}')
-        } else {
-            f.write_char('[')?;
-            for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
-                if idx > 0 {
-                    f.write_str(", ")?;
-                }
-                ty.display(self.db).fmt(f)?;
-            }
-            if self.tuple_specialization.is_yes() {
-                f.write_str(", ...")?;
-            }
-            f.write_char(']')
+            ty.display(self.db).fmt(f)?;
         }
+        if self.tuple_specialization.is_yes() {
+            f.write_str(", ...")?;
+        }
+        f.write_char(']')
     }
 }
 

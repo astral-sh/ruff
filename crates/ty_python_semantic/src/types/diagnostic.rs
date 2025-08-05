@@ -15,7 +15,6 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::tuple::TupleType;
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
@@ -2251,6 +2250,41 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
+pub(crate) fn report_bad_argument_to_protocol_interface(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    param_type: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `reveal_protocol_interface`");
+    diagnostic
+        .set_primary_message("Only protocol classes can be passed to `reveal_protocol_interface`");
+
+    if let Some(class) = param_type.to_class_type(context.db()) {
+        let mut class_def_diagnostic = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{}` is declared here, but it is not a protocol class:",
+                class.name(db)
+            ),
+        );
+        class_def_diagnostic.annotate(Annotation::primary(
+            class.class_literal(db).0.header_span(db),
+        ));
+        diagnostic.sub(class_def_diagnostic);
+    }
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // See TODO in `report_bad_argument_to_get_protocol_members` above
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html");
+}
+
 pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
@@ -2395,7 +2429,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    let tuple_of_types = TupleType::homogeneous(db, instance_of_type);
+    let tuple_of_types = Type::homogeneous_tuple(db, instance_of_type);
 
     let explain_mro_entries = |diagnostic: &mut LintDiagnosticGuard| {
         diagnostic.info(

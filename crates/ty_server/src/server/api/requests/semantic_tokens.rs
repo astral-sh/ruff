@@ -22,7 +22,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         _params: SemanticTokensParams,
     ) -> crate::server::Result<Option<SemanticTokensResult>> {

@@ -5389,7 +5389,7 @@ fn walrus_before_py38() {
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -5435,15 +5435,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
-    "###
+    "
     );
 
     // syntax error on 3.9 with preview
@@ -5464,7 +5464,7 @@ match 2:
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
@@ -5492,7 +5492,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5505,7 +5505,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5618,7 +5618,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5632,7 +5632,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5651,7 +5651,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----

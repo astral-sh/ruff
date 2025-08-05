@@ -128,6 +128,7 @@ class Dialect:
     This must be subclassed (see csv.excel).  Valid attributes are:
     delimiter, quotechar, escapechar, doublequote, skipinitialspace,
     lineterminator, quoting.
+
     """
 
     delimiter: str
@@ -234,12 +235,15 @@ class DictWriter(Generic[_T]):
             """
 
 class Sniffer:
-    """ "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
+    """
+    "Sniffs" the format of a CSV file (i.e. delimiter, quotechar)
     Returns a Dialect object.
     """
 
     preferred: list[str]
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
-        """Returns a dialect (or None) corresponding to the sample"""
+        """
+        Returns a dialect (or None) corresponding to the sample
+        """
 
     def has_header(self, sample: str) -> bool: ...

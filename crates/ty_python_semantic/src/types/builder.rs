@@ -1068,8 +1068,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
-    use crate::KnownModule;
     use crate::db::tests::setup_db;
+    use crate::module_resolver::KnownModule;
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
     use crate::types::{KnownClass, Truthiness};

@@ -6,7 +6,7 @@
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Two levels up
@@ -16,7 +16,7 @@ def f():
     x = 1
     def g():
         def h():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Skips class scope
@@ -28,7 +28,7 @@ def f():
     class C:
         x = 2
         def g():
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Reads respect annotation-only declarations
@@ -104,12 +104,12 @@ def a():
 
             def d():
                 nonlocal x
-                reveal_type(x)  # revealed: Unknown | Literal[3, 2]
+                reveal_type(x)  # revealed: Literal[3, 2]
                 x = 4
                 reveal_type(x)  # revealed: Literal[4]
 
                 def e():
-                    reveal_type(x)  # revealed: Unknown | Literal[4, 3, 2]
+                    reveal_type(x)  # revealed: Literal[4, 3, 2]
 ```
 
 However, currently the union of types that we build is incomplete. We walk parent scopes, but not
@@ -127,7 +127,7 @@ def a():
             nonlocal x
             x = 3
         # TODO: This should include 2 and 3.
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -249,7 +249,7 @@ def f():
         x = 2
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+            reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## `nonlocal` "chaining"
@@ -263,7 +263,7 @@ def f():
         nonlocal x
         def h():
             nonlocal x
-            reveal_type(x)  # revealed: Unknown | Literal[1]
+            reveal_type(x)  # revealed: Literal[1]
 ```
 
 And the `nonlocal` chain can skip over a scope that doesn't bind the variable:
@@ -277,7 +277,7 @@ def f1():
             # No binding; this scope gets skipped.
             def f4():
                 nonlocal x
-                reveal_type(x)  # revealed: Unknown | Literal[1]
+                reveal_type(x)  # revealed: Literal[1]
 ```
 
 But a `global` statement breaks the chain:
@@ -353,7 +353,7 @@ affected by `g`:
 def f():
     x = 1
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     reveal_type(x)  # revealed: Literal[1]
 ```
 
@@ -365,9 +365,9 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
         x += 1
-        reveal_type(x)  # revealed: Unknown | Literal[2]
+        reveal_type(x)  # revealed: Literal[2]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```
@@ -379,7 +379,7 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Unknown | Literal[1]
+        reveal_type(x)  # revealed: Literal[1]
     # TODO: should be `Unknown | Literal[1]`
     reveal_type(x)  # revealed: Literal[1]
 ```

@@ -87,7 +87,8 @@ def monthrange(year: int, month: int) -> tuple[int, int]:
     """
 
 class Calendar:
-    """Base calendar class. This class doesn't do any formatting. It simply
+    """
+    Base calendar class. This class doesn't do any formatting. It simply
     provides data to subclasses.
     """
 
@@ -96,137 +97,183 @@ class Calendar:
     def getfirstweekday(self) -> int: ...
     def setfirstweekday(self, firstweekday: int) -> None: ...
     def iterweekdays(self) -> Iterable[int]:
-        """Return an iterator for one week of weekday numbers starting with the
+        """
+        Return an iterator for one week of weekday numbers starting with the
         configured first one.
         """
 
     def itermonthdates(self, year: int, month: int) -> Iterable[datetime.date]:
-        """Return an iterator for one month. The iterator will yield datetime.date
+        """
+        Return an iterator for one month. The iterator will yield datetime.date
         values and will always iterate through complete weeks, so it will yield
         dates outside the specified month.
         """
 
     def itermonthdays2(self, year: int, month: int) -> Iterable[tuple[int, int]]:
-        """Like itermonthdates(), but will yield (day number, weekday number)
+        """
+        Like itermonthdates(), but will yield (day number, weekday number)
         tuples. For days outside the specified month the day number is 0.
         """
 
     def itermonthdays(self, year: int, month: int) -> Iterable[int]:
-        """Like itermonthdates(), but will yield day numbers. For days outside
+        """
+        Like itermonthdates(), but will yield day numbers. For days outside
         the specified month the day number is 0.
         """
 
     def monthdatescalendar(self, year: int, month: int) -> list[list[datetime.date]]:
-        """Return a matrix (list of lists) representing a month's calendar.
+        """
+        Return a matrix (list of lists) representing a month's calendar.
         Each row represents a week; week entries are datetime.date values.
         """
 
     def monthdays2calendar(self, year: int, month: int) -> list[list[tuple[int, int]]]:
-        """Return a matrix representing a month's calendar.
+        """
+        Return a matrix representing a month's calendar.
         Each row represents a week; week entries are
         (day number, weekday number) tuples. Day numbers outside this month
         are zero.
         """
 
     def monthdayscalendar(self, year: int, month: int) -> list[list[int]]:
-        """Return a matrix representing a month's calendar.
+        """
+        Return a matrix representing a month's calendar.
         Each row represents a week; days outside this month are zero.
         """
 
     def yeardatescalendar(self, year: int, width: int = 3) -> list[list[list[list[datetime.date]]]]:
-        """Return the data for the specified year ready for formatting. The return
+        """
+        Return the data for the specified year ready for formatting. The return
         value is a list of month rows. Each month row contains up to width months.
         Each month contains between 4 and 6 weeks and each week contains 1-7
         days. Days are datetime.date objects.
         """
 
     def yeardays2calendar(self, year: int, width: int = 3) -> list[list[list[list[tuple[int, int]]]]]:
-        """Return the data for the specified year ready for formatting (similar to
+        """
+        Return the data for the specified year ready for formatting (similar to
         yeardatescalendar()). Entries in the week lists are
         (day number, weekday number) tuples. Day numbers outside this month are
         zero.
         """
 
     def yeardayscalendar(self, year: int, width: int = 3) -> list[list[list[list[int]]]]:
-        """Return the data for the specified year ready for formatting (similar to
+        """
+        Return the data for the specified year ready for formatting (similar to
         yeardatescalendar()). Entries in the week lists are day numbers.
         Day numbers outside this month are zero.
         """
 
     def itermonthdays3(self, year: int, month: int) -> Iterable[tuple[int, int, int]]:
-        """Like itermonthdates(), but will yield (year, month, day) tuples.  Can be
+        """
+        Like itermonthdates(), but will yield (year, month, day) tuples.  Can be
         used for dates outside of datetime.date range.
         """
 
     def itermonthdays4(self, year: int, month: int) -> Iterable[tuple[int, int, int, int]]:
-        """Like itermonthdates(), but will yield (year, month, day, day_of_week) tuples.
+        """
+        Like itermonthdates(), but will yield (year, month, day, day_of_week) tuples.
         Can be used for dates outside of datetime.date range.
         """
 
 class TextCalendar(Calendar):
-    """Subclass of Calendar that outputs a calendar as a simple plain text
+    """
+    Subclass of Calendar that outputs a calendar as a simple plain text
     similar to the UNIX program cal.
     """
 
     def prweek(self, theweek: int, width: int) -> None:
-        """Print a single week (no newline)."""
+        """
+        Print a single week (no newline).
+        """
 
     def formatday(self, day: int, weekday: int, width: int) -> str:
-        """Returns a formatted day."""
+        """
+        Returns a formatted day.
+        """
 
     def formatweek(self, theweek: int, width: int) -> str:
-        """Returns a single week in a string (no newline)."""
+        """
+        Returns a single week in a string (no newline).
+        """
 
     def formatweekday(self, day: int, width: int) -> str:
-        """Returns a formatted week day name."""
+        """
+        Returns a formatted week day name.
+        """
 
     def formatweekheader(self, width: int) -> str:
-        """Return a header for a week."""
+        """
+        Return a header for a week.
+        """
 
     def formatmonthname(self, theyear: int, themonth: int, width: int, withyear: bool = True) -> str:
-        """Return a formatted month name."""
+        """
+        Return a formatted month name.
+        """
 
     def prmonth(self, theyear: int, themonth: int, w: int = 0, l: int = 0) -> None:
-        """Print a month's calendar."""
+        """
+        Print a month's calendar.
+        """
 
     def formatmonth(self, theyear: int, themonth: int, w: int = 0, l: int = 0) -> str:
-        """Return a month's calendar string (multi-line)."""
+        """
+        Return a month's calendar string (multi-line).
+        """
 
     def formatyear(self, theyear: int, w: int = 2, l: int = 1, c: int = 6, m: int = 3) -> str:
-        """Returns a year's calendar as a multi-line string."""
+        """
+        Returns a year's calendar as a multi-line string.
+        """
 
     def pryear(self, theyear: int, w: int = 0, l: int = 0, c: int = 6, m: int = 3) -> None:
         """Print a year's calendar."""
 
 def firstweekday() -> int: ...
 def monthcalendar(year: int, month: int) -> list[list[int]]:
-    """Return a matrix representing a month's calendar.
+    """
+    Return a matrix representing a month's calendar.
     Each row represents a week; days outside this month are zero.
     """
 
 def prweek(theweek: int, width: int) -> None:
-    """Print a single week (no newline)."""
+    """
+    Print a single week (no newline).
+    """
 
 def week(theweek: int, width: int) -> str:
-    """Returns a single week in a string (no newline)."""
+    """
+    Returns a single week in a string (no newline).
+    """
 
 def weekheader(width: int) -> str:
-    """Return a header for a week."""
+    """
+    Return a header for a week.
+    """
 
 def prmonth(theyear: int, themonth: int, w: int = 0, l: int = 0) -> None:
-    """Print a month's calendar."""
+    """
+    Print a month's calendar.
+    """
 
 def month(theyear: int, themonth: int, w: int = 0, l: int = 0) -> str:
-    """Return a month's calendar string (multi-line)."""
+    """
+    Return a month's calendar string (multi-line).
+    """
 
 def calendar(theyear: int, w: int = 2, l: int = 1, c: int = 6, m: int = 3) -> str:
-    """Returns a year's calendar as a multi-line string."""
+    """
+    Returns a year's calendar as a multi-line string.
+    """
 
 def prcal(theyear: int, w: int = 0, l: int = 0, c: int = 6, m: int = 3) -> None:
     """Print a year's calendar."""
 
 class HTMLCalendar(Calendar):
-    """This calendar returns complete HTML pages."""
+    """
+    This calendar returns complete HTML pages.
+    """
 
     cssclasses: ClassVar[list[str]]
     cssclass_noday: ClassVar[str]
@@ -236,30 +283,46 @@ class HTMLCalendar(Calendar):
     cssclass_year: ClassVar[str]
     cssclass_year_head: ClassVar[str]
     def formatday(self, day: int, weekday: int) -> str:
-        """Return a day as a table cell."""
+        """
+        Return a day as a table cell.
+        """
 
     def formatweek(self, theweek: int) -> str:
-        """Return a complete week as a table row."""
+        """
+        Return a complete week as a table row.
+        """
 
     def formatweekday(self, day: int) -> str:
-        """Return a weekday name as a table header."""
+        """
+        Return a weekday name as a table header.
+        """
 
     def formatweekheader(self) -> str:
-        """Return a header for a week as a table row."""
+        """
+        Return a header for a week as a table row.
+        """
 
     def formatmonthname(self, theyear: int, themonth: int, withyear: bool = True) -> str:
-        """Return a month name as a table row."""
+        """
+        Return a month name as a table row.
+        """
 
     def formatmonth(self, theyear: int, themonth: int, withyear: bool = True) -> str:
-        """Return a formatted month as a table."""
+        """
+        Return a formatted month as a table.
+        """
 
     def formatyear(self, theyear: int, width: int = 3) -> str:
-        """Return a formatted year as a table of tables."""
+        """
+        Return a formatted year as a table of tables.
+        """
 
     def formatyearpage(
         self, theyear: int, width: int = 3, css: str | None = "calendar.css", encoding: str | None = None
     ) -> bytes:
-        """Return a formatted year as a complete HTML page."""
+        """
+        Return a formatted year as a complete HTML page.
+        """
 
 class different_locale:
     def __init__(self, locale: _LocaleType) -> None: ...
@@ -267,14 +330,16 @@ class different_locale:
     def __exit__(self, *args: Unused) -> None: ...
 
 class LocaleTextCalendar(TextCalendar):
-    """This class can be passed a locale name in the constructor and will return
+    """
+    This class can be passed a locale name in the constructor and will return
     month and weekday names in the specified locale.
     """
 
     def __init__(self, firstweekday: int = 0, locale: _LocaleType | None = None) -> None: ...
 
 class LocaleHTMLCalendar(HTMLCalendar):
-    """This class can be passed a locale name in the constructor and will return
+    """
+    This class can be passed a locale name in the constructor and will return
     month and weekday names in the specified locale.
     """
 

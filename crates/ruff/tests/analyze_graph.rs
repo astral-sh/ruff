@@ -57,33 +57,40 @@ fn dependencies() -> Result<()> {
         .write_str(indoc::indoc! {r#"
         def f(): pass
     "#})?;
+    root.child("ruff")
+        .child("e.pyi")
+        .write_str(indoc::indoc! {r#"
+        def f() -> None: ...
+    "#})?;
 
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [
-                "ruff/c.py"
-              ],
-              "ruff/c.py": [
-                "ruff/d.py"
-              ],
-              "ruff/d.py": [
-                "ruff/e.py"
-              ],
-              "ruff/e.py": []
-            }
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [
+            "ruff/c.py"
+          ],
+          "ruff/c.py": [
+            "ruff/d.py"
+          ],
+          "ruff/d.py": [
+            "ruff/e.py",
+            "ruff/e.pyi"
+          ],
+          "ruff/e.py": [],
+          "ruff/e.pyi": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     Ok(())

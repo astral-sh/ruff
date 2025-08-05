@@ -340,6 +340,10 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::Or(predicates) => {
             UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
         }
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|p| pattern_kind_to_type(db, p))
+            .unwrap_or_else(|| Type::object(db)),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -761,6 +765,10 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
+                .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
         }
     }
@@ -844,19 +852,17 @@ impl ReachabilityConstraints {
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
                 let place_table = place_table(db, star_import.scope(db));
-                let symbol_name = place_table
-                    .place_expr(star_import.symbol_id(db))
-                    .expect_name();
+                let symbol = place_table.symbol(star_import.symbol_id(db));
                 let referenced_file = star_import.referenced_file(db);
 
                 let requires_explicit_reexport = match dunder_all_names(db, referenced_file) {
                     Some(all_names) => {
-                        if all_names.contains(symbol_name) {
+                        if all_names.contains(symbol.name()) {
                             Some(RequiresExplicitReExport::No)
                         } else {
                             tracing::trace!(
                                 "Symbol `{}` (via star import) not found in `__all__` of `{}`",
-                                symbol_name,
+                                symbol.name(),
                                 referenced_file.path(db)
                             );
                             return Truthiness::AlwaysFalse;
@@ -865,8 +871,13 @@ impl ReachabilityConstraints {
                     None => None,
                 };
 
-                match imported_symbol(db, referenced_file, symbol_name, requires_explicit_reexport)
-                    .place
+                match imported_symbol(
+                    db,
+                    referenced_file,
+                    symbol.name(),
+                    requires_explicit_reexport,
+                )
+                .place
                 {
                     crate::place::Place::Type(_, crate::place::Boundness::Bound) => {
                         Truthiness::AlwaysTrue
