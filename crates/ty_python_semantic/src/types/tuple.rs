@@ -957,7 +957,7 @@ impl<T> Tuple<T> {
         VariableLengthTuple::homogeneous(element)
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Tuple<T> {
+    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
         FixedLengthTuple::from_elements(elements).into()
     }
 
