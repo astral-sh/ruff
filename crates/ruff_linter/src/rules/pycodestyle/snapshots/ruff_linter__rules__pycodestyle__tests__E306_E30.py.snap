@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.py:854:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
@@ -220,3 +219,23 @@ E30.py:925:5: E306 [*] Expected 1 blank line before a nested definition, found 0
 925 926 |     async def b():
 926 927 |         pass
 927 928 | # end
+
+E30.py:983:9: E306 [*] Expected 1 blank line before a nested definition, found 0
+    |
+981 |     async def recv(self, *, length=65536):
+982 |         loop = asyncio.get_event_loop()
+983 |         def callback():
+    |         ^^^ E306
+984 |             loop.remove_reader(self._fd)
+985 |         loop.add_reader(self._fd, callback)
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+980 980 | class foo:
+981 981 |     async def recv(self, *, length=65536):
+982 982 |         loop = asyncio.get_event_loop()
+    983 |+
+983 984 |         def callback():
+984 985 |             loop.remove_reader(self._fd)
+985 986 |         loop.add_reader(self._fd, callback)

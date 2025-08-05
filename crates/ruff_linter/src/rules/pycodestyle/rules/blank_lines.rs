@@ -836,7 +836,12 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            && matches!(state.class_status, Status::Inside(_))
+            // Only apply to functions that are "immediately within" a class (not nested within other functions/blocks)
+            && if let Status::Inside(class_indent) = state.class_status {
+                line.indent_length == class_indent + self.context.settings().tab_size.as_usize()
+            } else {
+                false
+            }
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)

@@ -974,3 +974,13 @@ BANANA = 100
 APPLE = 200
 
 # end
+
+
+# https://github.com/astral-sh/ruff/issues/19752
+class foo:
+    async def recv(self, *, length=65536):
+        loop = asyncio.get_event_loop()
+        def callback():
+            loop.remove_reader(self._fd)
+        loop.add_reader(self._fd, callback)
+# end
