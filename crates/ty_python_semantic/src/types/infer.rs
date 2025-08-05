@@ -3268,22 +3268,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_exception(&mut self, node: Option<&ast::Expr>, is_star: bool) -> Type<'db> {
-        fn extract_tuple_specialization<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-            let class = ty.into_nominal_instance()?.class;
-            if !class.is_known(db, KnownClass::Tuple) {
-                return None;
-            }
-            let ClassType::Generic(class) = class else {
-                return None;
-            };
-            let specialization = class.specialization(db).types(db)[0];
-            let specialization_instance = specialization.to_instance(db)?;
-
-            specialization_instance
-                .is_assignable_to(db, KnownClass::BaseException.to_instance(db))
-                .then_some(specialization_instance)
-        }
-
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
         let node_ty = node.map_or(Type::unknown(), |ty| self.infer_expression(ty));
@@ -3318,7 +3302,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             Type::homogeneous_tuple(self.db(), type_base_exception),
         ) {
-            extract_tuple_specialization(self.db(), node_ty)
+            node_ty
+                .tuple_instance_spec(self.db())
+                .and_then(|spec| {
+                    let specialization = spec
+                        .homogeneous_element_type(self.db())
+                        .to_instance(self.db());
+
+                    debug_assert!(specialization.is_some_and(|specialization_type| {
+                        specialization_type.is_assignable_to(
+                            self.db(),
+                            KnownClass::BaseException.to_instance(self.db()),
+                        )
+                    }));
+
+                    specialization
+                })
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
         } else if node_ty.is_assignable_to(
             self.db(),
