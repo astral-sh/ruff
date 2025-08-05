@@ -2070,8 +2070,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.specialization = self.signature.generic_context.map(|gc| builder.build(gc));
         self.inherited_specialization = self.signature.inherited_generic_context.map(|gc| {
             // The inherited generic context is used when inferring the specialization of a generic
-            // class from a constructor call. In this case (only), we promote any typevars that are
-            // inferred as a literal to the corresponding instance type.
+            // class from a constructor call. In this case (only), we promote any non-covariant
+            // typevars that are inferred as a literal to the corresponding instance type.
             builder
                 .build(gc)
                 .apply_type_mapping(self.db, &TypeMapping::PromoteLiterals)

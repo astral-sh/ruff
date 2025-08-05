@@ -453,11 +453,30 @@ impl<'db> Specialization<'db> {
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .zip(self.generic_context(db).variables(db))
+            .map(
+                |(ty, variable)| match (type_mapping, variable.variance(db)) {
+                    // Do not promote literals for covariant or bivariant typevars:
+                    // we can always use the more precise type in this case
+                    (
+                        TypeMapping::PromoteLiterals,
+                        TypeVarVariance::Covariant | TypeVarVariance::Bivariant,
+                    ) => *ty,
+                    _ => ty.apply_type_mapping(db, type_mapping),
+                },
+            )
             .collect();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
+
+        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+            // tuples are always covariant so we can skip promoting literals for them,
+            // and always use the most precise type possible
+            if type_mapping == &TypeMapping::PromoteLiterals {
+                Some(tuple)
+            } else {
+                tuple.apply_type_mapping(db, type_mapping)
+            }
+        });
+
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
