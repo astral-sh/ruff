@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
-snapshot_kind: text
 ---
 SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
@@ -74,4 +73,61 @@ SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality compar
    14 |+if a in (b, c) or None:
 15 15 |     d
 16 16 | 
-17 17 | # OK
+17 17 | 
+
+SIM109.py:19:4: SIM109 [*] Use `b in (c, d)` instead of multiple equality comparisons
+   |
+18 | # SIM109
+19 | if a or b == c or b == d:
+   |    ^^^^^^^^^^^^^^^^^^^^^ SIM109
+20 |     e
+   |
+   = help: Replace with `b in (c, d)`
+
+ℹ Unsafe fix
+16 16 | 
+17 17 | 
+18 18 | # SIM109
+19    |-if a or b == c or b == d:
+   19 |+if a or b in (c, d):
+20 20 |     e
+21 21 | 
+22 22 | # SIM109
+
+SIM109.py:23:4: SIM109 [*] Use `b in (d, c)` instead of multiple equality comparisons
+   |
+22 | # SIM109
+23 | if a or b == d or b == c:
+   |    ^^^^^^^^^^^^^^^^^^^^^ SIM109
+24 |     e
+   |
+   = help: Replace with `b in (d, c)`
+
+ℹ Unsafe fix
+20 20 |     e
+21 21 | 
+22 22 | # SIM109
+23    |-if a or b == d or b == c:
+   23 |+if a or b in (d, c):
+24 24 |     e
+25 25 | 
+26 26 | # OK
+
+SIM109.py:27:4: SIM109 [*] Use `b in (e, c, d)` instead of multiple equality comparisons
+   |
+26 | # OK
+27 | if a or b == e or b == c or b == d or None:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+28 |     f
+   |
+   = help: Replace with `b in (e, c, d)`
+
+ℹ Unsafe fix
+24 24 |     e
+25 25 | 
+26 26 | # OK
+27    |-if a or b == e or b == c or b == d or None:
+   27 |+if a or b in (e, c, d) or None:
+28 28 |     f
+29 29 | 
+30 30 | # OK
