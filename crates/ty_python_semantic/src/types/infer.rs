@@ -3906,7 +3906,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::TypeIs(_) => {
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => {
                 // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
                 // assigning the attributed by the normal mechanism.
                 let setattr_dunder_call_result = object_ty.try_call_dunder_with_policy(
@@ -7149,7 +7150,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
-                | Type::TypeIs(_),
+                | Type::TypeIs(_)
+                | Type::TypedDict(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -7274,8 +7276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoTypeAlias
-                    | DynamicType::TodoTypedDict,
+                    | DynamicType::TodoTypeAlias,
                 ),
                 _,
                 _,
@@ -7285,8 +7286,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
-                    | DynamicType::TodoTypeAlias
-                    | DynamicType::TodoTypedDict,
+                    | DynamicType::TodoTypeAlias,
                 ),
                 _,
             ) => Some(todo),
@@ -7474,7 +7474,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
-                | Type::TypeIs(_),
+                | Type::TypeIs(_)
+                | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::Callable(..)
@@ -7503,7 +7504,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
-                | Type::TypeIs(_),
+                | Type::TypeIs(_)
+                | Type::TypedDict(_),
                 op,
             ) => {
                 // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from

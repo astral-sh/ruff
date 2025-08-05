@@ -98,6 +98,14 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_instance_members(db, class_literal);
             }
 
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
             Type::ClassLiteral(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
@@ -154,6 +162,14 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {}
             },
+
+            Type::TypedDict(_) => {
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                    self.extend_with_class_members(db, ty, class_literal);
+                }
+
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_instance(db));
+            }
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));

@@ -606,6 +606,8 @@ pub enum Type<'db> {
     BoundSuper(BoundSuperType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
+    /// A type that represents an inhabitant of a `TypedDict`.
+    TypedDict(TypedDictType<'db>),
 }
 
 #[salsa::tracked]
@@ -779,6 +781,10 @@ impl<'db> Type<'db> {
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
+            }
+            Type::TypedDict(_) => {
+                // TODO: Materialization of gradual TypedDicts
+                *self
             }
         }
     }
@@ -1080,6 +1086,12 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
+
+            Type::TypedDict(_) => {
+                // TODO: Normalize TypedDicts
+                self
+            }
+
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -1128,7 +1140,8 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_)
             // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_) => true,
+            | Type::ClassLiteral(_)
+             => true,
             Type::Dynamic(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -1140,7 +1153,8 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_) => false,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => false,
         }
     }
 
@@ -1203,7 +1217,8 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeIs(_) => None,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => None,
 
             // TODO
             Type::MethodWrapper(_)
@@ -1295,6 +1310,11 @@ impl<'db> Type<'db> {
                 if relation.is_assignability() =>
             {
                 field.default_type(db).has_relation_to(db, right, relation)
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement assignability and subtyping for TypedDict
+                relation.is_assignability()
             }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
@@ -1760,6 +1780,11 @@ impl<'db> Type<'db> {
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement disjointness for TypedDict
+                false
+            }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
             // be specialized to the same type. (This is an important difference between typevars
@@ -2374,6 +2399,7 @@ impl<'db> Type<'db> {
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => false,
             Type::TypeIs(type_is) => type_is.is_bound(db),
+            Type::TypedDict(_) => false,
         }
     }
 
@@ -2462,7 +2488,8 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::PropertyInstance(_)
             | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_) => false,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => false,
         }
     }
 
@@ -2502,6 +2529,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Place::bound(self).into()),
 
+            Type::ClassLiteral(class) if class.is_typed_dict(db) => {
+                Some(class.typed_dict_member(db, None, name, policy))
+            }
+
             Type::ClassLiteral(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
@@ -2529,6 +2560,10 @@ impl<'db> Type<'db> {
 
                     _ => Some(class.class_member(db, name, policy)),
                 }
+            }
+
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Some(alias.origin(db).typed_dict_member(db, None, name, policy))
             }
 
             Type::GenericAlias(alias) => {
@@ -2582,7 +2617,8 @@ impl<'db> Type<'db> {
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
-            | Type::TypeIs(_) => None,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => None,
         }
     }
 
@@ -2739,6 +2775,8 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                 Place::Unbound.into()
             }
+
+            Type::TypedDict(_) => Place::Unbound.into(),
         }
     }
 
@@ -3228,7 +3266,8 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::TypeIs(..) => {
+            | Type::TypeIs(..)
+            | Type::TypedDict(_) => {
                 let fallback = self.instance_member(db, name_str);
 
                 let result = self.invoke_descriptor_protocol(
@@ -3513,6 +3552,12 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::LiteralString
             | Type::TypeIs(_) => Truthiness::Ambiguous,
+
+            Type::TypedDict(_) => {
+                // TODO: We could do better here, but it's unclear if this is important.
+                // See existing `TypedDict`-related tests in `truthiness.md`
+                Truthiness::Ambiguous
+            }
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -4552,7 +4597,8 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::BoundSuper(_)
             | Type::ModuleLiteral(_)
-            | Type::TypeIs(_) => CallableBinding::not_callable(self).into(),
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
     }
 
@@ -5167,7 +5213,8 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
-            | Type::TypeIs(_) => None,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => None,
         }
     }
 
@@ -5206,10 +5253,16 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
+                    _ if class.is_typed_dict(db) => {
+                        Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::TypedDict(
+                TypedDictType::new(db, ClassType::from(*alias)),
+            )),
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -5235,7 +5288,8 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
-            | Type::TypeIs(_) => Err(InvalidTypeExpressionError {
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec_inline![
                     InvalidTypeExpression::InvalidType(*self, scope_id)
                 ],
@@ -5537,6 +5591,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class(db)),
         }
     }
 
@@ -5635,6 +5690,10 @@ impl<'db> Type<'db> {
 
             Type::GenericAlias(generic) => {
                 Type::GenericAlias(generic.apply_type_mapping(db, type_mapping))
+            }
+
+            Type::TypedDict(typed_dict) => {
+                Type::TypedDict(typed_dict.apply_type_mapping(db, type_mapping))
             }
 
             Type::SubclassOf(subclass_of) => Type::SubclassOf(
@@ -5796,7 +5855,8 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
-            | Type::KnownInstance(_) => {}
+            | Type::KnownInstance(_)
+            | Type::TypedDict(_) => {}
         }
     }
 
@@ -5910,6 +5970,10 @@ impl<'db> Type<'db> {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
                 Protocol::Synthesized(_) => None,
             },
+
+            Type::TypedDict(typed_dict) => {
+                Some(TypeDefinition::Class(typed_dict.defining_class(db).definition(db)))
+            }
 
             Self::Union(_) | Self::Intersection(_) => None,
 
@@ -6255,9 +6319,6 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
-    /// A special Todo-variant for classes inheriting from `TypedDict`.
-    /// A temporary variant to avoid false positives while we wait for full support.
-    TodoTypedDict,
 }
 
 impl DynamicType {
@@ -6285,13 +6346,6 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
-                } else {
-                    f.write_str("@Todo")
-                }
-            }
-            DynamicType::TodoTypedDict => {
-                if cfg!(debug_assertions) {
-                    f.write_str("@Todo(Support for `TypedDict`)")
                 } else {
                     f.write_str("@Todo")
                 }
@@ -8828,6 +8882,40 @@ impl<'db> EnumLiteralType<'db> {
     pub fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
     }
+}
+
+/// Type that represents the set of all inhabitants (`dict` instances) that conform to
+/// a given `TypedDict` schema.
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
+pub struct TypedDictType<'db> {
+    /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
+    /// schema of this `TypedDict`.
+    defining_class: ClassType<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypedDictType<'_> {}
+
+impl<'db> TypedDictType<'db> {
+    pub(crate) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.defining_class(db).apply_type_mapping(db, type_mapping),
+        )
+    }
+}
+
+fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    visitor: &mut V,
+) {
+    visitor.visit_type(db, typed_dict.defining_class(db).into());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -60,6 +60,8 @@ Assignments to keys are also validated:
 ```py
 # TODO: this should be an error
 alice["name"] = None
+# TODO: this should be an error
+bob["name"] = None
 ```
 
 Assignments to non-existing keys are disallowed:
@@ -67,6 +69,8 @@ Assignments to non-existing keys are disallowed:
 ```py
 # TODO: this should be an error
 alice["extra"] = True
+# TODO: this should be an error
+bob["extra"] = True
 ```
 
 ## Structural assignability
@@ -123,7 +127,7 @@ dangerous(alice)
 reveal_type(alice["name"])  # revealed: Unknown
 ```
 
-## Types of keys and values
+## Methods on `TypedDict`
 
 ```py
 from typing import TypedDict
@@ -133,8 +137,13 @@ class Person(TypedDict):
     age: int | None
 
 def _(p: Person) -> None:
-    reveal_type(p.keys())  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.values())  # revealed: @Todo(Support for `TypedDict`)
+    reveal_type(p.keys())  # revealed: dict_keys[str, object]
+    reveal_type(p.values())  # revealed: dict_values[str, object]
+
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
+
+    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
+    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
 ```
 
 ## Unlike normal classes
@@ -149,11 +158,16 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-# TODO: this should be an error
+# error: [unresolved-attribute] "Type `<class 'Person'>` has no attribute `name`"
 Person.name
 
-# TODO: this should be an error
-Person(name="Alice", age=30).name
+def _(P: type[Person]):
+    # error: [unresolved-attribute] "Type `type[Person]` has no attribute `name`"
+    P.name
+
+def _(p: Person) -> None:
+    # error: [unresolved-attribute] "Type `Person` has no attribute `name`"
+    p.name
 ```
 
 ## Special properties
@@ -167,9 +181,29 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-reveal_type(Person.__total__)  # revealed: @Todo(Support for `TypedDict`)
-reveal_type(Person.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
-reveal_type(Person.__optional_keys__)  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(Person.__total__)  # revealed: bool
+reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
+reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
+```
+
+These attributes can not be accessed on inhabitants:
+
+```py
+def _(person: Person) -> None:
+    # TODO: these should be errors
+    person.__total__
+    person.__required_keys__
+    person.__optional_keys__
+```
+
+Also, they can not be accessed on `type(person)`, as that would be `dict` at runtime:
+
+```py
+def _(t_person: type[Person]) -> None:
+    # TODO: these should be errors
+    t_person.__total__
+    t_person.__required_keys__
+    t_person.__optional_keys__
 ```
 
 ## Subclassing
@@ -272,6 +306,9 @@ msg = Message(id=1, content="Hello")
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 
 reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict`)
+
+# TODO: this should be an error
+msg.content
 ```
 
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

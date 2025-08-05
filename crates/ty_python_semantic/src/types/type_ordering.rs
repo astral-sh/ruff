@@ -166,6 +166,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Generic, _) => Ordering::Less,
                 (_, ClassBase::Generic) => Ordering::Greater,
 
+                (ClassBase::TypedDict, _) => Ordering::Less,
+                (_, ClassBase::TypedDict) => Ordering::Greater,
+
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
@@ -234,6 +237,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
+
+        (Type::TypedDict(left), Type::TypedDict(right)) => left.cmp(right),
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 
@@ -257,9 +264,6 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
-
-        (DynamicType::TodoTypedDict, _) => Ordering::Less,
-        (_, DynamicType::TodoTypedDict) => Ordering::Greater,
     }
 }
 
