@@ -593,6 +593,36 @@ impl FormatString {
         let mut cur_text = text;
         let mut result_string = String::new();
         while !cur_text.is_empty() {
+            // Check for Unicode escape sequences like \N{...}
+            if cur_text.starts_with("\\N{") {
+                // Find the matching closing brace
+                let mut brace_count = 1;
+                let mut end_pos = 3; // Skip \N{
+                let chars: Vec<char> = cur_text.chars().collect();
+
+                for (i, &c) in chars.iter().enumerate().skip(3) {
+                    if c == '{' {
+                        brace_count += 1;
+                    } else if c == '}' {
+                        brace_count -= 1;
+                        if brace_count == 0 {
+                            end_pos = i + 1;
+                            break;
+                        }
+                    }
+                }
+
+                if brace_count == 0 {
+                    // Add the entire Unicode escape sequence as literal text
+                    result_string.push_str(&cur_text[..end_pos]);
+                    cur_text = &cur_text[end_pos..];
+                    continue;
+                }
+                result_string.push_str(cur_text);
+                cur_text = "";
+                continue;
+            }
+
             match FormatString::parse_literal_single(cur_text) {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
@@ -1019,5 +1049,50 @@ mod tests {
             FieldName::parse("key[0]after"),
             Err(FormatParseError::InvalidCharacterAfterRightBracket)
         );
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape() {
+        let result = FormatString::from_str("\\N{LATIN SMALL LETTER A}");
+        assert!(result.is_ok());
+
+        let format_string = result.unwrap();
+        assert_eq!(format_string.format_parts.len(), 1);
+        match &format_string.format_parts[0] {
+            FormatPart::Literal(literal) => {
+                assert_eq!(literal, "\\N{LATIN SMALL LETTER A}");
+            }
+            FormatPart::Field { .. } => panic!("Expected literal part"),
+        }
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape_incomplete() {
+        let result = FormatString::from_str("\\N{incomplete");
+        assert!(result.is_ok());
+
+        let format_string = result.unwrap();
+        assert_eq!(format_string.format_parts.len(), 1);
+        match &format_string.format_parts[0] {
+            FormatPart::Literal(literal) => {
+                assert_eq!(literal, "\\N{incomplete");
+            }
+            FormatPart::Field { .. } => panic!("Expected literal part"),
+        }
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape_nested() {
+        let result = FormatString::from_str("\\N{LATIN {SMALL} LETTER A}");
+        assert!(result.is_ok());
+
+        let format_string = result.unwrap();
+        assert_eq!(format_string.format_parts.len(), 1);
+        match &format_string.format_parts[0] {
+            FormatPart::Literal(literal) => {
+                assert_eq!(literal, "\\N{LATIN {SMALL} LETTER A}");
+            }
+            FormatPart::Field { .. } => panic!("Expected literal part"),
+        }
     }
 }
