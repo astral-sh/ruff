@@ -34,7 +34,8 @@ input.py:2:5: F821 Undefined name `y`
 4 |     case _: ...
   |
 
-input.py:3:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+ --> input.py:3:1
   |
 1 | import os  # F401
 2 | x = y      # F821

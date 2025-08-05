@@ -11,7 +11,8 @@ E11.py:6:1: E117 Over-indented
 8 | if False:
   |
 
-E11.py:9:1: invalid-syntax: Expected an indented block after `if` statement
+invalid-syntax: Expected an indented block after `if` statement
+  --> E11.py:9:1
    |
  7 | #: E112
  8 | if False:
@@ -21,7 +22,8 @@ E11.py:9:1: invalid-syntax: Expected an indented block after `if` statement
 11 | print()
    |
 
-E11.py:12:1: invalid-syntax: Unexpected indentation
+invalid-syntax: Unexpected indentation
+  --> E11.py:12:1
    |
 10 | #: E113
 11 | print()
@@ -31,7 +33,8 @@ E11.py:12:1: invalid-syntax: Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-E11.py:14:1: invalid-syntax: Expected a statement
+invalid-syntax: Expected a statement
+  --> E11.py:14:1
    |
 12 |     print()
 13 | #: E114 E116
@@ -61,7 +64,8 @@ E11.py:42:1: E117 Over-indented
 44 | if False:  #
    |
 
-E11.py:45:1: invalid-syntax: Expected an indented block after `if` statement
+invalid-syntax: Expected an indented block after `if` statement
+  --> E11.py:45:1
    |
 43 | #: E112
 44 | if False:  #

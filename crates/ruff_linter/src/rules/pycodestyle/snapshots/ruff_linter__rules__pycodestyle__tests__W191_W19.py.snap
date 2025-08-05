@@ -8,14 +8,16 @@ W19.py:1:1: W191 Indentation contains tabs
 2 |     multiline string with tab in it'''
   |
 
-W19.py:1:1: invalid-syntax: Unexpected indentation
+invalid-syntax: Unexpected indentation
+ --> W19.py:1:1
   |
 1 |     '''File starts with a tab
   | ^^^^
 2 |     multiline string with tab in it'''
   |
 
-W19.py:5:1: invalid-syntax: Expected a statement
+invalid-syntax: Expected a statement
+ --> W19.py:5:1
   |
 4 | #: W191
 5 | if False:
