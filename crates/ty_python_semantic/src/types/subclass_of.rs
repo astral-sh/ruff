@@ -99,7 +99,7 @@ impl<'db> SubclassOfType<'db> {
                         )),
                         variance,
                         None,
-                        TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy),
+                        TypeVarKind::Explicit(ExplicitTypeVarKind::Pep695),
                     ))
                 }
                 TypeVarVariance::Bivariant => unreachable!(),

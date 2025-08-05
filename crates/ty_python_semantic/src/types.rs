@@ -710,7 +710,7 @@ impl<'db> Type<'db> {
                     None,
                     variance,
                     None,
-                    TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy),
+                    TypeVarKind::Explicit(ExplicitTypeVarKind::Pep695),
                 )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
@@ -5402,7 +5402,7 @@ impl<'db> Type<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Implicit,
+                        TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy),
                     )))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
