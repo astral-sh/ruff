@@ -471,10 +471,11 @@ fn stdin_fix_jupyter() {
      "nbformat_minor": 5
     }
     ----- stderr -----
-    Jupyter.ipynb:cell 3:1:7: F821 Undefined name `x`
+    F821 Undefined name `x`
+     --> Jupyter.ipynb:cell 3:1:7
       |
     1 | print(x)
-      |       ^ F821
+      |       ^
       |
 
     Found 3 errors (2 fixed, 1 remaining).
@@ -569,19 +570,21 @@ fn stdin_override_parser_ipynb() {
     success: false
     exit_code: 1
     ----- stdout -----
-    Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> Jupyter.py:cell 1:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
-    Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
+    F401 [*] `sys` imported but unused
+     --> Jupyter.py:cell 3:1:8
       |
     1 | import sys
-      |        ^^^ F401
+      |        ^^^
       |
-      = help: Remove unused import: `sys`
+    help: Remove unused import: `sys`
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
