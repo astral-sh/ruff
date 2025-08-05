@@ -232,8 +232,7 @@ impl ClassInfoConstraintFunction {
                         db,
                         tuple
                             .all_elements()
-                            .copied()
-                            .map(|element| self.generate_constraint(db, element)),
+                            .map(|element| self.generate_constraint(db, *element)),
                     )
                 })
             }
