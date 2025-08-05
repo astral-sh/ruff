@@ -6,8 +6,11 @@
 // XXX
 #![allow(dead_code)]
 
+use rustc_hash::FxHashMap;
+
 use crate::Db;
-use crate::types::{IntersectionType, Type, TypeVarInstance, UnionType};
+use crate::types::visitor::TypeVisitor;
+use crate::types::{IntersectionBuilder, IntersectionType, Type, TypeVarInstance, UnionType};
 
 /// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
 /// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
@@ -52,6 +55,13 @@ impl<'db> ConstraintSet<'db> {
     fn empty() -> Self {
         Self {
             constraints: vec![],
+        }
+    }
+
+    /// Returns a singleton constraint set.
+    pub(crate) fn singleton(constraint: Constraint<'db>) -> Self {
+        Self {
+            constraints: vec![constraint],
         }
     }
 
@@ -101,11 +111,130 @@ impl<'db> ConstraintSetSet<'db> {
         Self { sets: vec![] }
     }
 
-    /// Returns the set of constraints set that is always satisfied.
-    pub(crate) fn always() -> Self {
+    /// Returns a singleton set of constraint sets.
+    pub(crate) fn singleton(constraint_set: ConstraintSet<'db>) -> Self {
         Self {
-            sets: vec![ConstraintSet::empty()],
+            sets: vec![constraint_set],
         }
+    }
+
+    /// Returns the set of constraint sets that is always satisfied.
+    pub(crate) fn always() -> Self {
+        Self::singleton(ConstraintSet::empty())
+    }
+
+    /// Returns a normalized set of constraint sets for all of the polymorphic typevars in a type.
+    ///
+    /// This is a combination of the "Constraint normalization" and "Constraint merging" steps from
+    /// [[POPL2015][]], §3.2.1.
+    ///
+    /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+    pub(crate) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        struct NormVisitor<'db> {
+            results: FxHashMap<Type<'db>, ConstraintSetSet<'db>>,
+        }
+
+        impl<'db> NormVisitor<'db> {
+            fn result(&self, ty: Type<'db>) -> &ConstraintSetSet<'db> {
+                self.results
+                    .get(&ty)
+                    .expect("should have computed a result for this type")
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for NormVisitor<'db> {
+            fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+                // Figure 3, step 1, plus a memoization optimization: If we've already visited (or
+                // started visiting) this type, return the result that we already calculated for it
+                // (or the coinductive base case).
+                if self.results.contains_key(&ty) {
+                    return;
+                };
+
+                // Figure 3, step 1: Insert the coinductive base case for this type into the result
+                // set. That ensures that if we encounter this type again recursively while we are
+                // in the middle of calculating a result for it, we use the coinductive base case
+                // for it at the point of recursion.
+                self.results.insert(ty, ConstraintSetSet::always());
+
+                match ty {
+                    Type::Union(union) => {
+                        // Figure 3, step 6
+                        self.visit_union_type(db, union);
+                        let result = (union.iter(db))
+                            .fold(ConstraintSetSet::always(), |sets, element| {
+                                self.result(*element).intersect(db, &sets)
+                            });
+                        self.results.insert(ty, result);
+                    }
+
+                    Type::Intersection(intersection) => {
+                        // Figure 3, step 2
+                        let smallest_positive =
+                            find_smallest_typevar(intersection.iter_positive(db));
+                        let smallest_negative =
+                            find_smallest_typevar(intersection.iter_negative(db));
+                        let constraint = match (smallest_positive, smallest_negative) {
+                            (Some(typevar), None) => Some(Constraint {
+                                lower: Type::Never,
+                                typevar,
+                                upper: remove_positive_typevar(db, intersection, typevar)
+                                    .negate(db),
+                            }),
+
+                            (Some(typevar), Some(negative)) if typevar < negative => {
+                                Some(Constraint {
+                                    lower: Type::Never,
+                                    typevar,
+                                    upper: remove_positive_typevar(db, intersection, typevar)
+                                        .negate(db),
+                                })
+                            }
+
+                            (_, Some(typevar)) => Some(Constraint {
+                                lower: remove_negative_typevar(db, intersection, typevar),
+                                typevar,
+                                upper: Type::object(db),
+                            }),
+
+                            (None, None) => None,
+                        };
+                        if let Some(constraint) = constraint {
+                            let constraint_set = ConstraintSet::singleton(constraint);
+                            let result = ConstraintSetSet::singleton(constraint_set);
+                            self.results.insert(ty, result);
+                            return;
+                        }
+
+                        // TODO: other intersection clauses
+                    }
+
+                    Type::TypeVar(typevar) => {
+                        // Figure 3, step 2
+                        // (special case where P' = {typevar}, and P = N = N' = ø)
+                        let constraint = Constraint {
+                            lower: Type::Never,
+                            typevar,
+                            upper: Type::object(db),
+                        };
+                        let constraint_set = ConstraintSet::singleton(constraint);
+                        let result = ConstraintSetSet::singleton(constraint_set);
+                        self.results.insert(ty, result);
+                    }
+
+                    _ => todo!(),
+                }
+            }
+        }
+
+        let mut visitor = NormVisitor {
+            results: FxHashMap::default(),
+        };
+        visitor.visit_type(db, ty);
+        visitor
+            .results
+            .remove(&ty)
+            .expect("should have computed a result for the input type")
     }
 
     /// Adds a new constraint set to this set, ensuring that no constraint set in the set subsumes
@@ -126,7 +255,7 @@ impl<'db> ConstraintSetSet<'db> {
 
     /// Intersects two sets of constraint sets.
     ///
-    /// This is the ⊓ operator from [[POPL15][]], Definition 3.5.
+    /// This is the ⊓ operator from [[POPL2015][]], Definition 3.5.
     ///
     /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
     fn intersect(&self, db: &'db dyn Db, other: &Self) -> Self {
@@ -143,7 +272,7 @@ impl<'db> ConstraintSetSet<'db> {
 
     /// union two sets of constraint sets.
     ///
-    /// This is the ⊔ operator from [[POPL15][]], Definition 3.5.
+    /// This is the ⊔ operator from [[POPL2015][]], Definition 3.5.
     ///
     /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
     fn union(&mut self, db: &'db dyn Db, other: Self) {
@@ -151,4 +280,66 @@ impl<'db> ConstraintSetSet<'db> {
             self.add(db, set);
         }
     }
+}
+
+/// Returns the “smallest” top-level typevar in an iterator of types.
+///
+/// “Smallest” is with respect to the ≼ total order mentioned in [[POPL2015][]], §3.2.1. “Any will
+/// do”, so we just compare Salsa IDs.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+fn find_smallest_typevar<'db>(
+    types: impl IntoIterator<Item = Type<'db>>,
+) -> Option<TypeVarInstance<'db>> {
+    types
+        .into_iter()
+        .filter_map(|ty| match ty {
+            Type::TypeVar(typevar) => Some(typevar),
+            _ => None,
+        })
+        .min()
+}
+
+/// Removes a top-level positive typevar from an intersection.
+///
+/// This is the `single` function from [[POPL2015][]], §3.2.1, for the `k ∈ P'` case.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+fn remove_positive_typevar<'db>(
+    db: &'db dyn Db,
+    intersection: IntersectionType<'db>,
+    typevar: TypeVarInstance<'db>,
+) -> Type<'db> {
+    let mut builder = IntersectionBuilder::new(db);
+    for positive in intersection.iter_positive(db) {
+        if positive != Type::TypeVar(typevar) {
+            builder = builder.add_positive(positive);
+        }
+    }
+    for negative in intersection.iter_negative(db) {
+        builder = builder.add_negative(negative);
+    }
+    builder.build()
+}
+
+/// Removes a top-level negative typevar from an intersection.
+///
+/// This is the `single` function from [[POPL2015][]], §3.2.1, for the `k ∈ N'` case.
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+fn remove_negative_typevar<'db>(
+    db: &'db dyn Db,
+    intersection: IntersectionType<'db>,
+    typevar: TypeVarInstance<'db>,
+) -> Type<'db> {
+    let mut builder = IntersectionBuilder::new(db);
+    for positive in intersection.iter_positive(db) {
+        builder = builder.add_positive(positive);
+    }
+    for negative in intersection.iter_negative(db) {
+        if negative != Type::TypeVar(typevar) {
+            builder = builder.add_negative(negative);
+        }
+    }
+    builder.build()
 }
