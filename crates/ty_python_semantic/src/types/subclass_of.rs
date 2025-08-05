@@ -2,8 +2,8 @@ use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
-    ClassType, DynamicType, ExplicitTypeVarKind, KnownClass, MemberLookupPolicy, Type, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarInstance,
+    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -99,7 +99,7 @@ impl<'db> SubclassOfType<'db> {
                         )),
                         variance,
                         None,
-                        TypeVarKind::Explicit(ExplicitTypeVarKind::Pep695),
+                        TypeVarKind::Pep695,
                     ))
                 }
                 TypeVarVariance::Bivariant => unreachable!(),

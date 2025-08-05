@@ -710,7 +710,7 @@ impl<'db> Type<'db> {
                     None,
                     variance,
                     None,
-                    TypeVarKind::Explicit(ExplicitTypeVarKind::Pep695),
+                    TypeVarKind::Pep695,
                 )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
@@ -6694,17 +6694,12 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
-/// Whether this typevar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum ExplicitTypeVarKind {
-    Legacy,
-    Pep695,
-}
-
-/// Whether this typevar was explicitly created, or an implicit typevar like `Self` was used.
+/// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
+/// or an implicit typevar like `Self` was used.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeVarKind {
-    Explicit(ExplicitTypeVarKind),
+    Legacy,
+    Pep695,
     Implicit,
 }
 
@@ -6807,10 +6802,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
-        matches!(
-            self.kind(db),
-            TypeVarKind::Explicit(ExplicitTypeVarKind::Legacy)
-        )
+        matches!(self.kind(db), TypeVarKind::Legacy)
     }
 
     pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
