@@ -263,7 +263,11 @@ impl DisplaySet<'_> {
             if annotation.is_fixable {
                 buffer.append(line_offset, "[", stylesheet.none);
                 buffer.append(line_offset, "*", stylesheet.help);
-                buffer.append(line_offset, "] ", stylesheet.none);
+                buffer.append(line_offset, "]", stylesheet.none);
+                // In the hide-severity case, we need a space instead of the colon and space below.
+                if hide_severity {
+                    buffer.append(line_offset, " ", stylesheet.none);
+                }
             }
 
             if !is_annotation_empty(annotation) {

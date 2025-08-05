@@ -294,7 +294,7 @@ print()
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[unused-import]: `os` imported but unused
+        error[unused-import][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
         1 | # cell 1
@@ -303,7 +303,7 @@ print()
           |
         help: Remove unused import: `os`
 
-        error[unused-import]: `math` imported but unused
+        error[unused-import][*]: `math` imported but unused
          --> notebook.ipynb:cell 2:2:8
           |
         1 | # cell 2
