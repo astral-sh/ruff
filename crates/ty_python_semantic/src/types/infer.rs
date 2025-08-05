@@ -8825,11 +8825,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(outcome) => {
                 let return_type = outcome.return_type(db);
 
-                if return_type.is_never() {
+                if return_type.is_never() && !value_ty.is_never() {
                     let key = match slice_ty {
-                        Type::IntLiteral(i) => format!("key `{i}`"),
-                        Type::StringLiteral(s) => format!("key '{}'", s.value(db)),
-                        _ => format!("key of type `{}`", slice_ty.display(db)),
+                        Type::IntLiteral(i) => format!("the key `{i}`"),
+                        Type::StringLiteral(s) => format!("the key '{}'", s.value(db)),
+                        _ => format!("a key of type `{}`", slice_ty.display(db)),
                     };
 
                     let lint_type = if slice_ty.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
@@ -8841,7 +8841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(builder) = context.report_lint(lint_type, value_node) {
                         if value_ty.is_typed_dict() {
                             builder.into_diagnostic(format_args!(
-                                "The `{}` TypedDict does not define a {key}",
+                                "The `{}` TypedDict does not define {key}",
                                 value_ty.display(db),
                             ));
                         } else {

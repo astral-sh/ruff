@@ -38,7 +38,7 @@ bob = Person(name="Bob", age=25)
 reveal_type(bob["name"])  # revealed: str
 reveal_type(bob["age"])  # revealed: int | None
 
-# error: [invalid-key] "TypedDict `Person` does not have a key 'non_existing'"
+# error: [invalid-key] "The `Person` TypedDict does not define the key 'non_existing'"
 reveal_type(bob["non_existing"])  # revealed: Never
 ```
 
@@ -134,6 +134,32 @@ dangerous(alice)
 
 # TODO: this should be `str`
 reveal_type(alice["name"])  # revealed: Unknown
+```
+
+## Key-based access
+
+```py
+from typing import TypedDict, Final, Literal
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+A_KEY: Final = "name"
+
+def _(person: Person, another_key: Literal["age"], union_of_keys: Literal["age", "name"]) -> None:
+    reveal_type(person["name"])  # revealed: str
+    reveal_type(person["age"])  # revealed: int | None
+
+    reveal_type(person[A_KEY])  # revealed: str
+    reveal_type(person[another_key])  # revealed: int | None
+
+    # TODO: this should be `int | None | str`; no error
+    # error: [invalid-key] "The `Person` TypedDict does not define a key of type `Literal["age", "name"]"
+    reveal_type(person[union_of_keys])  # revealed: Never
+
+    # error: [invalid-key] "The `Person` TypedDict does not define the key 'non_existing'"
+    reveal_type(person["non_existing"])  # revealed: Never
 ```
 
 ## Methods on `TypedDict`
