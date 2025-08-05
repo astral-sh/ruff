@@ -10,7 +10,9 @@ use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::types::visitor::TypeVisitor;
-use crate::types::{IntersectionBuilder, IntersectionType, Type, TypeVarInstance, UnionType};
+use crate::types::{
+    IntersectionBuilder, IntersectionType, Type, TypeVarInstance, UnionBuilder, UnionType,
+};
 
 /// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
 /// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
@@ -182,6 +184,7 @@ impl<'db> ConstraintSetSet<'db> {
 
                     Type::Union(union) => {
                         // Figure 3, step 6
+                        // A union is a subtype of Never only if every element is.
                         self.visit_union_type(db, union);
                         let result = (union.iter(db))
                             .fold(ConstraintSetSet::always(), |sets, element| {
@@ -192,6 +195,9 @@ impl<'db> ConstraintSetSet<'db> {
 
                     Type::Intersection(intersection) => {
                         // Figure 3, step 2
+                        // If an intersection contains any (positive or negative) top-level type
+                        // variables, extract out and isolate the smallest one (according to our
+                        // arbitrary ordering).
                         let smallest_positive =
                             find_smallest_typevar(intersection.iter_positive(db));
                         let smallest_negative =
@@ -223,6 +229,47 @@ impl<'db> ConstraintSetSet<'db> {
                         };
                         if let Some(constraint) = constraint {
                             self.results.insert(ty, constraint.into());
+                            return;
+                        }
+
+                        // Figure 3, step 3
+                        // If all (positive and negative) elements of the intersection are atomic
+                        // types (and therefore cannot contain any typevars), fall back on an
+                        // assignability check: if the intersection of the positive elements is
+                        // assignable to the union of the negative elements, then the overall
+                        // intersection is empty.
+                        let mut all_atomic = true;
+                        let mut positive_atomic = IntersectionBuilder::new(db);
+                        let mut negative_atomic = UnionBuilder::new(db);
+                        for positive in intersection.iter_positive(db) {
+                            if !all_atomic {
+                                break;
+                            }
+                            if !positive.is_atomic() {
+                                all_atomic = false;
+                                break;
+                            }
+                            positive_atomic = positive_atomic.add_positive(positive);
+                        }
+                        for negative in intersection.iter_negative(db) {
+                            if !all_atomic {
+                                break;
+                            }
+                            if !negative.is_atomic() {
+                                all_atomic = false;
+                                break;
+                            }
+                            negative_atomic = negative_atomic.add(negative);
+                        }
+                        if all_atomic {
+                            let positive_atomic = positive_atomic.build();
+                            let negative_atomic = negative_atomic.build();
+                            let result = if positive_atomic.is_assignable_to(db, negative_atomic) {
+                                ConstraintSetSet::always()
+                            } else {
+                                ConstraintSetSet::never()
+                            };
+                            self.results.insert(ty, result);
                             return;
                         }
 
