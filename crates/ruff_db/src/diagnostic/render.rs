@@ -387,6 +387,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
+    is_file_level: bool,
 }
 
 impl<'a> ResolvedAnnotation<'a> {
@@ -432,6 +433,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         })
     }
 }
@@ -653,6 +655,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
+    /// Whether this annotation applies to an entire file, rather than a snippet within it.
+    is_file_level: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -670,6 +674,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         }
     }
 
@@ -695,7 +700,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann
+        ann.is_file_level(self.is_file_level)
     }
 }
 
@@ -2551,7 +2556,12 @@ watermelon
         /// of the corresponding line minus one. (The "minus one" is because
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
-        fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
+        pub(super) fn span(
+            &self,
+            path: &str,
+            line_offset_start: &str,
+            line_offset_end: &str,
+        ) -> Span {
             let span = self.path(path);
 
             let file = span.expect_ty_file();
@@ -2574,7 +2584,7 @@ watermelon
         }
 
         /// Like `span`, but only attaches a file path.
-        fn path(&self, path: &str) -> Span {
+        pub(super) fn path(&self, path: &str) -> Span {
             let file = system_path_to_file(&self.db, path).unwrap();
             Span::from(file)
         }

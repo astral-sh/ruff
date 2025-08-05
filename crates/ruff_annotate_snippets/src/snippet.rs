@@ -124,11 +124,17 @@ pub struct Annotation<'a> {
     pub(crate) range: Range<usize>,
     pub(crate) label: Option<&'a str>,
     pub(crate) level: Level,
+    pub(crate) is_file_level: bool,
 }
 
 impl<'a> Annotation<'a> {
     pub fn label(mut self, label: &'a str) -> Self {
         self.label = Some(label);
+        self
+    }
+
+    pub fn is_file_level(mut self, yes: bool) -> Self {
+        self.is_file_level = yes;
         self
     }
 }
@@ -165,6 +171,7 @@ impl Level {
             range: span,
             label: None,
             level: self,
+            is_file_level: false,
         }
     }
 }

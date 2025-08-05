@@ -712,6 +712,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
+    /// Whether this annotation is a file-level or full-file annotation.
+    ///
+    /// When set, rendering will only include the file's name and (optional) range. Everything else
+    /// is omitted, including any file snippet or message.
+    is_file_level: bool,
 }
 
 impl Annotation {
@@ -730,6 +735,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -746,6 +752,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -810,6 +817,21 @@ impl Annotation {
     /// Attaches an additional tag to this annotation.
     pub fn push_tag(&mut self, tag: DiagnosticTag) {
         self.tags.push(tag);
+    }
+
+    /// Set whether or not this annotation is file-level.
+    ///
+    /// File-level annotations are only rendered with their file name and range, if available. This
+    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
+    /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
+    /// documentation.
+    ///
+    /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
+    /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
+    /// details.
+    pub fn set_file_level(&mut self, yes: bool) {
+        self.is_file_level = yes;
     }
 }
 

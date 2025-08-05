@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod tests {
     use ruff_diagnostics::Applicability;
+    use ruff_text_size::TextRange;
 
     use crate::diagnostic::{
-        DiagnosticFormat, Severity,
+        Annotation, DiagnosticFormat, Severity,
         render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
     };
 
@@ -262,6 +263,26 @@ print()
         2 |     return 1
           |     ^^^^^^^^
           |
+        ");
+    }
+
+    /// For file-level diagnostics, we expect to see the header line with the diagnostic information
+    /// and the `-->` line with the file information but no lines of source code.
+    #[test]
+    fn file_level() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "");
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env.path("example.py").with_range(TextRange::default());
+        let mut annotation = Annotation::primary(span);
+        annotation.set_file_level(true);
+        diagnostic.annotate(annotation);
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+        --> example.py:1:1
         ");
     }
 }
