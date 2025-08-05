@@ -193,9 +193,14 @@ impl DisplaySet<'_> {
         stylesheet: &Stylesheet,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
+        let hide_severity = annotation.annotation_type.is_none();
         let color = get_annotation_style(&annotation.annotation_type, stylesheet);
         let formatted_len = if let Some(id) = &annotation.id {
-            2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            if hide_severity {
+                id.len()
+            } else {
+                2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            }
         } else {
             annotation_type_len(&annotation.annotation_type)
         };
@@ -209,18 +214,62 @@ impl DisplaySet<'_> {
         if formatted_len == 0 {
             self.format_label(line_offset, &annotation.label, stylesheet, buffer)
         } else {
-            let id = match &annotation.id {
-                Some(id) => format!("[{id}]"),
-                None => String::new(),
-            };
-            buffer.append(
-                line_offset,
-                &format!("{}{}", annotation_type_str(&annotation.annotation_type), id),
-                *color,
-            );
+            // TODO(brent) All of this complicated checking of `hide_severity` should be reverted
+            // once we have real severities in Ruff. This code is trying to account for two
+            // different cases:
+            //
+            // - main diagnostic message
+            // - subdiagnostic message
+            //
+            // In the first case, signaled by `hide_severity = true`, we want to print the ID (the
+            // noqa code for a ruff lint diagnostic, e.g. `F401`, or `invalid-syntax` for a syntax
+            // error) without brackets. Instead, for subdiagnostics, we actually want to print the
+            // severity (usually `help`) regardless of the `hide_severity` setting. This is signaled
+            // by an ID of `None`.
+            //
+            // With real severities these should be reported more like in ty:
+            //
+            // ```
+            // error[F401]: `math` imported but unused
+            // error[invalid-syntax]: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // instead of the current versions intended to mimic the old Ruff output format:
+            //
+            // ```
+            // F401 `math` imported but unused
+            // invalid-syntax: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // Note that the `invalid-syntax` colon is added manually in `ruff_db`, not here. We
+            // could eventually add a colon to Ruff lint diagnostics (`F401:`) and then make the
+            // colon below unconditional again.
+            //
+            // This also applies to the hard-coded `stylesheet.error()` styling of the
+            // hidden-severity `id`. This should just be `*color` again later, but for now we don't
+            // want an unformatted `id`, which is what `get_annotation_style` returns for
+            // `DisplayAnnotationType::None`.
+            let annotation_type = annotation_type_str(&annotation.annotation_type);
+            if let Some(id) = annotation.id {
+                if hide_severity {
+                    buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
+                } else {
+                    buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
+                }
+            } else {
+                buffer.append(line_offset, annotation_type, *color);
+            }
+
+            if annotation.is_fixable {
+                buffer.append(line_offset, "[", stylesheet.none);
+                buffer.append(line_offset, "*", stylesheet.help);
+                buffer.append(line_offset, "] ", stylesheet.none);
+            }
 
             if !is_annotation_empty(annotation) {
-                buffer.append(line_offset, ": ", stylesheet.none);
+                if annotation.id.is_none() || !hide_severity {
+                    buffer.append(line_offset, ": ", stylesheet.none);
+                }
                 self.format_label(line_offset, &annotation.label, stylesheet, buffer)?;
             }
             Ok(())
@@ -768,6 +817,7 @@ pub(crate) struct Annotation<'a> {
     pub(crate) annotation_type: DisplayAnnotationType,
     pub(crate) id: Option<&'a str>,
     pub(crate) label: Vec<DisplayTextFragment<'a>>,
+    pub(crate) is_fixable: bool,
 }
 
 /// A single line used in `DisplayList`.
@@ -920,6 +970,13 @@ pub(crate) enum DisplayAnnotationType {
     Help,
 }
 
+impl DisplayAnnotationType {
+    #[inline]
+    const fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
+}
+
 impl From<snippet::Level> for DisplayAnnotationType {
     fn from(at: snippet::Level) -> Self {
         match at {
@@ -1015,11 +1072,12 @@ fn format_message<'m>(
         title,
         footer,
         snippets,
+        is_fixable,
     } = message;
 
     let mut sets = vec![];
     let body = if !snippets.is_empty() || primary {
-        vec![format_title(level, id, title)]
+        vec![format_title(level, id, title, is_fixable)]
     } else {
         format_footer(level, id, title)
     };
@@ -1060,12 +1118,18 @@ fn format_message<'m>(
     sets
 }
 
-fn format_title<'a>(level: crate::Level, id: Option<&'a str>, label: &'a str) -> DisplayLine<'a> {
+fn format_title<'a>(
+    level: crate::Level,
+    id: Option<&'a str>,
+    label: &'a str,
+    is_fixable: bool,
+) -> DisplayLine<'a> {
     DisplayLine::Raw(DisplayRawLine::Annotation {
         annotation: Annotation {
             annotation_type: DisplayAnnotationType::from(level),
             id,
             label: format_label(Some(label), Some(DisplayTextStyle::Emphasis)),
+            is_fixable,
         },
         source_aligned: false,
         continuation: false,
@@ -1084,6 +1148,7 @@ fn format_footer<'a>(
                 annotation_type: DisplayAnnotationType::from(level),
                 id,
                 label: format_label(Some(line), None),
+                is_fixable: false,
             },
             source_aligned: true,
             continuation: i != 0,
@@ -1472,6 +1537,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1511,6 +1577,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: vec![],
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1580,6 +1647,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),

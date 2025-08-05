@@ -22,6 +22,7 @@ pub struct Message<'a> {
     pub(crate) title: &'a str,
     pub(crate) snippets: Vec<Snippet<'a>>,
     pub(crate) footer: Vec<Message<'a>>,
+    pub(crate) is_fixable: bool,
 }
 
 impl<'a> Message<'a> {
@@ -47,6 +48,15 @@ impl<'a> Message<'a> {
 
     pub fn footers(mut self, footer: impl IntoIterator<Item = Message<'a>>) -> Self {
         self.footer.extend(footer);
+        self
+    }
+
+    /// Whether or not the diagnostic for this message is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the `id` in an annotation header, if the
+    /// annotation also has `Level::None`.
+    pub fn is_fixable(mut self, yes: bool) -> Self {
+        self.is_fixable = yes;
         self
     }
 }
@@ -145,6 +155,7 @@ impl Level {
             title,
             snippets: vec![],
             footer: vec![],
+            is_fixable: false,
         }
     }
 
