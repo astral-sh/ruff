@@ -1,5 +1,5 @@
 use anyhow::Result;
-use insta::assert_debug_snapshot;
+use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
