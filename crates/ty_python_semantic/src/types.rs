@@ -3551,8 +3551,13 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Callable(_)
             | Type::LiteralString
-            | Type::TypeIs(_)
-            | Type::TypedDict(_) => Truthiness::Ambiguous,
+            | Type::TypeIs(_) => Truthiness::Ambiguous,
+
+            Type::TypedDict(_) => {
+                // TODO: We could do better here, but it's unclear if this is important.
+                // See existing `TypedDict`-related tests in `truthiness.md`
+                Truthiness::Ambiguous
+            }
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)

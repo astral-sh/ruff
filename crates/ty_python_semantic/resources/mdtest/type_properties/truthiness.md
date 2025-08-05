@@ -211,6 +211,10 @@ reveal_type(bool(CustomLenEnum.YES))  # revealed: bool
 It may be feasible to infer `Literal[True]` for some `TypedDict` types, if `{}` can definitely be
 excluded as a possible value. We currently do not attempt to do this.
 
+If `{}` is the *only* possible value, we could infer `Literal[False]`. This might only be possible
+if something like <https://peps.python.org/pep-0728> is accepted, a `TypedDict` has no defined
+items, and `closed=True` is used.
+
 ```py
 from typing_extensions import TypedDict, Literal, NotRequired
 
