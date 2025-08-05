@@ -1494,6 +1494,25 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
     .into()
 }
 
+/// Recursively flatten nested Optional types into a single PEP 604 union.
+/// For example, `Optional[Optional[str]]` becomes `str | None`.
+pub fn flatten_optional(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Subscript(ast::ExprSubscript { slice, .. }) => {
+            let flattened_inner = flatten_optional(slice);
+            ast::ExprBinOp {
+                left: Box::new(flattened_inner),
+                op: Operator::BitOr,
+                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::dummy(),
+            }
+            .into()
+        }
+        _ => pep_604_optional(expr),
+    }
+}
+
 /// Format the expressions as a PEP 604-style union.
 pub fn pep_604_union(elts: &[Expr]) -> Expr {
     match elts {

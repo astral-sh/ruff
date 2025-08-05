@@ -160,3 +160,56 @@ UP045.py:49:6: UP045 Use `X | None` for type annotations
    |      ^^^^^^^^^^^^^^ UP045
    |
    = help: Convert to `X | None`
+
+UP045.py:76:18: UP045 [*] Use `X | None` for type annotations
+   |
+74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
+75 | # Nested Optional types should be flattened
+76 | nested_optional: Optional[Optional[str]] = None
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^ UP045
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+   |
+   = help: Convert to `X | None`
+
+ℹ Safe fix
+73 73 | 
+74 74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
+75 75 | # Nested Optional types should be flattened
+76    |-nested_optional: Optional[Optional[str]] = None
+   76 |+nested_optional: str | None = None
+77 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+
+UP045.py:76:27: UP045 Use `X | None` for type annotations
+   |
+74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
+75 | # Nested Optional types should be flattened
+76 | nested_optional: Optional[Optional[str]] = None
+   |                           ^^^^^^^^^^^^^ UP045
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+   |
+   = help: Convert to `X | None`
+
+UP045.py:77:25: UP045 [*] Use `X | None` for type annotations
+   |
+75 | # Nested Optional types should be flattened
+76 | nested_optional: Optional[Optional[str]] = None
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045
+   |
+   = help: Convert to `X | None`
+
+ℹ Safe fix
+74 74 | # Test for: https://github.com/astral-sh/ruff/issues/19746
+75 75 | # Nested Optional types should be flattened
+76 76 | nested_optional: Optional[Optional[str]] = None
+77    |-nested_optional_typing: typing.Optional[Optional[int]] = None
+   77 |+nested_optional_typing: int | None = None
+
+UP045.py:77:41: UP045 Use `X | None` for type annotations
+   |
+75 | # Nested Optional types should be flattened
+76 | nested_optional: Optional[Optional[str]] = None
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+   |                                         ^^^^^^^^^^^^^ UP045
+   |
+   = help: Convert to `X | None`

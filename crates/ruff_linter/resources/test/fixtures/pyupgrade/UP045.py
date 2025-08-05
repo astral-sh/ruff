@@ -69,3 +69,9 @@ a7: OptionalTE[typing.NamedTuple] = None
 a8: typing_extensions.Optional[typing.NamedTuple] = None
 a9: "Optional[NamedTuple]" = None
 a10: Optional[NamedTupleTE] = None
+
+
+# Test for: https://github.com/astral-sh/ruff/issues/19746
+# Nested Optional types should be flattened
+nested_optional: Optional[Optional[str]] = None
+nested_optional_typing: typing.Optional[Optional[int]] = None
