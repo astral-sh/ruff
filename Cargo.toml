@@ -23,6 +23,7 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_memory_usage = { path = "crates/ruff_memory_usage" }
 ruff_notebook = { path = "crates/ruff_notebook" }
 ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
@@ -84,7 +85,7 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.6.0", features = [
+get-size2 = { version = "0.6.2", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -142,7 +143,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "d66fe331d546216132ace503512b94d5c68d2c50", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "b121ee46c4483ba74c19e933a3522bd548eb7343", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
