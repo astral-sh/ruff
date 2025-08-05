@@ -14,7 +14,7 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, binding_type, declaration_type,
+    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -259,13 +259,12 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         typevar: TypeVarInstance<'db>,
     ) -> Option<TypeVarInstance<'db>> {
-        assert!(typevar.kind(db) == TypeVarKind::Legacy);
+        assert!(typevar.is_legacy(db));
         let typevar_def = typevar.definition(db);
         self.variables(db)
             .iter()
             .find(|self_typevar| {
-                self_typevar.kind(db) == TypeVarKind::Legacy
-                    && self_typevar.definition(db) == typevar_def
+                self_typevar.is_legacy(db) && self_typevar.definition(db) == typevar_def
             })
             .copied()
     }

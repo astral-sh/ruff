@@ -5402,7 +5402,7 @@ impl<'db> Type<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Legacy,
+                        TypeVarKind::Implicit,
                     )))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
@@ -5820,7 +5820,7 @@ impl<'db> Type<'db> {
     ) {
         match self {
             Type::TypeVar(typevar) => {
-                if typevar.is_legacy(db) {
+                if typevar.is_legacy(db) || typevar.is_implicit(db) {
                     typevars.insert(typevar);
                 }
             }
@@ -6694,11 +6694,16 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
-/// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
+/// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
+/// or an implicit typevar like `Self` was used.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeVarKind {
+    /// `T = TypeVar("T")`
     Legacy,
+    /// `def foo[T](x: T) -> T: ...`
     Pep695,
+    /// `typing.Self`
+    Implicit,
 }
 
 /// Data regarding a single type variable.
@@ -6801,6 +6806,10 @@ impl<'db> TypeVarInstance<'db> {
 
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Legacy)
+    }
+
+    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), TypeVarKind::Implicit)
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
