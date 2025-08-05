@@ -7,18 +7,30 @@ At its simplest, to define a generic class using the legacy syntax, you inherit 
 
 ```py
 from ty_extensions import generic_context
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
 
 T = TypeVar("T")
 S = TypeVar("S")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
 
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
+class SingleParamSpec(Generic[P]): ...
+class TypeVarAndParamSpec(Generic[P, T]): ...
+class SingleTypeVarTuple(Generic[Unpack[Ts]]): ...
+class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
 
 # revealed: tuple[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly (these should not reveal `None`)
+reveal_type(generic_context(SingleParamSpec))  # revealed: None
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: None
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other

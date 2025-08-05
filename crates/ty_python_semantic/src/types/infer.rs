@@ -7284,6 +7284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoUnpack
                     | DynamicType::TodoTypeAlias,
                 ),
                 _,
@@ -7294,6 +7295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo @ Type::Dynamic(
                     DynamicType::Todo(_)
                     | DynamicType::TodoPEP695ParamSpec
+                    | DynamicType::TodoUnpack
                     | DynamicType::TodoTypeAlias,
                 ),
                 _,
@@ -8801,6 +8803,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(todo_type!("doubly-specialized typing.Generic"))
             }
 
+            (Type::SpecialForm(SpecialFormType::Unpack), _) => {
+                Some(Type::Dynamic(DynamicType::TodoUnpack))
+            }
+
             (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
                 Some(todo_type!("Inference of subscript on special form"))
             }
@@ -8967,6 +8973,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .map(|typevar| match typevar {
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
+                Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(NominalInstanceType { class, .. })
                     if matches!(
                         class.known(self.db()),

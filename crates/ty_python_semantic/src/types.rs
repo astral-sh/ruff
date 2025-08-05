@@ -6349,6 +6349,8 @@ pub enum DynamicType {
     /// A special Todo-variant for type aliases declared using `typing.TypeAlias`.
     /// A temporary variant to detect and special-case the handling of these aliases in autocomplete suggestions.
     TodoTypeAlias,
+    /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
+    TodoUnpack,
 }
 
 impl DynamicType {
@@ -6369,6 +6371,13 @@ impl std::fmt::Display for DynamicType {
             DynamicType::TodoPEP695ParamSpec => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(ParamSpec)")
+                } else {
+                    f.write_str("@Todo")
+                }
+            }
+            DynamicType::TodoUnpack => {
+                if cfg!(debug_assertions) {
+                    f.write_str("@Todo(typing.Unpack)")
                 } else {
                     f.write_str("@Todo")
                 }

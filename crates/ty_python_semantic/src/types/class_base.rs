@@ -52,7 +52,8 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias,
+                | DynamicType::TodoTypeAlias
+                | DynamicType::TodoUnpack,
             ) => "@Todo",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
