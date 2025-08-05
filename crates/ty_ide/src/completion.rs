@@ -1233,28 +1233,28 @@ quux.<CURSOR>
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
         __annotations__ :: dict[str, Any]
-        __class__ :: type
-        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __class__ :: type[Quux]
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
         __dict__ :: dict[str, Any]
-        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
         __doc__ :: str | None
-        __eq__ :: bound method object.__eq__(value: object, /) -> bool
-        __format__ :: bound method object.__format__(format_spec: str, /) -> str
-        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method object.__getstate__() -> object
-        __hash__ :: bound method object.__hash__() -> int
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
-        __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self@object
-        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method object.__repr__() -> str
-        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method object.__sizeof__() -> int
-        __str__ :: bound method object.__str__() -> str
-        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: bound method Quux.__new__() -> Self@object
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method Quux.__repr__() -> str
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
 
@@ -1278,28 +1278,28 @@ quux.b<CURSOR>
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
         __annotations__ :: dict[str, Any]
-        __class__ :: type
-        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __class__ :: type[Quux]
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
         __dict__ :: dict[str, Any]
-        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
         __doc__ :: str | None
-        __eq__ :: bound method object.__eq__(value: object, /) -> bool
-        __format__ :: bound method object.__format__(format_spec: str, /) -> str
-        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method object.__getstate__() -> object
-        __hash__ :: bound method object.__hash__() -> int
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
-        __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self@object
-        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method object.__repr__() -> str
-        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method object.__sizeof__() -> int
-        __str__ :: bound method object.__str__() -> str
-        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: bound method Quux.__new__() -> Self@object
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method Quux.__repr__() -> str
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
 

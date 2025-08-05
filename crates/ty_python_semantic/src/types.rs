@@ -669,6 +669,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
+    pub(crate) const fn is_typed_dict(&self) -> bool {
+        matches!(self, Type::TypedDict(..))
+    }
+
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
@@ -3108,7 +3112,7 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
-            return Place::bound(self.to_meta_type(db)).into();
+            return Place::bound(self.dunder_class(db)).into();
         }
 
         let name_str = name.as_str();
@@ -3324,6 +3328,12 @@ impl<'db> Type<'db> {
                     .unwrap_or(Place::Unbound)
                     .into()
                 };
+
+                if result.is_class_var() && self.is_typed_dict() {
+                    // `ClassVar`s on `TypedDictFallback` can not be accessed on inhabitants of `SomeTypedDict`.
+                    // They can only be accessed on `SomeTypedDict` directly.
+                    return Place::Unbound.into();
+                }
 
                 match result {
                     member @ PlaceAndQualifiers {
@@ -5533,6 +5543,9 @@ impl<'db> Type<'db> {
 
     /// Given a type that is assumed to represent an instance of a class,
     /// return a type that represents that class itself.
+    ///
+    /// Note: the return type of `type(obj)` is subtly different from this.
+    /// See `Self::dunder_class` for more details.
     #[must_use]
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
@@ -5593,6 +5606,23 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class(db)),
         }
+    }
+
+    /// Get the type of the `__class__` attribute of this type.
+    ///
+    /// For most types, this is equivalent to the meta type of this type. For `TypedDict` types,
+    /// this returns `type[dict[str, object]]` instead, because inhabitants of a `TypedDict` are
+    /// instances of `dict` at runtime.
+    #[must_use]
+    pub fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
+        if self.is_typed_dict() {
+            return KnownClass::Dict
+                .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object(db)])
+                .map(Type::from)
+                .unwrap_or_else(Type::unknown);
+        }
+
+        self.to_meta_type(db)
     }
 
     #[must_use]
