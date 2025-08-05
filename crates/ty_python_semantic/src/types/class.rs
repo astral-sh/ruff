@@ -4676,22 +4676,41 @@ mod tests {
     fn known_class_doesnt_fallback_to_unknown_unexpectedly_on_low_python_version() {
         let mut db = setup_db();
 
-        for class in KnownClass::iter() {
-            let version_added = match class {
-                KnownClass::UnionType => PythonVersion::PY310,
-                KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => PythonVersion::PY311,
-                KnownClass::GenericAlias => PythonVersion::PY39,
-                KnownClass::KwOnly => PythonVersion::PY310,
-                KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
-                _ => PythonVersion::PY37,
-            };
+        // First, collect the `KnownClass` variants
+        // and sort them according to the version they were added in.
+        // This makes the test far faster as it minimizes the number of times
+        // we need to change the Python version in the loop.
+        let mut classes: Vec<(KnownClass, PythonVersion)> = KnownClass::iter()
+            .map(|class| {
+                let version_added = match class {
+                    KnownClass::UnionType => PythonVersion::PY310,
+                    KnownClass::BaseExceptionGroup | KnownClass::ExceptionGroup => {
+                        PythonVersion::PY311
+                    }
+                    KnownClass::GenericAlias => PythonVersion::PY39,
+                    KnownClass::KwOnly => PythonVersion::PY310,
+                    KnownClass::Member | KnownClass::Nonmember => PythonVersion::PY311,
+                    _ => PythonVersion::PY37,
+                };
+                (class, version_added)
+            })
+            .collect();
 
-            Program::get(&db)
-                .set_python_version_with_source(&mut db)
-                .to(PythonVersionWithSource {
-                    version: version_added,
-                    source: PythonVersionSource::default(),
-                });
+        classes.sort_unstable_by_key(|(_, version)| *version);
+
+        let program = Program::get(&db);
+        let mut current_version = program.python_version(&db);
+
+        for (class, version_added) in classes {
+            if version_added != current_version {
+                program
+                    .set_python_version_with_source(&mut db)
+                    .to(PythonVersionWithSource {
+                        version: version_added,
+                        source: PythonVersionSource::default(),
+                    });
+                current_version = version_added;
+            }
 
             assert_ne!(
                 class.to_instance(&db),
