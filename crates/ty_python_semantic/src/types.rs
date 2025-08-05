@@ -71,6 +71,7 @@ mod builder;
 mod call;
 mod class;
 mod class_base;
+mod constraints;
 mod context;
 mod cyclic;
 mod diagnostic;
