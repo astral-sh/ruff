@@ -36,6 +36,7 @@ bitflags! {
         const IS_DECLARED           = 1 << 2;
         const MARKED_GLOBAL         = 1 << 3;
         const MARKED_NONLOCAL       = 1 << 4;
+        /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
     }
 }
@@ -92,7 +93,7 @@ impl Symbol {
     }
 
     pub(super) fn mark_bound(&mut self) {
-        if self.is_bound() {
+        if self.is_bound() || self.is_used() {
             self.insert_flags(SymbolFlags::IS_REASSIGNED);
         }
 

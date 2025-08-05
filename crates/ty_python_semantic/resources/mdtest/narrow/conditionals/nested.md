@@ -363,11 +363,12 @@ def f(x: str | Literal[1] | None):
         x = None
 
     def _():
+        # No narrowing is performed on unresolved references.
         # error: [unresolved-reference]
         if x is not None:
             def _():
                 if x != 1:
-                    reveal_type(x)  # revealed: Never
+                    reveal_type(x)  # revealed: None
         x = None
 
 def f(const: str | Literal[1] | None):
@@ -375,8 +376,7 @@ def f(const: str | Literal[1] | None):
         if const is not None:
             def _():
                 if const != 1:
-                    # TODO: should be `str`
-                    reveal_type(const)  # revealed: str | None
+                    reveal_type(const)  # revealed: str
 
             class D:
                 if const != 1:
