@@ -225,8 +225,11 @@ impl TestServer {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
-            initialization_options: initialization_options
-                .map(|options| serde_json::to_value(options).unwrap()),
+            initialization_options: initialization_options.map(|options| {
+                serde_json::to_value(options)
+                    .context("Failed to serialize initialization options to `ClientOptions`")
+                    .unwrap()
+            }),
             ..Default::default()
         };
 

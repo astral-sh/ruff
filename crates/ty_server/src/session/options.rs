@@ -4,6 +4,7 @@ use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use ty_project::combine::Combine;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -53,8 +54,9 @@ impl InitializationOptions {
     pub(crate) fn from_value(
         options: Option<Value>,
     ) -> (InitializationOptions, Option<serde_json::Error>) {
-        let options =
-            options.unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default()));
+        let Some(options) = options else {
+            return (InitializationOptions::default(), None);
+        };
         match serde_json::from_value(options) {
             Ok(options) => (options, None),
             Err(err) => (InitializationOptions::default(), Some(err)),
@@ -104,6 +106,10 @@ impl Combine for ClientOptions {
     }
 }
 
+/// Options that are global to the language server.
+///
+/// These are the dynamic options that are applied to all workspaces managed by the language
+/// server.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GlobalOptions {
@@ -125,6 +131,9 @@ impl Combine for GlobalOptions {
     }
 }
 
+/// Options that are specific to a workspace.
+///
+/// These are the dynamic options that are applied to a specific workspace.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WorkspaceOptions {
@@ -222,6 +231,14 @@ impl DiagnosticMode {
 
 impl Combine for DiagnosticMode {
     fn combine_with(&mut self, other: Self) {
+        // Diagnostic mode is a global option but as it can be updated without a server restart,
+        // it is part of the dynamic option set. But, there's no easy way to enforce the fact that
+        // this option should not be set for individual workspaces. The ty VS Code extension
+        // enforces this but we're not in control of other clients.
+        //
+        // So, this is a workaround to ensure that if the diagnostic mode is set to `workspace` in
+        // either an initialization options or one of the workspace options, it is always set to
+        // `workspace` in the global options.
         if other.is_workspace() {
             *self = DiagnosticMode::Workspace;
         }
@@ -236,7 +253,7 @@ struct PythonExtension {
 
 impl Combine for PythonExtension {
     fn combine_with(&mut self, _other: Self) {
-        unreachable!(
+        panic!(
             "`python_extension` is not expected to be combined with the initialization options as \
             it's only set by the ty VS Code extension in the `workspace/configuration` request."
         );
@@ -280,81 +297,3 @@ pub(crate) struct PythonExecutable {
     pub(crate) uri: Url,
     pub(crate) sys_prefix: SystemPathBuf,
 }
-
-pub(crate) trait Combine {
-    #[must_use]
-    fn combine(mut self, other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        self.combine_with(other);
-        self
-    }
-
-    fn combine_with(&mut self, other: Self);
-}
-
-impl<T> Combine for Option<T>
-where
-    T: Combine,
-{
-    fn combine(self, other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        match (self, other) {
-            (Some(a), Some(b)) => Some(a.combine(b)),
-            (None, Some(b)) => Some(b),
-            (a, _) => a,
-        }
-    }
-
-    fn combine_with(&mut self, other: Self) {
-        match (self, other) {
-            (Some(a), Some(b)) => {
-                a.combine_with(b);
-            }
-            (a @ None, Some(b)) => {
-                *a = Some(b);
-            }
-            _ => {}
-        }
-    }
-}
-
-impl<T> Combine for Vec<T> {
-    fn combine_with(&mut self, _other: Self) {
-        // No-op, use own elements
-    }
-}
-
-/// Implements [`Combine`] for a value that always returns `self` when combined with another value.
-macro_rules! impl_noop_combine {
-    ($name:ident) => {
-        impl Combine for $name {
-            #[inline(always)]
-            fn combine_with(&mut self, _other: Self) {}
-
-            #[inline(always)]
-            fn combine(self, _other: Self) -> Self {
-                self
-            }
-        }
-    };
-}
-
-// std types
-impl_noop_combine!(bool);
-impl_noop_combine!(usize);
-impl_noop_combine!(u8);
-impl_noop_combine!(u16);
-impl_noop_combine!(u32);
-impl_noop_combine!(u64);
-impl_noop_combine!(u128);
-impl_noop_combine!(isize);
-impl_noop_combine!(i8);
-impl_noop_combine!(i16);
-impl_noop_combine!(i32);
-impl_noop_combine!(i64);
-impl_noop_combine!(i128);
-impl_noop_combine!(String);

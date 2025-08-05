@@ -59,7 +59,20 @@ fn workspace_diagnostic_registration_without_configuration() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": true,
+        "workspaceDiagnostics": true
+      }
+    }
+    "#);
+
     Ok(())
 }
 
@@ -89,7 +102,20 @@ fn open_files_diagnostic_registration_without_configuration() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": false,
+        "workspaceDiagnostics": false
+      }
+    }
+    "#);
+
     Ok(())
 }
 
@@ -115,7 +141,20 @@ fn workspace_diagnostic_registration_via_initialization() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": true,
+        "workspaceDiagnostics": true
+      }
+    }
+    "#);
+
     Ok(())
 }
 
@@ -141,7 +180,20 @@ fn open_files_diagnostic_registration_via_initialization() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": false,
+        "workspaceDiagnostics": false
+      }
+    }
+    "#);
+
     Ok(())
 }
 
@@ -167,7 +219,20 @@ fn workspace_diagnostic_registration() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": true,
+        "workspaceDiagnostics": true
+      }
+    }
+    "#);
+
     Ok(())
 }
 
@@ -193,7 +258,20 @@ fn open_files_diagnostic_registration() -> Result<()> {
         );
     };
 
-    insta::assert_json_snapshot!(registration);
+    insta::assert_json_snapshot!(registration, @r#"
+    {
+      "id": "ty/textDocument/diagnostic",
+      "method": "textDocument/diagnostic",
+      "registerOptions": {
+        "documentSelector": null,
+        "identifier": "ty",
+        "interFileDependencies": true,
+        "workDoneProgress": false,
+        "workspaceDiagnostics": false
+      }
+    }
+    "#);
+
     Ok(())
 }
 

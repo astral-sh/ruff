@@ -204,21 +204,23 @@ impl Server {
     /// using the initialization options provided by the client.
     fn request_workspace_configurations(&mut self, client: &Client) {
         if !self
-            .resolved_client_capabilities
+            .session
+            .client_capabilities()
             .supports_workspace_configuration()
         {
             tracing::info!(
                 "Client does not support workspace configuration, initializing workspaces \
                 using the initialization options"
             );
-            client.queue_action(Action::InitializeWorkspaces(
+            self.session.initialize_workspaces(
                 self.session
                     .workspaces()
                     .urls()
                     .cloned()
                     .map(|url| (url, self.session.initialization_options().options.clone()))
                     .collect::<Vec<_>>(),
-            ));
+                client,
+            );
             return;
         }
 
@@ -246,21 +248,27 @@ impl Server {
 
                 // This shouldn't fail because, as per the spec, the client needs to provide a
                 // `null` value even if it cannot provide a configuration for a workspace.
-                assert_eq!(result.len(), urls.len());
+                assert_eq!(
+                    result.len(),
+                    urls.len(),
+                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
+                    urls.len(),
+                    result.len()
+                );
 
                 let workspaces_with_options: Vec<_> = urls
                     .into_iter()
                     .zip(result)
                     .map(|(url, value)| {
                         if value.is_null() {
-                            tracing::info!(
+                            tracing::debug!(
                                 "No workspace options provided for {url}, using default options"
                             );
                             return (url, ClientOptions::default());
                         }
                         let options: ClientOptions =
                             serde_json::from_value(value).unwrap_or_else(|err| {
-                                tracing::warn!(
+                                tracing::error!(
                                     "Failed to deserialize workspace options for {url}: {err}. \
                                         Using default options"
                                 );
@@ -279,7 +287,7 @@ impl Server {
     fn try_register_file_watcher(&mut self, client: &Client) {
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
-        if !self.resolved_client_capabilities.supports_file_watcher() {
+        if !self.session.client_capabilities().supports_file_watcher() {
             tracing::warn!("Client does not support file system watching");
             return;
         }

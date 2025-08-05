@@ -4,6 +4,7 @@ use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::session::{InitializationOptions, Session};
+use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{
     ClientCapabilities, DeclarationCapability, DiagnosticServerCapabilities,
@@ -34,7 +35,6 @@ pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 
 pub struct Server {
     connection: Connection,
-    resolved_client_capabilities: ResolvedClientCapabilities,
     worker_threads: NonZeroUsize,
     main_loop_receiver: MainLoopReceiver,
     main_loop_sender: MainLoopSender,
@@ -55,7 +55,8 @@ impl Server {
             capabilities: client_capabilities,
             workspace_folders,
             ..
-        } = serde_json::from_value(init_value)?;
+        } = serde_json::from_value(init_value)
+            .context("Failed to deserialize initialization parameters")?;
 
         let (initialization_options, deserialization_error) =
             InitializationOptions::from_value(initialization_options);
@@ -67,14 +68,11 @@ impl Server {
             );
         }
 
-        tracing::info!("Initialization options: {initialization_options:?}");
-
         if let Some(error) = deserialization_error {
-            tracing::error!(
-                "Failed to deserialize initialization options: {error}. \
-                Using default initialization options."
-            );
+            tracing::error!("Failed to deserialize initialization options: {error}");
         }
+
+        tracing::debug!("Initialization options: {initialization_options:?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
@@ -158,7 +156,6 @@ impl Server {
                 native_system,
                 in_test,
             )?,
-            resolved_client_capabilities,
         })
     }
 

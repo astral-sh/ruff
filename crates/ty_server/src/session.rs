@@ -12,7 +12,7 @@ use lsp_types::{
     DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
-use options::{Combine, GlobalOptions};
+use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -21,6 +21,7 @@ use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
+use ty_project::combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
@@ -455,11 +456,7 @@ impl Session {
                 .clone()
                 .combine(options.clone());
 
-            combined_global_options = if let Some(global_options) = combined_global_options.take() {
-                Some(global_options.combine(global))
-            } else {
-                Some(global)
-            };
+            combined_global_options.combine_with(Some(global));
 
             let workspace_settings = workspace.into_settings();
             let Some((root, workspace)) = self.workspaces.initialize(&url, workspace_settings)
@@ -536,9 +533,7 @@ impl Session {
             let global_settings = global_options.into_settings();
             if global_settings.diagnostic_mode().is_workspace() {
                 for project in self.projects.values_mut() {
-                    if project.db.check_mode() != CheckMode::AllFiles {
-                        project.db.set_check_mode(CheckMode::AllFiles);
-                    }
+                    project.db.set_check_mode(CheckMode::AllFiles);
                 }
             }
             self.global_settings = Arc::new(global_settings);
