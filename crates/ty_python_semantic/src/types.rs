@@ -730,8 +730,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::ClassLiteral(_)
-            | Type::BoundSuper(_)
-            | Type::TypedDict(_) => *self,
+            | Type::BoundSuper(_) => *self,
 
             Type::PropertyInstance(property_instance) => {
                 Type::PropertyInstance(property_instance.materialize(db, variance))
@@ -782,6 +781,10 @@ impl<'db> Type<'db> {
             Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
+            }
+            Type::TypedDict(_) => {
+                // TODO: Materialization of gradual TypedDicts
+                *self
             }
         }
     }
@@ -1083,6 +1086,12 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
+
+            Type::TypedDict(_) => {
+                // TODO: Normalize TypedDicts
+                self
+            }
+
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -1097,8 +1106,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::IntLiteral(_)
-            | Type::TypedDict(_) => self,
+            | Type::IntLiteral(_) => self,
         }
     }
 
@@ -1133,7 +1141,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_)
-            | Type::TypedDict(_) => true,
+             => true,
             Type::Dynamic(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -1145,7 +1153,8 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_) => false,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => false,
         }
     }
 
@@ -3542,7 +3551,8 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::Callable(_)
             | Type::LiteralString
-            | Type::TypeIs(_) => Truthiness::Ambiguous,
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => Truthiness::Ambiguous,
 
             Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -3555,8 +3565,7 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)
-            | Type::AlwaysTruthy
-            | Type::TypedDict(_) => Truthiness::AlwaysTrue,
+            | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
@@ -5239,26 +5248,17 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => {
-                        if class.is_typed_dict(db) {
-                            Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
-                        } else {
-                            Type::instance(db, class.default_specialization(db))
-                        }
+                    _ if class.is_typed_dict(db) => {
+                        Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
                     }
+                    _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => {
-                if alias.is_typed_dict(db) {
-                    Ok(Type::TypedDict(TypedDictType::new(
-                        db,
-                        ClassType::from(*alias),
-                    )))
-                } else {
-                    Ok(Type::instance(db, ClassType::from(*alias)))
-                }
-            }
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::TypedDict(
+                TypedDictType::new(db, ClassType::from(*alias)),
+            )),
+            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)

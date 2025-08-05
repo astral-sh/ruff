@@ -186,6 +186,26 @@ reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
 ```
 
+These attributes can not be accessed on inhabitants:
+
+```py
+def _(person: Person) -> None:
+    # TODO: these should be errors
+    person.__total__
+    person.__required_keys__
+    person.__optional_keys__
+```
+
+Also, they can not be accessed on `type(person)`, as that would be `dict` at runtime:
+
+```py
+def _(t_person: type[Person]) -> None:
+    # TODO: these should be errors
+    t_person.__total__
+    t_person.__required_keys__
+    t_person.__optional_keys__
+```
+
 ## Subclassing
 
 `TypedDict` types can be subclassed. The subclass can add new keys:

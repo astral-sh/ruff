@@ -205,3 +205,50 @@ reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
 reveal_type(bool(CustomLenEnum.NO))  # revealed: bool
 reveal_type(bool(CustomLenEnum.YES))  # revealed: bool
 ```
+
+## TypedDict
+
+It may be feasible to infer `Literal[True]` for some `TypedDict` types, if `{}` can definitely be
+excluded as a possible value. We currently do not attempt to do this.
+
+```py
+from typing_extensions import TypedDict, Literal, NotRequired
+
+class Normal(TypedDict):
+    a: str
+    b: int
+
+def _(n: Normal) -> None:
+    # Could be `Literal[True]`
+    reveal_type(bool(n))  # revealed: bool
+
+class OnlyFalsyItems(TypedDict):
+    wrong: Literal[False]
+
+def _(n: OnlyFalsyItems) -> None:
+    # Could be `Literal[True]` (it does not matter if all items are falsy)
+    reveal_type(bool(n))  # revealed: bool
+
+class Empty(TypedDict):
+    pass
+
+def _(e: Empty) -> None:
+    # This should be `bool`. `Literal[False]` would be wrong, as `Empty` can be subclassed.
+    reveal_type(bool(e))  # revealed: bool
+
+class AllKeysOptional(TypedDict, total=False):
+    a: str
+    b: int
+
+def _(a: AllKeysOptional) -> None:
+    # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
+    reveal_type(bool(a))  # revealed: bool
+
+class AllKeysNotRequired(TypedDict):
+    a: NotRequired[str]
+    b: NotRequired[int]
+
+def _(a: AllKeysNotRequired) -> None:
+    # This should be `bool`. `Literal[True]` would be wrong as `{}` is a valid value.
+    reveal_type(bool(a))  # revealed: bool
+```

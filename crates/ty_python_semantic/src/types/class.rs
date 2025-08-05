@@ -471,7 +471,10 @@ impl<'db> ClassType<'db> {
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
                 },
 
-                ClassBase::TypedDict => true,
+                ClassBase::TypedDict => {
+                    // TODO: Implement subclassing and assignability for TypedDicts.
+                    true
+                }
             }
         })
     }
