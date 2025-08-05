@@ -45,9 +45,6 @@ jobs:
           path: typing
           persist-credentials: false
 
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
-
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
         with:
           workspaces: "ruff"
@@ -65,14 +62,13 @@ jobs:
             cd ruff
 
             echo "new commit"
-            git checkout -b new_commit "${{ github.event.pull_request.head.sha }}"
-            git rev-list --format=%s --max-count=1 new_commit
+            git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
             cargo build --release --bin ty
             mv target/release/ty ty-new
 
-            echo "old commit (merge base)"
             MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
             git checkout -b old_commit "$MERGE_BASE"
+            echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit
             cargo build --release --bin ty
             mv target/release/ty ty-old
