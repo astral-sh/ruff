@@ -269,35 +269,10 @@ impl PlaceTable {
         self.members.place_id_by_instance_attribute_name(name)
     }
 
-    pub(crate) fn definition_in_enclosing_scope(
-        &self,
-        symbol_id: ScopedSymbolId,
-    ) -> Option<(FileScopeId, ScopedSymbolId)> {
-        self.symbols
-            .definitions_in_enclosing_scopes
-            .get(&symbol_id)
-            .copied()
-    }
-
-    // TODO: Use this for "find all references" in the LSP.
-    pub(crate) fn _references_in_nested_scopes(
-        &self,
-        symbol_id: ScopedSymbolId,
-    ) -> &[(FileScopeId, ScopedSymbolId)] {
-        if let Some(references) = self.symbols.references_in_nested_scopes.get(&symbol_id) {
-            references
-        } else {
-            &[]
-        }
-    }
-
     // TODO: Use this in `infer_place_load`.
-    pub(crate) fn _bindings_in_nested_scopes(
-        &self,
-        symbol_id: ScopedSymbolId,
-    ) -> &[(FileScopeId, ScopedSymbolId)] {
-        if let Some(references) = self.symbols.bindings_in_nested_scopes.get(&symbol_id) {
-            references
+    pub(crate) fn nested_scopes_with_bindings(&self, symbol_id: ScopedSymbolId) -> &[FileScopeId] {
+        if let Some(scopes) = self.symbols.nested_scopes_with_bindings.get(&symbol_id) {
+            scopes
         } else {
             &[]
         }
@@ -367,10 +342,6 @@ impl PlaceTableBuilder {
 
     pub(crate) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.symbols.iter()
-    }
-
-    pub(crate) fn symbols_enumerated(&self) -> impl Iterator<Item = (ScopedSymbolId, &Symbol)> {
-        self.symbols.iter_enumerated()
     }
 
     pub(crate) fn add_symbol(&mut self, symbol: Symbol) -> (ScopedSymbolId, bool) {
@@ -448,32 +419,13 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(super) fn add_reference_in_nested_scope(
+    pub(super) fn add_nested_scope_with_binding(
         &mut self,
         this_scope_symbol_id: ScopedSymbolId,
         nested_scope: FileScopeId,
-        nested_scope_symbol_id: ScopedSymbolId,
-        is_bound_in_nested_scope: bool,
     ) {
-        self.symbols.add_reference_in_nested_scope(
-            this_scope_symbol_id,
-            nested_scope,
-            nested_scope_symbol_id,
-            is_bound_in_nested_scope,
-        );
-    }
-
-    pub(super) fn add_definition_in_enclosing_scope(
-        &mut self,
-        this_scope_symbol_id: ScopedSymbolId,
-        enclosing_scope: FileScopeId,
-        enclosing_scope_symbol_id: ScopedSymbolId,
-    ) {
-        self.symbols.add_definition_in_enclosing_scope(
-            this_scope_symbol_id,
-            enclosing_scope,
-            enclosing_scope_symbol_id,
-        );
+        self.symbols
+            .add_nested_scope_with_binding(this_scope_symbol_id, nested_scope);
     }
 
     pub(crate) fn finish(self) -> PlaceTable {

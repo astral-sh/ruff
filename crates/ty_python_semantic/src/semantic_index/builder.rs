@@ -96,7 +96,6 @@ struct ScopeInfo<'ast> {
 
 struct FreeVariable<'ast> {
     scope_id: FileScopeId,
-    symbol_id: ScopedSymbolId,
     // If this variable is `nonlocal`, then this is `Some` reference to its identifier in the
     // `nonlocal` statement. In that case, it's an error if we don't resolve it before we reach the
     // global scope (or if we resolve it in a scope where it's `global`).
@@ -549,7 +548,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let resolved_variables = popped_free_variables.remove(&resolution.name).unwrap();
                 for FreeVariable {
                     scope_id: nested_scope_id,
-                    symbol_id: nested_scope_symbol_id,
                     nonlocal_identifier,
                 } in resolved_variables
                 {
@@ -566,20 +564,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             python_version: self.python_version,
                         });
                     } else {
-                        let is_bound_in_nested_scope = self.place_tables[nested_scope_id]
-                            .symbol(nested_scope_symbol_id)
-                            .is_bound();
-                        self.place_tables[popped_scope_id].add_reference_in_nested_scope(
-                            resolution.symbol_id,
-                            nested_scope_id,
-                            nested_scope_symbol_id,
-                            is_bound_in_nested_scope,
-                        );
-                        self.place_tables[nested_scope_id].add_definition_in_enclosing_scope(
-                            nested_scope_symbol_id,
-                            popped_scope_id,
-                            resolution.symbol_id,
-                        );
+                        let nested_place_table = &self.place_tables[nested_scope_id];
+                        let nested_symbol_id =
+                            nested_place_table.symbol_id(&resolution.name).unwrap();
+                        let nested_symbol = nested_place_table.symbol(nested_symbol_id);
+                        if nested_symbol.is_bound() {
+                            self.place_tables[popped_scope_id].add_nested_scope_with_binding(
+                                resolution.symbol_id,
+                                nested_scope_id,
+                            );
+                        }
                     }
                 }
             }
@@ -620,8 +614,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .extend(variables);
             }
             let popped_place_table = &self.place_tables[popped_scope_id];
-            let mut references_to_globals = Vec::new();
-            for (symbol_id, symbol) in popped_place_table.symbols_enumerated() {
+            let mut bound_global_symbols = Vec::new();
+            for symbol in popped_place_table.symbols() {
                 // Collect new free variables.
                 if symbol.is_used()
                     && !symbol.is_bound()
@@ -636,41 +630,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .or_default()
                         .push(FreeVariable {
                             scope_id: popped_scope_id,
-                            symbol_id,
                             nonlocal_identifier: None,
                         });
                 }
 
-                // Record references to global variables. Put these in a temporary Vec as another
+                // Record bindings of global variables. Put these in a temporary Vec as another
                 // borrowck workaround.
-                if symbol.is_global() {
-                    references_to_globals.push((
-                        symbol_id,
-                        symbol.name().clone(),
-                        symbol.is_bound(),
-                    ));
+                if symbol.is_global() && symbol.is_bound() {
+                    bound_global_symbols.push(symbol.name().clone());
                 }
             }
 
             // Update the global scope with those references to globals, now that
             // `popped_place_table` and `parent_free_variables` are no longer borrowed.
-            for (symbol_id, symbol_name, is_bound) in references_to_globals {
+            for symbol_name in bound_global_symbols {
                 // Add this symbol to the global scope, if it isn't there already.
                 let global_symbol_id = self.add_symbol_to_scope(symbol_name, FileScopeId::global());
                 // Update the global place table with this reference, and update this place
                 // table with the global definition. Doing this here rather than when we first
                 // encounter the `global` statement lets us record whether the symbol is bound.
-                self.place_tables[FileScopeId::global()].add_reference_in_nested_scope(
-                    global_symbol_id,
-                    popped_scope_id,
-                    symbol_id,
-                    is_bound,
-                );
-                self.place_tables[popped_scope_id].add_definition_in_enclosing_scope(
-                    symbol_id,
-                    FileScopeId::global(),
-                    global_symbol_id,
-                );
+                self.place_tables[FileScopeId::global()]
+                    .add_nested_scope_with_binding(global_symbol_id, popped_scope_id);
             }
         }
 
@@ -2404,7 +2384,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .or_default()
                         .push(FreeVariable {
                             scope_id,
-                            symbol_id,
                             nonlocal_identifier: Some(name),
                         });
                 }
