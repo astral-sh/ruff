@@ -1,0 +1,77 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: typed_dict.md - `TypedDict` - Diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict, Final
+ 2 | 
+ 3 | class Person(TypedDict):
+ 4 |     name: str
+ 5 |     age: int | None
+ 6 | 
+ 7 | def access_invalid_literal_string_key(person: Person):
+ 8 |     person["naem"]  # error: [invalid-key]
+ 9 | 
+10 | NAME_KEY: Final = "naem"
+11 | 
+12 | def access_invalid_key(person: Person):
+13 |     person[NAME_KEY]  # error: [invalid-key]
+14 | 
+15 | def access_with_str_key(person: Person, str_key: str):
+16 |     person[str_key]  # error: [invalid-key]
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: Invalid key access on TypedDict `Person`
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | def access_invalid_literal_string_key(person: Person):
+ 8 |     person["naem"]  # error: [invalid-key]
+   |     ------ ^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     |
+   |     TypedDict `Person`
+ 9 |
+10 | NAME_KEY: Final = "naem"
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: Invalid key access on TypedDict `Person`
+  --> src/mdtest_snippet.py:13:5
+   |
+12 | def access_invalid_key(person: Person):
+13 |     person[NAME_KEY]  # error: [invalid-key]
+   |     ------ ^^^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     |
+   |     TypedDict `Person`
+14 |
+15 | def access_with_str_key(person: Person, str_key: str):
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: TypedDict `Person` can not be indexed with a key of type `str`
+  --> src/mdtest_snippet.py:16:12
+   |
+15 | def access_with_str_key(person: Person, str_key: str):
+16 |     person[str_key]  # error: [invalid-key]
+   |            ^^^^^^^
+   |
+info: rule `invalid-key` is enabled by default
+
+```

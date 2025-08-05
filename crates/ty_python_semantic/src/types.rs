@@ -38,6 +38,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::{CodeGeneratorKind, Field, FxOrderMap};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -669,10 +670,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
-    pub(crate) const fn is_typed_dict(&self) -> bool {
-        matches!(self, Type::TypedDict(..))
-    }
-
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
@@ -832,6 +829,17 @@ impl<'db> Type<'db> {
     pub fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.into_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
+    }
+
+    pub(crate) const fn is_typed_dict(&self) -> bool {
+        matches!(self, Type::TypedDict(..))
+    }
+
+    pub(crate) fn into_typed_dict(self) -> Option<TypedDictType<'db>> {
+        match self {
+            Type::TypedDict(typed_dict) => Some(typed_dict),
+            _ => None,
+        }
     }
 
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
@@ -8931,6 +8939,11 @@ impl get_size2::GetSize for TypedDictType<'_> {}
 impl<'db> TypedDictType<'db> {
     pub(crate) fn from(db: &'db dyn Db, defining_class: ClassType<'db>) -> Type<'db> {
         Type::TypedDict(Self::new(db, defining_class))
+    }
+
+    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
+        let (class_literal, specialization) = self.defining_class(db).class_literal(db);
+        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
 
     pub(crate) fn apply_type_mapping<'a>(

@@ -2617,3 +2617,28 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 
     add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving modules");
 }
+
+/// Suggest a name from `existing_names` that is similar to `wrong_name`.
+pub(super) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
+    existing_names: impl Iterator<Item = S>,
+    wrong_name: T,
+) -> Option<String> {
+    if wrong_name.as_ref().len() < 3 {
+        return None;
+    }
+
+    existing_names
+        .map(|ref id| {
+            (
+                id.as_ref().to_string(),
+                strsim::damerau_levenshtein(
+                    &id.as_ref().to_lowercase(),
+                    &wrong_name.as_ref().to_lowercase(),
+                ),
+            )
+        })
+        .min_by_key(|(_, dist)| *dist)
+        // Heuristic to filter out bad matches
+        .filter(|(id, dist)| id.len() >= 2 && *dist <= 3)
+        .map(|(id, _)| id)
+}
