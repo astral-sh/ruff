@@ -55,6 +55,12 @@ impl Violation for ExplicitFStringTypeConversion {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum CommentPreservation {
+    Safe,
+    Unsafe,
+}
+
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &ast::FString) {
     for (index, element) in f_string.elements.iter().enumerate() {
@@ -121,8 +127,17 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &Checker, f_string: &as
             return;
         }
 
+        let comment_preservation = analyze_comment_preservation(checker, expression, call);
+
         diagnostic.try_set_fix(|| {
-            convert_call_to_conversion_flag(checker, conversion, f_string, index, arg)
+            convert_call_to_conversion_flag(
+                checker,
+                conversion,
+                f_string,
+                index,
+                arg,
+                &comment_preservation,
+            )
         });
     }
 }
@@ -134,9 +149,10 @@ fn convert_call_to_conversion_flag(
     f_string: &ast::FString,
     index: usize,
     arg: &Expr,
+    comment_preservation: &CommentPreservation,
 ) -> Result<Fix> {
     let source_code = checker.locator().slice(f_string);
-    transform_expression(source_code, checker.stylist(), |mut expression| {
+    let output = transform_expression(source_code, checker.stylist(), |mut expression| {
         let formatted_string = match_formatted_string(&mut expression)?;
         // Replace the formatted call expression at `index` with a conversion flag.
         let formatted_string_expression =
@@ -159,8 +175,14 @@ fn convert_call_to_conversion_flag(
         };
 
         Ok(expression)
-    })
-    .map(|output| Fix::safe_edit(Edit::range_replacement(output, f_string.range())))
+    })?;
+
+    let edit = Edit::range_replacement(output, f_string.range());
+
+    match comment_preservation {
+        CommentPreservation::Safe => Ok(Fix::safe_edit(edit)),
+        CommentPreservation::Unsafe => Ok(Fix::unsafe_edit(edit)),
+    }
 }
 
 fn starts_with_brace(checker: &Checker, arg: &Expr) -> bool {
@@ -218,5 +240,62 @@ impl Conversion {
 impl Display for Conversion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
+    }
+}
+
+/// Analyze whether comments within the function call can be preserved during transformation.
+fn analyze_comment_preservation(
+    checker: &Checker,
+    expression: &Expr,
+    call: &ast::ExprCall,
+) -> CommentPreservation {
+    let expression_range = expression.range();
+
+    // Find all comment tokens within the expression
+    let comment_tokens: Vec<_> = checker
+        .tokens()
+        .in_range(expression_range)
+        .iter()
+        .filter(|token| token.kind().is_comment())
+        .collect();
+
+    if comment_tokens.is_empty() {
+        return CommentPreservation::Safe;
+    }
+
+    // The transformation extracts everything between the function call parentheses
+    // and uses that as the new expression. So we need to find the range between
+    // the opening and closing parentheses of the function call.
+
+    let call_tokens: Vec<_> = checker.tokens().in_range(call.range()).iter().collect();
+
+    // Find the opening and closing parentheses of the function call
+    let mut paren_start = None;
+    let mut paren_end = None;
+
+    for token in &call_tokens {
+        if token.kind() == TokenKind::Lpar && paren_start.is_none() {
+            paren_start = Some(token.end()); // Content starts after opening paren
+        }
+        if token.kind() == TokenKind::Rpar {
+            paren_end = Some(token.start()); // Content ends before closing paren
+        }
+    }
+
+    let (Some(content_start), Some(content_end)) = (paren_start, paren_end) else {
+        return CommentPreservation::Unsafe;
+    };
+
+    let preserved_range = ruff_text_size::TextRange::new(content_start, content_end);
+
+    // Check if all comments are within the parentheses content that will be preserved
+    let all_comments_preserved = comment_tokens
+        .iter()
+        .all(|token| preserved_range.contains_range(token.range()));
+
+    if all_comments_preserved {
+        CommentPreservation::Safe
+    } else {
+        CommentPreservation::Unsafe
     }
 }

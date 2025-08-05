@@ -244,176 +244,289 @@ RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
    35 |+    f" that flows {obj!r} of type {type(obj)}.{additional_message}"  # RUF010
 36 36 | )
 37 37 | 
-38 38 | 
+38 38 | # https://github.com/astral-sh/ruff/issues/16325
 
-RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:39:4: RUF010 [*] Use explicit conversion flag
    |
-39 | # https://github.com/astral-sh/ruff/issues/16325
-40 | f"{str({})}"
+38 | # https://github.com/astral-sh/ruff/issues/16325
+39 | f"{str({})}"
    |    ^^^^^^^ RUF010
-41 |
-42 | f"{str({} | {})}"
+40 |
+41 | f"{str({} | {})}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
+36 36 | )
 37 37 | 
-38 38 | 
-39 39 | # https://github.com/astral-sh/ruff/issues/16325
-40    |-f"{str({})}"
-   40 |+f"{ {}!s}"
-41 41 | 
-42 42 | f"{str({} | {})}"
-43 43 | 
+38 38 | # https://github.com/astral-sh/ruff/issues/16325
+39    |-f"{str({})}"
+   39 |+f"{ {}!s}"
+40 40 | 
+41 41 | f"{str({} | {})}"
+42 42 | 
 
-RUF010.py:42:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:41:4: RUF010 [*] Use explicit conversion flag
    |
-40 | f"{str({})}"
-41 |
-42 | f"{str({} | {})}"
+39 | f"{str({})}"
+40 |
+41 | f"{str({} | {})}"
    |    ^^^^^^^^^^^^ RUF010
-43 |
-44 | import builtins
+42 |
+43 | import builtins
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-39 39 | # https://github.com/astral-sh/ruff/issues/16325
-40 40 | f"{str({})}"
-41 41 | 
-42    |-f"{str({} | {})}"
-   42 |+f"{ {} | {}!s}"
-43 43 | 
-44 44 | import builtins
-45 45 | 
+38 38 | # https://github.com/astral-sh/ruff/issues/16325
+39 39 | f"{str({})}"
+40 40 | 
+41    |-f"{str({} | {})}"
+   41 |+f"{ {} | {}!s}"
+42 42 | 
+43 43 | import builtins
+44 44 | 
 
-RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:45:4: RUF010 [*] Use explicit conversion flag
    |
-44 | import builtins
-45 |
-46 | f"{builtins.repr(1)}"
+43 | import builtins
+44 |
+45 | f"{builtins.repr(1)}"
    |    ^^^^^^^^^^^^^^^^ RUF010
-47 |
-48 | f"{repr(1)=}"
+46 |
+47 | f"{repr(1)=}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-43 43 | 
-44 44 | import builtins
-45 45 | 
-46    |-f"{builtins.repr(1)}"
-   46 |+f"{1!r}"
-47 47 | 
-48 48 | f"{repr(1)=}"
-49 49 | 
+42 42 | 
+43 43 | import builtins
+44 44 | 
+45    |-f"{builtins.repr(1)}"
+   45 |+f"{1!r}"
+46 46 | 
+47 47 | f"{repr(1)=}"
+48 48 | 
 
-RUF010.py:48:4: RUF010 Use explicit conversion flag
+RUF010.py:47:4: RUF010 Use explicit conversion flag
    |
-46 | f"{builtins.repr(1)}"
-47 |
-48 | f"{repr(1)=}"
+45 | f"{builtins.repr(1)}"
+46 |
+47 | f"{repr(1)=}"
    |    ^^^^^^^ RUF010
-49 |
-50 | f"{repr(lambda: 1)}"
+48 |
+49 | f"{repr(lambda: 1)}"
    |
    = help: Replace with conversion flag
 
-RUF010.py:50:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:49:4: RUF010 [*] Use explicit conversion flag
    |
-48 | f"{repr(1)=}"
-49 |
-50 | f"{repr(lambda: 1)}"
+47 | f"{repr(1)=}"
+48 |
+49 | f"{repr(lambda: 1)}"
    |    ^^^^^^^^^^^^^^^ RUF010
-51 |
-52 | f"{repr(x := 2)}"
+50 |
+51 | f"{repr(x := 2)}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-47 47 | 
-48 48 | f"{repr(1)=}"
-49 49 | 
-50    |-f"{repr(lambda: 1)}"
-   50 |+f"{(lambda: 1)!r}"
-51 51 | 
-52 52 | f"{repr(x := 2)}"
-53 53 | 
+46 46 | 
+47 47 | f"{repr(1)=}"
+48 48 | 
+49    |-f"{repr(lambda: 1)}"
+   49 |+f"{(lambda: 1)!r}"
+50 50 | 
+51 51 | f"{repr(x := 2)}"
+52 52 | 
 
-RUF010.py:52:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:51:4: RUF010 [*] Use explicit conversion flag
    |
-50 | f"{repr(lambda: 1)}"
-51 |
-52 | f"{repr(x := 2)}"
+49 | f"{repr(lambda: 1)}"
+50 |
+51 | f"{repr(x := 2)}"
    |    ^^^^^^^^^^^^ RUF010
-53 |
-54 | f"{str(object=3)}"
+52 |
+53 | f"{str(object=3)}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-49 49 | 
-50 50 | f"{repr(lambda: 1)}"
-51 51 | 
-52    |-f"{repr(x := 2)}"
-   52 |+f"{(x := 2)!r}"
-53 53 | 
-54 54 | f"{str(object=3)}"
-55 55 | 
+48 48 | 
+49 49 | f"{repr(lambda: 1)}"
+50 50 | 
+51    |-f"{repr(x := 2)}"
+   51 |+f"{(x := 2)!r}"
+52 52 | 
+53 53 | f"{str(object=3)}"
+54 54 | 
 
-RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:53:4: RUF010 [*] Use explicit conversion flag
    |
-52 | f"{repr(x := 2)}"
-53 |
-54 | f"{str(object=3)}"
+51 | f"{repr(x := 2)}"
+52 |
+53 | f"{str(object=3)}"
    |    ^^^^^^^^^^^^^ RUF010
-55 |
-56 | f"{str(x for x in [])}"
+54 |
+55 | f"{str(x for x in [])}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-51 51 | 
-52 52 | f"{repr(x := 2)}"
-53 53 | 
-54    |-f"{str(object=3)}"
-   54 |+f"{3!s}"
-55 55 | 
-56 56 | f"{str(x for x in [])}"
-57 57 | 
+50 50 | 
+51 51 | f"{repr(x := 2)}"
+52 52 | 
+53    |-f"{str(object=3)}"
+   53 |+f"{3!s}"
+54 54 | 
+55 55 | f"{str(x for x in [])}"
+56 56 | 
 
-RUF010.py:56:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:55:4: RUF010 [*] Use explicit conversion flag
    |
-54 | f"{str(object=3)}"
-55 |
-56 | f"{str(x for x in [])}"
+53 | f"{str(object=3)}"
+54 |
+55 | f"{str(x for x in [])}"
    |    ^^^^^^^^^^^^^^^^^^ RUF010
-57 |
-58 | f"{str((x for x in []))}"
+56 |
+57 | f"{str((x for x in []))}"
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-53 53 | 
-54 54 | f"{str(object=3)}"
-55 55 | 
-56    |-f"{str(x for x in [])}"
-   56 |+f"{(x for x in [])!s}"
-57 57 | 
-58 58 | f"{str((x for x in []))}"
+52 52 | 
+53 53 | f"{str(object=3)}"
+54 54 | 
+55    |-f"{str(x for x in [])}"
+   55 |+f"{(x for x in [])!s}"
+56 56 | 
+57 57 | f"{str((x for x in []))}"
+58 58 | 
 
-RUF010.py:58:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:57:4: RUF010 [*] Use explicit conversion flag
    |
-56 | f"{str(x for x in [])}"
-57 |
-58 | f"{str((x for x in []))}"
+55 | f"{str(x for x in [])}"
+56 |
+57 | f"{str((x for x in []))}"
    |    ^^^^^^^^^^^^^^^^^^^^ RUF010
+58 |
+59 | # test f-strings with comments
    |
    = help: Replace with conversion flag
 
 ℹ Safe fix
-55 55 | 
-56 56 | f"{str(x for x in [])}"
-57 57 | 
-58    |-f"{str((x for x in []))}"
-   58 |+f"{(x for x in [])!s}"
+54 54 | 
+55 55 | f"{str(x for x in [])}"
+56 56 | 
+57    |-f"{str((x for x in []))}"
+   57 |+f"{(x for x in [])!s}"
+58 58 | 
+59 59 | # test f-strings with comments
+60 60 | 
+
+RUF010.py:71:4: RUF010 [*] Use explicit conversion flag
+   |
+69 |   ])}"
+70 |
+71 |   f"{repr({
+   |  ____^
+72 | |     'a': 1,  # comment 1
+73 | |     'b': 2,  # comment 2
+74 | | })}"
+   | |__^ RUF010
+75 |
+76 |   f"{ascii((
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+68 68 |     2  # second item
+69 69 | ])}"
+70 70 | 
+71    |-f"{repr({
+   71 |+f"{ {
+72 72 |     'a': 1,  # comment 1
+73 73 |     'b': 2,  # comment 2
+74    |-})}"
+   74 |+}!r}"
+75 75 | 
+76 76 | f"{ascii((
+77 77 |     [1, 2, 3][  # accessing list
+
+RUF010.py:82:4: RUF010 [*] Use explicit conversion flag
+   |
+80 |   ))}"
+81 |
+82 |   f"{str(
+   |  ____^
+83 | |     some_function(
+84 | |         arg1,  # first argument
+85 | |         arg2  # second argument
+86 | |     ) + other_value  # addition
+87 | | )}"
+   | |_^ RUF010
+88 |
+89 |   ## UNSAFE CASES
+   |
+   = help: Replace with conversion flag
+
+ℹ Safe fix
+79 79 |     ]
+80 80 | ))}"
+81 81 | 
+82    |-f"{str(
+83    |-    some_function(
+   82 |+f"{some_function(
+84 83 |         arg1,  # first argument
+85 84 |         arg2  # second argument
+86    |-    ) + other_value  # addition
+87    |-)}"
+   85 |+    ) + other_value!s}"
+88 86 | 
+89 87 | ## UNSAFE CASES
+90 88 | f"{ascii  # this comment will be lost
+
+RUF010.py:93:4: RUF010 [*] Use explicit conversion flag
+   |
+91 |   (1)}"
+92 |
+93 |   f"{str  # comment here
+   |  ____^
+94 | | (my_var)}"
+   | |________^ RUF010
+95 |
+96 |   f"{repr
+   |
+   = help: Replace with conversion flag
+
+ℹ Unsafe fix
+90 90 | f"{ascii  # this comment will be lost
+91 91 | (1)}"
+92 92 | 
+93    |-f"{str  # comment here
+94    |-(my_var)}"
+   93 |+f"{my_var!s}"
+95 94 | 
+96 95 | f"{repr
+97 96 | # this comment is lost
+
+RUF010.py:96:4: RUF010 [*] Use explicit conversion flag
+   |
+94 |   (my_var)}"
+95 |
+96 |   f"{repr
+   |  ____^
+97 | | # this comment is lost
+98 | | (value)}"
+   | |_______^ RUF010
+   |
+   = help: Replace with conversion flag
+
+ℹ Unsafe fix
+93 93 | f"{str  # comment here
+94 94 | (my_var)}"
+95 95 | 
+96    |-f"{repr
+97    |-# this comment is lost
+98    |-(value)}"
+   96 |+f"{value!r}"
