@@ -7,19 +7,30 @@ python-version = "3.13"
 
 ## Defining a generic class
 
-At its simplest, to define a generic class using PEP 695 syntax, you add a list of typevars after
-the class name.
+At its simplest, to define a generic class using PEP 695 syntax, you add a list of `TypeVar`s,
+`ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
 from ty_extensions import generic_context
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
+class SingleParamSpec[**P]: ...
+class TypeVarAndParamSpec[T, **P]: ...
+class SingleTypeVarTuple[*Ts]: ...
+class TypeVarAndTypeVarTuple[T, *Ts]: ...
 
 # revealed: tuple[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly
+# (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
+reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
 ```
 
 You cannot use the same typevar more than once.
