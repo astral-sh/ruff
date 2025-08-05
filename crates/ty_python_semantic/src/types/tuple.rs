@@ -1180,7 +1180,7 @@ impl<'db> Tuple<Type<'db>> {
         false
     }
 
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
