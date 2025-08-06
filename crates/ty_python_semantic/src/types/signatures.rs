@@ -510,7 +510,8 @@ impl<'db> Signature<'db> {
 
         let specialization = builder.build(self_gc);
         let signature = self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
-        return Cow::Owned(signature);
+
+        Cow::Owned(signature)
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as
@@ -601,7 +602,7 @@ impl<'db> Signature<'db> {
         relation: TypeRelation,
     ) -> bool {
         let mut signature_check_mode = SignatureCheckMode::Relation {
-            relation: relation,
+            relation,
             result: false,
         };
         self.compare_with(db, other, &mut signature_check_mode);
@@ -1723,11 +1724,11 @@ impl<'db> SignatureCheckMode<'_, 'db> {
     {
         match self {
             Self::Relation { relation, result } => {
-                if !check_func(type1, type2, *relation) {
+                if check_func(type1, type2, *relation) {
+                    false
+                } else {
                     *result = false;
                     true
-                } else {
-                    false
                 }
             }
             Self::InferSpecialization {
