@@ -127,10 +127,9 @@ impl ProjectDatabase {
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let salsa_db = self as &dyn salsa::Database;
-
-        let mut ingredients = salsa_db.structs_info();
-        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let mut ingredients = memory_usage.structs;
+        let mut memos = memory_usage.queries.into_iter().collect::<Vec<_>>();
 
         ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
         memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
@@ -140,12 +139,14 @@ impl ProjectDatabase {
         for ingredient in &ingredients {
             total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
+            total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
         }
 
         let mut total_memo_fields = 0;
         let mut total_memo_metadata = 0;
         for (_, memo) in &memos {
             total_memo_fields += memo.size_of_fields();
+            total_memo_fields += memo.heap_size_of_fields().unwrap_or(0);
             total_memo_metadata += memo.size_of_metadata();
         }
 
