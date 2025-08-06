@@ -58,7 +58,7 @@ pub fn run(
     for test in suite.tests() {
         if filter
             .as_ref()
-            .is_some_and(|f| !test.uncontracted_name().contains(f))
+            .is_some_and(|f| !(test.uncontracted_name().contains(f) || test.name() == *f))
         {
             continue;
         }
