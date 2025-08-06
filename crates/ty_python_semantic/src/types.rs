@@ -710,7 +710,7 @@ impl<'db> Type<'db> {
                         None,
                         TypeVarKind::Pep695,
                     ),
-                    Inferrable::Inferrable,
+                    Inferrable::NotInferrable,
                 ),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
@@ -6813,6 +6813,10 @@ pub enum TypeVarKind {
 /// Outside of that generic class or function, the typevar is _inferrable_. Assignability checks
 /// only have to hold for _some_ specialization, and we infer the constraints under which the check
 /// holds.
+///
+/// Given the above, typevars typically start off not inferrable, when they're defined in Python
+/// code or created synthentically by our type inference logic. They are marked as inferrable when
+/// they are used in the generic context of a class or function.
 ///
 /// (In [[POPL2015][]] and related papers, inferrable typevars are sometimes called _polymorphic_,
 /// and non-inferrable ones _monomorphic_.)
