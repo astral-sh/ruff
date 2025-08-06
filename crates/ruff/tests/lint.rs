@@ -5004,7 +5004,7 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
         &ruff_toml,
         r#"
 [lint.flake8-import-conventions.aliases]
-"test.module" = "＿＿ｄｅｂｕｇ＿＿"
+"test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
 "#,
     )?;
 
@@ -5015,21 +5015,15 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
             .args(STDIN_BASE_OPTIONS)
             .arg("--config")
             .arg(&ruff_toml)
-    , @r#"
+    , @r"
         success: false
         exit_code: 2
         ----- stdout -----
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to load configuration `[TMP]/ruff.toml`
-          Cause: Failed to parse [TMP]/ruff.toml
-          Cause: TOML parse error at line 3, column 17
-          |
-        3 | "test.module" = "＿＿ｄｅｂｕｇ＿＿"
-          |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        invalid value: string "＿＿ｄｅｂｕｇ＿＿", expected a Python identifier
-        "#);});
+          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+        ");});
     Ok(())
 }
 
