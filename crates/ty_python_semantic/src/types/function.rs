@@ -76,9 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, KnownClass,
-    Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, UnionBuilder,
-    all_members, walk_type_mapping,
+    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
+    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -798,6 +798,15 @@ impl<'db> FunctionType<'db> {
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signature(db), false)
+    }
+
+    /// Convert the `FunctionType` into a [`BoundMethodType`].
+    pub(crate) fn into_bound_method_type(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+    ) -> BoundMethodType<'db> {
+        BoundMethodType::new(db, self, self_instance)
     }
 
     pub(crate) fn has_relation_to(
