@@ -1026,10 +1026,7 @@ impl<'db> ClassType<'db> {
                 None
             };
 
-        match (
-            dunder_new_function.and_then(|ty| ty.into_callable(db)),
-            synthesized_dunder_init_callable.and_then(|ty| ty.into_callable(db)),
-        ) {
+        match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
                 UnionType::from_elements(
                     db,
