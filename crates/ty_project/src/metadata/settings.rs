@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
+use ty_combine::Combine;
 use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
-use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
+use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
 ///

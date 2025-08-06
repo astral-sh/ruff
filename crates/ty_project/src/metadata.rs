@@ -4,9 +4,9 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
+use ty_combine::Combine;
 use ty_python_semantic::ProgramSettings;
 
-use crate::combine::Combine;
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;

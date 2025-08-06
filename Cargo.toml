@@ -40,6 +40,7 @@ ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
+ty_combine = { path = "crates/ty_combine" }
 ty_ide = { path = "crates/ty_ide" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }

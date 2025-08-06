@@ -107,8 +107,10 @@ impl ProjectDatabase {
 
     /// Set the check mode for the project.
     pub fn set_check_mode(&mut self, mode: CheckMode) {
-        tracing::debug!("Updating project to check {mode}");
-        self.project().set_check_mode(self).to(mode);
+        if self.project().check_mode(self) != mode {
+            tracing::debug!("Updating project to check {mode}");
+            self.project().set_check_mode(self).to(mode);
+        }
     }
 
     /// Returns a mutable reference to the system.
