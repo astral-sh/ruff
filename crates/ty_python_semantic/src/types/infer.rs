@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -9026,7 +9026,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    let typevar = bind_typevar(
+                        self.db(),
+                        self.module(),
+                        self.index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        *typevar,
+                    )
+                    .unwrap_or(*typevar);
+                    Ok(typevar)
+                }
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(NominalInstanceType { class, .. })
                     if matches!(
