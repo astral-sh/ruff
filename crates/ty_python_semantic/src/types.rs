@@ -19,7 +19,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder, UnionStrategy};
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -605,7 +605,7 @@ pub enum Type<'db> {
     TypeIs(TypeIsType<'db>),
     /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
-    /// An inhabitant of an aliased type (lazily not-unpacked).
+    /// An aliased type (lazily not-yet-unpacked to its value type).
     TypeAlias(TypeAliasType<'db>),
 }
 
@@ -5764,10 +5764,10 @@ impl<'db> Type<'db> {
             )),
 
             Type::NominalInstance(instance) =>
-                instance.apply_type_mapping(db, type_mapping),
+                instance.apply_type_mapping_impl(db, type_mapping, visitor),
 
             Type::ProtocolInstance(instance) => {
-                Type::ProtocolInstance(instance.apply_type_mapping(db, type_mapping))
+                Type::ProtocolInstance(instance.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
@@ -5799,15 +5799,15 @@ impl<'db> Type<'db> {
             }
 
             Type::GenericAlias(generic) => {
-                Type::GenericAlias(generic.apply_type_mapping(db, type_mapping))
+                Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::TypedDict(typed_dict) => {
-                Type::TypedDict(typed_dict.apply_type_mapping(db, type_mapping))
+                Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::SubclassOf(subclass_of) => Type::SubclassOf(
-                subclass_of.apply_type_mapping(db, type_mapping),
+                subclass_of.apply_type_mapping_impl(db, type_mapping, visitor),
             ),
 
             Type::PropertyInstance(property) => {
@@ -8675,16 +8675,29 @@ impl get_size2::GetSize for UnionType<'_> {}
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Self::from_elements_impl(db, elements, UnionStrategy::EliminateSubtypes)
+    }
+
+    pub(crate) fn from_elements_impl<I, T>(
+        db: &'db dyn Db,
+        elements: I,
+        strategy: UnionStrategy,
+    ) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
         elements
             .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
+            .fold(
+                UnionBuilder::new(db).strategy(strategy),
+                |builder, element| builder.add(element.into()),
+            )
             .build()
     }
 
@@ -9165,13 +9178,16 @@ impl<'db> TypedDictType<'db> {
         class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         Self {
-            defining_class: self.defining_class.apply_type_mapping(db, type_mapping),
+            defining_class: self
+                .defining_class
+                .apply_type_mapping_impl(db, type_mapping, visitor),
         }
     }
 }

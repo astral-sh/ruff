@@ -340,17 +340,18 @@ impl<'db> NominalInstanceType<'db> {
         SubclassOfType::from(db, self.class(db))
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.apply_type_mapping(db, type_mapping))
+                Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(class.apply_type_mapping(db, type_mapping))
+                Type::non_tuple_instance(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -552,17 +553,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
-                Self::from_class(class.apply_type_mapping(db, type_mapping))
+                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.apply_type_mapping(db, type_mapping))
+                Self::synthesized(synthesized.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -646,10 +648,11 @@ mod synthesized_protocol {
             Self(self.0.materialize(db, variance))
         }
 
-        pub(super) fn apply_type_mapping<'a>(
+        pub(super) fn apply_type_mapping_impl<'a>(
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
+            _visitor: &mut TypeTransformer<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }

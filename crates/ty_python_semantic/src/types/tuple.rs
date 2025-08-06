@@ -24,6 +24,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
 use crate::types::Truthiness;
+use crate::types::builder::UnionStrategy;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
     BoundTypeVarInstance, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance,
@@ -231,7 +232,8 @@ impl<'db> TupleType<'db> {
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                generic_context.specialize_tuple(db, self)
+                let element_type = self.tuple(db).homogeneous_element_type(db);
+                generic_context.specialize_tuple(db, element_type, self)
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
             }
@@ -988,7 +990,15 @@ impl<T> Tuple<T> {
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(db, self.all_elements())
+        self.homogeneous_element_type_impl(db, UnionStrategy::EliminateSubtypes)
+    }
+
+    pub(crate) fn homogeneous_element_type_impl(
+        &self,
+        db: &'db dyn Db,
+        union_strategy: UnionStrategy,
+    ) -> Type<'db> {
+        UnionType::from_elements_impl(db, self.all_elements(), union_strategy)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.

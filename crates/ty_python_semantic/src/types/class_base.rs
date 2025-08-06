@@ -249,9 +249,16 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
-            Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
+            Self::Class(class) => {
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
     }
@@ -262,7 +269,11 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
+            self.apply_type_mapping_impl(
+                db,
+                &TypeMapping::Specialization(specialization),
+                &mut TypeTransformer::default(),
+            )
         } else {
             self
         }

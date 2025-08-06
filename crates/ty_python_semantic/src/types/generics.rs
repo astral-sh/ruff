@@ -304,9 +304,9 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn specialize_tuple(
         self,
         db: &'db dyn Db,
+        element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = tuple.tuple(db).homogeneous_element_type(db);
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 

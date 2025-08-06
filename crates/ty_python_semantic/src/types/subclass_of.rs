@@ -112,14 +112,19 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
-                subclass_of: SubclassOfInner::Class(class.apply_type_mapping(db, type_mapping)),
+                subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    visitor,
+                )),
             },
             SubclassOfInner::Dynamic(_) => self,
         }

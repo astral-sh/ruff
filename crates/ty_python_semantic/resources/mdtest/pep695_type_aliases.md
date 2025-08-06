@@ -20,7 +20,7 @@ x: IntOrStr = 1
 reveal_type(x)  # revealed: Literal[1]
 
 def f() -> None:
-    reveal_type(x)  # revealed: IntOrStr
+    reveal_type(x)  # revealed: int | str
 ```
 
 ## `__value__` attribute
@@ -49,7 +49,7 @@ type IntOrStrOrBytes = IntOrStr | bytes
 x: IntOrStrOrBytes = 1
 
 def f() -> None:
-    reveal_type(x)  # revealed: IntOrStrOrBytes
+    reveal_type(x)  # revealed: int | str | bytes
 ```
 
 ## Aliased type aliases
@@ -69,6 +69,18 @@ y: MyIntOrStr = None
 ```py
 type ListOrSet[T] = list[T] | set[T]
 reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+```
+
+## In unions and intersections
+
+We can "break apart" a type alias by e.g. adding it to a union:
+
+```py
+type IntOrStr = int | str
+
+def f(x: IntOrStr, y: str | bytes):
+    z = x or y
+    reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
 ## `TypeAliasType` properties
@@ -109,7 +121,7 @@ reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 def f(x: IntOrStr) -> None:
-    reveal_type(x)  # revealed: IntOrStr
+    reveal_type(x)  # revealed: int | str
 ```
 
 ### Generic example
@@ -147,7 +159,7 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
 
 def f(x: OptNestedInt) -> None:
-    reveal_type(x)  # revealed: OptNestedInt
+    reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
         reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
 ```
@@ -158,7 +170,7 @@ def f(x: OptNestedInt) -> None:
 type IntOr = int | IntOr
 
 def f(x: IntOr):
-    reveal_type(x)  # revealed: IntOr
+    reveal_type(x)  # revealed: int
     if not isinstance(x, int):
         reveal_type(x)  # revealed: Never
 ```
