@@ -47,7 +47,10 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             .range
             .to_text_range(&source, &index, snapshot.encoding());
 
-        let inlay_hints = inlay_hints(db, file, range);
+        let inlay_hints = inlay_hints(db, file, range, snapshot.workspace_settings().inlay_hints());
+        if inlay_hints.is_empty() {
+            return Ok(None);
+        }
 
         let inlay_hints = inlay_hints
             .into_iter()

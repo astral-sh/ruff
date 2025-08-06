@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use ty_combine::Combine;
+use ty_ide::InlayHintSettings;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -107,6 +108,15 @@ impl ClientOptions {
     }
 
     #[must_use]
+    pub fn with_variable_types_inlay_hints(mut self, variable_types: bool) -> Self {
+        self.workspace
+            .inlay_hints
+            .get_or_insert_default()
+            .variable_types = Some(variable_types);
+        self
+    }
+
+    #[must_use]
     pub fn with_unknown(mut self, unknown: HashMap<String, Value>) -> Self {
         self.unknown = unknown;
         self
@@ -140,6 +150,9 @@ impl GlobalOptions {
 pub(crate) struct WorkspaceOptions {
     /// Whether to disable language services like code completions, hover, etc.
     disable_language_services: Option<bool>,
+
+    /// Options to configure inlay hints.
+    inlay_hints: Option<InlayHintOptions>,
 
     /// Information about the currently active Python environment in the VS Code Python extension.
     ///
@@ -194,7 +207,25 @@ impl WorkspaceOptions {
 
         WorkspaceSettings {
             disable_language_services: self.disable_language_services.unwrap_or_default(),
+            inlay_hints: self
+                .inlay_hints
+                .map(InlayHintOptions::into_settings)
+                .unwrap_or_default(),
             overrides,
+        }
+    }
+}
+
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct InlayHintOptions {
+    variable_types: Option<bool>,
+}
+
+impl InlayHintOptions {
+    fn into_settings(self) -> InlayHintSettings {
+        InlayHintSettings {
+            variable_types: self.variable_types.unwrap_or_default(),
         }
     }
 }
