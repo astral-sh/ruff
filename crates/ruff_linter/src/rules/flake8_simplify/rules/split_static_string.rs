@@ -1,10 +1,9 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::StringFlags;
 use ruff_python_ast::{
-    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
-    StringLiteralValue, UnaryOp,
+    Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringFlags, StringLiteral,
+    StringLiteralFlags, StringLiteralValue, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -132,22 +131,27 @@ fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
     // 'single'quoted
     // """.split() # -> [r"itemA",r"'single'quoted'"]
     // ```
-    if !flags.prefix().is_raw() || !elt.contains(flags.quote_style().as_char()) {
-        flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
+
+    if !flags.prefix().is_raw() {
+        return flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
     }
-    // If we have a raw string containing a quotation mark of the same style,
-    // then we have to swap the style of quotation marks used
-    else if !elt.contains(flags.quote_style().opposite().as_char()) {
-        flags
+
+    if elt.contains('\n') || elt.contains('\r') {
+        return StringLiteralFlags::empty()
+            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
+    }
+
+    if elt.contains(flags.quote_style().as_char()) {
+        if elt.contains(flags.quote_style().opposite().as_char()) {
+            return StringLiteralFlags::empty()
+                .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
+        }
+        return flags
             .with_quote_style(flags.quote_style().opposite())
-            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
-    } else
-    // If both types of quotes are used in the raw, triple-quoted string, then
-    // we are forced to either add escapes or keep the triple quotes. We opt for
-    // the latter.
-    {
-        flags
+            .with_triple_quotes(ruff_python_ast::str::TripleQuotes::No);
     }
+
+    flags.with_triple_quotes(ruff_python_ast::str::TripleQuotes::No)
 }
 
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
