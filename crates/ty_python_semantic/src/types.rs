@@ -1872,11 +1872,17 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeAlias(alias), _) => {
-                alias.value_type(db).is_disjoint_from_impl(db, other, visitor)
+                let self_alias_ty = alias.value_type(db);
+                visitor.visit((self_alias_ty, other), |v| {
+                    self_alias_ty.is_disjoint_from_impl(db, other, v)
+                })
             }
 
             (_, Type::TypeAlias(alias)) => {
-                self.is_disjoint_from_impl(db, alias.value_type(db), visitor)
+                let other_alias_ty = alias.value_type(db);
+                visitor.visit((self, other_alias_ty), |v| {
+                    self.is_disjoint_from_impl(db, other_alias_ty, v)
+                })
             }
 
             // A typevar is never disjoint from itself, since all occurrences of the typevar must
@@ -8538,7 +8544,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=value_type_cycle_recover, cycle_initial=value_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -8550,6 +8556,19 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &TypeTransformer<'db>) -> Self {
         self
     }
+}
+
+fn value_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: PEP695TypeAliasType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn value_type_cycle_initial<'db>(_db: &'db dyn Db, _self: PEP695TypeAliasType<'db>) -> Type<'db> {
+    Type::Never
 }
 
 /// # Ordering

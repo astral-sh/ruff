@@ -187,4 +187,12 @@ def f(x: A):
         y = x[0]
         if y is not None:
             reveal_type(y)  # revealed: tuple[A]
+
+def g(x: A | B):
+    reveal_type(x)  # revealed: tuple[B] | None
+
+from ty_extensions import Intersection
+
+def h(x: Intersection[A, B]):
+    reveal_type(x)  # revealed: tuple[B] | None
 ```

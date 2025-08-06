@@ -285,8 +285,18 @@ impl<'db> TupleType<'db> {
         other: Self,
         relation: TypeRelation,
     ) -> bool {
+        self.has_relation_to_impl(db, other, relation, &mut PairVisitor::new(true))
+    }
+
+    pub(crate) fn has_relation_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         self.tuple(db)
-            .has_relation_to(db, other.tuple(db), relation)
+            .has_relation_to_impl(db, other.tuple(db), relation, visitor)
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -410,18 +420,19 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
                 self.0.len() == other.0.len()
-                    && (self.0.iter())
-                        .zip(&other.0)
-                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                    && (self.0.iter()).zip(&other.0).all(|(self_ty, other_ty)| {
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+                    })
             }
 
             Tuple::Variable(other) => {
@@ -432,7 +443,9 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !visitor.visit((*self_ty, *other_ty), |v| {
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, v)
+                    }) {
                         return false;
                     }
                 }
@@ -440,14 +453,20 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next_back() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !visitor.visit((*self_ty, *other_ty), |v| {
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, v)
+                    }) {
                         return false;
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                self_iter.all(|self_ty| {
+                    visitor.visit((*self_ty, other.variable), |v| {
+                        self_ty.has_relation_to_impl(db, other.variable, relation, v)
+                    })
+                })
             }
         }
     }
@@ -733,11 +752,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -764,7 +784,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
+                    if !visitor.visit((self_ty, other_ty), |v| {
+                        self_ty.has_relation_to_impl(db, other_ty, relation, v)
+                    }) {
                         return false;
                     }
                 }
@@ -773,7 +795,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next_back() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
+                    if !visitor.visit((*self_ty, other_ty), |v| {
+                        self_ty.has_relation_to_impl(db, other_ty, relation, v)
+                    }) {
                         return false;
                     }
                 }
@@ -802,12 +826,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         other.prenormalized_prefix_elements(db, other_prenormalize_variable),
                     )
                     .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
+                        EitherOrBoth::Both(self_ty, other_ty) => visitor
+                            .visit((self_ty, other_ty), |v| {
+                                self_ty.has_relation_to_impl(db, other_ty, relation, v)
+                            }),
+                        EitherOrBoth::Left(self_ty) => visitor
+                            .visit((self_ty, other.variable), |v| {
+                                self_ty.has_relation_to_impl(db, other.variable, relation, v)
+                            }),
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
@@ -827,12 +853,14 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 if !(self_suffix.iter().rev())
                     .zip_longest(other_suffix.iter().rev())
                     .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
-                        }
-                        EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
-                        }
+                        EitherOrBoth::Both(self_ty, other_ty) => visitor
+                            .visit((*self_ty, *other_ty), |v| {
+                                self_ty.has_relation_to_impl(db, *other_ty, relation, v)
+                            }),
+                        EitherOrBoth::Left(self_ty) => visitor
+                            .visit((*self_ty, other.variable), |v| {
+                                self_ty.has_relation_to_impl(db, other.variable, relation, v)
+                            }),
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
@@ -844,7 +872,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                visitor.visit((self.variable, other.variable), |v| {
+                    self.variable
+                        .has_relation_to_impl(db, other.variable, relation, v)
+                })
             }
         }
     }
@@ -1060,10 +1091,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
+    ) -> bool {
         match self {
-            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
-            Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),
+            Tuple::Fixed(self_tuple) => {
+                self_tuple.has_relation_to_impl(db, other, relation, visitor)
+            }
+            Tuple::Variable(self_tuple) => {
+                self_tuple.has_relation_to_impl(db, other, relation, visitor)
+            }
         }
     }
 
