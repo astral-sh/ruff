@@ -2,7 +2,7 @@ use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
 use crate::types::{
-    ClassType, DynamicType, Inferrable, KnownClass, MemberLookupPolicy, Type, TypeMapping,
+    ClassType, DynamicType, Inferable, KnownClass, MemberLookupPolicy, Type, TypeMapping,
     TypeRelation, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
@@ -102,7 +102,7 @@ impl<'db> SubclassOfType<'db> {
                             None,
                             TypeVarKind::Pep695,
                         ),
-                        Inferrable::NotInferrable,
+                        Inferable::NotInferable,
                     )
                 }
                 TypeVarVariance::Bivariant => unreachable!(),

@@ -11,7 +11,7 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, Inferrable, IntersectionBuilder, KnownClass, SubclassOfInner,
+    ClassLiteral, ClassType, Inferable, IntersectionBuilder, KnownClass, SubclassOfInner,
     SubclassOfType, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
     infer_expression_types,
 };
@@ -223,7 +223,7 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(type_var, Inferrable::NotInferrable) => match type_var
+            Type::TypeVar(type_var, Inferable::NotInferable) => match type_var
                 .bound_or_constraints(db)?
             {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
@@ -258,7 +258,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
-            | Type::TypeVar(_, Inferrable::Inferrable)
+            | Type::TypeVar(_, Inferable::Inferable)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,

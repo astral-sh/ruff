@@ -117,7 +117,7 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    Inferrable, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    Inferable, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
     ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
@@ -6450,9 +6450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If the legacy typevar is still unbound after that search, and we are in a
                 // context that binds unbound legacy typevars (i.e., the signature of a generic
                 // function), bind it with that context.
-                Type::TypeVar(typevar, Inferrable::NotInferrable)
-                    if typevar.is_legacy(self.db()) =>
-                {
+                Type::TypeVar(typevar, Inferable::NotInferable) if typevar.is_legacy(self.db()) => {
                     bind_legacy_typevar(
                         self.db(),
                         self.context.module(),
@@ -6461,7 +6459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.legacy_typevar_binding_context,
                         typevar,
                     )
-                    .map(|typevar| Type::TypeVar(typevar, Inferrable::NotInferrable))
+                    .map(|typevar| Type::TypeVar(typevar, Inferable::NotInferable))
                     .unwrap_or(ty)
                 }
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar))

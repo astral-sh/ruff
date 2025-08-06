@@ -348,11 +348,11 @@ impl<'db> Signature<'db> {
             // TODO: Raise a diagnostic!
         }
 
-        // Mark any of the typevars bound by this function as inferrable.
+        // Mark any of the typevars bound by this function as inferable.
         parameters =
-            parameters.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferrable(definition));
+            parameters.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferable(definition));
         return_ty = return_ty
-            .map(|ty| ty.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferrable(definition)));
+            .map(|ty| ty.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferable(definition)));
 
         Self {
             generic_context: generic_context.or(legacy_generic_context),
