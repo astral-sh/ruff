@@ -61,3 +61,13 @@ ISC.py:74:10: ISC002 Implicitly concatenated string literals over multiple lines
 76 |
 77 |   # Explicitly concatenated nested f-strings
    |
+
+ISC.py:204:5: ISC002 Implicitly concatenated string literals over multiple lines
+    |
+202 |   _ = [
+203 |       "start " +
+204 | /     " middle "
+205 | |     " end"
+    | |__________^ ISC002
+206 |   ]
+    |

@@ -198,3 +198,14 @@ _ = "Line1\n" + (
         + " middle "
         + " end"
 ) + "\nLine5"
+
+_ = [
+    "start " +
+    " middle "
+    " end"
+]
+
+_ = {
+    "start " +
+    " middle "
+}

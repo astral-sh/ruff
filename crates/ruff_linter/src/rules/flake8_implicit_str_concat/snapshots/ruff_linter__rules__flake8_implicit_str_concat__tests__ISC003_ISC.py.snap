@@ -394,3 +394,44 @@ ISC.py:197:9: ISC003 [*] Explicitly concatenated string should be implicitly con
     198 |+         " middle "
 199 199 |         + " end"
 200 200 | ) + "\nLine5"
+201 201 | 
+
+ISC.py:203:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+202 |   _ = [
+203 | /     "start " +
+204 | |     " middle "
+205 | |     " end"
+    | |__________^ ISC003
+206 |   ]
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+200 200 | ) + "\nLine5"
+201 201 | 
+202 202 | _ = [
+203     |-    "start " +
+    203 |+    "start "
+204 204 |     " middle "
+205 205 |     " end"
+206 206 | ]
+
+ISC.py:209:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+208 |   _ = {
+209 | /     "start " +
+210 | |     " middle "
+    | |______________^ ISC003
+211 |   }
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+206 206 | ]
+207 207 | 
+208 208 | _ = {
+209     |-    "start " +
+    209 |+    "start "
+210 210 |     " middle "
+211 211 | }
