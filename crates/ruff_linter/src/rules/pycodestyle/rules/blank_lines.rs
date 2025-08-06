@@ -836,7 +836,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            // Only apply to functions that are "immediately within" a class (not nested within other functions/blocks)
+            // Only apply to functions that are "immediately within" a class (not nested within other functions/blocks).
+            // This change aligns with flake8's behavior and avoids false positives for functions nested within
+            // conditional blocks, loops, or other control structures within classes. E301 is primarily concerned
+            // with the spacing between direct class methods, not deeply nested implementation details.
             && if let Status::Inside(class_indent) = state.class_status {
                 line.indent_length == class_indent + self.context.settings().tab_size.as_usize()
             } else {
