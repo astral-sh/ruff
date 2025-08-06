@@ -91,11 +91,12 @@ F504 [*] `%`-format string has unused named argument(s): test1, test2
    |
 13 |   # https://github.com/astral-sh/ruff/issues/4899
 14 | / "" % {
-15 | |   'test1': '',  'test2': '',
-16 | | }
+15 | |   'test1': '',
+16 | |   'test2': '',
+17 | | }
    | |_^
-17 |
-18 |   # https://github.com/astral-sh/ruff/issues/18806
+18 |
+19 |   # https://github.com/astral-sh/ruff/issues/18806
    |
 help: Remove extra named arguments: test1, test2
 
