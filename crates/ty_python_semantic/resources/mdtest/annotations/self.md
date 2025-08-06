@@ -99,6 +99,9 @@ reveal_type(Shape.bar())  # revealed: Unknown
 python-version = "3.11"
 ```
 
+TODO: The use of `Self` to annotate the `next_node` attribute should be
+[modeled as a property][self attribute], using `Self` in its parameter and return type.
+
 ```py
 from typing import Self
 
@@ -108,6 +111,8 @@ class LinkedList:
 
     def next(self: Self) -> Self:
         reveal_type(self.value)  # revealed: int
+        # TODO: no error
+        # error: [invalid-return-type]
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
@@ -205,3 +210,5 @@ class MyMetaclass(type):
     def __new__(cls) -> Self:
         return super().__new__(cls)
 ```
+
+[self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
