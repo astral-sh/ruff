@@ -19,7 +19,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder, UnionStrategy};
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -609,7 +609,7 @@ pub enum Type<'db> {
     TypeIs(TypeIsType<'db>),
     /// A type that represents an inhabitant of a `TypedDict`.
     TypedDict(TypedDictType<'db>),
-    /// An inhabitant of an aliased type (lazily not-unpacked).
+    /// An aliased type (lazily not-yet-unpacked to its value type).
     TypeAlias(TypeAliasType<'db>),
 }
 
@@ -1610,18 +1610,18 @@ impl<'db> Type<'db> {
                 self_tuple.has_relation_to(db, target_tuple, relation)
             }
 
-            (Type::Tuple(self_tuple), Type::NominalInstance(target_instance)) => {
-                self_tuple.to_class_type(db).is_some_and(|self_class| {
+            (Type::Tuple(self_tuple), Type::NominalInstance(target_instance)) => self_tuple
+                .to_class_type_unsimplified(db)
+                .is_some_and(|self_class| {
                     self_class.has_relation_to(db, target_instance.class, relation)
-                })
-            }
-            (Type::NominalInstance(self_instance), Type::Tuple(target_tuple)) => {
-                target_tuple.to_class_type(db).is_some_and(|target_class| {
+                }),
+            (Type::NominalInstance(self_instance), Type::Tuple(target_tuple)) => target_tuple
+                .to_class_type_unsimplified(db)
+                .is_some_and(|target_class| {
                     self_instance
                         .class
                         .has_relation_to(db, target_class, relation)
-                })
-            }
+                }),
             (Type::Tuple(_), _) => false,
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
@@ -8663,16 +8663,29 @@ impl get_size2::GetSize for UnionType<'_> {}
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Self::from_elements_impl(db, elements, UnionStrategy::EliminateSubtypes)
+    }
+
+    pub(crate) fn from_elements_impl<I, T>(
+        db: &'db dyn Db,
+        elements: I,
+        strategy: UnionStrategy,
+    ) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
         elements
             .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
+            .fold(
+                UnionBuilder::new(db).strategy(strategy),
+                |builder, element| builder.add(element.into()),
+            )
             .build()
     }
 

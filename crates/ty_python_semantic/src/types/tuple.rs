@@ -22,6 +22,7 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::types::builder::UnionStrategy;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
@@ -226,15 +227,31 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        self.to_class_type_impl(db, UnionStrategy::EliminateSubtypes)
+    }
+
+    pub(crate) fn to_class_type_unsimplified(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        self.to_class_type_impl(db, UnionStrategy::EliminateEquivalentTypes)
+    }
+
+    fn to_class_type_impl(
+        self,
+        db: &'db dyn Db,
+        union_strategy: UnionStrategy,
+    ) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)
             .and_then(|class_literal| match class_literal.generic_context(db) {
                 None => Some(ClassType::NonGeneric(class_literal)),
                 Some(generic_context) if generic_context.variables(db).len() != 1 => None,
-                Some(generic_context) => Some(
-                    class_literal
-                        .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
-                ),
+                Some(generic_context) => {
+                    let element_type = self
+                        .tuple(db)
+                        .homogeneous_element_type_impl(db, union_strategy);
+                    Some(class_literal.apply_specialization(db, |_| {
+                        generic_context.specialize_tuple(db, element_type, self)
+                    }))
+                }
             })
     }
 
@@ -1078,7 +1095,15 @@ impl<T> Tuple<T> {
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(db, self.all_elements())
+        self.homogeneous_element_type_impl(db, UnionStrategy::EliminateSubtypes)
+    }
+
+    pub(crate) fn homogeneous_element_type_impl(
+        &self,
+        db: &'db dyn Db,
+        union_strategy: UnionStrategy,
+    ) -> Type<'db> {
+        UnionType::from_elements_impl(db, self.all_elements(), union_strategy)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
