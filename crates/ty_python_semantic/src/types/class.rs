@@ -914,7 +914,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -932,9 +932,7 @@ impl<'db> ClassType<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return Some(Type::Callable(
-                metaclass_dunder_call_function.into_callable_type(db),
-            ));
+            return Type::Callable(metaclass_dunder_call_function.into_callable_type(db));
         }
 
         let dunder_new_function_symbol = self_ty
@@ -974,7 +972,7 @@ impl<'db> ClassType<'db> {
             ));
 
             if returns_non_subclass {
-                return Some(dunder_new_bound_method);
+                return dunder_new_bound_method;
             }
 
             Some(dunder_new_bound_method)
@@ -1034,12 +1032,12 @@ impl<'db> ClassType<'db> {
             synthesized_dunder_init_callable.and_then(|ty| ty.into_callable(db)),
         ) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                Some(UnionType::from_elements(
+                UnionType::from_elements(
                     db,
                     vec![dunder_new_function, synthesized_dunder_init_callable],
-                ))
+                )
             }
-            (Some(constructor), None) | (None, Some(constructor)) => Some(constructor),
+            (Some(constructor), None) | (None, Some(constructor)) => constructor,
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
@@ -1052,15 +1050,13 @@ impl<'db> ClassType<'db> {
                     .place;
 
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                    new_function
-                        .into_bound_method_type(db, self_ty)
-                        .into_callable(db)
+                    Type::Callable(new_function.into_callable_type(db))
                 } else {
                     // Fallback if no `object.__new__` is found.
-                    Some(CallableType::single(
+                    CallableType::single(
                         db,
                         Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    ))
+                    )
                 }
             }
         }
