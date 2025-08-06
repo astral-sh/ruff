@@ -104,9 +104,12 @@ fn is_inside_brackets(checker: &Checker, expr_range: TextRange) -> bool {
         let after_expr = &stmt_source[expr_end_in_stmt.to_usize()..];
 
         // Check for parentheses or curly braces
-        let has_opening_bracket =
-            before_expr.rfind('(').is_some() || before_expr.rfind('{').is_some() || before_expr.rfind('[').is_some();
-        let has_closing_bracket = after_expr.find(')').is_some() || after_expr.find('}').is_some() || after_expr.find(']').is_some();
+        let has_opening_bracket = before_expr.rfind('(').is_some()
+            || before_expr.rfind('{').is_some()
+            || before_expr.rfind('[').is_some();
+        let has_closing_bracket = after_expr.find(')').is_some()
+            || after_expr.find('}').is_some()
+            || after_expr.find(']').is_some();
 
         has_opening_bracket && has_closing_bracket
     } else {
