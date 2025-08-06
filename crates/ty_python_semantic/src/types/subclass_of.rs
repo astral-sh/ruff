@@ -3,8 +3,8 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance,
+    BoundTypeVarInstance, ClassType, DynamicType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -90,10 +90,9 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::TypeVar(TypeVarInstance::new(
+                    Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
                         db,
                         Name::new_static("T_all"),
-                        None,
                         None,
                         Some(TypeVarBoundOrConstraints::UpperBound(
                             KnownClass::Type.to_instance(db),
@@ -101,7 +100,7 @@ impl<'db> SubclassOfType<'db> {
                         variance,
                         None,
                         TypeVarKind::Pep695,
-                    ))
+                    )))
                 }
                 TypeVarVariance::Bivariant => unreachable!(),
             },
@@ -126,7 +125,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {

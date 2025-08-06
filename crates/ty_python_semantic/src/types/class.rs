@@ -2,8 +2,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeQualifiers,
+    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers,
     class_base::ClassBase,
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
@@ -251,7 +251,7 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
@@ -398,7 +398,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
@@ -4389,15 +4389,11 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                // A freshly created legacy TypeVar does not have a binding context until it is
-                // used in a base class list, function parameter list, or type alias.
-                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
-                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,

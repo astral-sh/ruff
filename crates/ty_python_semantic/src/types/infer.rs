@@ -3483,7 +3483,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             &name.id,
             Some(definition),
-            None,
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,

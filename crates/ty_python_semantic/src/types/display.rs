@@ -7,17 +7,17 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType,
     WrapperDescriptorKind,
 };
-use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
@@ -208,12 +208,12 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => {
+            Type::TypeVar(BoundTypeVarInstance {
+                typevar,
+                binding_context,
+            }) => {
                 f.write_str(typevar.name(self.db))?;
-                if let Some(binding_context) = typevar
-                    .binding_context(self.db)
-                    .and_then(|def| def.name(self.db))
-                {
+                if let Some(binding_context) = binding_context.name(self.db) {
                     write!(f, "@{binding_context}")?;
                 }
                 Ok(())
@@ -452,7 +452,7 @@ impl Display for DisplayGenericContext<'_> {
 
         let non_implicit_variables: Vec<_> = variables
             .iter()
-            .filter(|var| !var.is_implicit(self.db))
+            .filter(|BoundTypeVarInstance { typevar, .. }| !typevar.is_implicit(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {
@@ -460,12 +460,12 @@ impl Display for DisplayGenericContext<'_> {
         }
 
         f.write_char('[')?;
-        for (idx, var) in non_implicit_variables.iter().enumerate() {
+        for (idx, bound_typevar) in non_implicit_variables.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            f.write_str(var.name(self.db))?;
-            match var.bound_or_constraints(self.db) {
+            f.write_str(bound_typevar.typevar.name(self.db))?;
+            match bound_typevar.typevar.bound_or_constraints(self.db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     write!(f, ": {}", bound.display(self.db))?;
                 }
@@ -481,7 +481,7 @@ impl Display for DisplayGenericContext<'_> {
                 }
                 None => {}
             }
-            if let Some(default_type) = var.default_ty(self.db) {
+            if let Some(default_type) = bound_typevar.default_ty(self.db) {
                 write!(f, " = {}", default_type.display(self.db))?;
             }
         }
@@ -497,7 +497,6 @@ impl<'db> Specialization<'db> {
         tuple_specialization: TupleSpecialization,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
             tuple_specialization,
@@ -506,7 +505,6 @@ impl<'db> Specialization<'db> {
 }
 
 pub struct DisplaySpecialization<'db> {
-    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
@@ -515,7 +513,7 @@ pub struct DisplaySpecialization<'db> {
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
-        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+        for (idx, ty) in self.types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }

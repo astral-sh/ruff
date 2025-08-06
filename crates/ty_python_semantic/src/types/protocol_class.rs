@@ -12,8 +12,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{definition::Definition, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, KnownFunction,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        TypeTransformer,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
     },
@@ -211,7 +212,7 @@ impl<'db> ProtocolInterface<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for data in self.inner(db).values() {
             data.find_legacy_typevars(db, binding_context, typevars);
@@ -273,7 +274,7 @@ impl<'db> ProtocolMemberData<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         self.kind
             .find_legacy_typevars(db, binding_context, typevars);
@@ -362,7 +363,7 @@ impl<'db> ProtocolMemberKind<'db> {
         &self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
             ProtocolMemberKind::Method(callable) => {

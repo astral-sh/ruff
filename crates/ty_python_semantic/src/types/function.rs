@@ -76,9 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
-    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
+    BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
+    DeprecatedInstance, DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation,
+    TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -862,7 +862,7 @@ impl<'db> FunctionType<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         let signatures = self.signature(db);
         for signature in &signatures.overloads {

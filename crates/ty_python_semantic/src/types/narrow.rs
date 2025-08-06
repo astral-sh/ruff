@@ -222,7 +222,7 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+            Type::TypeVar(bound_typevar) => match bound_typevar.typevar.bound_or_constraints(db)? {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
                 TypeVarBoundOrConstraints::Constraints(constraints) => {
                     self.generate_constraint(db, Type::Union(constraints))

@@ -2857,7 +2857,7 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let typevar = error.typevar();
+                let bound_typevar = error.bound_typevar();
                 let argument_type = error.argument_type();
                 let argument_ty_display = argument_type.display(context.db());
 
@@ -2875,10 +2875,10 @@ impl<'db> BindingError<'db> {
                         SpecializationError::MismatchedBound {..} => "upper bound",
                         SpecializationError::MismatchedConstraint {..} => "constraints",
                     },
-                    typevar.name(context.db()),
+                    bound_typevar.typevar.name(context.db()),
                 ));
 
-                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                if let Some(typevar_definition) = bound_typevar.typevar.definition(context.db()) {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
                         .load(context.db());
                     let typevar_range = typevar_definition.full_range(context.db(), &module);

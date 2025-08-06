@@ -39,7 +39,7 @@
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
+    BoundTypeVarInstance, BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -973,7 +973,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let Type::TypeVar(typevar) = ty else {
+            let Type::TypeVar(BoundTypeVarInstance { typevar, .. }) = ty else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
