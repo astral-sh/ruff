@@ -7,19 +7,30 @@ python-version = "3.13"
 
 ## Defining a generic class
 
-At its simplest, to define a generic class using PEP 695 syntax, you add a list of typevars after
-the class name.
+At its simplest, to define a generic class using PEP 695 syntax, you add a list of `TypeVar`s,
+`ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
 from ty_extensions import generic_context
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
+class SingleParamSpec[**P]: ...
+class TypeVarAndParamSpec[T, **P]: ...
+class SingleTypeVarTuple[*Ts]: ...
+class TypeVarAndTypeVarTuple[T, *Ts]: ...
 
 # revealed: tuple[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly
+# (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
+reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
 ```
 
 You cannot use the same typevar more than once.
@@ -306,6 +317,42 @@ class D[V](C[V, int]):
     def __init__(self, x: V) -> None: ...
 
 reveal_type(D(1))  # revealed: D[int]
+```
+
+### Generic class inherits `__init__` from generic base class
+
+```py
+class C[T, U]:
+    def __init__(self, t: T, u: U) -> None: ...
+
+class D[T, U](C[T, U]):
+    pass
+
+reveal_type(C(1, "str"))  # revealed: C[int, str]
+reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+### Generic class inherits `__init__` from `dict`
+
+This is a specific example of the above, since it was reported specifically by a user.
+
+```py
+class D[T, U](dict[T, U]):
+    pass
+
+reveal_type(D(key=1))  # revealed: D[str, int]
+```
+
+### Generic class inherits `__new__` from `tuple`
+
+(Technically, we synthesize a `__new__` method that is more precise than the one defined in typeshed
+for `tuple`, so we use a different mechanism to make sure it has the right inherited generic
+context. But from the user's point of view, this is another example of the above.)
+
+```py
+class C[T, U](tuple[T, U]): ...
+
+reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
 
 ### `__init__` is itself generic

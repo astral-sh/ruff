@@ -257,7 +257,8 @@ impl ClassInfoConstraintFunction {
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_) => None,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => None,
         }
     }
 }
@@ -411,6 +412,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }

@@ -196,6 +196,12 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
         }
     }
+
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.subclass_of
+            .into_class()
+            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+    }
 }
 
 /// An enumeration of the different kinds of `type[]` types that a [`SubclassOfType`] can represent:

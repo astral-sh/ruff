@@ -124,16 +124,19 @@ impl Display for DisplayRepresentation<'_> {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
 
-                // TODO: use the specialization from the method. Similar to the comment above
-                // about the function specialization,
-
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
+                        let type_parameters = DisplayOptionalGenericContext {
+                            generic_context: signature.generic_context.as_ref(),
+                            db: self.db,
+                        };
+
                         write!(
                             f,
-                            "bound method {instance}.{method}{signature}",
+                            "bound method {instance}.{method}{type_parameters}{signature}",
                             method = function.name(self.db),
                             instance = bound_method.self_instance(self.db).display(self.db),
+                            type_parameters = type_parameters,
                             signature = signature.bind_self().display(self.db)
                         )
                     }
@@ -234,6 +237,9 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::TypedDict(typed_dict) => {
+                f.write_str(typed_dict.defining_class(self.db).name(self.db))
+            }
         }
     }
 }
@@ -315,10 +321,16 @@ pub(crate) struct DisplayOverloadLiteral<'db> {
 impl Display for DisplayOverloadLiteral<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let signature = self.literal.signature(self.db, None);
+        let type_parameters = DisplayOptionalGenericContext {
+            generic_context: signature.generic_context.as_ref(),
+            db: self.db,
+        };
+
         write!(
             f,
-            "def {name}{signature}",
+            "def {name}{type_parameters}{signature}",
             name = self.literal.name(self.db),
+            type_parameters = type_parameters,
             signature = signature.display(self.db)
         )
     }
@@ -339,15 +351,18 @@ impl Display for DisplayFunctionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let signature = self.ty.signature(self.db);
 
-        // TODO: We should consider adding the type parameters to the signature of a generic
-        // function, i.e. `def foo[T](x: T) -> T`.
-
         match signature.overloads.as_slice() {
             [signature] => {
+                let type_parameters = DisplayOptionalGenericContext {
+                    generic_context: signature.generic_context.as_ref(),
+                    db: self.db,
+                };
+
                 write!(
                     f,
-                    "def {name}{signature}",
+                    "def {name}{type_parameters}{signature}",
                     name = self.ty.name(self.db),
+                    type_parameters = type_parameters,
                     signature = signature.display(self.db)
                 )
             }
@@ -401,21 +416,51 @@ impl Display for DisplayGenericAlias<'_> {
 impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         DisplayGenericContext {
-            typevars: self.variables(db),
+            generic_context: self,
             db,
         }
     }
 }
 
+struct DisplayOptionalGenericContext<'db> {
+    generic_context: Option<&'db GenericContext<'db>>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayOptionalGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(generic_context) = self.generic_context {
+            DisplayGenericContext {
+                generic_context,
+                db: self.db,
+            }
+            .fmt(f)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 pub struct DisplayGenericContext<'db> {
-    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
+    generic_context: &'db GenericContext<'db>,
     db: &'db dyn Db,
 }
 
 impl Display for DisplayGenericContext<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let variables = self.generic_context.variables(self.db);
+
+        let non_implicit_variables: Vec<_> = variables
+            .iter()
+            .filter(|var| !var.is_implicit(self.db))
+            .collect();
+
+        if non_implicit_variables.is_empty() {
+            return Ok(());
+        }
+
         f.write_char('[')?;
-        for (idx, var) in self.typevars.iter().enumerate() {
+        for (idx, var) in non_implicit_variables.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }

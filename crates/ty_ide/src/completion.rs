@@ -1233,28 +1233,28 @@ quux.<CURSOR>
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
         __annotations__ :: dict[str, Any]
-        __class__ :: type
-        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __class__ :: type[Quux]
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
         __dict__ :: dict[str, Any]
-        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
         __doc__ :: str | None
-        __eq__ :: bound method object.__eq__(value: object, /) -> bool
-        __format__ :: bound method object.__format__(format_spec: str, /) -> str
-        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method object.__getstate__() -> object
-        __hash__ :: bound method object.__hash__() -> int
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
-        __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self@object
-        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method object.__repr__() -> str
-        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method object.__sizeof__() -> int
-        __str__ :: bound method object.__str__() -> str
-        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: bound method Quux.__new__() -> Self@object
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method Quux.__repr__() -> str
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
 
@@ -1278,28 +1278,28 @@ quux.b<CURSOR>
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
         __annotations__ :: dict[str, Any]
-        __class__ :: type
-        __delattr__ :: bound method object.__delattr__(name: str, /) -> None
+        __class__ :: type[Quux]
+        __delattr__ :: bound method Quux.__delattr__(name: str, /) -> None
         __dict__ :: dict[str, Any]
-        __dir__ :: bound method object.__dir__() -> Iterable[str]
+        __dir__ :: bound method Quux.__dir__() -> Iterable[str]
         __doc__ :: str | None
-        __eq__ :: bound method object.__eq__(value: object, /) -> bool
-        __format__ :: bound method object.__format__(format_spec: str, /) -> str
-        __getattribute__ :: bound method object.__getattribute__(name: str, /) -> Any
-        __getstate__ :: bound method object.__getstate__() -> object
-        __hash__ :: bound method object.__hash__() -> int
+        __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
+        __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
+        __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
+        __getstate__ :: bound method Quux.__getstate__() -> object
+        __hash__ :: bound method Quux.__hash__() -> int
         __init__ :: bound method Quux.__init__() -> Unknown
-        __init_subclass__ :: bound method object.__init_subclass__() -> None
+        __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
-        __ne__ :: bound method object.__ne__(value: object, /) -> bool
-        __new__ :: bound method object.__new__() -> Self@object
-        __reduce__ :: bound method object.__reduce__() -> str | tuple[Any, ...]
-        __reduce_ex__ :: bound method object.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
-        __repr__ :: bound method object.__repr__() -> str
-        __setattr__ :: bound method object.__setattr__(name: str, value: Any, /) -> None
-        __sizeof__ :: bound method object.__sizeof__() -> int
-        __str__ :: bound method object.__str__() -> str
-        __subclasshook__ :: bound method type.__subclasshook__(subclass: type, /) -> bool
+        __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
+        __new__ :: bound method Quux.__new__() -> Self@object
+        __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
+        __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
+        __repr__ :: bound method Quux.__repr__() -> str
+        __setattr__ :: bound method Quux.__setattr__(name: str, value: Any, /) -> None
+        __sizeof__ :: bound method Quux.__sizeof__() -> int
+        __str__ :: bound method Quux.__str__() -> str
+        __subclasshook__ :: bound method type[Quux].__subclasshook__(subclass: type, /) -> bool
         ");
     }
 
@@ -1358,7 +1358,7 @@ C.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'C'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'C'>.__subclasses__() -> list[Self]
+        __subclasses__ :: bound method <class 'C'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'C'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1426,7 +1426,7 @@ Meta.<CURSOR>
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: def __subclasscheck__(self, subclass: type, /) -> bool
-                __subclasses__ :: def __subclasses__(self: Self) -> list[Self]
+                __subclasses__ :: def __subclasses__[Self](self: Self) -> list[Self]
                 __subclasshook__ :: bound method <class 'Meta'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1534,7 +1534,7 @@ Quux.<CURSOR>
         __sizeof__ :: def __sizeof__(self) -> int
         __str__ :: def __str__(self) -> str
         __subclasscheck__ :: bound method <class 'Quux'>.__subclasscheck__(subclass: type, /) -> bool
-        __subclasses__ :: bound method <class 'Quux'>.__subclasses__() -> list[Self]
+        __subclasses__ :: bound method <class 'Quux'>.__subclasses__[Self]() -> list[Self]
         __subclasshook__ :: bound method <class 'Quux'>.__subclasshook__(subclass: type, /) -> bool
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -1585,14 +1585,14 @@ Answer.<CURSOR>
                 __flags__ :: int
                 __format__ :: def __format__(self, format_spec: str) -> str
                 __getattribute__ :: def __getattribute__(self, name: str, /) -> Any
-                __getitem__ :: bound method <class 'Answer'>.__getitem__(name: str) -> _EnumMemberT@__getitem__
+                __getitem__ :: bound method <class 'Answer'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT@__getitem__
                 __getstate__ :: def __getstate__(self) -> object
                 __hash__ :: def __hash__(self) -> int
                 __init__ :: def __init__(self) -> None
                 __init_subclass__ :: def __init_subclass__(cls) -> None
                 __instancecheck__ :: bound method <class 'Answer'>.__instancecheck__(instance: Any, /) -> bool
                 __itemsize__ :: int
-                __iter__ :: bound method <class 'Answer'>.__iter__() -> Iterator[_EnumMemberT@__iter__]
+                __iter__ :: bound method <class 'Answer'>.__iter__[_EnumMemberT]() -> Iterator[_EnumMemberT@__iter__]
                 __len__ :: bound method <class 'Answer'>.__len__() -> int
                 __members__ :: MappingProxyType[str, Unknown]
                 __module__ :: str
@@ -1606,14 +1606,14 @@ Answer.<CURSOR>
                 __qualname__ :: str
                 __reduce__ :: def __reduce__(self) -> str | tuple[Any, ...]
                 __repr__ :: def __repr__(self) -> str
-                __reversed__ :: bound method <class 'Answer'>.__reversed__() -> Iterator[_EnumMemberT@__reversed__]
+                __reversed__ :: bound method <class 'Answer'>.__reversed__[_EnumMemberT]() -> Iterator[_EnumMemberT@__reversed__]
                 __ror__ :: bound method <class 'Answer'>.__ror__(value: Any, /) -> UnionType
                 __setattr__ :: def __setattr__(self, name: str, value: Any, /) -> None
                 __signature__ :: bound method <class 'Answer'>.__signature__() -> str
                 __sizeof__ :: def __sizeof__(self) -> int
                 __str__ :: def __str__(self) -> str
                 __subclasscheck__ :: bound method <class 'Answer'>.__subclasscheck__(subclass: type, /) -> bool
-                __subclasses__ :: bound method <class 'Answer'>.__subclasses__() -> list[Self]
+                __subclasses__ :: bound method <class 'Answer'>.__subclasses__[Self]() -> list[Self]
                 __subclasshook__ :: bound method <class 'Answer'>.__subclasshook__(subclass: type, /) -> bool
                 __text_signature__ :: str | None
                 __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]

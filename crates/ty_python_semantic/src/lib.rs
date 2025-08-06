@@ -46,6 +46,7 @@ mod util;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 
+type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;

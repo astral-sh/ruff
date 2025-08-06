@@ -366,6 +366,14 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::object(db), Some(Type::Never))
     }
 
+    pub(crate) fn with_inherited_generic_context(
+        mut self,
+        inherited_generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        self.inherited_generic_context = inherited_generic_context;
+        self
+    }
+
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
             generic_context: self.generic_context,

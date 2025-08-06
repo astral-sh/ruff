@@ -135,7 +135,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                     .none(stylesheet.none);
 
                 for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag);
+                    let resolved = Resolved::new(self.resolver, diag, self.config);
                     let renderable = resolved.to_renderable(self.config.context);
                     for diag in renderable.diagnostics.iter() {
                         writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
@@ -191,9 +191,13 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(
+        resolver: &'a dyn FileResolver,
+        diag: &'a Diagnostic,
+        config: &DisplayDiagnosticConfig,
+    ) -> Resolved<'a> {
         let mut diagnostics = vec![];
-        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
+        diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
         for sub in &diag.inner.subs {
             diagnostics.push(ResolvedDiagnostic::from_sub_diagnostic(resolver, sub));
         }
@@ -223,12 +227,14 @@ struct ResolvedDiagnostic<'a> {
     id: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
+    is_fixable: bool,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
         resolver: &'a dyn FileResolver,
+        config: &DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -238,16 +244,38 @@ impl<'a> ResolvedDiagnostic<'a> {
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &diagnostic_source, ann)
+                ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
             .collect();
-        let id = Some(diag.inner.id.to_string());
-        let message = diag.inner.message.as_str().to_string();
+
+        let id = if config.hide_severity {
+            // Either the rule code alone (e.g. `F401`), or the lint id with a colon (e.g.
+            // `invalid-syntax:`). When Ruff gets real severities, we should put the colon back in
+            // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
+            // the formatting of syntax errors for now. This should also be kept consistent with the
+            // concise formatting.
+            Some(diag.secondary_code().map_or_else(
+                || format!("{id}:", id = diag.inner.id),
+                |code| code.to_string(),
+            ))
+        } else {
+            Some(diag.inner.id.to_string())
+        };
+
+        let level = if config.hide_severity {
+            AnnotateLevel::None
+        } else {
+            diag.inner.severity.to_annotate()
+        };
+
         ResolvedDiagnostic {
-            level: diag.inner.severity.to_annotate(),
+            level,
             id,
-            message,
+            message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: diag
+                .fix()
+                .is_some_and(|fix| fix.applies(config.fix_applicability)),
         }
     }
 
@@ -263,7 +291,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &diagnostic_source, ann)
+                ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
             .collect();
         ResolvedDiagnostic {
@@ -271,6 +299,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
+            is_fixable: false,
         }
     }
 
@@ -301,20 +330,49 @@ impl<'a> ResolvedDiagnostic<'a> {
                     &prev.diagnostic_source.as_source_code(),
                     context,
                     prev.line_end,
+                    prev.notebook_index.as_ref(),
                 )
                 .get();
                 let this_context_begins = context_before(
                     &ann.diagnostic_source.as_source_code(),
                     context,
                     ann.line_start,
+                    ann.notebook_index.as_ref(),
                 )
                 .get();
+
+                // For notebooks, check whether the end of the
+                // previous annotation and the start of the current
+                // annotation are in different cells.
+                let prev_cell_index = prev.notebook_index.as_ref().map(|notebook_index| {
+                    let prev_end = prev
+                        .diagnostic_source
+                        .as_source_code()
+                        .line_column(prev.range.end());
+                    notebook_index.cell(prev_end.line).unwrap_or_default().get()
+                });
+                let this_cell_index = ann.notebook_index.as_ref().map(|notebook_index| {
+                    let this_start = ann
+                        .diagnostic_source
+                        .as_source_code()
+                        .line_column(ann.range.start());
+                    notebook_index
+                        .cell(this_start.line)
+                        .unwrap_or_default()
+                        .get()
+                });
+                let in_different_cells = prev_cell_index != this_cell_index;
+
                 // The boundary case here is when `prev_context_ends`
                 // is exactly one less than `this_context_begins`. In
                 // that case, the context windows are adjacent and we
                 // should fall through below to add this annotation to
                 // the existing snippet.
-                if this_context_begins.saturating_sub(prev_context_ends) > 1 {
+                //
+                // For notebooks, also check that the context windows
+                // are in the same cell. Windows from different cells
+                // should never be considered adjacent.
+                if in_different_cells || this_context_begins.saturating_sub(prev_context_ends) > 1 {
                     snippet_by_path
                         .entry(path)
                         .or_default()
@@ -338,6 +396,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             id: self.id.as_deref(),
             message: &self.message,
             snippets_by_input,
+            is_fixable: self.is_fixable,
         }
     }
 }
@@ -357,6 +416,8 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
+    is_file_level: bool,
+    notebook_index: Option<NotebookIndex>,
 }
 
 impl<'a> ResolvedAnnotation<'a> {
@@ -369,6 +430,7 @@ impl<'a> ResolvedAnnotation<'a> {
         path: &'a str,
         diagnostic_source: &DiagnosticSource,
         ann: &'a Annotation,
+        resolver: &'a dyn FileResolver,
     ) -> Option<ResolvedAnnotation<'a>> {
         let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
@@ -402,6 +464,8 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
+            notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
 }
@@ -436,6 +500,10 @@ struct RenderableDiagnostic<'r> {
     /// should be from the same file, and none of the snippets inside of a
     /// collection should overlap with one another or be directly adjacent.
     snippets_by_input: Vec<RenderableSnippets<'r>>,
+    /// Whether or not the diagnostic is fixable.
+    ///
+    /// This is rendered as a `[*]` indicator after the diagnostic ID.
+    is_fixable: bool,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -448,7 +516,7 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message);
+        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
         if let Some(id) = self.id {
             message = message.id(id);
         }
@@ -530,16 +598,26 @@ struct RenderableSnippet<'r> {
     /// Whether this snippet contains at least one primary
     /// annotation.
     has_primary: bool,
+    /// The cell index in a Jupyter notebook, if this snippet refers to a notebook.
+    ///
+    /// This is used for rendering annotations with offsets like `cell 1:2:3` instead of simple row
+    /// and column numbers.
+    cell_index: Option<usize>,
 }
 
 impl<'r> RenderableSnippet<'r> {
     /// Creates a new snippet with one or more annotations that is ready to be
-    /// renderer.
+    /// rendered.
     ///
     /// The first line of the snippet is the smallest line number on which one
     /// of the annotations begins, minus the context window size. The last line
     /// is the largest line number on which one of the annotations ends, plus
     /// the context window size.
+    ///
+    /// For Jupyter notebooks, the context window may also be truncated at cell
+    /// boundaries. If multiple annotations are present, and they point to
+    /// different cells, these will have already been split into separate
+    /// snippets by `ResolvedDiagnostic::to_renderable`.
     ///
     /// Callers should guarantee that the `input` on every `ResolvedAnnotation`
     /// given is identical.
@@ -557,19 +635,19 @@ impl<'r> RenderableSnippet<'r> {
             "creating a renderable snippet requires a non-zero number of annotations",
         );
         let diagnostic_source = &anns[0].diagnostic_source;
+        let notebook_index = anns[0].notebook_index.as_ref();
         let source = diagnostic_source.as_source_code();
         let has_primary = anns.iter().any(|ann| ann.is_primary);
 
-        let line_start = context_before(
-            &source,
-            context,
-            anns.iter().map(|ann| ann.line_start).min().unwrap(),
-        );
-        let line_end = context_after(
-            &source,
-            context,
-            anns.iter().map(|ann| ann.line_end).max().unwrap(),
-        );
+        let content_start_index = anns.iter().map(|ann| ann.line_start).min().unwrap();
+        let line_start = context_before(&source, context, content_start_index, notebook_index);
+
+        let start = source.line_column(anns[0].range.start());
+        let cell_index = notebook_index
+            .map(|notebook_index| notebook_index.cell(start.line).unwrap_or_default().get());
+
+        let content_end_index = anns.iter().map(|ann| ann.line_end).max().unwrap();
+        let line_end = context_after(&source, context, content_end_index, notebook_index);
 
         let snippet_start = source.line_start(line_start);
         let snippet_end = source.line_end(line_end);
@@ -587,11 +665,18 @@ impl<'r> RenderableSnippet<'r> {
             annotations,
         } = replace_unprintable(snippet, annotations).fix_up_empty_spans_after_line_terminator();
 
+        let line_start = notebook_index.map_or(line_start, |notebook_index| {
+            notebook_index
+                .cell_row(line_start)
+                .unwrap_or(OneIndexed::MIN)
+        });
+
         RenderableSnippet {
             snippet,
             line_start,
             annotations,
             has_primary,
+            cell_index,
         }
     }
 
@@ -605,6 +690,7 @@ impl<'r> RenderableSnippet<'r> {
                     .iter()
                     .map(RenderableAnnotation::to_annotate),
             )
+            .cell_index(self.cell_index)
     }
 }
 
@@ -619,6 +705,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
+    /// Whether this annotation applies to an entire file, rather than a snippet within it.
+    is_file_level: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -636,6 +724,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
+            is_file_level: ann.is_file_level,
         }
     }
 
@@ -661,7 +750,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann
+        ann.is_file_level(self.is_file_level)
     }
 }
 
@@ -788,7 +877,15 @@ pub struct Input {
 ///
 /// The line number returned is guaranteed to be less than
 /// or equal to `start`.
-fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> OneIndexed {
+///
+/// In Jupyter notebooks, lines outside the cell containing
+/// `start` will be omitted.
+fn context_before(
+    source: &SourceCode<'_, '_>,
+    len: usize,
+    start: OneIndexed,
+    notebook_index: Option<&NotebookIndex>,
+) -> OneIndexed {
     let mut line = start.saturating_sub(len);
     // Trim leading empty lines.
     while line < start {
@@ -797,6 +894,17 @@ fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) ->
         }
         line = line.saturating_add(1);
     }
+
+    if let Some(index) = notebook_index {
+        let content_start_cell = index.cell(start).unwrap_or(OneIndexed::MIN);
+        while line < start {
+            if index.cell(line).unwrap_or(OneIndexed::MIN) == content_start_cell {
+                break;
+            }
+            line = line.saturating_add(1);
+        }
+    }
+
     line
 }
 
@@ -806,7 +914,15 @@ fn context_before(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) ->
 /// The line number returned is guaranteed to be greater
 /// than or equal to `start` and no greater than the
 /// number of lines in `source`.
-fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> OneIndexed {
+///
+/// In Jupyter notebooks, lines outside the cell containing
+/// `start` will be omitted.
+fn context_after(
+    source: &SourceCode<'_, '_>,
+    len: usize,
+    start: OneIndexed,
+    notebook_index: Option<&NotebookIndex>,
+) -> OneIndexed {
     let max_lines = OneIndexed::from_zero_indexed(source.line_count());
     let mut line = start.saturating_add(len).min(max_lines);
     // Trim trailing empty lines.
@@ -816,6 +932,17 @@ fn context_after(source: &SourceCode<'_, '_>, len: usize, start: OneIndexed) -> 
         }
         line = line.saturating_sub(1);
     }
+
+    if let Some(index) = notebook_index {
+        let content_end_cell = index.cell(start).unwrap_or(OneIndexed::MIN);
+        while line > start {
+            if index.cell(line).unwrap_or(OneIndexed::MIN) == content_end_cell {
+                break;
+            }
+            line = line.saturating_sub(1);
+        }
+    }
+
     line
 }
 
@@ -2517,7 +2644,12 @@ watermelon
         /// of the corresponding line minus one. (The "minus one" is because
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
-        fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
+        pub(super) fn span(
+            &self,
+            path: &str,
+            line_offset_start: &str,
+            line_offset_end: &str,
+        ) -> Span {
             let span = self.path(path);
 
             let file = span.expect_ty_file();
@@ -2540,7 +2672,7 @@ watermelon
         }
 
         /// Like `span`, but only attaches a file path.
-        fn path(&self, path: &str) -> Span {
+        pub(super) fn path(&self, path: &str) -> Span {
             let file = system_path_to_file(&self.db, path).unwrap();
             Span::from(file)
         }
@@ -2654,7 +2786,7 @@ watermelon
         ///
         /// See the docs on `TestEnvironment::span` for the meaning of
         /// `path`, `line_offset_start` and `line_offset_end`.
-        fn secondary(
+        pub(super) fn secondary(
             mut self,
             path: &str,
             line_offset_start: &str,
@@ -2690,7 +2822,7 @@ watermelon
         }
 
         /// Adds a "help" sub-diagnostic with the given message.
-        fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+        pub(super) fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
             self.diag.help(message);
             self
         }
@@ -2850,10 +2982,10 @@ if call(foo
         env.format(format);
 
         let diagnostics = vec![
-            env.invalid_syntax("SyntaxError: Expected one or more symbol names after import")
+            env.invalid_syntax("Expected one or more symbol names after import")
                 .primary("syntax_errors.py", "1:14", "1:15", "")
                 .build(),
-            env.invalid_syntax("SyntaxError: Expected ')', found newline")
+            env.invalid_syntax("Expected ')', found newline")
                 .primary("syntax_errors.py", "3:11", "3:12", "")
                 .build(),
         ];
@@ -2861,7 +2993,8 @@ if call(foo
         (env, diagnostics)
     }
 
-    /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    /// A Jupyter notebook for testing diagnostics.
+    ///
     ///
     /// The concatenated cells look like this:
     ///
@@ -2881,17 +3014,7 @@ if call(foo
     /// The first diagnostic is on the unused `os` import with location cell 1, row 2, column 8
     /// (`cell 1:2:8`). The second diagnostic is the unused `math` import at `cell 2:2:8`, and the
     /// third diagnostic is an unfixable unused variable at `cell 3:4:5`.
-    #[allow(
-        dead_code,
-        reason = "This is currently only used for JSON but will be needed soon for other formats"
-    )]
-    pub(crate) fn create_notebook_diagnostics(
-        format: DiagnosticFormat,
-    ) -> (TestEnvironment, Vec<Diagnostic>) {
-        let mut env = TestEnvironment::new();
-        env.add(
-            "notebook.ipynb",
-            r##"
+    pub(super) static NOTEBOOK: &str = r##"
         {
  "cells": [
   {
@@ -2930,8 +3053,14 @@ if call(foo
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"##,
-        );
+"##;
+
+    /// Create Ruff-style diagnostics for testing the various output formats for a notebook.
+    pub(crate) fn create_notebook_diagnostics(
+        format: DiagnosticFormat,
+    ) -> (TestEnvironment, Vec<Diagnostic>) {
+        let mut env = TestEnvironment::new();
+        env.add("notebook.ipynb", NOTEBOOK);
         env.format(format);
 
         let diagnostics = vec![

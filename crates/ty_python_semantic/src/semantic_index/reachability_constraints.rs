@@ -340,6 +340,10 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::Or(predicates) => {
             UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
         }
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|p| pattern_kind_to_type(db, p))
+            .unwrap_or_else(|| Type::object(db)),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -761,6 +765,10 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
+                .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
         }
     }

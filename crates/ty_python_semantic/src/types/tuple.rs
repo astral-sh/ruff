@@ -22,8 +22,8 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
-use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -151,6 +151,25 @@ impl<'db> Type<'db> {
         };
         Self::Tuple(tuple)
     }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::tuple(TupleType::homogeneous(db, element))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::from_elements(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::Tuple(TupleType::empty(db))
+    }
 }
 
 #[salsa::tracked]
@@ -181,18 +200,16 @@ impl<'db> TupleType<'db> {
         Some(TupleType::new_internal(db, tuple_key))
     }
 
-    pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(TupleType::new(
-            db,
-            TupleSpec::from(FixedLengthTuple::empty()),
-        ))
+    pub(crate) fn empty(db: &'db dyn Db) -> Self {
+        TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty()))
+            .expect("TupleType::new() should always return `Some` for an empty `TupleSpec`")
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::from_elements(types)))
+    ) -> Option<Self> {
+        TupleType::new(db, TupleSpec::from_elements(types))
     }
 
     #[cfg(test)]
@@ -201,15 +218,12 @@ impl<'db> TupleType<'db> {
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
-        Type::tuple(TupleType::new(
-            db,
-            VariableLengthTuple::mixed(prefix, variable, suffix),
-        ))
+    ) -> Option<Self> {
+        TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix))
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::homogeneous(element)))
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Option<Self> {
+        TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
     #[salsa::tracked]
@@ -224,6 +238,11 @@ impl<'db> TupleType<'db> {
                         .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
                 ),
             })
+    }
+
+    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_type(db)
+            .map(|class| SubclassOfType::from(db, class))
     }
 
     /// Return a normalized version of `self`.

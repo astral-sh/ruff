@@ -26,11 +26,14 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: HoverParams,
     ) -> crate::server::Result<Option<lsp_types::Hover>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

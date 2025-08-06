@@ -22,11 +22,14 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         _params: SemanticTokensParams,
     ) -> crate::server::Result<Option<SemanticTokensResult>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

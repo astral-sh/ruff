@@ -38,6 +38,29 @@ c.d = 2
 c.e = 2
 ```
 
+## From stubs
+
+This is a regression test for a bug where we did not properly keep track of type qualifiers when
+accessed from stub files.
+
+`module.pyi`:
+
+```pyi
+from typing import ClassVar
+
+class C:
+    a: ClassVar[int]
+```
+
+`main.py`:
+
+```py
+from module import C
+
+c = C()
+c.a = 2  # error: [invalid-attribute-access]
+```
+
 ## Conflicting type qualifiers
 
 We currently ignore conflicting qualifiers and simply union them, which is more conservative than

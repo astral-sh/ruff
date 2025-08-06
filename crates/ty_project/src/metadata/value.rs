@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::combine::Combine;
 use crate::glob::{
     AbsolutePortableGlobPattern, PortableGlobError, PortableGlobKind, PortableGlobPattern,
 };
@@ -15,6 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use toml::Spanned;
+use ty_combine::Combine;
 
 #[derive(Clone, Debug)]
 pub enum ValueSource {
