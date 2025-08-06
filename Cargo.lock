@@ -4310,6 +4310,7 @@ dependencies = [
  "serde",
  "smallvec",
  "static_assertions",
+ "strsim",
  "strum",
  "strum_macros",
  "tempfile",

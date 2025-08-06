@@ -38,6 +38,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -61,7 +62,7 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signat
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -669,10 +670,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
-    pub(crate) const fn is_typed_dict(&self) -> bool {
-        matches!(self, Type::TypedDict(..))
-    }
-
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
@@ -832,6 +829,17 @@ impl<'db> Type<'db> {
     pub fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.into_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
+    }
+
+    pub(crate) const fn is_typed_dict(&self) -> bool {
+        matches!(self, Type::TypedDict(..))
+    }
+
+    pub(crate) fn into_typed_dict(self) -> Option<TypedDictType<'db>> {
+        match self {
+            Type::TypedDict(typed_dict) => Some(typed_dict),
+            _ => None,
+        }
     }
 
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
@@ -5289,15 +5297,15 @@ impl<'db> Type<'db> {
                         ],
                     ),
                     _ if class.is_typed_dict(db) => {
-                        Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
+                        TypedDictType::from(db, ClassType::NonGeneric(*class))
                     }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::TypedDict(
-                TypedDictType::new(db, ClassType::from(*alias)),
-            )),
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Ok(TypedDictType::from(db, ClassType::from(*alias)))
+            }
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -5644,6 +5652,7 @@ impl<'db> Type<'db> {
             return KnownClass::Dict
                 .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object(db)])
                 .map(Type::from)
+                // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
         }
 
@@ -9000,6 +9009,15 @@ pub struct TypedDictType<'db> {
 impl get_size2::GetSize for TypedDictType<'_> {}
 
 impl<'db> TypedDictType<'db> {
+    pub(crate) fn from(db: &'db dyn Db, defining_class: ClassType<'db>) -> Type<'db> {
+        Type::TypedDict(Self::new(db, defining_class))
+    }
+
+    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
+        let (class_literal, specialization) = self.defining_class(db).class_literal(db);
+        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    }
+
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,

@@ -25,12 +25,21 @@ alice: Person = {"name": "Alice", "age": 30}
 reveal_type(alice["name"])  # revealed: Unknown
 # TODO: this should be `int | None`
 reveal_type(alice["age"])  # revealed: Unknown
+
+# TODO: this should reveal `Unknown`, and it should emit an error
+reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
 Inhabitants can also be created through a constructor call:
 
 ```py
 bob = Person(name="Bob", age=25)
+
+reveal_type(bob["name"])  # revealed: str
+reveal_type(bob["age"])  # revealed: int | None
+
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
+reveal_type(bob["non_existing"])  # revealed: Unknown
 ```
 
 Methods that are available on `dict`s are also available on `TypedDict`s:
@@ -125,6 +134,39 @@ dangerous(alice)
 
 # TODO: this should be `str`
 reveal_type(alice["name"])  # revealed: Unknown
+```
+
+## Key-based access
+
+```py
+from typing import TypedDict, Final, Literal, Any
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+NAME_FINAL: Final = "name"
+AGE_FINAL: Final[Literal["age"]] = "age"
+
+def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age", "name"], str_key: str, unknown_key: Any) -> None:
+    reveal_type(person["name"])  # revealed: str
+    reveal_type(person["age"])  # revealed: int | None
+
+    reveal_type(person[NAME_FINAL])  # revealed: str
+    reveal_type(person[AGE_FINAL])  # revealed: int | None
+
+    reveal_type(person[literal_key])  # revealed: int | None
+
+    reveal_type(person[union_of_keys])  # revealed: int | None | str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
+    reveal_type(person["non_existing"])  # revealed: Unknown
+
+    # error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
+    reveal_type(person[str_key])  # revealed: Unknown
+
+    # No error here:
+    reveal_type(person[unknown_key])  # revealed: Unknown
 ```
 
 ## Methods on `TypedDict`
@@ -331,6 +373,31 @@ reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict
 
 # TODO: this should be an error
 msg.content
+```
+
+## Diagnostics
+
+<!-- snapshot-diagnostics -->
+
+Snapshot tests for diagnostic messages including suggestions:
+
+```py
+from typing import TypedDict, Final
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+def access_invalid_literal_string_key(person: Person):
+    person["naem"]  # error: [invalid-key]
+
+NAME_KEY: Final = "naem"
+
+def access_invalid_key(person: Person):
+    person[NAME_KEY]  # error: [invalid-key]
+
+def access_with_str_key(person: Person, str_key: str):
+    person[str_key]  # error: [invalid-key]
 ```
 
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

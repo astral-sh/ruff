@@ -9,7 +9,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
+use crate::types::{
+    DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypedDictType,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -24,10 +26,16 @@ impl<'db> Type<'db> {
             (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
                 Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
             }
-            _ if class.class_literal(db).0.is_protocol(db) => {
-                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+            _ => {
+                let class_literal = class.class_literal(db).0;
+                if class_literal.is_protocol(db) {
+                    Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+                } else if class_literal.is_typed_dict(db) {
+                    TypedDictType::from(db, class)
+                } else {
+                    Self::NominalInstance(NominalInstanceType::from_class(class))
+                }
             }
-            _ => Self::NominalInstance(NominalInstanceType::from_class(class)),
         }
     }
 
