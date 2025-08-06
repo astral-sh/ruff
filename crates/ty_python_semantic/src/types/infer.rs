@@ -10349,6 +10349,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Signature::new_generic(
                             GenericContext::from_function_params(
                                 db,
+                                self.scope(),
                                 &parameters,
                                 Some(return_type),
                             ),

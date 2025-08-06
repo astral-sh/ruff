@@ -5,7 +5,7 @@ use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
+use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
@@ -126,7 +126,7 @@ impl<'db> GenericContext<'db> {
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
-        definition: Definition<'db>,
+        containing_scope: ScopeId,
         parameters: &Parameters<'db>,
         return_type: Option<Type<'db>>,
     ) -> Option<Self> {
@@ -145,11 +145,11 @@ impl<'db> GenericContext<'db> {
         }
 
         // Then remove any that were bound in enclosing scopes.
-        let file = definition.file(db);
+        let file = containing_scope.file(db);
         let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
-        let containing_scope = definition.file_scope(db);
-        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
+        for typevar in bound_legacy_typevars(db, &module, index, containing_scope.file_scope_id(db))
+        {
             variables.remove(&typevar);
         }
 

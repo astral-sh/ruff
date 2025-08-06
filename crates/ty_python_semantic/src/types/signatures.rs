@@ -18,6 +18,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::ScopeId;
 use crate::types::generics::{GenericContext, SpecializationBuilder, walk_generic_context};
 use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
@@ -324,6 +325,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        containing_scope: ScopeId,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
@@ -338,7 +340,7 @@ impl<'db> Signature<'db> {
             }
         });
         let legacy_generic_context =
-            GenericContext::from_function_params(db, definition, &parameters, return_ty);
+            GenericContext::from_function_params(db, containing_scope, &parameters, return_ty);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!
