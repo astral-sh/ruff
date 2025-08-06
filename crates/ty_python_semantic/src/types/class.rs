@@ -1,4 +1,3 @@
-use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
@@ -9,6 +8,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
@@ -54,9 +54,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashSet, FxHasher};
-
-pub(crate) type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
+use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_recover<'db>(
     _db: &'db dyn Db,
