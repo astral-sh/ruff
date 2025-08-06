@@ -88,10 +88,11 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, typevars);
+            signature.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -428,18 +429,19 @@ impl<'db> Signature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 

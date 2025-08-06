@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
+use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
-use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
@@ -48,18 +48,6 @@ fn enclosing_generic_contexts<'db>(
             }
             _ => None,
         })
-}
-
-/// Returns the legacy typevars that have been bound in the given scope or any enclosing scope.
-fn bound_legacy_typevars<'db>(
-    db: &'db dyn Db,
-    module: &ParsedModuleRef,
-    index: &'db SemanticIndex<'db>,
-    scope: FileScopeId,
-) -> impl Iterator<Item = TypeVarInstance<'db>> {
-    enclosing_generic_contexts(db, module, index, scope)
-        .flat_map(|generic_context| generic_context.variables(db).iter().copied())
-        .filter(|typevar| typevar.is_legacy(db))
 }
 
 /// Binds an unbound legacy typevar.
@@ -168,23 +156,14 @@ impl<'db> GenericContext<'db> {
         let mut variables = FxOrderSet::default();
         for param in parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                ty.find_legacy_typevars(db, Some(definition), &mut variables);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, &mut variables);
+                ty.find_legacy_typevars(db, Some(definition), &mut variables);
             }
         }
         if let Some(ty) = return_type {
-            ty.find_legacy_typevars(db, &mut variables);
-        }
-
-        // Then remove any that were bound in enclosing scopes.
-        let file = definition.file(db);
-        let module = parsed_module(db, file).load(db);
-        let index = semantic_index(db, file);
-        let containing_scope = definition.file_scope(db);
-        for typevar in bound_legacy_typevars(db, &module, index, containing_scope) {
-            variables.remove(&typevar);
+            ty.find_legacy_typevars(db, Some(definition), &mut variables);
         }
 
         if variables.is_empty() {
@@ -201,7 +180,7 @@ impl<'db> GenericContext<'db> {
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            base.find_legacy_typevars(db, &mut variables);
+            base.find_legacy_typevars(db, None, &mut variables);
         }
         if variables.is_empty() {
             return None;
@@ -661,10 +640,11 @@ impl<'db> Specialization<'db> {
     pub(crate) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         for ty in self.types(db) {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 }

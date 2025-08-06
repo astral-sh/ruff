@@ -250,11 +250,13 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-        self.specialization(db).find_legacy_typevars(db, typevars);
+        self.specialization(db)
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -395,11 +397,12 @@ impl<'db> ClassType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
-            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
+            Self::Generic(generic) => generic.find_legacy_typevars(db, binding_context, typevars),
         }
     }
 

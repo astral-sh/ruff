@@ -5,6 +5,7 @@ use std::marker::PhantomData;
 use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::semantic_index::definition::Definition;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
@@ -161,9 +162,11 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        self.class.find_legacy_typevars(db, typevars);
+        self.class
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 }
 
@@ -342,14 +345,15 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
-                class.find_legacy_typevars(db, typevars);
+                class.find_legacy_typevars(db, binding_context, typevars);
             }
             Protocol::Synthesized(synthesized) => {
-                synthesized.find_legacy_typevars(db, typevars);
+                synthesized.find_legacy_typevars(db, binding_context, typevars);
             }
         }
     }
@@ -385,6 +389,7 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
+    use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance};
     use crate::{Db, FxOrderSet};
@@ -427,9 +432,10 @@ mod synthesized_protocol {
         pub(super) fn find_legacy_typevars(
             self,
             db: &'db dyn Db,
+            binding_context: Option<Definition<'db>>,
             typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
         ) {
-            self.0.find_legacy_typevars(db, typevars);
+            self.0.find_legacy_typevars(db, binding_context, typevars);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

@@ -430,13 +430,14 @@ impl<'db> PropertyInstanceType<'db> {
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         if let Some(ty) = self.getter(db) {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
         if let Some(ty) = self.setter(db) {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -5841,80 +5842,93 @@ impl<'db> Type<'db> {
     pub(crate) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self {
             Type::TypeVar(typevar) => {
-                if typevar.is_legacy(db) || typevar.is_implicit(db) {
+                if (typevar.is_legacy(db) || typevar.is_implicit(db))
+                    && binding_context.is_none_or(|binding_context| {
+                        typevar.binding_context(db) == Some(binding_context)
+                    })
+                {
                     typevars.insert(typevar);
                 }
             }
 
-            Type::FunctionLiteral(function) => function.find_legacy_typevars(db, typevars),
+            Type::FunctionLiteral(function) => {
+                function.find_legacy_typevars(db, binding_context, typevars);
+            }
 
             Type::BoundMethod(method) => {
-                method.self_instance(db).find_legacy_typevars(db, typevars);
-                method.function(db).find_legacy_typevars(db, typevars);
+                method
+                    .self_instance(db)
+                    .find_legacy_typevars(db, binding_context, typevars);
+                method
+                    .function(db)
+                    .find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::MethodWrapper(
                 MethodWrapperKind::FunctionTypeDunderGet(function)
                 | MethodWrapperKind::FunctionTypeDunderCall(function),
             ) => {
-                function.find_legacy_typevars(db, typevars);
+                function.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::MethodWrapper(
                 MethodWrapperKind::PropertyDunderGet(property)
                 | MethodWrapperKind::PropertyDunderSet(property),
             ) => {
-                property.find_legacy_typevars(db, typevars);
+                property.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::Callable(callable) => {
-                callable.find_legacy_typevars(db, typevars);
+                callable.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::PropertyInstance(property) => {
-                property.find_legacy_typevars(db, typevars);
+                property.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::Union(union) => {
                 for element in union.iter(db) {
-                    element.find_legacy_typevars(db, typevars);
+                    element.find_legacy_typevars(db, binding_context, typevars);
                 }
             }
             Type::Intersection(intersection) => {
                 for positive in intersection.positive(db) {
-                    positive.find_legacy_typevars(db, typevars);
+                    positive.find_legacy_typevars(db, binding_context, typevars);
                 }
                 for negative in intersection.negative(db) {
-                    negative.find_legacy_typevars(db, typevars);
+                    negative.find_legacy_typevars(db, binding_context, typevars);
                 }
             }
 
             Type::Tuple(tuple) => {
-                tuple.find_legacy_typevars(db, typevars);
+                tuple.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::GenericAlias(alias) => {
-                alias.find_legacy_typevars(db, typevars);
+                alias.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::NominalInstance(instance) => {
-                instance.find_legacy_typevars(db, typevars);
+                instance.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::ProtocolInstance(instance) => {
-                instance.find_legacy_typevars(db, typevars);
+                instance.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::SubclassOf(subclass_of) => {
-                subclass_of.find_legacy_typevars(db, typevars);
+                subclass_of.find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::TypeIs(type_is) => {
-                type_is.return_type(db).find_legacy_typevars(db, typevars);
+                type_is
+                    .return_type(db)
+                    .find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::Dynamic(_)
@@ -8109,9 +8123,11 @@ impl<'db> CallableType<'db> {
     fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        self.signatures(db).find_legacy_typevars(db, typevars);
+        self.signatures(db)
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     /// Check whether this callable type has the given relation to another callable type.

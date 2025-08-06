@@ -1,6 +1,7 @@
 use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
+use crate::semantic_index::definition::Definition;
 use crate::types::{
     ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarInstance,
@@ -124,11 +125,12 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars(db, typevars);
+                class.find_legacy_typevars(db, binding_context, typevars);
             }
             SubclassOfInner::Dynamic(_) => {}
         }
