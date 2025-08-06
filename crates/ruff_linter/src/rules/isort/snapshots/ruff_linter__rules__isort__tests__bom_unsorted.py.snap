@@ -2,9 +2,9 @@
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
 I001 [*] Import block is un-sorted or un-formatted
- --> bom_unsorted.py:1:2
+ --> bom_unsorted.py:1:1
   |
-1 | / ﻿import foo
+1 | / import foo
 2 | | import bar
   | |__________^
   |

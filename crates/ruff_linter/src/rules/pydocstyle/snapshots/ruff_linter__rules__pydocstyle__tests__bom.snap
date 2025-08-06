@@ -2,9 +2,9 @@
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
 D300 [*] Use triple double quotes `"""`
- --> bom.py:1:2
+ --> bom.py:1:1
   |
-1 | ﻿''' SAM macro definitions '''
+1 | ''' SAM macro definitions '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Convert to triple double quotes
