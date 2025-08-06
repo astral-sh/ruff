@@ -2317,7 +2317,7 @@ impl<'db> ClassLiteral<'db> {
                 }
                 ClassBase::TypedDict => {
                     return KnownClass::TypedDictFallback
-                        .to_class_literal(db)
+                        .to_instance(db)
                         .instance_member(db, name);
                 }
             }
