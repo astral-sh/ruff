@@ -99,11 +99,11 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
     TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, did_you_mean,
-    report_implicit_return_type, report_instance_layout_conflict,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_return_type, report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
@@ -3702,13 +3702,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Expr::Name(_) => None,
             _ => Some(infer_value_expr(self, value)),
         };
-        self.infer_target_impl(target, assigned_ty);
+        self.infer_target_impl(target, value, assigned_ty);
     }
 
     /// Make sure that the subscript assignment `obj[slice] = value` is valid.
     fn validate_subscript_assignment(
         &mut self,
         target: &ast::ExprSubscript,
+        rhs: &ast::Expr,
         assigned_ty: Type<'db>,
     ) -> bool {
         let ast::ExprSubscript {
@@ -3757,17 +3758,92 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         CallErrorKind::BindingError => {
-                            if let Some(builder) =
-                                context.report_lint(&INVALID_ASSIGNMENT, &**value)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Method `__setitem__` of type `{}` cannot be called with \
-                                    a key of type `{}` and a value of type `{}` on object of type `{}`",
-                                    bindings.callable_type().display(db),
-                                    slice_ty.display(db),
-                                    assigned_ty.display(db),
-                                    value_ty.display(db),
-                                ));
+                            let assigned_d = assigned_ty.display(db);
+                            let value_d = value_ty.display(db);
+
+                            if let Some(typed_dict) = value_ty.into_typed_dict() {
+                                if let Some(key) = slice_ty.into_string_literal() {
+                                    let key = key.value(self.db());
+                                    let items = typed_dict.items(self.db());
+                                    if let Some((_, item)) =
+                                        items.iter().find(|(name, _)| *name == key)
+                                    {
+                                        if let Some(builder) =
+                                            context.report_lint(&INVALID_ASSIGNMENT, rhs)
+                                        {
+                                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                                "Invalid assignment to key \"{key}\" with declared type `{}` on TypedDict `{value_d}`",
+                                                item.declared_ty.display(db),
+                                            ));
+
+                                            diagnostic.set_primary_message(format_args!(
+                                                "value of type `{assigned_d}`"
+                                            ));
+
+                                            diagnostic.annotate(
+                                                self.context
+                                                    .secondary(value.as_ref())
+                                                    .message(format_args!("TypedDict `{value_d}`")),
+                                            );
+
+                                            diagnostic.annotate(
+                                                self.context.secondary(slice.as_ref()).message(
+                                                    format_args!(
+                                                        "key has declared type `{}`",
+                                                        item.declared_ty.display(db),
+                                                    ),
+                                                ),
+                                            );
+                                        }
+                                    } else {
+                                        report_invalid_key_on_typed_dict(
+                                            &self.context,
+                                            value.as_ref().into(),
+                                            slice.as_ref().into(),
+                                            value_ty,
+                                            slice_ty,
+                                            &items,
+                                        );
+                                    }
+                                } else {
+                                    // Check if the key has a valid type. We only allow string literals, a union of string literals,
+                                    // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
+                                    // but we need to exclude `LiteralString` itself. This check would technically allow weird key
+                                    // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
+                                    // fail to provide the "Only string literals are allowed" hint in that case.
+                                    if slice_ty.is_assignable_to(db, Type::LiteralString)
+                                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+                                    {
+                                        if let Some(builder) =
+                                            context.report_lint(&INVALID_ASSIGNMENT, &**slice)
+                                        {
+                                            builder.into_diagnostic(format_args!(
+                                                "Cannot assign value of type `{assigned_d}` to key of type `{}` on TypedDict `{value_d}`",
+                                                slice_ty.display(db)
+                                            ));
+                                        }
+                                    } else {
+                                        if let Some(builder) =
+                                            context.report_lint(&INVALID_KEY, &**slice)
+                                        {
+                                            builder.into_diagnostic(format_args!(
+                                                "Cannot access `{value_d}` with a key of type `{}`. Only string literals are allowed as keys on TypedDicts.",
+                                                slice_ty.display(db)
+                                            ));
+                                        }
+                                    }
+                                }
+                            } else {
+                                if let Some(builder) =
+                                    context.report_lint(&INVALID_ASSIGNMENT, &**value)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Method `__setitem__` of type `{}` cannot be called with \
+                                        a key of type `{}` and a value of type `{assigned_d}` on object of type `{value_d}`",
+                                        bindings.callable_type().display(db),
+                                        slice_ty.display(db),
+                                    ));
+                                }
                             }
                         }
                         CallErrorKind::PossiblyNotCallable => {
@@ -4333,7 +4409,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_target_impl(&mut self, target: &ast::Expr, assigned_ty: Option<Type<'db>>) {
+    fn infer_target_impl(
+        &mut self,
+        target: &ast::Expr,
+        value: &ast::Expr,
+        assigned_ty: Option<Type<'db>>,
+    ) {
         match target {
             ast::Expr::Name(name) => self.infer_definition(name),
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -4346,7 +4427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 for element in elts {
-                    self.infer_target_impl(element, assigned_tys.next());
+                    self.infer_target_impl(element, value, assigned_tys.next());
                 }
             }
             ast::Expr::Attribute(
@@ -4375,7 +4456,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
                 if let Some(assigned_ty) = assigned_ty {
-                    self.validate_subscript_assignment(subscript_expr, assigned_ty);
+                    self.validate_subscript_assignment(subscript_expr, value, assigned_ty);
                 }
             }
             _ => {
@@ -8879,46 +8960,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if let Some(typed_dict) = value_ty.into_typed_dict() {
                             let slice_node = subscript.slice.as_ref();
 
-                            if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
-                                match slice_ty {
-                                    Type::StringLiteral(key) => {
-                                        let key = key.value(db);
-                                        let typed_dict_name = value_ty.display(db);
-
-                                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                                            "Invalid key access on TypedDict `{typed_dict_name}`",
-                                        ));
-
-                                        diagnostic.annotate(
-                                            self.context.secondary(value_node).message(
-                                                format_args!("TypedDict `{typed_dict_name}`"),
-                                            ),
-                                        );
-
-                                        let items = typed_dict.items(db);
-                                        let existing_keys =
-                                            items.iter().map(|(name, _)| name.as_str());
-
-                                        diagnostic.set_primary_message(format!(
-                                            "Unknown key \"{key}\"{hint}",
-                                            hint = if let Some(suggestion) =
-                                                did_you_mean(existing_keys, key)
-                                            {
-                                                format!(" - did you mean \"{suggestion}\"?")
-                                            } else {
-                                                String::new()
-                                            }
-                                        ));
-
-                                        diagnostic
-                                    }
-                                    _ => builder.into_diagnostic(format_args!(
-                                        "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                                        value_ty.display(db),
-                                        slice_ty.display(db),
-                                    )),
-                                };
-                            }
+                            report_invalid_key_on_typed_dict(
+                                context,
+                                value_node.into(),
+                                slice_node.into(),
+                                value_ty,
+                                slice_ty,
+                                &typed_dict.items(db),
+                            );
                         } else {
                             if let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)

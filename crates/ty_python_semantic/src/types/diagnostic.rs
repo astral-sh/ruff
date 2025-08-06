@@ -8,7 +8,7 @@ use super::{
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
-use crate::types::class::{SolidBase, SolidBaseKind};
+use crate::types::class::{Field, SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
@@ -17,9 +17,10 @@ use crate::types::string_annotation::{
 };
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
-use crate::{Db, FxIndexMap, Module, ModuleName, Program, declare_lint};
+use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -2570,6 +2571,53 @@ fn report_invalid_base<'ctx, 'db>(
     Some(diagnostic)
 }
 
+pub(crate) fn report_invalid_key_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    value_node: AnyNodeRef,
+    slice_node: AnyNodeRef,
+    value_ty: Type<'db>,
+    slice_ty: Type<'db>,
+    items: &FxOrderMap<Name, Field<'db>>,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
+        match slice_ty {
+            Type::StringLiteral(key) => {
+                let key = key.value(db);
+                let typed_dict_name = value_ty.display(db);
+
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Invalid key access on TypedDict `{typed_dict_name}`",
+                ));
+
+                diagnostic.annotate(
+                    context
+                        .secondary(value_node)
+                        .message(format_args!("TypedDict `{typed_dict_name}`")),
+                );
+
+                let existing_keys = items.iter().map(|(name, _)| name.as_str());
+
+                diagnostic.set_primary_message(format!(
+                    "Unknown key \"{key}\"{hint}",
+                    hint = if let Some(suggestion) = did_you_mean(existing_keys, key) {
+                        format!(" - did you mean \"{suggestion}\"?")
+                    } else {
+                        String::new()
+                    }
+                ));
+
+                diagnostic
+            }
+            _ => builder.into_diagnostic(format_args!(
+                "TypedDict `{}` cannot be indexed with a key of type `{}`",
+                value_ty.display(db),
+                slice_ty.display(db),
+            )),
+        };
+    }
+}
+
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
 /// have a `bar` member or submodule.
@@ -2619,7 +2667,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 }
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
-pub(super) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
+fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     existing_names: impl Iterator<Item = S>,
     wrong_name: T,
 ) -> Option<String> {
