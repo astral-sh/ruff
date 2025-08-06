@@ -6615,7 +6615,9 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypedDict => {
-                        f.write_str("`typing.TypedDict` is not allowed in type expressions")
+                        f.write_str(
+                            "The special form `typing.TypedDict` is not allowed in type expressions. \
+                            Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,

@@ -382,7 +382,8 @@ msg.content
 ```py
 from typing import TypedDict
 
-x: TypedDict = {"name": "Alice"}  # error: [invalid-type-form] "`typing.TypedDict` is not allowed in type expressions"
+# error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions."
+x: TypedDict = {"name": "Alice"}
 ```
 
 ## Diagnostics
