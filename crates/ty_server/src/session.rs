@@ -702,6 +702,7 @@ impl Session {
     /// Calling this multiple times for the same document is a logic error.
     pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
         self.index_mut().close_document(key)?;
+        self.bump_revision();
         Ok(())
     }
 
