@@ -800,13 +800,13 @@ impl<'db> FunctionType<'db> {
         CallableType::new(db, self.signature(db), false)
     }
 
-    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    /// Convert the `FunctionType` into a [`BoundMethodType`].
     pub(crate) fn into_bound_method_type(
         self,
         db: &'db dyn Db,
         self_instance: Type<'db>,
-    ) -> Type<'db> {
-        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
+    ) -> BoundMethodType<'db> {
+        BoundMethodType::new(db, self, self_instance)
     }
 
     pub(crate) fn has_relation_to(
