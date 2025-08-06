@@ -4,6 +4,7 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
+
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
