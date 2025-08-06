@@ -450,11 +450,22 @@ impl Session {
 
             // Combine the global options specified during initialization with the
             // workspace-specific options to create the final workspace options.
-            let ClientOptions { global, workspace } = self
+            let ClientOptions {
+                global, workspace, ..
+            } = self
                 .initialization_options
                 .options
                 .clone()
                 .combine(options.clone());
+
+            if !options.unknown.is_empty() {
+                let options = serde_json::to_string_pretty(&options.unknown)
+                    .unwrap_or_else(|_| "<invalid JSON>".to_string());
+                tracing::warn!("Received unknown options for workspace `{url}`: {options}");
+                client.show_warning_message(format!(
+                    "Received unknown options for workspace `{url}`: {options}",
+                ));
+            }
 
             combined_global_options.combine_with(Some(global));
 

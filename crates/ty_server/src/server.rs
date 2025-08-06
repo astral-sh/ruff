@@ -98,6 +98,15 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
+        if !initialization_options.options.unknown.is_empty() {
+            let options = serde_json::to_string_pretty(&initialization_options.options.unknown)
+                .unwrap_or_else(|_| "<invalid JSON>".to_string());
+            tracing::warn!("Received unknown options during initialization: {options}");
+            client.show_warning_message(format_args!(
+                "Received unknown options during initialization: {options}"
+            ));
+        }
+
         // Get workspace URLs without settings - settings will come from workspace/configuration
         let workspace_urls = workspace_folders
             .filter(|folders| !folders.is_empty())

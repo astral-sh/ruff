@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
 use ruff_macros::Combine;
@@ -84,6 +86,11 @@ pub struct ClientOptions {
 
     #[serde(flatten)]
     pub(crate) workspace: WorkspaceOptions,
+
+    /// Additional options that aren't valid as per the schema but we accept it to provide better
+    /// error message to the user.
+    #[serde(flatten)]
+    pub(crate) unknown: HashMap<String, Value>,
 }
 
 impl ClientOptions {
@@ -96,6 +103,12 @@ impl ClientOptions {
     #[must_use]
     pub fn with_disable_language_services(mut self, disable_language_services: bool) -> Self {
         self.workspace.disable_language_services = Some(disable_language_services);
+        self
+    }
+
+    #[must_use]
+    pub fn with_unknown(mut self, unknown: HashMap<String, Value>) -> Self {
+        self.unknown = unknown;
         self
     }
 }
