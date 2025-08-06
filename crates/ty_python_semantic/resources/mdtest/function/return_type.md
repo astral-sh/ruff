@@ -307,8 +307,7 @@ def fibonacci(n: int):
     else:
         return fibonacci(n - 1) + fibonacci(n - 2)
 
-# TODO: it may be better to infer this as `int` if we can
-reveal_type(fibonacci(5))  # revealed: Literal[0, 1] | Unknown
+reveal_type(fibonacci(5))  # revealed: int
 
 def even(n: int):
     if n == 0:
@@ -322,9 +321,8 @@ def odd(n: int):
     else:
         return even(n - 1)
 
-# TODO: it may be better to infer these as `bool` if we can
-reveal_type(even(1))  # revealed: bool | Unknown
-reveal_type(odd(1))  # revealed: bool | Unknown
+reveal_type(even(1))  # revealed: bool
+reveal_type(odd(1))  # revealed: bool
 
 def repeat_a(n: int):
     if n <= 0:
@@ -332,8 +330,7 @@ def repeat_a(n: int):
     else:
         return repeat_a(n - 1) + "a"
 
-# TODO: it may be better to infer this as `str` if we can
-reveal_type(repeat_a(3))  # revealed: Literal[""] | Unknown
+reveal_type(repeat_a(3))  # revealed: str
 
 def divergent(value):
     if type(value) is tuple:
@@ -342,14 +339,20 @@ def divergent(value):
         return None
 
 # tuple[tuple[tuple[...] | None] | None] | None => tuple[Unknown] | None
-reveal_type(divergent((1,)))  # revealed: tuple[Unknown] | None
+reveal_type(divergent((1,)))  # revealed: Divergent | None
+
+def call_divergent(x: int):
+    return (divergent((1, 2, 3)), x)
+
+# TODO: it would be better to reveal `tuple[Divergent | None, int]`
+reveal_type(call_divergent(1))  # revealed: Divergent
 
 def nested_scope():
     def inner():
         return nested_scope()
     return inner()
 
-reveal_type(nested_scope())  # revealed: Unknown
+reveal_type(nested_scope())  # revealed: Never
 
 def eager_nested_scope():
     class A:

@@ -81,7 +81,7 @@ use crate::semantic_index::definition::{
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::narrowing_constraints::ConstraintKey;
-use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
+use crate::semantic_index::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
@@ -157,6 +157,18 @@ fn scope_cycle_recover<'db>(
 
 fn scope_cycle_initial<'db>(_db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     ScopeInference::cycle_fallback(scope)
+}
+
+#[salsa::tracked]
+fn function_place<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<ScopedPlaceId> {
+    if let NodeWithScopeKind::Function(func) = scope.node(db) {
+        let file = scope.file(db);
+        let index = semantic_index(db, file);
+        let module = parsed_module(db, file).load(db);
+        Some(index.expect_single_definition(func.node(&module)).place(db))
+    } else {
+        None
+    }
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
@@ -501,11 +513,23 @@ impl<'db> ScopeInference<'db> {
                 "infer_return_type should only be called on a function body scope inference"
             );
         };
+        let div = Type::Dynamic(DynamicType::Divergent);
         for returnee in &extra.returnees {
             let ty = returnee.map_or(Type::none(db), |expression| {
                 self.expression_type(expression)
             });
-            union = union.add(ty);
+            // `Divergent` appearing in a union does not mean true divergence, so it can be removed.
+            if ty == div {
+                continue;
+            } else if ty.has_divergent_type(db) {
+                if let Type::Union(union_ty) = ty {
+                    union = union.add(union_ty.filter(db, |ty| **ty != div));
+                } else {
+                    union = union.add(div);
+                }
+            } else {
+                union = union.add(ty);
+            }
         }
         let use_def = use_def_map(db, self.scope);
         if use_def.can_implicitly_return_none(db) {
@@ -7317,6 +7341,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
+            (div @ Type::Dynamic(DynamicType::Divergent), _, _)
+            | (_, div @ Type::Dynamic(DynamicType::Divergent), _) => Some(div),
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
 
@@ -8208,7 +8234,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
                             match eq_result {
-                                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
+                                todo @ Type::Dynamic(
+                                    DynamicType::Todo(_) | DynamicType::Divergent,
+                                ) => return Ok(todo),
                                 // It's okay to ignore errors here because Python doesn't call `__bool__`
                                 // for different union variants. Instead, this is just for us to
                                 // evaluate a possibly truthy value to `false` or `true`.
@@ -8236,7 +8264,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
 
                         Ok(match eq_result {
-                            todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
+                            todo @ Type::Dynamic(DynamicType::Todo(_) | DynamicType::Divergent) => {
+                                todo
+                            }
                             // It's okay to ignore errors here because Python doesn't call `__bool__`
                             // for `is` and `is not` comparisons. This is an implementation detail
                             // for how we determine the truthiness of a type.

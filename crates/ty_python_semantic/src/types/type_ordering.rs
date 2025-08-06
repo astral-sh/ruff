@@ -260,6 +260,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypedDict, _) => Ordering::Less,
         (_, DynamicType::TodoTypedDict) => Ordering::Greater,
+
+        (DynamicType::Divergent, _) => Ordering::Less,
+        (_, DynamicType::Divergent) => Ordering::Greater,
     }
 }
 

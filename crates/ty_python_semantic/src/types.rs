@@ -97,6 +97,34 @@ mod definition;
 #[cfg(test)]
 mod property_tests;
 
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: BoundMethodType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: BoundMethodType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent)
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn has_divergent_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &bool,
+    _count: u32,
+    _self: Type<'db>,
+    _unit: (),
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn has_divergent_type_cycle_initial<'db>(_db: &'db dyn Db, _slf: Type<'db>, _unit: ()) -> bool {
+    false
+}
+
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
 
@@ -6007,6 +6035,90 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self._has_divergent_type(db, ())
+    }
+
+    #[allow(clippy::used_underscore_binding)]
+    #[salsa::tracked(cycle_fn=has_divergent_type_cycle_recover, cycle_initial=has_divergent_type_cycle_initial, heap_size=get_size2::heap_size)]
+    fn _has_divergent_type(self, db: &'db dyn Db, _unit: ()) -> bool {
+        match self {
+            Type::Dynamic(DynamicType::Divergent) => true,
+            Type::Union(union) => union.iter(db).any(|ty| ty.has_divergent_type(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.has_divergent_type(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.has_divergent_type(db))
+            }
+            Type::Tuple(tuple) => tuple
+                .tuple(db)
+                .all_elements()
+                .any(|ty| ty.has_divergent_type(db)),
+            Type::GenericAlias(alias) => alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.has_divergent_type(db)),
+            Type::NominalInstance(instance) => match instance.class {
+                ClassType::Generic(alias) => alias
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .any(|ty| ty.has_divergent_type(db)),
+                ClassType::NonGeneric(_) => false,
+            },
+            Type::Callable(callable) => callable.signatures(db).iter().any(|sig| {
+                sig.parameters().iter().any(|param| {
+                    param
+                        .annotated_type()
+                        .is_some_and(|ty| ty.has_divergent_type(db))
+                }) || sig.return_ty.iter().any(|ty| ty.has_divergent_type(db))
+            }),
+            Type::ProtocolInstance(protocol) => protocol.has_divergent_type(db),
+            Type::PropertyInstance(property) => {
+                property
+                    .setter(db)
+                    .is_some_and(|setter| setter.has_divergent_type(db))
+                    || property
+                        .getter(db)
+                        .is_some_and(|getter| getter.has_divergent_type(db))
+            }
+            Type::TypeIs(type_is) => type_is.return_type(db).has_divergent_type(db),
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Dynamic(DynamicType::Divergent) => true,
+                SubclassOfInner::Dynamic(_) => false,
+                SubclassOfInner::Class(class) => class.metaclass(db).has_divergent_type(db),
+            },
+            Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::TypeVar(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::Dynamic(_) => false,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -6266,12 +6378,20 @@ pub enum DynamicType {
     /// A special Todo-variant for classes inheriting from `TypedDict`.
     /// A temporary variant to avoid false positives while we wait for full support.
     TodoTypedDict,
+    /// A type that is determined to be divergent during type inference for a recursive function.
+    /// This type must never be eliminated by reduction
+    /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
+    /// Otherwise, type inference cannot converge properly.
+    Divergent,
 }
 
 impl DynamicType {
-    #[expect(clippy::unused_self)]
     fn normalized(self) -> Self {
-        Self::Any
+        if matches!(self, Self::Divergent) {
+            self
+        } else {
+            Self::Any
+        }
     }
 }
 
@@ -6304,6 +6424,7 @@ impl std::fmt::Display for DynamicType {
                     f.write_str("@Todo")
                 }
             }
+            DynamicType::Divergent => f.write_str("Divergent"),
         }
     }
 }
@@ -7795,6 +7916,7 @@ impl<'db> BoundMethodType<'db> {
     }
 
     /// Infers this method scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self
             .function(db)

@@ -347,6 +347,13 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.inner
+            .interface(db)
+            .members(db)
+            .any(|member| member.ty().has_divergent_type(db))
+    }
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class

@@ -83,6 +83,19 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: FunctionType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent)
+}
+
 /// A collection of useful spans for annotating functions.
 ///
 /// This can be retrieved via `FunctionType::spans` or
@@ -889,6 +902,7 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Infers this function scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition(db).body_scope(db);
         let inference = infer_scope_types(db, scope);
