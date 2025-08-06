@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, enclosing_generic_contexts};
+use crate::types::generics::{GenericContext, bind_legacy_typevar};
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -519,6 +519,9 @@ struct DefinitionInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// For function definitions, the undecorated type of the function.
+    undecorated_type: Option<Type<'db>>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -609,6 +612,10 @@ impl<'db> DefinitionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.is_cycle_callback().then_some(Type::Never)
+    }
+
+    pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
+        self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
 }
 
@@ -823,6 +830,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
+    /// For function definitions, the undecorated type of the function.
+    undecorated_type: Option<Type<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
@@ -858,6 +868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations: VecMap::default(),
             legacy_typevar_binding_context: None,
             deferred: VecSet::default(),
+            undecorated_type: None,
             cycle_fallback: false,
         }
     }
@@ -2662,6 +2673,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_literal,
             type_mappings,
         ));
+        self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
@@ -6427,7 +6439,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
         resolved
-            .map_type(|ty| {
+            .map_type(|ty| match ty {
                 // If the expression resolves to a legacy typevar, we will have the TypeVarInstance
                 // that was created when the typevar was created, which will not have an associated
                 // binding context. If this expression appears inside of a generic context that
@@ -6438,40 +6450,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If the legacy typevar is still unbound after that search, and we are in a
                 // context that binds unbound legacy typevars (i.e., the signature of a generic
                 // function), bind it with that context.
-                let find_legacy_typevar_binding = |typevar: TypeVarInstance<'db>| {
-                    enclosing_generic_contexts(
+                Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => bind_legacy_typevar(
+                    self.db(),
+                    self.context.module(),
+                    self.index,
+                    self.scope().file_scope_id(self.db()),
+                    self.legacy_typevar_binding_context,
+                    typevar,
+                )
+                .map(Type::TypeVar)
+                .unwrap_or(ty),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                    if typevar.is_legacy(self.db()) =>
+                {
+                    bind_legacy_typevar(
                         self.db(),
                         self.context.module(),
                         self.index,
                         self.scope().file_scope_id(self.db()),
+                        self.legacy_typevar_binding_context,
+                        typevar,
                     )
-                    .find_map(|enclosing_context| {
-                        enclosing_context.binds_legacy_typevar(self.db(), typevar)
-                    })
-                    .or_else(|| {
-                        self.legacy_typevar_binding_context
-                            .map(|legacy_typevar_binding_context| {
-                                typevar
-                                    .with_binding_context(self.db(), legacy_typevar_binding_context)
-                            })
-                    })
-                };
-
-                match ty {
-                    Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => {
-                        find_legacy_typevar_binding(typevar)
-                            .map(Type::TypeVar)
-                            .unwrap_or(ty)
-                    }
-                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                        if typevar.is_legacy(self.db()) =>
-                    {
-                        find_legacy_typevar_binding(typevar)
-                            .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
-                            .unwrap_or(ty)
-                    }
-                    _ => ty,
+                    .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
+                    .unwrap_or(ty)
                 }
+                _ => ty,
             })
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
@@ -9130,6 +9133,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_fallback,
 
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
+
             // builder only state
             legacy_typevar_binding_context: _,
             deferred_state: _,
@@ -9189,6 +9195,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
+            undecorated_type,
 
             // builder only state
             legacy_typevar_binding_context: _,
@@ -9202,14 +9209,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!diagnostics.is_empty() || cycle_fallback || !deferred.is_empty()).then(|| {
-                Box::new(DefinitionInferenceExtra {
-                    cycle_fallback,
-                    deferred: deferred.into_boxed_slice(),
-                    diagnostics,
-                })
-            });
+        let extra = (!diagnostics.is_empty()
+            || cycle_fallback
+            || undecorated_type.is_some()
+            || !deferred.is_empty())
+        .then(|| {
+            Box::new(DefinitionInferenceExtra {
+                cycle_fallback,
+                deferred: deferred.into_boxed_slice(),
+                diagnostics,
+                undecorated_type,
+            })
+        });
 
         if bindings.len() > 20 {
             tracing::debug!(
@@ -9252,6 +9263,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
 
             // Builder only state
             legacy_typevar_binding_context: _,
@@ -9360,7 +9374,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::INIT_VAR)
                         }
                         _ => name_expr_ty
-                            .in_type_expression(self.db(), self.scope())
+                            .in_type_expression(
+                                self.db(),
+                                self.scope(),
+                                self.legacy_typevar_binding_context,
+                            )
                             .unwrap_or_else(|error| {
                                 error.into_fallback_type(
                                     &self.context,
@@ -9579,7 +9597,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
-                    .in_type_expression(self.db(), self.scope())
+                    .in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        self.legacy_typevar_binding_context,
+                    )
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -9596,7 +9618,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db(), self.scope())
+                    .in_type_expression(
+                        self.db(),
+                        self.scope(),
+                        self.legacy_typevar_binding_context,
+                    )
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -10282,7 +10308,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             generic_context,
                         );
                         specialized_class
-                            .in_type_expression(self.db(), self.scope())
+                            .in_type_expression(
+                                self.db(),
+                                self.scope(),
+                                self.legacy_typevar_binding_context,
+                            )
                             .unwrap_or(Type::unknown())
                     }
                     None => {

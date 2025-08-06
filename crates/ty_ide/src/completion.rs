@@ -1247,7 +1247,7 @@ quux.<CURSOR>
         __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Self@object
+        __new__ :: bound method Quux.__new__() -> Self@__new__
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -1292,7 +1292,7 @@ quux.b<CURSOR>
         __init_subclass__ :: bound method Quux.__init_subclass__() -> None
         __module__ :: str
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: bound method Quux.__new__() -> Self@object
+        __new__ :: bound method Quux.__new__() -> Self@__new__
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
         __repr__ :: bound method Quux.__repr__() -> str
@@ -1346,7 +1346,7 @@ C.<CURSOR>
         __mro__ :: tuple[<class 'C'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@object
+        __new__ :: def __new__(cls) -> Self@__new__
         __or__ :: bound method <class 'C'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'Meta'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1522,7 +1522,7 @@ Quux.<CURSOR>
         __mro__ :: tuple[<class 'Quux'>, <class 'object'>]
         __name__ :: str
         __ne__ :: def __ne__(self, value: object, /) -> bool
-        __new__ :: def __new__(cls) -> Self@object
+        __new__ :: def __new__(cls) -> Self@__new__
         __or__ :: bound method <class 'Quux'>.__or__(value: Any, /) -> UnionType
         __prepare__ :: bound method <class 'type'>.__prepare__(name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]
         __qualname__ :: str
@@ -1574,8 +1574,8 @@ Answer.<CURSOR>
                 __bool__ :: bound method <class 'Answer'>.__bool__() -> Literal[True]
                 __class__ :: <class 'EnumMeta'>
                 __contains__ :: bound method <class 'Answer'>.__contains__(value: object) -> bool
-                __copy__ :: def __copy__(self) -> Self@Enum
-                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@Enum
+                __copy__ :: def __copy__(self) -> Self@__copy__
+                __deepcopy__ :: def __deepcopy__(self, memo: Any) -> Self@__deepcopy__
                 __delattr__ :: def __delattr__(self, name: str, /) -> None
                 __dict__ :: MappingProxyType[str, Any]
                 __dictoffset__ :: int
@@ -1599,7 +1599,7 @@ Answer.<CURSOR>
                 __mro__ :: tuple[<class 'Answer'>, <class 'Enum'>, <class 'object'>]
                 __name__ :: str
                 __ne__ :: def __ne__(self, value: object, /) -> bool
-                __new__ :: def __new__(cls, value: object) -> Self@Enum
+                __new__ :: def __new__(cls, value: object) -> Self@__new__
                 __or__ :: bound method <class 'Answer'>.__or__(value: Any, /) -> UnionType
                 __order__ :: str
                 __prepare__ :: bound method <class 'EnumMeta'>.__prepare__(cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict

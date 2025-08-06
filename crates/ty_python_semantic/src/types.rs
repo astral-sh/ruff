@@ -47,8 +47,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_legacy_typevar,
+    walk_generic_context, walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
@@ -5268,12 +5268,13 @@ impl<'db> Type<'db> {
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
     ///
-    /// The `scope_id` argument must always be a scope from the file we are currently inferring, so
+    /// The `scope_id` and `legacy_typevar_binding_context` arguments must always come from the file we are currently inferring, so
     /// as to avoid cross-module AST dependency.
     pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
+        legacy_typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -5402,16 +5403,26 @@ impl<'db> Type<'db> {
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
                     let class_definition = class.definition(db);
-                    Ok(Type::TypeVar(TypeVarInstance::new(
+                    let typevar = TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(class_definition),
+                        None,
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
                         TypeVarKind::Implicit,
-                    )))
+                    );
+                    let typevar = bind_legacy_typevar(
+                        db,
+                        &module,
+                        index,
+                        scope_id.file_scope_id(db),
+                        legacy_typevar_binding_context,
+                        typevar,
+                    )
+                    .unwrap_or(typevar);
+                    Ok(Type::TypeVar(typevar))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
@@ -5486,7 +5497,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id) {
+                    match element.in_type_expression(db, scope_id, legacy_typevar_binding_context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -6660,7 +6671,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         if module_member_with_same_name
-            .in_type_expression(db, scope)
+            .in_type_expression(db, scope, None)
             .is_err()
         {
             return;
