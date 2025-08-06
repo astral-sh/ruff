@@ -972,7 +972,6 @@ impl<'db> ClassType<'db> {
             if returns_non_subclass {
                 return dunder_new_bound_method;
             }
-
             Some(dunder_new_bound_method)
         } else {
             None
