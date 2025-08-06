@@ -44,7 +44,7 @@ use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
-    DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
+    DataclassTransformerParams, FunctionDecorators, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
     GenericContext, PartialSpecialization, Specialization, bind_legacy_typevar,
@@ -5455,7 +5455,7 @@ impl<'db> Type<'db> {
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Implicit,
+                        TypeVarKind::TypingSelf,
                     );
                     let typevar = bind_legacy_typevar(
                         db,
@@ -5767,6 +5767,13 @@ impl<'db> Type<'db> {
                 TypeMapping::BindLegacyTypevars(binding_context) => {
                     Type::TypeVar(typevar.with_binding_context(db, *binding_context), inferrable)
                 }
+                TypeMapping::BindSelf(self_type) => {
+                    if typevar.is_self(db) {
+                        *self_type
+                    } else {
+                        self
+                    }
+                }
                 TypeMapping::MarkTypeVarsInferrable(binding_context) => {
                     if typevar.binding_context(db) == Some(*binding_context) {
                         Type::TypeVar(typevar, Inferrable::Inferrable)
@@ -5867,6 +5874,7 @@ impl<'db> Type<'db> {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::BindSelf(_) |
                 TypeMapping::MarkTypeVarsInferrable(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
@@ -5900,7 +5908,7 @@ impl<'db> Type<'db> {
     ) {
         match self {
             Type::TypeVar(typevar, _) => {
-                if typevar.is_legacy(db) || typevar.is_implicit(db) {
+                if typevar.is_legacy(db) || typevar.is_self(db) {
                     typevars.insert(typevar);
                 }
             }
@@ -6224,6 +6232,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(Definition<'db>),
+    /// Binds any `typing.Self` typevar with a particular `self` class.
+    BindSelf(Type<'db>),
     /// Marks the typevars that are bound by a generic class or function as inferrable.
     MarkTypeVarsInferrable(Definition<'db>),
 }
@@ -6239,6 +6249,9 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         TypeMapping::PartialSpecialization(specialization) => {
             walk_partial_specialization(db, specialization, visitor);
+        }
+        TypeMapping::BindSelf(self_type) => {
+            visitor.visit_type(db, *self_type);
         }
         TypeMapping::PromoteLiterals
         | TypeMapping::BindLegacyTypevars(_)
@@ -6259,6 +6272,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
+            TypeMapping::BindSelf(self_type) => TypeMapping::BindSelf(*self_type),
             TypeMapping::MarkTypeVarsInferrable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferrable(*binding_context)
             }
@@ -6276,6 +6290,9 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
+            }
+            TypeMapping::BindSelf(self_type) => {
+                TypeMapping::BindSelf(self_type.normalized_impl(db, visitor))
             }
             TypeMapping::MarkTypeVarsInferrable(binding_context) => {
                 TypeMapping::MarkTypeVarsInferrable(*binding_context)
@@ -6800,7 +6817,7 @@ pub enum TypeVarKind {
     /// `def foo[T](x: T) -> T: ...`
     Pep695,
     /// `typing.Self`
-    Implicit,
+    TypingSelf,
 }
 
 /// Whether a typevar is inferrable in the current context.
@@ -6930,8 +6947,8 @@ impl<'db> TypeVarInstance<'db> {
         matches!(self.kind(db), TypeVarKind::Legacy)
     }
 
-    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), TypeVarKind::Implicit)
+    pub(crate) fn is_self(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), TypeVarKind::TypingSelf)
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -8049,15 +8066,32 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundMethodType<'db> {
+    /// Returns the type that replaces any `typing.Self` annotations in the bound mehtod signature.
+    /// This is normally the bound instance type, but if the bound method is a `@classmethod`, then
+    /// it should be an instance of the bound type.
+    pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
+        let mut self_instance = self.self_instance(db);
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+        {
+            self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
+        }
+        self_instance
+    }
+
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
+        let function = self.function(db);
+        let self_instance = self.typing_self_type(db);
+
         CallableType::new(
             db,
             CallableSignature::from_overloads(
-                self.function(db)
+                function
                     .signature(db)
                     .overloads
                     .iter()
-                    .map(signatures::Signature::bind_self),
+                    .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             false,
         )
@@ -8155,7 +8189,7 @@ impl<'db> CallableType<'db> {
     pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {
         Type::Callable(CallableType::new(
             db,
-            self.signatures(db).bind_self(),
+            self.signatures(db).bind_self(db, None),
             false,
         ))
     }

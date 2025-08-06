@@ -123,6 +123,8 @@ impl Display for DisplayRepresentation<'_> {
             Type::Callable(callable) => callable.display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
+                let self_ty = bound_method.self_instance(self.db);
+                let typing_self_ty = bound_method.typing_self_type(self.db);
 
                 match function.signature(self.db).overloads.as_slice() {
                     [signature] => {
@@ -135,9 +137,11 @@ impl Display for DisplayRepresentation<'_> {
                             f,
                             "bound method {instance}.{method}{type_parameters}{signature}",
                             method = function.name(self.db),
-                            instance = bound_method.self_instance(self.db).display(self.db),
+                            instance = self_ty.display(self.db),
                             type_parameters = type_parameters,
-                            signature = signature.bind_self().display(self.db)
+                            signature = signature
+                                .bind_self(self.db, Some(typing_self_ty))
+                                .display(self.db)
                         )
                     }
                     signatures => {
@@ -145,7 +149,11 @@ impl Display for DisplayRepresentation<'_> {
                         f.write_str("Overload[")?;
                         let mut join = f.join(", ");
                         for signature in signatures {
-                            join.entry(&signature.bind_self().display(self.db));
+                            join.entry(
+                                &signature
+                                    .bind_self(self.db, Some(typing_self_ty))
+                                    .display(self.db),
+                            );
                         }
                         f.write_str("]")
                     }
@@ -452,7 +460,7 @@ impl Display for DisplayGenericContext<'_> {
 
         let non_implicit_variables: Vec<_> = variables
             .iter()
-            .filter(|var| !var.is_implicit(self.db))
+            .filter(|var| !var.is_self(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {

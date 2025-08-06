@@ -914,6 +914,7 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
+        let instance_ty = Type::instance(db, self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
                 db,
@@ -965,7 +966,7 @@ impl<'db> ClassType<'db> {
 
             let dunder_new_bound_method = Type::Callable(CallableType::new(
                 db,
-                dunder_new_signature.bind_self(),
+                dunder_new_signature.bind_self(db, Some(instance_ty)),
                 true,
             ));
 
@@ -1005,7 +1006,7 @@ impl<'db> ClassType<'db> {
                     let synthesized_signature = |signature: &Signature<'db>| {
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
                             .with_definition(signature.definition())
-                            .bind_self()
+                            .bind_self(db, Some(instance_ty))
                     };
 
                     let synthesized_dunder_init_signature = CallableSignature::from_overloads(

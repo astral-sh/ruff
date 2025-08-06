@@ -10605,7 +10605,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut signature_iter = callable_binding.into_iter().map(|binding| {
                     if argument_type.is_bound_method() {
-                        binding.signature.bind_self()
+                        binding.signature.bind_self(self.db(), Some(argument_type))
                     } else {
                         binding.signature.clone()
                     }

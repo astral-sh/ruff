@@ -294,12 +294,12 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         typevar: TypeVarInstance<'db>,
     ) -> Option<TypeVarInstance<'db>> {
-        assert!(typevar.is_legacy(db) || typevar.is_implicit(db));
+        assert!(typevar.is_legacy(db) || typevar.is_self(db));
         let typevar_def = typevar.definition(db);
         self.variables(db)
             .iter()
             .find(|self_typevar| {
-                (self_typevar.is_legacy(db) || self_typevar.is_implicit(db))
+                (self_typevar.is_legacy(db) || self_typevar.is_self(db))
                     && self_typevar.definition(db) == typevar_def
             })
             .copied()

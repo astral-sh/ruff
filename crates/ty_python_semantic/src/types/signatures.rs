@@ -95,9 +95,16 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
+    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
+    /// annotations with that type.
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
-            overloads: self.overloads.iter().map(Signature::bind_self).collect(),
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.bind_self(db, self_type))
+                .collect(),
         }
     }
 
@@ -459,13 +466,20 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
+        let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
+        let mut return_ty = self.return_ty;
+        if let Some(self_type) = self_type {
+            parameters = parameters.apply_type_mapping(db, &TypeMapping::BindSelf(self_type));
+            return_ty =
+                return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
+        }
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
-            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
-            return_ty: self.return_ty,
+            parameters,
+            return_ty,
         }
     }
 
