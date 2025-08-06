@@ -194,19 +194,6 @@ impl<'db> GenericContext<'db> {
         Some(Self::new(db, variables))
     }
 
-    pub(crate) fn with_binding_context(
-        self,
-        db: &'db dyn Db,
-        binding_context: Definition<'db>,
-    ) -> Self {
-        let variables: FxOrderSet<_> = self
-            .variables(db)
-            .iter()
-            .map(|typevar| typevar.with_binding_context(db, binding_context))
-            .collect();
-        Self::new(db, variables)
-    }
-
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
         self.variables(db).len()
     }

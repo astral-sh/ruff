@@ -1319,21 +1319,7 @@ impl<'db> ClassLiteral<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(
-                |base_node| match definition_expression_type(db, class_definition, base_node) {
-                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(generic_context)) => {
-                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
-                            generic_context.with_binding_context(db, class_definition),
-                        ))
-                    }
-                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context,
-                    )) => Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context.with_binding_context(db, class_definition),
-                    )),
-                    ty => ty,
-                },
-            )
+            .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
     }
 
