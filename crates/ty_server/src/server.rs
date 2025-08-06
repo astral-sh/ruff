@@ -98,13 +98,31 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        if !initialization_options.options.unknown.is_empty() {
-            let options = serde_json::to_string_pretty(&initialization_options.options.unknown)
-                .unwrap_or_else(|_| "<invalid JSON>".to_string());
-            tracing::warn!("Received unknown options during initialization: {options}");
-            client.show_warning_message(format_args!(
-                "Received unknown options during initialization: {options}"
-            ));
+        let unknown_options = &initialization_options.options.unknown;
+        if !unknown_options.is_empty() {
+            // HACK: Old versions of the ty VS Code extension used a custom schema for settings
+            // which was changed in version 2025.35.0. This is to ensure that users don't receive
+            // unnecessary warnings when using an older version of the extension. This should be
+            // removed after a few releases.
+            if !unknown_options.contains_key("settings")
+                || !unknown_options.contains_key("globalSettings")
+            {
+                tracing::warn!(
+                    "Received unknown options during initialization: {}",
+                    serde_json::to_string_pretty(unknown_options)
+                        .unwrap_or_else(|_| format!("{unknown_options:?}"))
+                );
+
+                client.show_warning_message(format_args!(
+                    "Received unknown options during initialization: '{}'. \
+                    Refer to the logs for more details",
+                    unknown_options
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>()
+                        .join("', '")
+                ));
+            }
         }
 
         // Get workspace URLs without settings - settings will come from workspace/configuration

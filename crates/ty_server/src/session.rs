@@ -458,13 +458,30 @@ impl Session {
                 .clone()
                 .combine(options.clone());
 
-            if !options.unknown.is_empty() {
-                let options = serde_json::to_string_pretty(&options.unknown)
-                    .unwrap_or_else(|_| "<invalid JSON>".to_string());
-                tracing::warn!("Received unknown options for workspace `{url}`: {options}");
-                client.show_warning_message(format!(
-                    "Received unknown options for workspace `{url}`: {options}",
-                ));
+            let unknown_options = &options.unknown;
+            if !unknown_options.is_empty() {
+                // HACK: This is to ensure that users with an older version of the ty VS Code
+                // extension don't get warnings about unknown options when they are using a newer
+                // version of the language server. This should be removed after a few releases.
+                if !unknown_options.contains_key("importStrategy")
+                    && !unknown_options.contains_key("interpreter")
+                {
+                    tracing::warn!(
+                        "Received unknown options for workspace `{url}`: {}",
+                        serde_json::to_string_pretty(unknown_options)
+                            .unwrap_or_else(|_| format!("{unknown_options:?}"))
+                    );
+
+                    client.show_warning_message(format!(
+                        "Received unknown options for workspace `{url}`: '{}'. \
+                        Refer to the logs for more details.",
+                        unknown_options
+                            .keys()
+                            .map(String::as_str)
+                            .collect::<Vec<_>>()
+                            .join("', '")
+                    ));
+                }
             }
 
             combined_global_options.combine_with(Some(global));
