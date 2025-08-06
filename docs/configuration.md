@@ -302,9 +302,19 @@ config file, like so:
     line-length = 100
     ```
 
-Note that settings which work in pairs, like `select` and `extend-select`, are merged before
-being inherited; for example a child configuration file overriding a `select` won't be affected by
-the parent's `extend-select` setting.
+Note that settings which work in pairs, like `select` and `extend-select`, behave as if they were
+merged - at a single config file's level - into a resulting `select` before being inherited.
+It is so that a child configuration file overriding the `select` setting won't be further
+affected by a parent's `extend-select` setting.
+
+To be more precise, it means that:
+
+1. If a (child) `ruff.toml` which extends a (parent) `pyproject.toml` doesn't define these settings
+   at all, it will behave as if it inherited the addition of both of parent's settings;
+1. If it defines only `select`, or both `select` and `extend-select`, this entirely *resets*,
+   *overrides* these inherited settings;
+1. If it defines only `extend-select`, the final list of included rules will be the addition
+   of all settings: parent's `select` + parent's `extend-select` + child's `extend-select`;
 
 All of the above rules apply equivalently to `pyproject.toml`, `ruff.toml`, and `.ruff.toml` files.
 If Ruff detects multiple configuration files in the same directory, the `.ruff.toml` file will take
