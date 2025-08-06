@@ -327,6 +327,38 @@ fn single_expression_cycle_initial<'db>(
     Type::Never
 }
 
+/// I tried several attempts of this function:
+/// 1. infer_expression similar to infer_expression_type. It calls infer_expression_types
+///    internally and returns ExpressionInference. The problem I faced was that the return type of
+///    this function could not be &ExpressionInference because infer_expression_types itself is
+///    returning &ExpressionInference.
+/// 2. infer_expression_and_binding: return both type and definitely_bound. In order to overcome
+///    the problem that I cannot have two salsa::tracked functions calling each other and both
+///    returning &ExpressionInference. It did not help with the cycle because before we get the
+///    type we need to abort if it's not definitely_bound.
+/// 3. infer_expression_if_definitely_bound: returns Type::Unknown if the expression is not definitely_bound.
+///    it worked but it did not reduce the number of cycles as much as other way.
+///    This works for the analyze_cycles_gridout test case but causes panic for others
+#[salsa::tracked(cycle_fn=single_expression_cycle_recover, cycle_initial=single_expression_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+pub(crate) fn infer_expression_if_definitely_bound<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+) -> Type<'db> {
+    let inference = infer_expression_types(db, expression);
+    let file = expression.file(db);
+    let module = parsed_module(db, file).load(db);
+    let node = expression.node_ref(db, &module);
+    let b = inference.definitely_bound();
+
+    eprintln!("node {:?} is fully bound: {}", node, b);
+
+    if b {
+        inference.expression_type(node)
+    } else {
+        Type::unknown()
+    }
+}
+
 /// Infer the types for an [`Unpack`] operation.
 ///
 /// This infers the expression type and performs structural match against the target expression
@@ -640,6 +672,9 @@ struct ExpressionInferenceExtra<'db> {
     ///
     /// Falls back to `Type::Never` if an expression is missing.
     cycle_fallback: bool,
+
+    /// `true` if all expressions in this expression are definitely bound
+    all_definitely_bound: bool,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -648,6 +683,7 @@ impl<'db> ExpressionInference<'db> {
         Self {
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_fallback: true,
+                all_definitely_bound: true,
                 ..ExpressionInferenceExtra::default()
             })),
             expressions: FxHashMap::default(),
@@ -680,6 +716,13 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.is_cycle_callback().then_some(Type::Never)
+    }
+
+    pub(crate) fn definitely_bound(&self) -> bool {
+        match self.extra.as_ref() {
+            Some(e) => e.all_definitely_bound,
+            None => true,
+        }
     }
 }
 
@@ -827,6 +870,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
+
+    all_definitely_bound: bool,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -859,6 +904,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_typevar_binding_context: None,
             deferred: VecSet::default(),
             cycle_fallback: false,
+            all_definitely_bound: true,
         }
     }
 
@@ -6424,7 +6470,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let (resolved, constraint_keys) =
-            self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
+            self.record_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
         resolved
             .map_type(|ty| {
@@ -6560,6 +6606,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (place, Some(use_id))
         }
+    }
+
+    // TODO: Not needed
+    fn is_in_method(&self) -> bool {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
+        let Some(method) = current_scope.node().as_function(module) else {
+            return false;
+        };
+
+        let Some(parent_scope_id) = current_scope.parent() else {
+            return false;
+        };
+        let parent_scope = self.index.scope(parent_scope_id);
+        let Some(_) = parent_scope.node().as_class(module) else {
+            return false;
+        };
+
+        let definition = self.index.expect_single_definition(method);
+        if let DefinitionKind::Function(_) = definition.kind(self.db()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /// NOTE: first way, if any of places are not definitely bound then set the value
+    /// Calls infer_place_load and records if the expression is definitely bound.
+    fn record_place_load(
+        &mut self,
+        place_expr: PlaceExprRef,
+        expr_ref: ast::ExprRef,
+    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+        let place = self.infer_place_load(place_expr, expr_ref);
+        if !place.0.place.is_definitely_bound() {
+            self.all_definitely_bound = false;
+            eprintln!("expr_ref: {:?} was not bound", expr_ref);
+        }
+
+        place
     }
 
     /// Infer the type of a place expression from definitions, assuming a load context.
@@ -6970,7 +7057,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn narrow_expr_with_applicable_constraints<'r>(
-        &self,
+        &mut self,
         target: impl Into<ast::ExprRef<'r>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
@@ -7014,10 +7101,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let resolved_type = value_type
-            .member(db, &attr.id)
-            .map_type(|ty| self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys))
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+        let fallback_place = value_type.member(db, &attr.id);
+        if !fallback_place.place.is_definitely_bound() {
+            self.all_definitely_bound = false;
+            eprintln!("attribute: {:?} was not bound", attribute);
+        }
+
+        let resolved_type =
+            fallback_place.map_type(|ty| {
+            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+        }).unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
 
@@ -8497,7 +8590,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) = self.infer_place_load(
+                let (place, keys) = self.record_place_load(
                     PlaceExprRef::from(&expr),
                     ast::ExprRef::Subscript(subscript),
                 );
@@ -9129,6 +9222,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
+            all_definitely_bound,
 
             // builder only state
             legacy_typevar_binding_context: _,
@@ -9152,7 +9246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let extra =
-            (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty()).then(|| {
+            (cycle_fallback || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
                 if bindings.len() > 20 {
                     tracing::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
@@ -9165,10 +9259,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_fallback,
+                    all_definitely_bound,
                 })
             });
 
         expressions.shrink_to_fit();
+
+        // eprintln!(
+        //     "finished inference id {:?} and definitely bound {:?}",
+        //     scope, all_definitely_bound
+        // );
 
         ExpressionInference {
             expressions,
@@ -9189,6 +9289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
+            all_definitely_bound: _,
 
             // builder only state
             legacy_typevar_binding_context: _,
@@ -9252,6 +9353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+            all_definitely_bound: _,
 
             // Builder only state
             legacy_typevar_binding_context: _,
@@ -11365,6 +11467,113 @@ mod tests {
         let diagnostics = check_types(db, file);
 
         assert_diagnostic_messages(&diagnostics, expected);
+    }
+
+    #[test]
+    fn cyclic_dependant_attributes() {
+        let mut db = setup_db();
+        let filename = "src/cyclic.py";
+        db.write_dedented(
+            filename,
+            r#"
+            from typing import Literal
+
+            class Toggle:
+                def __init__(self: "Toggle"):
+                    if not self.x:
+                        self.x: Literal[True] = True
+            "#,
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, filename, &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle {
+                        database_key,
+                        iteration_count,
+                        fell_back: _,
+                    } = event.kind
+                    {
+                        Some(format!("{database_key:?}, {iteration_count:?}"))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(cycles.len(), 1);
+    }
+
+    #[test]
+    fn analyze_cycles_gridout() {
+        let mut db = setup_db();
+        let filename = "src/gridout.py";
+        db.write_dedented(
+            filename,
+            r#"
+            EMPTY = b""
+            class GridOut:
+                def __init__(self: "GridOut") -> None:
+                    self._buffer_pos = 0
+                    self._buffer = b""
+                def readchunk(self: "GridOut") -> bytes:
+                    if not len(self._buffer) - self._buffer_pos:
+                        raise Exception("truncated chunk")
+                    self._buffer_pos = 0
+                    return EMPTY
+                def _read_size_or_line(self: "GridOut", size: int = -1) -> bytes:
+                    if size > self._position:
+                        size = self._position
+                    if size == 0:
+                        return bytes()
+                    received = 0
+                    needed = size - received
+                    while received < size:
+                        if self._buffer:
+                            buf = self._buffer
+                            chunk_start = self._buffer_pos
+                            chunk_data = buf[self._buffer_pos :]
+                            self._buffer = EMPTY
+                        else:
+                            buf = self.readchunk()
+                            chunk_start = 0
+                            chunk_data = buf
+                        needed = buf.find(EMPTY, chunk_start, chunk_start + needed)
+                        if len(chunk_data) > needed:
+                            self._buffer = buf
+                            self._buffer_pos = chunk_start + needed
+                            self._position -= len(self._buffer) - self._buffer_pos
+                    return b""
+            "#,
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, filename, &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle {
+                        database_key,
+                        iteration_count,
+                        fell_back: _,
+                    } = event.kind
+                    {
+                        Some(format!("{database_key:?}, {iteration_count:?}"))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(cycles.len(), 2414);
     }
 
     #[test]
