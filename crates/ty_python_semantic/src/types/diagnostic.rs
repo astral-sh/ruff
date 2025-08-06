@@ -2628,6 +2628,7 @@ pub(super) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     }
 
     existing_names
+        .filter(|ref id| id.as_ref().len() >= 2)
         .map(|ref id| {
             (
                 id.as_ref().to_string(),
@@ -2639,6 +2640,6 @@ pub(super) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
         })
         .min_by_key(|(_, dist)| *dist)
         // Heuristic to filter out bad matches
-        .filter(|(id, dist)| id.len() >= 2 && *dist <= 3)
+        .filter(|(_, dist)| *dist <= 3)
         .map(|(id, _)| id)
 }
