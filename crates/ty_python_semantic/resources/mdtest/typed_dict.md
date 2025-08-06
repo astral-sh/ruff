@@ -162,7 +162,7 @@ def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age",
     # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
     reveal_type(person["non_existing"])  # revealed: Unknown
 
-    # error: [invalid-key] "TypedDict `Person` can not be indexed with a key of type `str`"
+    # error: [invalid-key] "TypedDict `Person` cannot be indexed with a key of type `str`"
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:

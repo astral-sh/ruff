@@ -8899,7 +8899,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         diagnostic
                                     }
                                     _ => builder.into_diagnostic(format_args!(
-                                        "TypedDict `{}` can not be indexed with a key of type `{}`",
+                                        "TypedDict `{}` cannot be indexed with a key of type `{}`",
                                         value_ty.display(db),
                                         slice_ty.display(db),
                                     )),

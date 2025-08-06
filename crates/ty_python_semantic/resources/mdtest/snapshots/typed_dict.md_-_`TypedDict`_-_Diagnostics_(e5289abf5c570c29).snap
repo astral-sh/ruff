@@ -65,7 +65,7 @@ info: rule `invalid-key` is enabled by default
 ```
 
 ```
-error[invalid-key]: TypedDict `Person` can not be indexed with a key of type `str`
+error[invalid-key]: TypedDict `Person` cannot be indexed with a key of type `str`
   --> src/mdtest_snippet.py:16:12
    |
 15 | def access_with_str_key(person: Person, str_key: str):
