@@ -509,8 +509,8 @@ impl ReportingMode {
         items: Vec<WorkspaceDocumentDiagnosticReport>,
     ) -> WorkspaceDiagnosticReportResult {
         match self {
-            ReportingMode::Streaming(streaming) => streaming.create_result(items),
-            ReportingMode::Bulk(..) => {
+            Self::Streaming(streaming) => streaming.create_result(items),
+            Self::Bulk(..) => {
                 WorkspaceDiagnosticReportResult::Report(WorkspaceDiagnosticReport { items })
             }
         }

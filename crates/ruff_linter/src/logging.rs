@@ -112,10 +112,10 @@ impl LogLevel {
     #[expect(clippy::trivially_copy_pass_by_ref)]
     const fn level_filter(&self) -> log::LevelFilter {
         match self {
-            LogLevel::Default => log::LevelFilter::Info,
-            LogLevel::Verbose => log::LevelFilter::Debug,
-            LogLevel::Quiet => log::LevelFilter::Off,
-            LogLevel::Silent => log::LevelFilter::Off,
+            Self::Default => log::LevelFilter::Info,
+            Self::Verbose => log::LevelFilter::Debug,
+            Self::Quiet => log::LevelFilter::Off,
+            Self::Silent => log::LevelFilter::Off,
         }
     }
 }

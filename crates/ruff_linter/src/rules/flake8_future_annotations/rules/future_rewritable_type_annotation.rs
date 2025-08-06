@@ -75,7 +75,7 @@ pub(crate) struct FutureRewritableTypeAnnotation {
 impl AlwaysFixableViolation for FutureRewritableTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FutureRewritableTypeAnnotation { name } = self;
+        let Self { name } = self;
         format!("Add `from __future__ import annotations` to simplify `{name}`")
     }
 

@@ -288,12 +288,12 @@ pub(crate) struct DocstringMissingException {
 impl Violation for DocstringMissingException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringMissingException { id } = self;
+        let Self { id } = self;
         format!("Raised exception `{id}` missing from docstring")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringMissingException { id } = self;
+        let Self { id } = self;
         Some(format!("Add `{id}` to the docstring"))
     }
 }
@@ -355,7 +355,7 @@ pub(crate) struct DocstringExtraneousException {
 impl Violation for DocstringExtraneousException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocstringExtraneousException { ids } = self;
+        let Self { ids } = self;
 
         if let [id] = ids.as_slice() {
             format!("Raised exception is not explicitly raised: `{id}`")
@@ -368,7 +368,7 @@ impl Violation for DocstringExtraneousException {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DocstringExtraneousException { ids } = self;
+        let Self { ids } = self;
         Some(format!(
             "Remove {} from the docstring",
             ids.iter().map(|id| format!("`{id}`")).join(", ")

@@ -223,10 +223,10 @@ bitflags! {
 
 impl NumericFlags {
     pub(super) fn seen_builtin_type(&mut self, name: &str) {
-        let flag: NumericFlags = match name {
-            "int" => NumericFlags::INT,
-            "float" => NumericFlags::FLOAT,
-            "complex" => NumericFlags::COMPLEX,
+        let flag: Self = match name {
+            "int" => Self::INT,
+            "float" => Self::FLOAT,
+            "complex" => Self::COMPLEX,
             _ => {
                 return;
             }

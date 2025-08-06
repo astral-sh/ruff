@@ -55,7 +55,7 @@ enum SliceBoundary {
 impl AlwaysFixableViolation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingMaxsplitArg {
+        let Self {
             actual_split_type: _,
             suggested_split_type,
         } = self;
@@ -64,7 +64,7 @@ impl AlwaysFixableViolation for MissingMaxsplitArg {
     }
 
     fn fix_title(&self) -> String {
-        let MissingMaxsplitArg {
+        let Self {
             actual_split_type,
             suggested_split_type,
         } = self;

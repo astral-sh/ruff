@@ -386,7 +386,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: &'static LintMetadata,
         range: TextRange,
-    ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
+    ) -> Option<Self> {
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
         // has been refactored, but this still kind of looked
@@ -571,7 +571,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         id: DiagnosticId,
         severity: Severity,
-    ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
+    ) -> Option<Self> {
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }

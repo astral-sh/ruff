@@ -49,8 +49,8 @@ impl SimpleToken {
         Self { ty, range }
     }
 
-    fn irrelevant() -> SimpleToken {
-        SimpleToken {
+    fn irrelevant() -> Self {
+        Self {
             ty: TokenType::Irrelevant,
             range: TextRange::default(),
         }

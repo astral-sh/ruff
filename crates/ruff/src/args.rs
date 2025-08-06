@@ -1110,7 +1110,7 @@ impl FromStr for FormatRange {
             return Err(FormatRangeParseError::StartGreaterThanEnd(start, end));
         }
 
-        Ok(FormatRange { start, end })
+        Ok(Self { start, end })
     }
 }
 
@@ -1126,7 +1126,7 @@ impl std::fmt::Display for FormatRangeParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let tip = "  tip:".bold().green();
         match self {
-            FormatRangeParseError::StartGreaterThanEnd(start, end) => {
+            Self::StartGreaterThanEnd(start, end) => {
                 write!(
                     f,
                     "the start position '{start_invalid}' is greater than the end position '{end_invalid}'.\n  {tip} Try switching start and end: '{end}-{start}'",
@@ -1136,8 +1136,8 @@ impl std::fmt::Display for FormatRangeParseError {
                     end = end.to_string().green().bold()
                 )
             }
-            FormatRangeParseError::InvalidStart(inner) => inner.write(f, true),
-            FormatRangeParseError::InvalidEnd(inner) => inner.write(f, false),
+            Self::InvalidStart(inner) => inner.write(f, true),
+            Self::InvalidEnd(inner) => inner.write(f, false),
         }
     }
 }
@@ -1167,7 +1167,7 @@ impl std::fmt::Display for LineColumn {
 
 impl Default for LineColumn {
     fn default() -> Self {
-        LineColumn {
+        Self {
             line: OneIndexed::MIN,
             column: OneIndexed::MIN,
         }
@@ -1209,7 +1209,7 @@ impl FromStr for LineColumn {
             .map_err(LineColumnParseError::ColumnParseError)?;
 
         match (OneIndexed::new(line), OneIndexed::new(column)) {
-            (Some(line), Some(column)) => Ok(LineColumn { line, column }),
+            (Some(line), Some(column)) => Ok(Self { line, column }),
             (Some(line), None) => Err(LineColumnParseError::ZeroColumnIndex { line }),
             (None, Some(column)) => Err(LineColumnParseError::ZeroLineIndex { column }),
             (None, None) => Err(LineColumnParseError::ZeroLineAndColumnIndex),
@@ -1233,33 +1233,33 @@ impl LineColumnParseError {
         let range = if start_range { "start" } else { "end" };
 
         match self {
-            LineColumnParseError::ColumnParseError(inner) => {
+            Self::ColumnParseError(inner) => {
                 write!(
                     f,
                     "the {range}s column is not a valid number ({inner})'\n  {tip} The format is 'line:column'."
                 )
             }
-            LineColumnParseError::LineParseError(inner) => {
+            Self::LineParseError(inner) => {
                 write!(
                     f,
                     "the {range} line is not a valid number ({inner})\n  {tip} The format is 'line:column'."
                 )
             }
-            LineColumnParseError::ZeroColumnIndex { line } => {
+            Self::ZeroColumnIndex { line } => {
                 write!(
                     f,
                     "the {range} column is 0, but it should be 1 or greater.\n  {tip} The column numbers start at 1.\n  {tip} Try {suggestion} instead.",
                     suggestion = format!("{line}:1").green().bold()
                 )
             }
-            LineColumnParseError::ZeroLineIndex { column } => {
+            Self::ZeroLineIndex { column } => {
                 write!(
                     f,
                     "the {range} line is 0, but it should be 1 or greater.\n  {tip} The line numbers start at 1.\n  {tip} Try {suggestion} instead.",
                     suggestion = format!("1:{column}").green().bold()
                 )
             }
-            LineColumnParseError::ZeroLineAndColumnIndex => {
+            Self::ZeroLineAndColumnIndex => {
                 write!(
                     f,
                     "the {range} line and column are both 0, but they should be 1 or greater.\n  {tip} The line and column numbers start at 1.\n  {tip} Try {suggestion} instead.",

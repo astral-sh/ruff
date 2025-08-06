@@ -126,7 +126,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue) -> Result<Self, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -135,7 +135,7 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Self { settings })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]

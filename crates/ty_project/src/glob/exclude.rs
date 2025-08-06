@@ -214,8 +214,8 @@ struct GitignoreBuilder {
 
 impl GitignoreBuilder {
     /// Create a new builder for a gitignore file.
-    fn new() -> GitignoreBuilder {
-        GitignoreBuilder {
+    fn new() -> Self {
+        Self {
             builder: GlobSetBuilder::new(),
             globs: vec![],
         }
@@ -237,10 +237,7 @@ impl GitignoreBuilder {
     /// Adds a gitignore like glob pattern to this builder.
     ///
     /// If the pattern could not be parsed as a glob, then an error is returned.
-    fn add(
-        &mut self,
-        pattern: &AbsolutePortableGlobPattern,
-    ) -> Result<&mut GitignoreBuilder, globset::Error> {
+    fn add(&mut self, pattern: &AbsolutePortableGlobPattern) -> Result<&mut Self, globset::Error> {
         let mut glob = IgnoreGlob {
             original: pattern.relative().to_string(),
             is_allow: false,

@@ -621,20 +621,14 @@ impl DefinitionCategory {
     ///
     /// Annotations establish a declared type. So do function and class definitions, and imports.
     pub(crate) fn is_declaration(self) -> bool {
-        matches!(
-            self,
-            DefinitionCategory::Declaration | DefinitionCategory::DeclarationAndBinding
-        )
+        matches!(self, Self::Declaration | Self::DeclarationAndBinding)
     }
 
     /// True if this definition assigns a value to the place.
     ///
     /// False only for annotated assignments without a RHS.
     pub(crate) fn is_binding(self) -> bool {
-        matches!(
-            self,
-            DefinitionCategory::Binding | DefinitionCategory::DeclarationAndBinding
-        )
+        matches!(self, Self::Binding | Self::DeclarationAndBinding)
     }
 }
 

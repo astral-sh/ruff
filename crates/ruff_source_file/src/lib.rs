@@ -319,8 +319,8 @@ pub enum SourceRow {
 impl Display for SourceRow {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SourceRow::Notebook { cell, line } => write!(f, "cell {cell}, line {line}"),
-            SourceRow::SourceFile { line } => write!(f, "line {line}"),
+            Self::Notebook { cell, line } => write!(f, "cell {cell}, line {line}"),
+            Self::SourceFile { line } => write!(f, "line {line}"),
         }
     }
 }

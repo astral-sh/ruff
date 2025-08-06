@@ -42,7 +42,7 @@ pub(crate) struct ImportShadowedByLoopVar {
 impl Violation for ImportShadowedByLoopVar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportShadowedByLoopVar { name, row } = self;
+        let Self { name, row } = self;
         format!("Import `{name}` from {row} shadowed by loop variable")
     }
 }
@@ -124,7 +124,7 @@ pub(crate) struct UndefinedLocalWithImportStar {
 impl Violation for UndefinedLocalWithImportStar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStar { name } = self;
+        let Self { name } = self;
         format!("`from {name} import *` used; unable to detect undefined names")
     }
 }
@@ -206,7 +206,7 @@ pub(crate) struct UndefinedLocalWithImportStarUsage {
 impl Violation for UndefinedLocalWithImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithImportStarUsage { name } = self;
+        let Self { name } = self;
         format!("`{name}` may be undefined, or defined from star imports")
     }
 }
@@ -247,7 +247,7 @@ pub(crate) struct UndefinedLocalWithNestedImportStarUsage {
 impl Violation for UndefinedLocalWithNestedImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocalWithNestedImportStarUsage { name } = self;
+        let Self { name } = self;
         format!("`from {name} import *` only allowed at module level")
     }
 }

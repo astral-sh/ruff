@@ -1475,7 +1475,7 @@ impl OptionDiagnostic {
 
     #[must_use]
     fn with_message(self, message: impl Display) -> Self {
-        OptionDiagnostic {
+        Self {
             message: message.to_string(),
             ..self
         }
@@ -1483,7 +1483,7 @@ impl OptionDiagnostic {
 
     #[must_use]
     fn with_annotation(self, annotation: Option<Annotation>) -> Self {
-        OptionDiagnostic { annotation, ..self }
+        Self { annotation, ..self }
     }
 
     #[must_use]

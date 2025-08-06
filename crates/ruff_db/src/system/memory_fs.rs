@@ -429,7 +429,7 @@ impl MemoryFileSystem {
 
 impl Default for MemoryFileSystem {
     fn default() -> Self {
-        MemoryFileSystem::new()
+        Self::new()
     }
 }
 
@@ -455,7 +455,7 @@ enum Entry {
 
 impl Entry {
     const fn is_file(&self) -> bool {
-        matches!(self, Entry::File(_))
+        matches!(self, Self::File(_))
     }
 
     const fn file_type(&self) -> FileType {

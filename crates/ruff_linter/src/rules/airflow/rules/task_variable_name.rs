@@ -39,7 +39,7 @@ pub(crate) struct AirflowVariableNameTaskIdMismatch {
 impl Violation for AirflowVariableNameTaskIdMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AirflowVariableNameTaskIdMismatch { task_id } = self;
+        let Self { task_id } = self;
         format!("Task variable name should match the `task_id`: \"{task_id}\"")
     }
 }

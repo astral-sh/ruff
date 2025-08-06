@@ -40,7 +40,7 @@ impl Violation for UnusedPrivateTypeVar {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateTypeVar {
+        let Self {
             type_var_like_name,
             type_var_like_kind,
         } = self;
@@ -48,7 +48,7 @@ impl Violation for UnusedPrivateTypeVar {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedPrivateTypeVar {
+        let Self {
             type_var_like_name,
             type_var_like_kind,
         } = self;
@@ -93,7 +93,7 @@ pub(crate) struct UnusedPrivateProtocol {
 impl Violation for UnusedPrivateProtocol {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateProtocol { name } = self;
+        let Self { name } = self;
         format!("Private protocol `{name}` is never used")
     }
 }
@@ -131,7 +131,7 @@ pub(crate) struct UnusedPrivateTypeAlias {
 impl Violation for UnusedPrivateTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateTypeAlias { name } = self;
+        let Self { name } = self;
         format!("Private TypeAlias `{name}` is never used")
     }
 }
@@ -171,7 +171,7 @@ pub(crate) struct UnusedPrivateTypedDict {
 impl Violation for UnusedPrivateTypedDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateTypedDict { name } = self;
+        let Self { name } = self;
         format!("Private TypedDict `{name}` is never used")
     }
 }

@@ -80,15 +80,15 @@ enum Set {
 impl Set {
     fn name(&self) -> Option<&str> {
         match self {
-            Set::Toplevel(_) => None,
-            Set::Named { name, .. } => Some(name),
+            Self::Toplevel(_) => None,
+            Self::Named { name, .. } => Some(name),
         }
     }
 
     fn metadata(&self) -> &OptionSet {
         match self {
-            Set::Toplevel(set) => set,
-            Set::Named { set, .. } => set,
+            Self::Toplevel(set) => set,
+            Self::Named { set, .. } => set,
         }
     }
 }

@@ -115,7 +115,7 @@ pub(crate) struct WrongTupleLengthVersionComparison {
 impl Violation for WrongTupleLengthVersionComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let WrongTupleLengthVersionComparison { expected_length } = self;
+        let Self { expected_length } = self;
         format!("Version comparison must be against a length-{expected_length} tuple")
     }
 }
@@ -212,7 +212,7 @@ impl ExpectedComparator {
     /// Returns the expected comparator for the given expression, if any.
     fn try_from(expr: &Expr) -> Option<Self> {
         let Expr::Subscript(ast::ExprSubscript { slice, .. }) = expr else {
-            return Some(ExpectedComparator::AnyTuple);
+            return Some(Self::AnyTuple);
         };
 
         // Only allow: (1) simple slices of the form `[:n]`, or (2) explicit indexing into the first
@@ -230,10 +230,10 @@ impl ExpectedComparator {
                 }) = upper.as_ref()
                 {
                     if *upper == 1 {
-                        return Some(ExpectedComparator::MajorTuple);
+                        return Some(Self::MajorTuple);
                     }
                     if *upper == 2 {
-                        return Some(ExpectedComparator::MajorMinorTuple);
+                        return Some(Self::MajorMinorTuple);
                     }
                 }
             }
@@ -241,7 +241,7 @@ impl ExpectedComparator {
                 value: ast::Number::Int(Int::ZERO),
                 ..
             }) => {
-                return Some(ExpectedComparator::MajorDigit);
+                return Some(Self::MajorDigit);
             }
             _ => (),
         }

@@ -49,7 +49,7 @@ pub(crate) struct FunctionUsesLoopVariable {
 impl Violation for FunctionUsesLoopVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionUsesLoopVariable { name } = self;
+        let Self { name } = self;
         format!("Function definition does not bind loop variable `{name}`")
     }
 }

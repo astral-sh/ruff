@@ -56,12 +56,12 @@ pub(crate) struct UnnecessaryDoubleCastOrProcess {
 impl AlwaysFixableViolation for UnnecessaryDoubleCastOrProcess {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryDoubleCastOrProcess { inner, outer } = self;
+        let Self { inner, outer } = self;
         format!("Unnecessary `{inner}()` call within `{outer}()`")
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryDoubleCastOrProcess { inner, .. } = self;
+        let Self { inner, .. } = self;
         format!("Remove the inner `{inner}()` call")
     }
 }

@@ -107,15 +107,11 @@ pub(crate) enum EvaluationMode {
 
 impl EvaluationMode {
     pub(crate) const fn from_is_async(is_async: bool) -> Self {
-        if is_async {
-            EvaluationMode::Async
-        } else {
-            EvaluationMode::Sync
-        }
+        if is_async { Self::Async } else { Self::Sync }
     }
 
     pub(crate) const fn is_async(self) -> bool {
-        matches!(self, EvaluationMode::Async)
+        matches!(self, Self::Async)
     }
 }
 

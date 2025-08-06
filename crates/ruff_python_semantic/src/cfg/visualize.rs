@@ -70,7 +70,7 @@ impl Display for MermaidNode {
         if self.content.is_empty() {
             write!(f, "empty")?;
         } else {
-            MermaidNode::mermaid_write_quoted_str(f, &self.content)?;
+            Self::mermaid_write_quoted_str(f, &self.content)?;
         }
         write!(f, "\"{close}")
     }
@@ -138,10 +138,10 @@ pub enum MermaidEdgeKind {
 impl Display for MermaidEdgeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MermaidEdgeKind::Arrow => write!(f, "-->"),
-            MermaidEdgeKind::DottedArrow => write!(f, "-..->"),
-            MermaidEdgeKind::ThickArrow => write!(f, "==>"),
-            MermaidEdgeKind::BidirectionalArrow => write!(f, "<-->"),
+            Self::Arrow => write!(f, "-->"),
+            Self::DottedArrow => write!(f, "-..->"),
+            Self::ThickArrow => write!(f, "==>"),
+            Self::BidirectionalArrow => write!(f, "<-->"),
         }
     }
 }

@@ -21,7 +21,7 @@ impl Format<PyFormatContext<'_>> for AnyStringPrefix {
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
         if !matches!(
             self,
-            AnyStringPrefix::Regular(StringLiteralPrefix::Empty | StringLiteralPrefix::Unicode)
+            Self::Regular(StringLiteralPrefix::Empty | StringLiteralPrefix::Unicode)
         ) {
             token(self.as_str()).fmt(f)?;
         }
@@ -60,10 +60,10 @@ impl From<AnyStringFlags> for StringQuotes {
 impl TryFrom<QuoteStyle> for Quote {
     type Error = ();
 
-    fn try_from(style: QuoteStyle) -> Result<Quote, ()> {
+    fn try_from(style: QuoteStyle) -> Result<Self, ()> {
         match style {
-            QuoteStyle::Single => Ok(Quote::Single),
-            QuoteStyle::Double => Ok(Quote::Double),
+            QuoteStyle::Single => Ok(Self::Single),
+            QuoteStyle::Double => Ok(Self::Double),
             QuoteStyle::Preserve => Err(()),
         }
     }
@@ -72,8 +72,8 @@ impl TryFrom<QuoteStyle> for Quote {
 impl From<Quote> for QuoteStyle {
     fn from(value: Quote) -> Self {
         match value {
-            Quote::Single => QuoteStyle::Single,
-            Quote::Double => QuoteStyle::Double,
+            Quote::Single => Self::Single,
+            Quote::Double => Self::Double,
         }
     }
 }

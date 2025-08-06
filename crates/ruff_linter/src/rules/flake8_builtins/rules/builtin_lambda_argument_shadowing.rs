@@ -28,7 +28,7 @@ pub(crate) struct BuiltinLambdaArgumentShadowing {
 impl Violation for BuiltinLambdaArgumentShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinLambdaArgumentShadowing { name } = self;
+        let Self { name } = self;
         format!("Lambda argument `{name}` is shadowing a Python builtin")
     }
 }

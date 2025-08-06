@@ -179,7 +179,7 @@ mod indexed {
                 index: 0,
             };
 
-            let mut inner = Arc::new(IndexedModule {
+            let mut inner = Arc::new(Self {
                 parsed,
                 index: Box::new([]),
             });

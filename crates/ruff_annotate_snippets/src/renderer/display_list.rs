@@ -123,7 +123,7 @@ impl<'a> DisplayList<'a> {
         anonymized_line_numbers: bool,
         term_width: usize,
         cut_indicator: &'static str,
-    ) -> DisplayList<'a> {
+    ) -> Self {
         let body = format_message(
             message,
             term_width,
@@ -995,12 +995,12 @@ impl DisplayAnnotationType {
 impl From<snippet::Level> for DisplayAnnotationType {
     fn from(at: snippet::Level) -> Self {
         match at {
-            snippet::Level::None => DisplayAnnotationType::None,
-            snippet::Level::Error => DisplayAnnotationType::Error,
-            snippet::Level::Warning => DisplayAnnotationType::Warning,
-            snippet::Level::Info => DisplayAnnotationType::Info,
-            snippet::Level::Note => DisplayAnnotationType::Note,
-            snippet::Level::Help => DisplayAnnotationType::Help,
+            snippet::Level::None => Self::None,
+            snippet::Level::Error => Self::Error,
+            snippet::Level::Warning => Self::Warning,
+            snippet::Level::Info => Self::Info,
+            snippet::Level::Note => Self::Note,
+            snippet::Level::Help => Self::Help,
         }
     }
 }
@@ -1036,9 +1036,9 @@ impl EndLine {
     /// The number of characters this line ending occupies in bytes.
     pub(crate) fn len(self) -> usize {
         match self {
-            EndLine::Eof => 0,
-            EndLine::Lf => 1,
-            EndLine::Crlf => 2,
+            Self::Eof => 0,
+            Self::Lf => 1,
+            Self::Crlf => 2,
         }
     }
 }

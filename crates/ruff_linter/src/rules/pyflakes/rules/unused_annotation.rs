@@ -28,7 +28,7 @@ pub(crate) struct UnusedAnnotation {
 impl Violation for UnusedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedAnnotation { name } = self;
+        let Self { name } = self;
         format!("Local variable `{name}` is annotated but never used")
     }
 }

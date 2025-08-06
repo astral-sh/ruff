@@ -28,8 +28,8 @@ pub(crate) enum Boundness {
 impl Boundness {
     pub(crate) const fn max(self, other: Self) -> Self {
         match (self, other) {
-            (Boundness::Bound, _) | (_, Boundness::Bound) => Boundness::Bound,
-            (Boundness::PossiblyUnbound, Boundness::PossiblyUnbound) => Boundness::PossiblyUnbound,
+            (Self::Bound, _) | (_, Self::Bound) => Self::Bound,
+            (Self::PossiblyUnbound, Self::PossiblyUnbound) => Self::PossiblyUnbound,
         }
     }
 }
@@ -93,7 +93,7 @@ impl<'db> Place<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
+    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         match self {
             Place::Type(ty, boundness) => Place::Type(f(ty), boundness),
             Place::Unbound => Place::Unbound,
@@ -111,7 +111,7 @@ impl<'db> Place<'db> {
     /// Try to call `__get__(None, owner)` on the type of this place (not on the meta type).
     /// If it succeeds, return the `__get__` return type. Otherwise, returns the original place.
     /// This is used to resolve (potential) descriptor attributes.
-    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
+    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Self {
         match self {
             Place::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
                 Place::Type(*elem, boundness).try_call_dunder_get(db, owner)
@@ -546,10 +546,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     }
 
     #[must_use]
-    pub(crate) fn map_type(
-        self,
-        f: impl FnOnce(Type<'db>) -> Type<'db>,
-    ) -> PlaceAndQualifiers<'db> {
+    pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         PlaceAndQualifiers {
             place: self.place.map_type(f),
             qualifiers: self.qualifiers,
@@ -605,7 +602,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
+        fallback_fn: impl FnOnce() -> Self,
     ) -> Self {
         self.into_lookup_result()
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
@@ -1423,7 +1420,7 @@ pub(crate) enum RequiresExplicitReExport {
 
 impl RequiresExplicitReExport {
     const fn is_yes(self) -> bool {
-        matches!(self, RequiresExplicitReExport::Yes)
+        matches!(self, Self::Yes)
     }
 }
 

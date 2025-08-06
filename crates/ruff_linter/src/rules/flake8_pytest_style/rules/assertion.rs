@@ -115,7 +115,7 @@ pub(crate) struct PytestAssertInExcept {
 impl Violation for PytestAssertInExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestAssertInExcept { name } = self;
+        let Self { name } = self;
         format!(
             "Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead"
         )
@@ -197,12 +197,12 @@ impl Violation for PytestUnittestAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUnittestAssertion { assertion } = self;
+        let Self { assertion } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestUnittestAssertion { assertion } = self;
+        let Self { assertion } = self;
         Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
 }
@@ -352,12 +352,12 @@ impl Violation for PytestUnittestRaisesAssertion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUnittestRaisesAssertion { assertion } = self;
+        let Self { assertion } = self;
         format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestUnittestRaisesAssertion { assertion } = self;
+        let Self { assertion } = self;
         Some(format!("Replace `{assertion}` with `pytest.raises`"))
     }
 }

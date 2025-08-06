@@ -46,7 +46,7 @@ pub(crate) struct HardcodedPasswordDefault {
 impl Violation for HardcodedPasswordDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedPasswordDefault { name } = self;
+        let Self { name } = self;
         format!(
             "Possible hardcoded password assigned to function default: \"{}\"",
             name.escape_debug()

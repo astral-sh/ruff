@@ -16,9 +16,9 @@ pub enum FixAvailability {
 impl Display for FixAvailability {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FixAvailability::Sometimes => write!(f, "Fix is sometimes available."),
-            FixAvailability::Always => write!(f, "Fix is always available."),
-            FixAvailability::None => write!(f, "Fix is not available."),
+            Self::Sometimes => write!(f, "Fix is sometimes available."),
+            Self::Always => write!(f, "Fix is always available."),
+            Self::None => write!(f, "Fix is not available."),
         }
     }
 }

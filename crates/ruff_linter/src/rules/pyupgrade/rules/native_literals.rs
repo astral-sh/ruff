@@ -23,11 +23,11 @@ impl FromStr for LiteralType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "str" => Ok(LiteralType::Str),
-            "bytes" => Ok(LiteralType::Bytes),
-            "int" => Ok(LiteralType::Int),
-            "float" => Ok(LiteralType::Float),
-            "bool" => Ok(LiteralType::Bool),
+            "str" => Ok(Self::Str),
+            "bytes" => Ok(Self::Bytes),
+            "int" => Ok(Self::Int),
+            "float" => Ok(Self::Float),
+            "bool" => Ok(Self::Bool),
             _ => Err(()),
         }
     }
@@ -36,33 +36,33 @@ impl FromStr for LiteralType {
 impl LiteralType {
     fn as_zero_value_expr(self, checker: &Checker) -> Expr {
         match self {
-            LiteralType::Str => ast::StringLiteral {
+            Self::Str => ast::StringLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_string_flags(),
             }
             .into(),
-            LiteralType::Bytes => ast::BytesLiteral {
+            Self::Bytes => ast::BytesLiteral {
                 value: Box::default(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 flags: checker.default_bytes_flags(),
             }
             .into(),
-            LiteralType::Int => ast::ExprNumberLiteral {
+            Self::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(Int::from(0u8)),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
-            LiteralType::Float => ast::ExprNumberLiteral {
+            Self::Float => ast::ExprNumberLiteral {
                 value: ast::Number::Float(0.0),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
             }
             .into(),
-            LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
+            Self::Bool => ast::ExprBooleanLiteral::default().into(),
         }
     }
 }
@@ -72,16 +72,16 @@ impl TryFrom<LiteralExpressionRef<'_>> for LiteralType {
 
     fn try_from(literal_expr: LiteralExpressionRef<'_>) -> Result<Self, Self::Error> {
         match literal_expr {
-            LiteralExpressionRef::StringLiteral(_) => Ok(LiteralType::Str),
-            LiteralExpressionRef::BytesLiteral(_) => Ok(LiteralType::Bytes),
+            LiteralExpressionRef::StringLiteral(_) => Ok(Self::Str),
+            LiteralExpressionRef::BytesLiteral(_) => Ok(Self::Bytes),
             LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
                 match value {
-                    ast::Number::Int(_) => Ok(LiteralType::Int),
-                    ast::Number::Float(_) => Ok(LiteralType::Float),
+                    ast::Number::Int(_) => Ok(Self::Int),
+                    ast::Number::Float(_) => Ok(Self::Float),
                     ast::Number::Complex { .. } => Err(()),
                 }
             }
-            LiteralExpressionRef::BooleanLiteral(_) => Ok(LiteralType::Bool),
+            LiteralExpressionRef::BooleanLiteral(_) => Ok(Self::Bool),
             LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
                 Err(())
             }
@@ -92,11 +92,11 @@ impl TryFrom<LiteralExpressionRef<'_>> for LiteralType {
 impl fmt::Display for LiteralType {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            LiteralType::Str => fmt.write_str("str"),
-            LiteralType::Bytes => fmt.write_str("bytes"),
-            LiteralType::Int => fmt.write_str("int"),
-            LiteralType::Float => fmt.write_str("float"),
-            LiteralType::Bool => fmt.write_str("bool"),
+            Self::Str => fmt.write_str("str"),
+            Self::Bytes => fmt.write_str("bytes"),
+            Self::Int => fmt.write_str("int"),
+            Self::Float => fmt.write_str("float"),
+            Self::Bool => fmt.write_str("bool"),
         }
     }
 }
@@ -135,12 +135,12 @@ pub(crate) struct NativeLiterals {
 impl AlwaysFixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NativeLiterals { literal_type } = self;
+        let Self { literal_type } = self;
         format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
     fn fix_title(&self) -> String {
-        let NativeLiterals { literal_type } = self;
+        let Self { literal_type } = self;
         match literal_type {
             LiteralType::Str => "Replace with string literal".to_string(),
             LiteralType::Bytes => "Replace with bytes literal".to_string(),

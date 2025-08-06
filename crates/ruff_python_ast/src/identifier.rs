@@ -56,8 +56,8 @@ impl Identifier for Stmt {
     /// ```
     fn identifier(&self) -> TextRange {
         match self {
-            Stmt::ClassDef(class) => class.identifier(),
-            Stmt::FunctionDef(function) => function.identifier(),
+            Self::ClassDef(class) => class.identifier(),
+            Self::FunctionDef(function) => function.identifier(),
             _ => self.range(),
         }
     }

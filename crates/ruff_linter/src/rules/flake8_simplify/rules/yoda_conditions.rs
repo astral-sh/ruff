@@ -61,7 +61,7 @@ impl Violation for YodaConditions {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let YodaConditions { suggestion } = self;
+        let Self { suggestion } = self;
         suggestion
             .as_ref()
             .and_then(|suggestion| suggestion.full_display())
@@ -86,39 +86,36 @@ impl From<&Expr> for ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an expression.
     fn from(expr: &Expr) -> Self {
         match expr {
-            _ if expr.is_literal_expr() => ConstantLikelihood::Definitely,
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                ConstantLikelihood::from_identifier(attr)
-            }
-            Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
+            _ if expr.is_literal_expr() => Self::Definitely,
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => Self::from_identifier(attr),
+            Expr::Name(ast::ExprName { id, .. }) => Self::from_identifier(id),
             Expr::Tuple(tuple) => tuple
                 .iter()
-                .map(ConstantLikelihood::from)
+                .map(Self::from)
                 .min()
-                .unwrap_or(ConstantLikelihood::Definitely),
+                .unwrap_or(Self::Definitely),
             Expr::List(list) => list
                 .iter()
-                .map(ConstantLikelihood::from)
+                .map(Self::from)
                 .min()
-                .unwrap_or(ConstantLikelihood::Definitely),
+                .unwrap_or(Self::Definitely),
             Expr::Dict(dict) => dict
                 .items
                 .iter()
                 .flat_map(|item| std::iter::once(&item.value).chain(item.key.as_ref()))
-                .map(ConstantLikelihood::from)
+                .map(Self::from)
                 .min()
-                .unwrap_or(ConstantLikelihood::Definitely),
-            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
-                ConstantLikelihood::from(&**left),
-                ConstantLikelihood::from(&**right),
-            ),
+                .unwrap_or(Self::Definitely),
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+                cmp::min(Self::from(&**left), Self::from(&**right))
+            }
             Expr::UnaryOp(ast::ExprUnaryOp {
                 op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
                 operand,
                 range: _,
                 node_index: _,
-            }) => ConstantLikelihood::from(&**operand),
-            _ => ConstantLikelihood::Unlikely,
+            }) => Self::from(&**operand),
+            _ => Self::Unlikely,
         }
     }
 }
@@ -127,9 +124,9 @@ impl ConstantLikelihood {
     /// Determine the [`ConstantLikelihood`] of an identifier.
     fn from_identifier(identifier: &str) -> Self {
         if str::is_cased_uppercase(identifier) {
-            ConstantLikelihood::Probably
+            Self::Probably
         } else {
-            ConstantLikelihood::Unlikely
+            Self::Unlikely
         }
     }
 }

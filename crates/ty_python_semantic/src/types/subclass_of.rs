@@ -147,7 +147,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn has_relation_to(
         self,
         db: &'db dyn Db,
-        other: SubclassOfType<'db>,
+        other: Self,
         relation: TypeRelation,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {

@@ -49,7 +49,7 @@ pub(crate) struct CompareToEmptyString {
 impl Violation for CompareToEmptyString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CompareToEmptyString {
+        let Self {
             existing,
             replacement,
         } = self;

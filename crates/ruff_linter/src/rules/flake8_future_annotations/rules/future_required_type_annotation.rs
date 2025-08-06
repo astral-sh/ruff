@@ -64,8 +64,8 @@ pub(crate) enum Reason {
 impl fmt::Display for Reason {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Reason::PEP585 => fmt.write_str("PEP 585 collection"),
-            Reason::PEP604 => fmt.write_str("PEP 604 union"),
+            Self::PEP585 => fmt.write_str("PEP 585 collection"),
+            Self::PEP604 => fmt.write_str("PEP 604 union"),
         }
     }
 }
@@ -73,7 +73,7 @@ impl fmt::Display for Reason {
 impl AlwaysFixableViolation for FutureRequiredTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FutureRequiredTypeAnnotation { reason } = self;
+        let Self { reason } = self;
         format!("Missing `from __future__ import annotations`, but uses {reason}")
     }
 

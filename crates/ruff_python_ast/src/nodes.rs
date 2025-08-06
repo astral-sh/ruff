@@ -63,24 +63,24 @@ impl Expr {
     pub fn is_literal_expr(&self) -> bool {
         matches!(
             self,
-            Expr::StringLiteral(_)
-                | Expr::BytesLiteral(_)
-                | Expr::NumberLiteral(_)
-                | Expr::BooleanLiteral(_)
-                | Expr::NoneLiteral(_)
-                | Expr::EllipsisLiteral(_)
+            Self::StringLiteral(_)
+                | Self::BytesLiteral(_)
+                | Self::NumberLiteral(_)
+                | Self::BooleanLiteral(_)
+                | Self::NoneLiteral(_)
+                | Self::EllipsisLiteral(_)
         )
     }
 
     /// Returns [`LiteralExpressionRef`] if the expression is a literal expression.
     pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
         match self {
-            Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
-            Expr::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
-            Expr::NumberLiteral(expr) => Some(LiteralExpressionRef::NumberLiteral(expr)),
-            Expr::BooleanLiteral(expr) => Some(LiteralExpressionRef::BooleanLiteral(expr)),
-            Expr::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
-            Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
+            Self::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
+            Self::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
+            Self::NumberLiteral(expr) => Some(LiteralExpressionRef::NumberLiteral(expr)),
+            Self::BooleanLiteral(expr) => Some(LiteralExpressionRef::BooleanLiteral(expr)),
+            Self::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
+            Self::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
     }
@@ -577,8 +577,8 @@ impl FStringPart {
 
     pub fn is_empty_literal(&self) -> bool {
         match &self {
-            FStringPart::Literal(string_literal) => string_literal.value.is_empty(),
-            FStringPart::FString(f_string) => f_string.elements.is_empty(),
+            Self::Literal(string_literal) => string_literal.value.is_empty(),
+            Self::FString(f_string) => f_string.elements.is_empty(),
         }
     }
 }
@@ -586,8 +586,8 @@ impl FStringPart {
 impl Ranged for FStringPart {
     fn range(&self) -> TextRange {
         match self {
-            FStringPart::Literal(string_literal) => string_literal.range(),
-            FStringPart::FString(f_string) => f_string.range(),
+            Self::Literal(string_literal) => string_literal.range(),
+            Self::FString(f_string) => f_string.range(),
         }
     }
 }
@@ -1126,7 +1126,7 @@ impl InterpolatedStringElements {
 
 impl From<Vec<InterpolatedStringElement>> for InterpolatedStringElements {
     fn from(elements: Vec<InterpolatedStringElement>) -> Self {
-        InterpolatedStringElements(elements)
+        Self(elements)
     }
 }
 
@@ -1461,7 +1461,7 @@ impl StringLiteralFlags {
 
     #[must_use]
     pub fn with_prefix(self, prefix: StringLiteralPrefix) -> Self {
-        let StringLiteralFlags(flags) = self;
+        let Self(flags) = self;
         match prefix {
             StringLiteralPrefix::Empty => Self(
                 flags
@@ -2167,7 +2167,7 @@ impl StringFlags for AnyStringFlags {
     }
 
     fn prefix(self) -> AnyStringPrefix {
-        let AnyStringFlags(flags) = self;
+        let Self(flags) = self;
 
         // f-strings
         if flags.contains(AnyStringFlagsInner::F_PREFIX) {
@@ -2227,14 +2227,14 @@ impl fmt::Debug for AnyStringFlags {
 }
 
 impl From<AnyStringFlags> for StringLiteralFlags {
-    fn from(value: AnyStringFlags) -> StringLiteralFlags {
+    fn from(value: AnyStringFlags) -> Self {
         let AnyStringPrefix::Regular(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a regular string",
                 value.prefix()
             )
         };
-        StringLiteralFlags::empty()
+        Self::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
@@ -2248,14 +2248,14 @@ impl From<StringLiteralFlags> for AnyStringFlags {
 }
 
 impl From<AnyStringFlags> for BytesLiteralFlags {
-    fn from(value: AnyStringFlags) -> BytesLiteralFlags {
+    fn from(value: AnyStringFlags) -> Self {
         let AnyStringPrefix::Bytes(bytestring_prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a bytestring",
                 value.prefix()
             )
         };
-        BytesLiteralFlags::empty()
+        Self::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(bytestring_prefix)
             .with_triple_quotes(value.triple_quotes())
@@ -2269,14 +2269,14 @@ impl From<BytesLiteralFlags> for AnyStringFlags {
 }
 
 impl From<AnyStringFlags> for FStringFlags {
-    fn from(value: AnyStringFlags) -> FStringFlags {
+    fn from(value: AnyStringFlags) -> Self {
         let AnyStringPrefix::Format(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into an f-string",
                 value.prefix()
             )
         };
-        FStringFlags::empty()
+        Self::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
@@ -2290,14 +2290,14 @@ impl From<FStringFlags> for AnyStringFlags {
 }
 
 impl From<AnyStringFlags> for TStringFlags {
-    fn from(value: AnyStringFlags) -> TStringFlags {
+    fn from(value: AnyStringFlags) -> Self {
         let AnyStringPrefix::Template(prefix) = value.prefix() else {
             unreachable!(
                 "Should never attempt to convert {} into a t-string",
                 value.prefix()
             )
         };
-        TStringFlags::empty()
+        Self::empty()
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
@@ -2398,8 +2398,8 @@ pub enum BoolOp {
 impl BoolOp {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            BoolOp::And => "and",
-            BoolOp::Or => "or",
+            Self::And => "and",
+            Self::Or => "or",
         }
     }
 }
@@ -2432,76 +2432,76 @@ pub enum Operator {
 impl Operator {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            Operator::Add => "+",
-            Operator::Sub => "-",
-            Operator::Mult => "*",
-            Operator::MatMult => "@",
-            Operator::Div => "/",
-            Operator::Mod => "%",
-            Operator::Pow => "**",
-            Operator::LShift => "<<",
-            Operator::RShift => ">>",
-            Operator::BitOr => "|",
-            Operator::BitXor => "^",
-            Operator::BitAnd => "&",
-            Operator::FloorDiv => "//",
+            Self::Add => "+",
+            Self::Sub => "-",
+            Self::Mult => "*",
+            Self::MatMult => "@",
+            Self::Div => "/",
+            Self::Mod => "%",
+            Self::Pow => "**",
+            Self::LShift => "<<",
+            Self::RShift => ">>",
+            Self::BitOr => "|",
+            Self::BitXor => "^",
+            Self::BitAnd => "&",
+            Self::FloorDiv => "//",
         }
     }
 
     /// Returns the dunder method name for the operator.
     pub const fn dunder(self) -> &'static str {
         match self {
-            Operator::Add => "__add__",
-            Operator::Sub => "__sub__",
-            Operator::Mult => "__mul__",
-            Operator::MatMult => "__matmul__",
-            Operator::Div => "__truediv__",
-            Operator::Mod => "__mod__",
-            Operator::Pow => "__pow__",
-            Operator::LShift => "__lshift__",
-            Operator::RShift => "__rshift__",
-            Operator::BitOr => "__or__",
-            Operator::BitXor => "__xor__",
-            Operator::BitAnd => "__and__",
-            Operator::FloorDiv => "__floordiv__",
+            Self::Add => "__add__",
+            Self::Sub => "__sub__",
+            Self::Mult => "__mul__",
+            Self::MatMult => "__matmul__",
+            Self::Div => "__truediv__",
+            Self::Mod => "__mod__",
+            Self::Pow => "__pow__",
+            Self::LShift => "__lshift__",
+            Self::RShift => "__rshift__",
+            Self::BitOr => "__or__",
+            Self::BitXor => "__xor__",
+            Self::BitAnd => "__and__",
+            Self::FloorDiv => "__floordiv__",
         }
     }
 
     /// Returns the in-place dunder method name for the operator.
     pub const fn in_place_dunder(self) -> &'static str {
         match self {
-            Operator::Add => "__iadd__",
-            Operator::Sub => "__isub__",
-            Operator::Mult => "__imul__",
-            Operator::MatMult => "__imatmul__",
-            Operator::Div => "__itruediv__",
-            Operator::Mod => "__imod__",
-            Operator::Pow => "__ipow__",
-            Operator::LShift => "__ilshift__",
-            Operator::RShift => "__irshift__",
-            Operator::BitOr => "__ior__",
-            Operator::BitXor => "__ixor__",
-            Operator::BitAnd => "__iand__",
-            Operator::FloorDiv => "__ifloordiv__",
+            Self::Add => "__iadd__",
+            Self::Sub => "__isub__",
+            Self::Mult => "__imul__",
+            Self::MatMult => "__imatmul__",
+            Self::Div => "__itruediv__",
+            Self::Mod => "__imod__",
+            Self::Pow => "__ipow__",
+            Self::LShift => "__ilshift__",
+            Self::RShift => "__irshift__",
+            Self::BitOr => "__ior__",
+            Self::BitXor => "__ixor__",
+            Self::BitAnd => "__iand__",
+            Self::FloorDiv => "__ifloordiv__",
         }
     }
 
     /// Returns the reflected dunder method name for the operator.
     pub const fn reflected_dunder(self) -> &'static str {
         match self {
-            Operator::Add => "__radd__",
-            Operator::Sub => "__rsub__",
-            Operator::Mult => "__rmul__",
-            Operator::MatMult => "__rmatmul__",
-            Operator::Div => "__rtruediv__",
-            Operator::Mod => "__rmod__",
-            Operator::Pow => "__rpow__",
-            Operator::LShift => "__rlshift__",
-            Operator::RShift => "__rrshift__",
-            Operator::BitOr => "__ror__",
-            Operator::BitXor => "__rxor__",
-            Operator::BitAnd => "__rand__",
-            Operator::FloorDiv => "__rfloordiv__",
+            Self::Add => "__radd__",
+            Self::Sub => "__rsub__",
+            Self::Mult => "__rmul__",
+            Self::MatMult => "__rmatmul__",
+            Self::Div => "__rtruediv__",
+            Self::Mod => "__rmod__",
+            Self::Pow => "__rpow__",
+            Self::LShift => "__rlshift__",
+            Self::RShift => "__rrshift__",
+            Self::BitOr => "__ror__",
+            Self::BitXor => "__rxor__",
+            Self::BitAnd => "__rand__",
+            Self::FloorDiv => "__rfloordiv__",
         }
     }
 }
@@ -2525,10 +2525,10 @@ pub enum UnaryOp {
 impl UnaryOp {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            UnaryOp::Invert => "~",
-            UnaryOp::Not => "not",
-            UnaryOp::UAdd => "+",
-            UnaryOp::USub => "-",
+            Self::Invert => "~",
+            Self::Not => "not",
+            Self::UAdd => "+",
+            Self::USub => "-",
         }
     }
 }
@@ -2558,32 +2558,32 @@ pub enum CmpOp {
 impl CmpOp {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            CmpOp::Eq => "==",
-            CmpOp::NotEq => "!=",
-            CmpOp::Lt => "<",
-            CmpOp::LtE => "<=",
-            CmpOp::Gt => ">",
-            CmpOp::GtE => ">=",
-            CmpOp::Is => "is",
-            CmpOp::IsNot => "is not",
-            CmpOp::In => "in",
-            CmpOp::NotIn => "not in",
+            Self::Eq => "==",
+            Self::NotEq => "!=",
+            Self::Lt => "<",
+            Self::LtE => "<=",
+            Self::Gt => ">",
+            Self::GtE => ">=",
+            Self::Is => "is",
+            Self::IsNot => "is not",
+            Self::In => "in",
+            Self::NotIn => "not in",
         }
     }
 
     #[must_use]
     pub const fn negate(&self) -> Self {
         match self {
-            CmpOp::Eq => CmpOp::NotEq,
-            CmpOp::NotEq => CmpOp::Eq,
-            CmpOp::Lt => CmpOp::GtE,
-            CmpOp::LtE => CmpOp::Gt,
-            CmpOp::Gt => CmpOp::LtE,
-            CmpOp::GtE => CmpOp::Lt,
-            CmpOp::Is => CmpOp::IsNot,
-            CmpOp::IsNot => CmpOp::Is,
-            CmpOp::In => CmpOp::NotIn,
-            CmpOp::NotIn => CmpOp::In,
+            Self::Eq => Self::NotEq,
+            Self::NotEq => Self::Eq,
+            Self::Lt => Self::GtE,
+            Self::LtE => Self::Gt,
+            Self::Gt => Self::LtE,
+            Self::GtE => Self::Lt,
+            Self::Is => Self::IsNot,
+            Self::IsNot => Self::Is,
+            Self::In => Self::NotIn,
+            Self::NotIn => Self::In,
         }
     }
 }
@@ -2689,7 +2689,7 @@ impl Pattern {
     /// Return `Some(IrrefutablePattern)` if `self` is irrefutable or `None` otherwise.
     pub fn irrefutable_pattern(&self) -> Option<IrrefutablePattern> {
         match self {
-            Pattern::MatchAs(PatternMatchAs {
+            Self::MatchAs(PatternMatchAs {
                 pattern,
                 name,
                 range,
@@ -2709,8 +2709,8 @@ impl Pattern {
                     }),
                 },
             },
-            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
-                patterns.iter().find_map(Pattern::irrefutable_pattern)
+            Self::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().find_map(Self::irrefutable_pattern)
             }
             _ => None,
         }
@@ -2729,11 +2729,11 @@ impl Pattern {
     /// [wildcard pattern]: https://docs.python.org/3/reference/compound_stmts.html#wildcard-patterns
     pub fn is_wildcard(&self) -> bool {
         match self {
-            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
-                pattern.as_deref().is_none_or(Pattern::is_wildcard)
+            Self::MatchAs(PatternMatchAs { pattern, .. }) => {
+                pattern.as_deref().is_none_or(Self::is_wildcard)
             }
-            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
-                patterns.iter().all(Pattern::is_wildcard)
+            Self::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(Self::is_wildcard)
             }
             _ => false,
         }
@@ -3017,7 +3017,7 @@ impl Parameters {
 
     /// Returns the total number of parameters included in this [`Parameters`] node.
     pub fn len(&self) -> usize {
-        let Parameters {
+        let Self {
             range: _,
             node_index: _,
             posonlyargs,
@@ -3449,12 +3449,12 @@ impl TryFrom<char> for IpyEscapeKind {
 
     fn try_from(ch: char) -> Result<Self, Self::Error> {
         match ch {
-            '!' => Ok(IpyEscapeKind::Shell),
-            '?' => Ok(IpyEscapeKind::Help),
-            '%' => Ok(IpyEscapeKind::Magic),
-            ',' => Ok(IpyEscapeKind::Quote),
-            ';' => Ok(IpyEscapeKind::Quote2),
-            '/' => Ok(IpyEscapeKind::Paren),
+            '!' => Ok(Self::Shell),
+            '?' => Ok(Self::Help),
+            '%' => Ok(Self::Magic),
+            ',' => Ok(Self::Quote),
+            ';' => Ok(Self::Quote2),
+            '/' => Ok(Self::Paren),
             _ => Err(format!("Unexpected magic escape: {ch}")),
         }
     }
@@ -3465,9 +3465,9 @@ impl TryFrom<[char; 2]> for IpyEscapeKind {
 
     fn try_from(ch: [char; 2]) -> Result<Self, Self::Error> {
         match ch {
-            ['!', '!'] => Ok(IpyEscapeKind::ShCap),
-            ['?', '?'] => Ok(IpyEscapeKind::Help2),
-            ['%', '%'] => Ok(IpyEscapeKind::Magic2),
+            ['!', '!'] => Ok(Self::ShCap),
+            ['?', '?'] => Ok(Self::Help2),
+            ['%', '%'] => Ok(Self::Magic2),
             [c1, c2] => Err(format!("Unexpected magic escape: {c1}{c2}")),
         }
     }
@@ -3482,25 +3482,25 @@ impl fmt::Display for IpyEscapeKind {
 impl IpyEscapeKind {
     /// Returns `true` if the escape kind is help i.e., `?` or `??`.
     pub const fn is_help(self) -> bool {
-        matches!(self, IpyEscapeKind::Help | IpyEscapeKind::Help2)
+        matches!(self, Self::Help | Self::Help2)
     }
 
     /// Returns `true` if the escape kind is magic i.e., `%` or `%%`.
     pub const fn is_magic(self) -> bool {
-        matches!(self, IpyEscapeKind::Magic | IpyEscapeKind::Magic2)
+        matches!(self, Self::Magic | Self::Magic2)
     }
 
     pub fn as_str(self) -> &'static str {
         match self {
-            IpyEscapeKind::Shell => "!",
-            IpyEscapeKind::ShCap => "!!",
-            IpyEscapeKind::Help => "?",
-            IpyEscapeKind::Help2 => "??",
-            IpyEscapeKind::Magic => "%",
-            IpyEscapeKind::Magic2 => "%%",
-            IpyEscapeKind::Quote => ",",
-            IpyEscapeKind::Quote2 => ";",
-            IpyEscapeKind::Paren => "/",
+            Self::Shell => "!",
+            Self::ShCap => "!!",
+            Self::Help => "?",
+            Self::Help2 => "??",
+            Self::Magic => "%",
+            Self::Magic2 => "%%",
+            Self::Quote => ",",
+            Self::Quote2 => ";",
+            Self::Paren => "/",
         }
     }
 }
@@ -3583,7 +3583,7 @@ impl std::fmt::Display for Identifier {
 
 impl From<Identifier> for Name {
     #[inline]
-    fn from(identifier: Identifier) -> Name {
+    fn from(identifier: Identifier) -> Self {
         identifier.id
     }
 }
@@ -3598,11 +3598,7 @@ pub enum Singleton {
 
 impl From<bool> for Singleton {
     fn from(value: bool) -> Self {
-        if value {
-            Singleton::True
-        } else {
-            Singleton::False
-        }
+        if value { Self::True } else { Self::False }
     }
 }
 

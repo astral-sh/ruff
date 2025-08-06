@@ -47,13 +47,13 @@ pub(crate) struct BitCount {
 impl AlwaysFixableViolation for BitCount {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BitCount { existing, .. } = self;
+        let Self { existing, .. } = self;
         let existing = existing.truncated_display();
         format!("Use of `bin({existing}).count('1')`")
     }
 
     fn fix_title(&self) -> String {
-        let BitCount { replacement, .. } = self;
+        let Self { replacement, .. } = self;
         if let Some(replacement) = replacement.full_display() {
             format!("Replace with `{replacement}`")
         } else {

@@ -49,8 +49,8 @@ pub enum FileRootKind {
 impl FileRootKind {
     const fn durability(self) -> Durability {
         match self {
-            FileRootKind::Project => Durability::LOW,
-            FileRootKind::LibrarySearchPath => Durability::HIGH,
+            Self::Project => Durability::LOW,
+            Self::LibrarySearchPath => Durability::HIGH,
         }
     }
 }

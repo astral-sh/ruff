@@ -33,12 +33,12 @@ pub(crate) struct RedirectedNOQA {
 impl AlwaysFixableViolation for RedirectedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedirectedNOQA { original, target } = self;
+        let Self { original, target } = self;
         format!("`{original}` is a redirect to `{target}`")
     }
 
     fn fix_title(&self) -> String {
-        let RedirectedNOQA { target, .. } = self;
+        let Self { target, .. } = self;
         format!("Replace with `{target}`")
     }
 }

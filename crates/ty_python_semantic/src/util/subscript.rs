@@ -49,9 +49,9 @@ pub(crate) enum Nth {
 impl Nth {
     pub(crate) fn from_index(index: i32) -> Self {
         if index >= 0 {
-            Nth::FromStart(from_nonnegative_i32(index))
+            Self::FromStart(from_nonnegative_i32(index))
         } else {
-            Nth::FromEnd(from_negative_i32(index) - 1)
+            Self::FromEnd(from_negative_i32(index) - 1)
         }
     }
 
@@ -59,14 +59,14 @@ impl Nth {
         debug_assert!(len > 0);
 
         match self {
-            Nth::FromStart(nth) => {
+            Self::FromStart(nth) => {
                 if *nth < len {
                     Position::AtIndex(*nth)
                 } else {
                     Position::AfterEnd
                 }
             }
-            Nth::FromEnd(nth_rev) => {
+            Self::FromEnd(nth_rev) => {
                 if *nth_rev < len {
                     Position::AtIndex(len - 1 - *nth_rev)
                 } else {

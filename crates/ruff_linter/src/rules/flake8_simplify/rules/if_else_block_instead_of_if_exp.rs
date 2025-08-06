@@ -73,7 +73,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents, kind } = self;
+        let Self { contents, kind } = self;
         match kind {
             AssignmentKind::Ternary => {
                 format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
@@ -85,7 +85,7 @@ impl Violation for IfElseBlockInsteadOfIfExp {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let Self { contents, .. } = self;
         Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }

@@ -60,7 +60,7 @@ impl Violation for VerboseDecimalConstructor {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let VerboseDecimalConstructor { replacement } = self;
+        let Self { replacement } = self;
         Some(format!("Replace with `{replacement}`"))
     }
 }

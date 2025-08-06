@@ -12,13 +12,13 @@ impl FromStr for Int {
     /// Parse an [`Int`] from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.parse::<u64>() {
-            Ok(value) => Ok(Int::small(value)),
+            Ok(value) => Ok(Self::small(value)),
             Err(err) => {
                 if matches!(
                     err.kind(),
                     std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
                 ) {
-                    Ok(Int::big(s))
+                    Ok(Self::big(s))
                 } else {
                     Err(err)
                 }
@@ -28,8 +28,8 @@ impl FromStr for Int {
 }
 
 impl Int {
-    pub const ZERO: Int = Int(Number::Small(0));
-    pub const ONE: Int = Int(Number::Small(1));
+    pub const ZERO: Self = Self(Number::Small(0));
+    pub const ONE: Self = Self(Number::Small(1));
 
     /// Create an [`Int`] to represent a value that can be represented as an `i64`.
     fn small(value: u64) -> Self {
@@ -51,13 +51,13 @@ impl Int {
         token: &str,
     ) -> Result<Self, std::num::ParseIntError> {
         match u64::from_str_radix(number, radix) {
-            Ok(value) => Ok(Int::small(value)),
+            Ok(value) => Ok(Self::small(value)),
             Err(err) => {
                 if matches!(
                     err.kind(),
                     std::num::IntErrorKind::PosOverflow | std::num::IntErrorKind::NegOverflow
                 ) {
-                    Ok(Int::big(token))
+                    Ok(Self::big(token))
                 } else {
                     Err(err)
                 }
@@ -228,8 +228,8 @@ enum Number {
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Number::Small(value) => write!(f, "{value}"),
-            Number::Big(value) => write!(f, "{value}"),
+            Self::Small(value) => write!(f, "{value}"),
+            Self::Big(value) => write!(f, "{value}"),
         }
     }
 }

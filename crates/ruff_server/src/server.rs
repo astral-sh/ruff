@@ -291,20 +291,20 @@ impl SupportedCommand {
     /// Returns the identifier of the command.
     const fn identifier(self) -> &'static str {
         match self {
-            SupportedCommand::Format => "ruff.applyFormat",
-            SupportedCommand::FixAll => "ruff.applyAutofix",
-            SupportedCommand::OrganizeImports => "ruff.applyOrganizeImports",
-            SupportedCommand::Debug => "ruff.printDebugInformation",
+            Self::Format => "ruff.applyFormat",
+            Self::FixAll => "ruff.applyAutofix",
+            Self::OrganizeImports => "ruff.applyOrganizeImports",
+            Self::Debug => "ruff.printDebugInformation",
         }
     }
 
     /// Returns all the commands that the server currently supports.
-    const fn all() -> [SupportedCommand; 4] {
+    const fn all() -> [Self; 4] {
         [
-            SupportedCommand::Format,
-            SupportedCommand::FixAll,
-            SupportedCommand::OrganizeImports,
-            SupportedCommand::Debug,
+            Self::Format,
+            Self::FixAll,
+            Self::OrganizeImports,
+            Self::Debug,
         ]
     }
 }

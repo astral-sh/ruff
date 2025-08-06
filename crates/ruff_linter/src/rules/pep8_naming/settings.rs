@@ -52,7 +52,7 @@ pub enum SettingsError {
 impl fmt::Display for SettingsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SettingsError::InvalidIgnoreName(err) => {
+            Self::InvalidIgnoreName(err) => {
                 write!(f, "Invalid pattern in ignore-names: {err}")
             }
         }
@@ -62,7 +62,7 @@ impl fmt::Display for SettingsError {
 impl Error for SettingsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            SettingsError::InvalidIgnoreName(err) => Some(err),
+            Self::InvalidIgnoreName(err) => Some(err),
         }
     }
 }
@@ -103,7 +103,7 @@ impl IgnoreNames {
         // If the user is not customizing the set of ignored names, use the default matcher,
         // which is hard-coded to avoid expensive regex matching.
         if ignore_names.is_none() && extend_ignore_names.as_ref().is_none_or(Vec::is_empty) {
-            return Ok(IgnoreNames::Default);
+            return Ok(Self::Default);
         }
 
         let mut builder = GlobSetBuilder::new();
@@ -133,13 +133,13 @@ impl IgnoreNames {
 
         let matcher = builder.build().map_err(SettingsError::InvalidIgnoreName)?;
 
-        Ok(IgnoreNames::UserProvided { matcher, literals })
+        Ok(Self::UserProvided { matcher, literals })
     }
 
     /// Returns `true` if the given name matches any of the ignored patterns.
     pub fn matches(&self, name: &str) -> bool {
         match self {
-            IgnoreNames::Default => matches!(
+            Self::Default => matches!(
                 name,
                 "setUp"
                     | "tearDown"
@@ -154,7 +154,7 @@ impl IgnoreNames {
                     | "longMessage"
                     | "maxDiff"
             ),
-            IgnoreNames::UserProvided { matcher, .. } => matcher.is_match(name),
+            Self::UserProvided { matcher, .. } => matcher.is_match(name),
         }
     }
 
@@ -172,17 +172,17 @@ impl IgnoreNames {
 
         let matcher = builder.build().map_err(SettingsError::InvalidIgnoreName)?;
 
-        Ok(IgnoreNames::UserProvided { matcher, literals })
+        Ok(Self::UserProvided { matcher, literals })
     }
 }
 
 impl CacheKey for IgnoreNames {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         match self {
-            IgnoreNames::Default => {
+            Self::Default => {
                 "default".cache_key(state);
             }
-            IgnoreNames::UserProvided {
+            Self::UserProvided {
                 literals: patterns, ..
             } => {
                 "user-provided".cache_key(state);
@@ -195,14 +195,14 @@ impl CacheKey for IgnoreNames {
 impl fmt::Display for IgnoreNames {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            IgnoreNames::Default => {
+            Self::Default => {
                 writeln!(f, "[")?;
                 for elem in DEFAULTS {
                     writeln!(f, "\t{elem},")?;
                 }
                 write!(f, "]")?;
             }
-            IgnoreNames::UserProvided {
+            Self::UserProvided {
                 literals: patterns, ..
             } => {
                 writeln!(f, "[")?;

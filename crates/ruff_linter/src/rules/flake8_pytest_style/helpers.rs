@@ -154,8 +154,8 @@ pub(super) enum Parentheses {
 impl fmt::Display for Parentheses {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Parentheses::None => fmt.write_str(""),
-            Parentheses::Empty => fmt.write_str("()"),
+            Self::None => fmt.write_str(""),
+            Self::Empty => fmt.write_str("()"),
         }
     }
 }

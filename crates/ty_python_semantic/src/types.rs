@@ -676,14 +676,14 @@ impl<'db> Type<'db> {
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
-    pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn top_materialization(&self, db: &'db dyn Db) -> Self {
         self.materialize(db, TypeVarVariance::Covariant)
     }
 
     /// Returns the bottom materialization (or lower bound materialization) of this type, which is
     /// the most specific form of the type that is fully static.
     #[must_use]
-    pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn bottom_materialization(&self, db: &'db dyn Db) -> Self {
         self.materialize(db, TypeVarVariance::Contravariant)
     }
 
@@ -695,7 +695,7 @@ impl<'db> Type<'db> {
     /// - In covariant position, it's replaced with `object`
     /// - In contravariant position, it's replaced with `Never`
     /// - In invariant position, it's replaced with an unresolved type variable
-    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             Type::Dynamic(_) => match variance {
                 // TODO: For an invariant position, e.g. `list[Any]`, it should be replaced with an
@@ -985,18 +985,18 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn negate(&self, db: &'db dyn Db) -> Self {
         IntersectionBuilder::new(db).add_negative(*self).build()
     }
 
     #[must_use]
-    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
+    pub fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Self {
         if yes { self.negate(db) } else { *self }
     }
 
     /// Returns the fallback instance type that a literal is an instance of, or `None` if the type
     /// is not a literal.
-    pub fn literal_fallback_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub fn literal_fallback_instance(self, db: &'db dyn Db) -> Option<Self> {
         // There are other literal types that could conceivable be included here: class literals
         // falling back to `type[X]`, for instance. For now, there is not much rigorous thought put
         // into what's included vs not; this is just an empirical choice that makes our ecosystem
@@ -1162,7 +1162,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn into_callable(self, db: &'db dyn Db) -> Option<Self> {
         match self {
             Type::Callable(_) => Some(self),
 
@@ -1274,18 +1274,18 @@ impl<'db> Type<'db> {
     /// P`, but not `B <: P`. Losing transitivity of subtyping is not tenable (it makes union and
     /// intersection simplification dependent on the order in which elements are added), so we do
     /// not use this more general definition of subtyping.
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Self) -> bool {
         self.has_relation_to(db, target, TypeRelation::Subtyping)
     }
 
     /// Return true if this type is [assignable to] type `target`.
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Self) -> bool {
         self.has_relation_to(db, target, TypeRelation::Assignability)
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
+    fn has_relation_to(self, db: &'db dyn Db, target: Self, relation: TypeRelation) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -1687,7 +1687,7 @@ impl<'db> Type<'db> {
     /// > &mdash; [Summary of type relations]
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         if self == other {
             return true;
         }
@@ -1752,7 +1752,7 @@ impl<'db> Type<'db> {
     ///
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
-    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
+    pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
         let mut visitor = PairVisitor::new(false);
         self.is_disjoint_from_impl(db, other, &mut visitor)
     }
@@ -1760,7 +1760,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
-        other: Type<'db>,
+        other: Self,
         visitor: &mut PairVisitor<'db>,
     ) -> bool {
         fn any_protocol_members_absent_or_disjoint<'db>(
@@ -2876,8 +2876,8 @@ impl<'db> Type<'db> {
     fn try_call_dunder_get_on_attribute(
         db: &'db dyn Db,
         attribute: PlaceAndQualifiers<'db>,
-        instance: Type<'db>,
-        owner: Type<'db>,
+        instance: Self,
+        owner: Self,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
         match attribute {
             // This branch is not strictly needed, but it short-circuits the lookup of various dunder
@@ -3643,7 +3643,7 @@ impl<'db> Type<'db> {
     ///
     /// In the second case, the return type of `len()` in `typeshed` (`int`)
     /// is used as a fallback.
-    fn len(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn len(&self, db: &'db dyn Db) -> Option<Self> {
         fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
@@ -4881,7 +4881,7 @@ impl<'db> Type<'db> {
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
-    fn enter(self, db: &'db dyn Db) -> Type<'db> {
+    fn enter(self, db: &'db dyn Db) -> Self {
         self.try_enter_with_mode(db, EvaluationMode::Sync)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
@@ -4890,7 +4890,7 @@ impl<'db> Type<'db> {
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_enter_with_mode`](Self::try_enter_with_mode) instead.
-    fn aenter(self, db: &'db dyn Db) -> Type<'db> {
+    fn aenter(self, db: &'db dyn Db) -> Self {
         self.try_enter_with_mode(db, EvaluationMode::Async)
             .unwrap_or_else(|err| err.fallback_enter_type(db))
     }
@@ -4907,7 +4907,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         mode: EvaluationMode,
-    ) -> Result<Type<'db>, ContextManagerError<'db>> {
+    ) -> Result<Self, ContextManagerError<'db>> {
         let (enter_method, exit_method) = match mode {
             EvaluationMode::Async => ("__aenter__", "__aexit__"),
             EvaluationMode::Sync => ("__enter__", "__exit__"),
@@ -4953,7 +4953,7 @@ impl<'db> Type<'db> {
     }
 
     /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
-    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
+    fn resolve_await(self, db: &'db dyn Db) -> Self {
         // TODO: Add proper error handling and rename this method to `try_await`.
         self.try_call_dunder(db, "__await__", CallArguments::none())
             .map_or(Type::unknown(), |result| {
@@ -4968,7 +4968,7 @@ impl<'db> Type<'db> {
     ///
     /// This corresponds to the `ReturnT` parameter of the generic `typing.Generator[YieldT, SendT, ReturnT]`
     /// protocol.
-    fn generator_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn generator_return_type(self, db: &'db dyn Db) -> Option<Self> {
         // TODO: Ideally, we would first try to upcast `self` to an instance of `Generator` and *then*
         // match on the protocol instance to get the `ReturnType` type parameter. For now, implement
         // an ad-hoc solution that works for protocols and instances of classes that explicitly inherit
@@ -5018,7 +5018,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         argument_types: CallArguments<'_, 'db>,
-    ) -> Result<Type<'db>, ConstructorCallError<'db>> {
+    ) -> Result<Self, ConstructorCallError<'db>> {
         debug_assert!(matches!(
             self,
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
@@ -5192,7 +5192,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub fn to_instance(&self, db: &'db dyn Db) -> Option<Self> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
@@ -5266,7 +5266,7 @@ impl<'db> Type<'db> {
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
-    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+    ) -> Result<Self, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
@@ -5528,7 +5528,7 @@ impl<'db> Type<'db> {
     }
 
     /// The type `NoneType` / `None`
-    pub fn none(db: &'db dyn Db) -> Type<'db> {
+    pub fn none(db: &'db dyn Db) -> Self {
         KnownClass::NoneType.to_instance(db)
     }
 
@@ -5572,7 +5572,7 @@ impl<'db> Type<'db> {
     /// Note: the return type of `type(obj)` is subtly different from this.
     /// See `Self::dunder_class` for more details.
     #[must_use]
-    pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn to_meta_type(&self, db: &'db dyn Db) -> Self {
         match self {
             Type::Never => Type::Never,
             Type::NominalInstance(instance) => instance.to_meta_type(db),
@@ -5639,7 +5639,7 @@ impl<'db> Type<'db> {
     /// this returns `type[dict[str, object]]` instead, because inhabitants of a `TypedDict` are
     /// instances of `dict` at runtime.
     #[must_use]
-    pub fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn dunder_class(self, db: &'db dyn Db) -> Self {
         if self.is_typed_dict() {
             return KnownClass::Dict
                 .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object(db)])
@@ -5655,7 +5655,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> Type<'db> {
+    ) -> Self {
         if let Some(specialization) = specialization {
             self.apply_specialization(db, specialization)
         } else {
@@ -5678,11 +5678,7 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
     }
 
-    fn apply_type_mapping<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Type<'db> {
+    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
         match self {
             Type::TypeVar(typevar) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
@@ -5921,7 +5917,7 @@ impl<'db> Type<'db> {
     /// When not available, this should fall back to the value of `[Type::repr]`.
     /// Note: this method is used in the builtins `format`, `print`, `str.format` and `f-strings`.
     #[must_use]
-    pub fn str(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn str(&self, db: &'db dyn Db) -> Self {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
@@ -5946,7 +5942,7 @@ impl<'db> Type<'db> {
     /// Return the string representation of this type as it would be provided by the  `__repr__`
     /// method at runtime.
     #[must_use]
-    pub fn repr(&self, db: &'db dyn Db) -> Type<'db> {
+    pub fn repr(&self, db: &'db dyn Db) -> Self {
         match self {
             Type::IntLiteral(number) => Type::string_literal(db, &number.to_string()),
             Type::BooleanLiteral(true) => Type::string_literal(db, "True"),
@@ -6120,8 +6116,8 @@ impl<'db> Type<'db> {
     }
 }
 
-impl<'db> From<&Type<'db>> for Type<'db> {
-    fn from(value: &Type<'db>) -> Self {
+impl From<&Self> for Type<'_> {
+    fn from(value: &Self) -> Self {
         *value
     }
 }
@@ -6388,26 +6384,26 @@ impl DynamicType {
 impl std::fmt::Display for DynamicType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DynamicType::Any => f.write_str("Any"),
-            DynamicType::Unknown => f.write_str("Unknown"),
+            Self::Any => f.write_str("Any"),
+            Self::Unknown => f.write_str("Unknown"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
-            DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoPEP695ParamSpec => {
+            Self::Todo(todo) => write!(f, "@Todo{todo}"),
+            Self::TodoPEP695ParamSpec => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(ParamSpec)")
                 } else {
                     f.write_str("@Todo")
                 }
             }
-            DynamicType::TodoUnpack => {
+            Self::TodoUnpack => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(typing.Unpack)")
                 } else {
                     f.write_str("@Todo")
                 }
             }
-            DynamicType::TodoTypeAlias => {
+            Self::TodoTypeAlias => {
                 if cfg!(debug_assertions) {
                     f.write_str("@Todo(Support for `typing.TypeAlias`)")
                 } else {
@@ -6875,10 +6871,10 @@ impl TypeVarVariance {
     /// Covariant becomes contravariant, contravariant becomes covariant, others remain unchanged.
     pub(crate) const fn flip(self) -> Self {
         match self {
-            TypeVarVariance::Invariant => TypeVarVariance::Invariant,
-            TypeVarVariance::Covariant => TypeVarVariance::Contravariant,
-            TypeVarVariance::Contravariant => TypeVarVariance::Covariant,
-            TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
+            Self::Invariant => Self::Invariant,
+            Self::Covariant => Self::Contravariant,
+            Self::Contravariant => Self::Covariant,
+            Self::Bivariant => Self::Bivariant,
         }
     }
 }
@@ -7817,7 +7813,7 @@ pub(crate) enum TypeRelation {
 
 impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
-        matches!(self, TypeRelation::Assignability)
+        matches!(self, Self::Assignability)
     }
 }
 
@@ -7833,11 +7829,11 @@ pub enum Truthiness {
 
 impl Truthiness {
     pub(crate) const fn is_ambiguous(self) -> bool {
-        matches!(self, Truthiness::Ambiguous)
+        matches!(self, Self::Ambiguous)
     }
 
     pub(crate) const fn is_always_false(self) -> bool {
-        matches!(self, Truthiness::AlwaysFalse)
+        matches!(self, Self::AlwaysFalse)
     }
 
     pub(crate) const fn may_be_true(self) -> bool {
@@ -7845,7 +7841,7 @@ impl Truthiness {
     }
 
     pub(crate) const fn is_always_true(self) -> bool {
-        matches!(self, Truthiness::AlwaysTrue)
+        matches!(self, Self::AlwaysTrue)
     }
 
     pub(crate) const fn negate(self) -> Self {
@@ -7862,17 +7858,17 @@ impl Truthiness {
 
     pub(crate) fn and(self, other: Self) -> Self {
         match (self, other) {
-            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
-            (Truthiness::AlwaysFalse, _) | (_, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
-            _ => Truthiness::Ambiguous,
+            (Self::AlwaysTrue, Self::AlwaysTrue) => Self::AlwaysTrue,
+            (Self::AlwaysFalse, _) | (_, Self::AlwaysFalse) => Self::AlwaysFalse,
+            _ => Self::Ambiguous,
         }
     }
 
     pub(crate) fn or(self, other: Self) -> Self {
         match (self, other) {
-            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
-            (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
-            _ => Truthiness::Ambiguous,
+            (Self::AlwaysFalse, Self::AlwaysFalse) => Self::AlwaysFalse,
+            (Self::AlwaysTrue, _) | (_, Self::AlwaysTrue) => Self::AlwaysTrue,
+            _ => Self::Ambiguous,
         }
     }
 
@@ -7888,9 +7884,9 @@ impl Truthiness {
 impl From<bool> for Truthiness {
     fn from(value: bool) -> Self {
         if value {
-            Truthiness::AlwaysTrue
+            Self::AlwaysTrue
         } else {
-            Truthiness::AlwaysFalse
+            Self::AlwaysFalse
         }
     }
 }

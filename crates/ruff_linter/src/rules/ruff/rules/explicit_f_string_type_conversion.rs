@@ -208,9 +208,9 @@ impl Conversion {
 
     fn as_str(self) -> &'static str {
         match self {
-            Conversion::Ascii => "a",
-            Conversion::Str => "s",
-            Conversion::Repr => "r",
+            Self::Ascii => "a",
+            Self::Str => "s",
+            Self::Repr => "r",
         }
     }
 }

@@ -447,7 +447,7 @@ pub(crate) struct LoggingExtraAttrClash(pub String);
 impl Violation for LoggingExtraAttrClash {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoggingExtraAttrClash(key) = self;
+        let Self(key) = self;
         format!(
             "Logging statement uses an `extra` field that clashes with a `LogRecord` field: `{key}`"
         )

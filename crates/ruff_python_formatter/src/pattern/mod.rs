@@ -93,7 +93,7 @@ impl FormatRule<Pattern, PyFormatContext<'_>> for FormatPattern {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Pattern {
-    type Format<'a> = FormatRefWithRule<'a, Pattern, FormatPattern, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatPattern, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatPattern::default())
@@ -101,7 +101,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Pattern {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Pattern {
-    type Format = FormatOwnedWithRule<Pattern, FormatPattern, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatPattern, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatPattern::default())
@@ -142,14 +142,14 @@ impl NeedsParentheses for Pattern {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         match self {
-            Pattern::MatchValue(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchSingleton(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchSequence(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchMapping(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchClass(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
-            Pattern::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchValue(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchSingleton(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchSequence(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchMapping(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchClass(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchStar(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchAs(pattern) => pattern.needs_parentheses(parent, context),
+            Self::MatchOr(pattern) => pattern.needs_parentheses(parent, context),
         }
     }
 }
@@ -380,7 +380,7 @@ enum First<'a> {
 
 impl<'a> First<'a> {
     #[inline]
-    fn set_if_none(&mut self, first: First<'a>) {
+    fn set_if_none(&mut self, first: Self) {
         if matches!(self, First::None) {
             *self = first;
         }

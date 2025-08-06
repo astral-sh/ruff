@@ -65,12 +65,12 @@ impl Violation for NonPEP585Annotation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP585Annotation { from, to } = self;
+        let Self { from, to } = self;
         format!("Use `{to}` instead of `{from}` for type annotation")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NonPEP585Annotation { to, .. } = self;
+        let Self { to, .. } = self;
         Some(format!("Replace with `{to}`"))
     }
 }

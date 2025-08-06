@@ -53,7 +53,7 @@ pub(crate) struct NumpyLegacyRandom {
 impl Violation for NumpyLegacyRandom {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NumpyLegacyRandom { method_name } = self;
+        let Self { method_name } = self;
         format!("Replace legacy `np.random.{method_name}` call with `np.random.Generator`")
     }
 }

@@ -145,11 +145,11 @@ impl Statistics {
     }
 }
 
-impl Add<Statistics> for Statistics {
-    type Output = Statistics;
+impl Add<Self> for Statistics {
+    type Output = Self;
 
-    fn add(self, rhs: Statistics) -> Self::Output {
-        Statistics {
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
             black_input: self.black_input + rhs.black_input,
             ruff_output: self.ruff_output + rhs.ruff_output,
             intersection: self.intersection + rhs.intersection,
@@ -158,8 +158,8 @@ impl Add<Statistics> for Statistics {
     }
 }
 
-impl AddAssign<Statistics> for Statistics {
-    fn add_assign(&mut self, rhs: Statistics) {
+impl AddAssign<Self> for Statistics {
+    fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
     }
 }
@@ -787,12 +787,12 @@ impl CheckFileError {
     /// Returns `false` if this is a formatter bug or `true` is if it is something outside of ruff
     fn is_success(&self) -> bool {
         match self {
-            CheckFileError::SyntaxErrorInInput(_) | CheckFileError::IoError(_) => true,
-            CheckFileError::Unstable { .. }
-            | CheckFileError::SyntaxErrorInOutput { .. }
-            | CheckFileError::FormatError(_)
-            | CheckFileError::PrintError(_)
-            | CheckFileError::Panic { .. } => false,
+            Self::SyntaxErrorInInput(_) | Self::IoError(_) => true,
+            Self::Unstable { .. }
+            | Self::SyntaxErrorInOutput { .. }
+            | Self::FormatError(_)
+            | Self::PrintError(_)
+            | Self::Panic { .. } => false,
             #[cfg(not(debug_assertions))]
             CheckFileError::Slow(_) => true,
         }

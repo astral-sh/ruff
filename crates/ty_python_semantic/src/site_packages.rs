@@ -171,7 +171,7 @@ impl PythonEnvironment {
         tracing::debug!("Discovering virtual environment in `{project_root}`");
         let virtual_env_directory = project_root.join(".venv");
 
-        match PythonEnvironment::new(
+        match Self::new(
             &virtual_env_directory,
             SysPrefixPathOrigin::LocalVenv,
             system,
@@ -400,7 +400,7 @@ impl VirtualEnvironment {
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-        let VirtualEnvironment {
+        let Self {
             root_path,
             base_executable_home_path,
             include_system_site_packages,
@@ -607,7 +607,7 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-        let SystemEnvironment { root_path } = self;
+        let Self { root_path } = self;
 
         let site_packages_directories =
             SitePackagesPaths::single(site_packages_directory_from_sys_prefix(
@@ -1230,7 +1230,7 @@ mod tests {
     impl PythonEnvironmentTestCase {
         /// Builds a mock environment, and returns the path to the environment root.
         fn build(&self) -> SystemPathBuf {
-            let PythonEnvironmentTestCase {
+            let Self {
                 system,
                 minor_version,
                 free_threaded,

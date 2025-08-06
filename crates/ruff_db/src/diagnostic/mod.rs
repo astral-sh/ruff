@@ -57,7 +57,7 @@ impl Diagnostic {
         id: DiagnosticId,
         severity: Severity,
         message: impl IntoDiagnosticMessage + 'a,
-    ) -> Diagnostic {
+    ) -> Self {
         let inner = Arc::new(DiagnosticInner {
             id,
             severity,
@@ -69,7 +69,7 @@ impl Diagnostic {
             noqa_offset: None,
             secondary_code: None,
         });
-        Diagnostic { inner }
+        Self { inner }
     }
 
     /// Creates a `Diagnostic` for a syntax error.
@@ -88,8 +88,8 @@ impl Diagnostic {
         span: impl Into<Span>,
         message: impl IntoDiagnosticMessage,
         range: impl Ranged,
-    ) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+    ) -> Self {
+        let mut diag = Self::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
         let span = span.into().with_range(range.range());
         diag.annotate(Annotation::primary(span).message(message));
         diag
@@ -593,13 +593,13 @@ impl SubDiagnostic {
     pub fn new<'a>(
         severity: SubDiagnosticSeverity,
         message: impl IntoDiagnosticMessage + 'a,
-    ) -> SubDiagnostic {
+    ) -> Self {
         let inner = Box::new(SubDiagnosticInner {
             severity,
             message: message.into_diagnostic_message(),
             annotations: vec![],
         });
-        SubDiagnostic { inner }
+        Self { inner }
     }
 
     /// Add an annotation to this sub-diagnostic.
@@ -729,8 +729,8 @@ impl Annotation {
     /// A diagnostic may have many primary annotations. A diagnostic may not
     /// have any annotations, but if it does, at least one _ought_ to be
     /// primary.
-    pub fn primary(span: Span) -> Annotation {
-        Annotation {
+    pub fn primary(span: Span) -> Self {
+        Self {
             span,
             message: None,
             is_primary: true,
@@ -746,8 +746,8 @@ impl Annotation {
     ///
     /// A diagnostic with only secondary annotations is usually not sensible,
     /// but it is allowed and will produce a reasonable rendering.
-    pub fn secondary(span: Span) -> Annotation {
-        Annotation {
+    pub fn secondary(span: Span) -> Self {
+        Self {
             span,
             message: None,
             is_primary: false,
@@ -770,9 +770,9 @@ impl Annotation {
     /// Callers can pass anything that implements `std::fmt::Display`
     /// directly. If callers want or need to avoid cloning the diagnostic
     /// message, then they can also pass a `DiagnosticMessage` directly.
-    pub fn message<'a>(self, message: impl IntoDiagnosticMessage + 'a) -> Annotation {
+    pub fn message<'a>(self, message: impl IntoDiagnosticMessage + 'a) -> Self {
         let message = Some(message.into_diagnostic_message());
-        Annotation { message, ..self }
+        Self { message, ..self }
     }
 
     /// Sets the message on this annotation.
@@ -809,7 +809,7 @@ impl Annotation {
     /// Attaches this tag to this annotation.
     ///
     /// It will not replace any existing tags.
-    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
+    pub fn tag(mut self, tag: DiagnosticTag) -> Self {
         self.tags.push(tag);
         self
     }
@@ -996,12 +996,12 @@ impl DiagnosticId {
 
     /// Returns `true` if this `DiagnosticId` represents a lint.
     pub fn is_lint(&self) -> bool {
-        matches!(self, DiagnosticId::Lint(_))
+        matches!(self, Self::Lint(_))
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
     pub fn is_lint_named(&self, name: &str) -> bool {
-        matches!(self, DiagnosticId::Lint(self_name) if self_name == name)
+        matches!(self, Self::Lint(self_name) if self_name == name)
     }
 
     pub fn strip_category(code: &str) -> Option<&str> {
@@ -1014,17 +1014,17 @@ impl DiagnosticId {
     /// only includes the lint's name.
     pub fn as_str(&self) -> &'static str {
         match self {
-            DiagnosticId::Panic => "panic",
-            DiagnosticId::Io => "io",
-            DiagnosticId::InvalidSyntax => "invalid-syntax",
-            DiagnosticId::Lint(name) => name.as_str(),
-            DiagnosticId::RevealedType => "revealed-type",
-            DiagnosticId::UnknownRule => "unknown-rule",
-            DiagnosticId::InvalidGlob => "invalid-glob",
-            DiagnosticId::EmptyInclude => "empty-include",
-            DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
-            DiagnosticId::UselessOverridesSection => "useless-overrides-section",
-            DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            Self::Panic => "panic",
+            Self::Io => "io",
+            Self::InvalidSyntax => "invalid-syntax",
+            Self::Lint(name) => name.as_str(),
+            Self::RevealedType => "revealed-type",
+            Self::UnknownRule => "unknown-rule",
+            Self::InvalidGlob => "invalid-glob",
+            Self::EmptyInclude => "empty-include",
+            Self::UnnecessaryOverridesSection => "unnecessary-overrides-section",
+            Self::UselessOverridesSection => "useless-overrides-section",
+            Self::DeprecatedSetting => "deprecated-setting",
         }
     }
 
@@ -1057,8 +1057,8 @@ pub enum UnifiedFile {
 impl UnifiedFile {
     pub fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
         match self {
-            UnifiedFile::Ty(file) => resolver.path(*file),
-            UnifiedFile::Ruff(file) => file.name(),
+            Self::Ty(file) => resolver.path(*file),
+            Self::Ruff(file) => file.name(),
         }
     }
 
@@ -1076,8 +1076,8 @@ impl UnifiedFile {
 
     fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
         match self {
-            UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
-            UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),
+            Self::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
+            Self::Ruff(file) => DiagnosticSource::Ruff(file.clone()),
         }
     }
 }
@@ -1101,8 +1101,8 @@ impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
     fn as_source_code(&self) -> SourceCode {
         match self {
-            DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
-            DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
+            Self::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
+            Self::Ruff(source) => SourceCode::new(source.source_text(), source.index()),
         }
     }
 }
@@ -1134,13 +1134,13 @@ impl Span {
     }
 
     /// Returns a new `Span` with the given `range` attached to it.
-    pub fn with_range(self, range: TextRange) -> Span {
+    pub fn with_range(self, range: TextRange) -> Self {
         self.with_optional_range(Some(range))
     }
 
     /// Returns a new `Span` with the given optional `range` attached to it.
-    pub fn with_optional_range(self, range: Option<TextRange>) -> Span {
-        Span { range, ..self }
+    pub fn with_optional_range(self, range: Option<TextRange>) -> Self {
+        Self { range, ..self }
     }
 
     /// Returns the [`File`] attached to this [`Span`].
@@ -1171,22 +1171,22 @@ impl Span {
 }
 
 impl From<File> for Span {
-    fn from(file: File) -> Span {
+    fn from(file: File) -> Self {
         let file = UnifiedFile::Ty(file);
-        Span { file, range: None }
+        Self { file, range: None }
     }
 }
 
 impl From<SourceFile> for Span {
     fn from(file: SourceFile) -> Self {
         let file = UnifiedFile::Ruff(file);
-        Span { file, range: None }
+        Self { file, range: None }
     }
 }
 
 impl From<crate::files::FileRange> for Span {
-    fn from(file_range: crate::files::FileRange) -> Span {
-        Span::from(file_range.file()).with_range(file_range.range())
+    fn from(file_range: crate::files::FileRange) -> Self {
+        Self::from(file_range.file()).with_range(file_range.range())
     }
 }
 
@@ -1201,9 +1201,9 @@ pub enum Severity {
 impl Severity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
-            Severity::Info => AnnotateLevel::Info,
-            Severity::Warning => AnnotateLevel::Warning,
-            Severity::Error => AnnotateLevel::Error,
+            Self::Info => AnnotateLevel::Info,
+            Self::Warning => AnnotateLevel::Warning,
+            Self::Error => AnnotateLevel::Error,
             // NOTE: Should we really collapse this to "error"?
             //
             // After collapsing this, the snapshot tests seem to reveal that we
@@ -1211,12 +1211,12 @@ impl Severity {
             // And maybe *rendering* this as just an `error` is fine. If we
             // really do need different rendering, then I think we can add a
             // `Level::Fatal`. ---AG
-            Severity::Fatal => AnnotateLevel::Error,
+            Self::Fatal => AnnotateLevel::Error,
         }
     }
 
     pub const fn is_fatal(self) -> bool {
-        matches!(self, Severity::Fatal)
+        matches!(self, Self::Fatal)
     }
 }
 
@@ -1237,11 +1237,11 @@ pub enum SubDiagnosticSeverity {
 impl SubDiagnosticSeverity {
     fn to_annotate(self) -> AnnotateLevel {
         match self {
-            SubDiagnosticSeverity::Help => AnnotateLevel::Help,
-            SubDiagnosticSeverity::Info => AnnotateLevel::Info,
-            SubDiagnosticSeverity::Warning => AnnotateLevel::Warning,
-            SubDiagnosticSeverity::Error => AnnotateLevel::Error,
-            SubDiagnosticSeverity::Fatal => AnnotateLevel::Error,
+            Self::Help => AnnotateLevel::Help,
+            Self::Info => AnnotateLevel::Info,
+            Self::Warning => AnnotateLevel::Warning,
+            Self::Error => AnnotateLevel::Error,
+            Self::Fatal => AnnotateLevel::Error,
         }
     }
 }
@@ -1285,42 +1285,42 @@ pub struct DisplayDiagnosticConfig {
 
 impl DisplayDiagnosticConfig {
     /// Whether to enable concise diagnostic output or not.
-    pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig { format, ..self }
+    pub fn format(self, format: DiagnosticFormat) -> Self {
+        Self { format, ..self }
     }
 
     /// Whether to enable colors or not.
-    pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig { color: yes, ..self }
+    pub fn color(self, yes: bool) -> Self {
+        Self { color: yes, ..self }
     }
 
     /// Set the number of contextual lines to show around each snippet.
-    pub fn context(self, lines: usize) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    pub fn context(self, lines: usize) -> Self {
+        Self {
             context: lines,
             ..self
         }
     }
 
     /// Whether to enable preview behavior or not.
-    pub fn preview(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    pub fn preview(self, yes: bool) -> Self {
+        Self {
             preview: yes,
             ..self
         }
     }
 
     /// Whether to hide a diagnostic's severity or not.
-    pub fn hide_severity(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    pub fn hide_severity(self, yes: bool) -> Self {
+        Self {
             hide_severity: yes,
             ..self
         }
     }
 
     /// Whether to show a fix's availability or not.
-    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    pub fn show_fix_status(self, yes: bool) -> Self {
+        Self {
             show_fix_status: yes,
             ..self
         }
@@ -1332,8 +1332,8 @@ impl DisplayDiagnosticConfig {
     /// availability for unsafe or display-only fixes.
     ///
     /// Note that this option is currently ignored when `hide_severity` is false.
-    pub fn fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    pub fn fix_applicability(self, applicability: Applicability) -> Self {
+        Self {
             fix_applicability: applicability,
             ..self
         }
@@ -1341,8 +1341,8 @@ impl DisplayDiagnosticConfig {
 }
 
 impl Default for DisplayDiagnosticConfig {
-    fn default() -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
+    fn default() -> Self {
+        Self {
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
@@ -1471,20 +1471,20 @@ impl DiagnosticMessage {
 }
 
 impl From<&str> for DiagnosticMessage {
-    fn from(s: &str) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
+    fn from(s: &str) -> Self {
+        Self(s.into())
     }
 }
 
 impl From<String> for DiagnosticMessage {
-    fn from(s: String) -> DiagnosticMessage {
-        DiagnosticMessage(s.into())
+    fn from(s: String) -> Self {
+        Self(s.into())
     }
 }
 
 impl From<Box<str>> for DiagnosticMessage {
-    fn from(s: Box<str>) -> DiagnosticMessage {
-        DiagnosticMessage(s)
+    fn from(s: Box<str>) -> Self {
+        Self(s)
     }
 }
 
@@ -1564,8 +1564,8 @@ impl PartialEq<SecondaryCode> for &str {
 }
 
 // for `hashbrown::EntryRef`
-impl From<&SecondaryCode> for SecondaryCode {
-    fn from(value: &SecondaryCode) -> Self {
+impl From<&Self> for SecondaryCode {
+    fn from(value: &Self) -> Self {
         value.clone()
     }
 }

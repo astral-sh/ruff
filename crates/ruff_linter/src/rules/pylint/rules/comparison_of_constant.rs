@@ -37,7 +37,7 @@ pub(crate) struct ComparisonOfConstant {
 impl Violation for ComparisonOfConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComparisonOfConstant {
+        let Self {
             left_constant,
             op,
             right_constant,

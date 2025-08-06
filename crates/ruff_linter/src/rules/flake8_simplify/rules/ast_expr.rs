@@ -51,7 +51,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UncapitalizedEnvironmentVariables { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use capitalized environment variable `{expected}` instead of `{actual}`")
         } else {
@@ -60,7 +60,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UncapitalizedEnvironmentVariables { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             Some(format!("Replace `{actual}` with `{expected}`"))
         } else {
@@ -99,7 +99,7 @@ pub(crate) struct DictGetWithNoneDefault {
 impl AlwaysFixableViolation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DictGetWithNoneDefault { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
@@ -108,7 +108,7 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
     }
 
     fn fix_title(&self) -> String {
-        let DictGetWithNoneDefault { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Replace `{actual}` with `{expected}`")
         } else {

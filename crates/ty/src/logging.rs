@@ -88,21 +88,21 @@ pub(crate) enum VerbosityLevel {
 impl VerbosityLevel {
     const fn level_filter(self) -> LevelFilter {
         match self {
-            VerbosityLevel::Silent => LevelFilter::OFF,
-            VerbosityLevel::Quiet => LevelFilter::ERROR,
-            VerbosityLevel::Default => LevelFilter::WARN,
-            VerbosityLevel::Verbose => LevelFilter::INFO,
-            VerbosityLevel::ExtraVerbose => LevelFilter::DEBUG,
-            VerbosityLevel::Trace => LevelFilter::TRACE,
+            Self::Silent => LevelFilter::OFF,
+            Self::Quiet => LevelFilter::ERROR,
+            Self::Default => LevelFilter::WARN,
+            Self::Verbose => LevelFilter::INFO,
+            Self::ExtraVerbose => LevelFilter::DEBUG,
+            Self::Trace => LevelFilter::TRACE,
         }
     }
 
     pub(crate) const fn is_trace(self) -> bool {
-        matches!(self, VerbosityLevel::Trace)
+        matches!(self, Self::Trace)
     }
 
     pub(crate) const fn is_extra_verbose(self) -> bool {
-        matches!(self, VerbosityLevel::ExtraVerbose)
+        matches!(self, Self::ExtraVerbose)
     }
 }
 

@@ -48,7 +48,7 @@ impl Violation for UnusedUnpackedVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedUnpackedVariable { name } = self;
+        let Self { name } = self;
         format!("Unpacked variable `{name}` is never used")
     }
 

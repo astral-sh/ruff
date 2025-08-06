@@ -21,7 +21,7 @@ impl get_size2::GetSize for EnumMetadata {}
 
 impl EnumMetadata {
     fn empty() -> Self {
-        EnumMetadata {
+        Self {
             members: FxOrderSet::default(),
             aliases: FxHashMap::default(),
         }

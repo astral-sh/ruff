@@ -105,15 +105,15 @@ impl TryFrom<ClientConfiguration> for ResolvedConfiguration {
 
     fn try_from(value: ClientConfiguration) -> Result<Self, Self::Error> {
         match value {
-            ClientConfiguration::String(path) => Ok(ResolvedConfiguration::FilePath(
-                PathBuf::from(shellexpand::full(&path)?.as_ref()),
-            )),
+            ClientConfiguration::String(path) => Ok(Self::FilePath(PathBuf::from(
+                shellexpand::full(&path)?.as_ref(),
+            ))),
             ClientConfiguration::Object(map) => {
                 let options = toml::Table::try_from(map)?.try_into::<Options>()?;
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)
                 } else {
-                    Ok(ResolvedConfiguration::Inline(Box::new(options)))
+                    Ok(Self::Inline(Box::new(options)))
                 }
             }
         }

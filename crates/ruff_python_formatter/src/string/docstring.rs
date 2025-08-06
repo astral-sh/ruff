@@ -879,7 +879,7 @@ impl<'src> CodeExampleDoctest<'src> {
     ///
     /// If one was found, then state for a new doctest code example is
     /// returned, along with the code example line.
-    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleDoctest<'src>> {
+    fn new(original: InputDocstringLine<'src>) -> Option<Self> {
         let trim_start = original.line.trim_start();
         // Prompts must be followed by an ASCII space character[1].
         //
@@ -910,7 +910,7 @@ impl<'src> CodeExampleDoctest<'src> {
         mut self,
         original: InputDocstringLine<'src>,
         queue: &mut VecDeque<CodeExampleAddAction<'src>>,
-    ) -> Option<CodeExampleDoctest<'src>> {
+    ) -> Option<Self> {
         let Some((ps2_indent, ps2_after)) = original.line.split_once("...") else {
             queue.push_back(self.into_format_action());
             return None;
@@ -1020,7 +1020,7 @@ impl<'src> CodeExampleRst<'src> {
     ///
     /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
     /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
+    fn new(original: InputDocstringLine<'src>) -> Option<Self> {
         let (opening_indent, rest) = indent_with_suffix(original.line);
         if rest.starts_with(".. ") {
             if let Some(litblock) = CodeExampleRst::new_code_block(original) {
@@ -1055,7 +1055,7 @@ impl<'src> CodeExampleRst<'src> {
     /// Attempts to create a new reStructuredText code example from a
     /// `code-block` or `sourcecode` directive. If one couldn't be found, then
     /// `None` is returned.
-    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst<'src>> {
+    fn new_code_block(original: InputDocstringLine<'src>) -> Option<Self> {
         // This regex attempts to parse the start of a reStructuredText code
         // block [directive]. From the reStructuredText spec:
         //
@@ -1128,7 +1128,7 @@ impl<'src> CodeExampleRst<'src> {
         mut self,
         original: InputDocstringLine<'src>,
         queue: &mut VecDeque<CodeExampleAddAction<'src>>,
-    ) -> Option<CodeExampleRst<'src>> {
+    ) -> Option<Self> {
         // If we haven't started populating the minimum indent yet, then
         // we haven't found the first code line and may need to find and
         // pass through leading empty lines.
@@ -1200,7 +1200,7 @@ impl<'src> CodeExampleRst<'src> {
         mut self,
         original: InputDocstringLine<'src>,
         queue: &mut VecDeque<CodeExampleAddAction<'src>>,
-    ) -> Option<CodeExampleRst<'src>> {
+    ) -> Option<Self> {
         assert!(self.min_indent.is_none());
 
         // While the rst spec isn't completely clear on this point, through
@@ -1317,7 +1317,7 @@ impl<'src> CodeExampleMarkdown<'src> {
     /// as it is not retained as part of the block.
     ///
     /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
-    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleMarkdown<'src>> {
+    fn new(original: InputDocstringLine<'src>) -> Option<Self> {
         static FENCE_START: LazyLock<Regex> = LazyLock::new(|| {
             Regex::new(
                 r"(?xm)
@@ -1380,7 +1380,7 @@ impl<'src> CodeExampleMarkdown<'src> {
         mut self,
         original: InputDocstringLine<'src>,
         queue: &mut VecDeque<CodeExampleAddAction<'src>>,
-    ) -> Option<CodeExampleMarkdown<'src>> {
+    ) -> Option<Self> {
         if self.is_end(original) {
             queue.push_back(self.into_format_action());
             queue.push_back(CodeExampleAddAction::Print { original });
@@ -1497,8 +1497,8 @@ impl MarkdownFenceKind {
     /// Convert the fence kind to the actual character used to build the fence.
     fn to_char(self) -> char {
         match self {
-            MarkdownFenceKind::Backtick => '`',
-            MarkdownFenceKind::Tilde => '~',
+            Self::Backtick => '`',
+            Self::Tilde => '~',
         }
     }
 }

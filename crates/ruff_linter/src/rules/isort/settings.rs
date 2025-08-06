@@ -182,19 +182,19 @@ pub enum SettingsError {
 impl Display for SettingsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SettingsError::InvalidKnownThirdParty(err) => {
+            Self::InvalidKnownThirdParty(err) => {
                 write!(f, "invalid known third-party pattern: {err}")
             }
-            SettingsError::InvalidKnownFirstParty(err) => {
+            Self::InvalidKnownFirstParty(err) => {
                 write!(f, "invalid known first-party pattern: {err}")
             }
-            SettingsError::InvalidKnownLocalFolder(err) => {
+            Self::InvalidKnownLocalFolder(err) => {
                 write!(f, "invalid known local folder pattern: {err}")
             }
-            SettingsError::InvalidExtraStandardLibrary(err) => {
+            Self::InvalidExtraStandardLibrary(err) => {
                 write!(f, "invalid extra standard library pattern: {err}")
             }
-            SettingsError::InvalidUserDefinedSection(err) => {
+            Self::InvalidUserDefinedSection(err) => {
                 write!(f, "invalid user-defined section pattern: {err}")
             }
         }
@@ -204,11 +204,11 @@ impl Display for SettingsError {
 impl Error for SettingsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            SettingsError::InvalidKnownThirdParty(err) => Some(err),
-            SettingsError::InvalidKnownFirstParty(err) => Some(err),
-            SettingsError::InvalidKnownLocalFolder(err) => Some(err),
-            SettingsError::InvalidExtraStandardLibrary(err) => Some(err),
-            SettingsError::InvalidUserDefinedSection(err) => Some(err),
+            Self::InvalidKnownThirdParty(err) => Some(err),
+            Self::InvalidKnownFirstParty(err) => Some(err),
+            Self::InvalidKnownLocalFolder(err) => Some(err),
+            Self::InvalidExtraStandardLibrary(err) => Some(err),
+            Self::InvalidUserDefinedSection(err) => Some(err),
         }
     }
 }

@@ -47,7 +47,7 @@ pub(crate) struct GlobalVariableNotAssigned {
 impl Violation for GlobalVariableNotAssigned {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let GlobalVariableNotAssigned { name } = self;
+        let Self { name } = self;
         format!("Using global for `{name}` but no assignment is done")
     }
 }

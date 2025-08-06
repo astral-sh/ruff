@@ -48,7 +48,7 @@ pub(crate) struct InvalidClassName {
 impl Violation for InvalidClassName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidClassName { name } = self;
+        let Self { name } = self;
         format!("Class name `{name}` should use CapWords convention")
     }
 }

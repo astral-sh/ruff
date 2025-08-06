@@ -271,16 +271,13 @@ struct InteriorNode {
 
 impl ScopedReachabilityConstraintId {
     /// A special ID that is used for an "always true" / "always visible" constraint.
-    pub(crate) const ALWAYS_TRUE: ScopedReachabilityConstraintId =
-        ScopedReachabilityConstraintId(0xffff_ffff);
+    pub(crate) const ALWAYS_TRUE: Self = Self(0xffff_ffff);
 
     /// A special ID that is used for an ambiguous constraint.
-    pub(crate) const AMBIGUOUS: ScopedReachabilityConstraintId =
-        ScopedReachabilityConstraintId(0xffff_fffe);
+    pub(crate) const AMBIGUOUS: Self = Self(0xffff_fffe);
 
     /// A special ID that is used for an "always false" / "never visible" constraint.
-    pub(crate) const ALWAYS_FALSE: ScopedReachabilityConstraintId =
-        ScopedReachabilityConstraintId(0xffff_fffd);
+    pub(crate) const ALWAYS_FALSE: Self = Self(0xffff_fffd);
 
     fn is_terminal(self) -> bool {
         self.0 >= SMALLEST_TERMINAL.0

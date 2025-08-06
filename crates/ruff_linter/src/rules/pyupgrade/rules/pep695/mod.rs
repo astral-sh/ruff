@@ -138,7 +138,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
     ) -> Self {
         match kind {
             TypeParamKind::TypeVar => {
-                TypeParam::TypeVar(TypeParamTypeVar {
+                Self::TypeVar(TypeParamTypeVar {
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                     name: Identifier::new(*name, TextRange::default()),
@@ -182,13 +182,13 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                     default: None,
                 })
             }
-            TypeParamKind::TypeVarTuple => TypeParam::TypeVarTuple(TypeParamTypeVarTuple {
+            TypeParamKind::TypeVarTuple => Self::TypeVarTuple(TypeParamTypeVarTuple {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 name: Identifier::new(*name, TextRange::default()),
                 default: None,
             }),
-            TypeParamKind::ParamSpec => TypeParam::ParamSpec(TypeParamParamSpec {
+            TypeParamKind::ParamSpec => Self::ParamSpec(TypeParamParamSpec {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 name: Identifier::new(*name, TextRange::default()),

@@ -136,13 +136,13 @@ enum SourceTextKind {
 
 impl From<String> for SourceTextKind {
     fn from(value: String) -> Self {
-        SourceTextKind::Text(value)
+        Self::Text(value)
     }
 }
 
 impl From<Notebook> for SourceTextKind {
     fn from(notebook: Notebook) -> Self {
-        SourceTextKind::Notebook {
+        Self::Notebook {
             notebook: Box::new(notebook),
         }
     }

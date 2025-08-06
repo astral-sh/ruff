@@ -646,7 +646,7 @@ impl Format<PyFormatContext<'_>> for TrailingFormatOffComment<'_> {
 struct Indentation(u32);
 
 impl Indentation {
-    fn from_stmt(stmt: &Stmt, source: &str) -> Indentation {
+    fn from_stmt(stmt: &Stmt, source: &str) -> Self {
         let line_start = source.line_start(stmt.start());
 
         let mut indentation = 0u32;
@@ -658,7 +658,7 @@ impl Indentation {
             }
         }
 
-        Indentation(indentation)
+        Self(indentation)
     }
 
     fn trim_indent(self, ranged: impl Ranged, source: &str) -> TextRange {

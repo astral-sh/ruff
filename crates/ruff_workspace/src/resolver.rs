@@ -69,12 +69,12 @@ pub enum PyprojectDiscoveryStrategy {
 impl PyprojectDiscoveryStrategy {
     #[inline]
     pub const fn is_fixed(self) -> bool {
-        matches!(self, PyprojectDiscoveryStrategy::Fixed)
+        matches!(self, Self::Fixed)
     }
 
     #[inline]
     pub const fn is_hierarchical(self) -> bool {
-        matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
+        matches!(self, Self::Hierarchical)
     }
 }
 
@@ -91,10 +91,10 @@ pub enum Relativity {
 impl Relativity {
     pub fn resolve(self, path: &Path) -> &Path {
         match self {
-            Relativity::Parent => path
+            Self::Parent => path
                 .parent()
                 .expect("Expected pyproject.toml file to be in parent directory"),
-            Relativity::Cwd => &path_dedot::CWD,
+            Self::Cwd => &path_dedot::CWD,
         }
     }
 }
@@ -693,15 +693,15 @@ pub enum ResolvedFile {
 impl ResolvedFile {
     pub fn into_path(self) -> PathBuf {
         match self {
-            ResolvedFile::Root(path) => path,
-            ResolvedFile::Nested(path) => path,
+            Self::Root(path) => path,
+            Self::Nested(path) => path,
         }
     }
 
     pub fn path(&self) -> &Path {
         match self {
-            ResolvedFile::Root(root) => root.as_path(),
-            ResolvedFile::Nested(root) => root.as_path(),
+            Self::Root(root) => root.as_path(),
+            Self::Nested(root) => root.as_path(),
         }
     }
 
@@ -711,7 +711,7 @@ impl ResolvedFile {
     }
 
     pub fn is_root(&self) -> bool {
-        matches!(self, ResolvedFile::Root(_))
+        matches!(self, Self::Root(_))
     }
 }
 
@@ -830,10 +830,10 @@ pub enum ExclusionKind {
 impl std::fmt::Display for ExclusionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExclusionKind::Exclude => write!(f, "exclude"),
-            ExclusionKind::ExtendExclude => write!(f, "extend-exclude"),
-            ExclusionKind::LintExclude => write!(f, "lint.exclude"),
-            ExclusionKind::FormatExclude => write!(f, "lint.extend-exclude"),
+            Self::Exclude => write!(f, "exclude"),
+            Self::ExtendExclude => write!(f, "extend-exclude"),
+            Self::LintExclude => write!(f, "lint.exclude"),
+            Self::FormatExclude => write!(f, "lint.extend-exclude"),
         }
     }
 }
@@ -887,8 +887,8 @@ pub enum InclusionKind {
 impl std::fmt::Display for InclusionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            InclusionKind::Include => write!(f, "include"),
-            InclusionKind::ExtendInclude => write!(f, "extend-include"),
+            Self::Include => write!(f, "include"),
+            Self::ExtendInclude => write!(f, "extend-include"),
         }
     }
 }

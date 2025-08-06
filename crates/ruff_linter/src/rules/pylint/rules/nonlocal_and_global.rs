@@ -48,7 +48,7 @@ pub(crate) struct NonlocalAndGlobal {
 impl Violation for NonlocalAndGlobal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonlocalAndGlobal { name } = self;
+        let Self { name } = self;
         format!("Name `{name}` is both `nonlocal` and `global`")
     }
 }

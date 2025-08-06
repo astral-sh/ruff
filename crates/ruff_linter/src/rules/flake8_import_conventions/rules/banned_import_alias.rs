@@ -42,7 +42,7 @@ pub(crate) struct BannedImportAlias {
 impl Violation for BannedImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BannedImportAlias { name, asname } = self;
+        let Self { name, asname } = self;
         format!("`{name}` should not be imported as `{asname}`")
     }
 }

@@ -53,7 +53,7 @@ pub(crate) struct TypeNameIncorrectVariance {
 impl Violation for TypeNameIncorrectVariance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeNameIncorrectVariance {
+        let Self {
             kind,
             param_name,
             variance,
@@ -172,8 +172,8 @@ enum VarKind {
 impl fmt::Display for VarKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VarKind::TypeVar => fmt.write_str("TypeVar"),
-            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
+            Self::TypeVar => fmt.write_str("TypeVar"),
+            Self::ParamSpec => fmt.write_str("ParamSpec"),
         }
     }
 }
@@ -189,10 +189,10 @@ enum VarVariance {
 impl fmt::Display for VarVariance {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VarVariance::Bivariance => fmt.write_str("bivariance"),
-            VarVariance::Covariance => fmt.write_str("covariance"),
-            VarVariance::Contravariance => fmt.write_str("contravariance"),
-            VarVariance::Invariance => fmt.write_str("invariance"),
+            Self::Bivariance => fmt.write_str("bivariance"),
+            Self::Covariance => fmt.write_str("covariance"),
+            Self::Contravariance => fmt.write_str("contravariance"),
+            Self::Invariance => fmt.write_str("invariance"),
         }
     }
 }

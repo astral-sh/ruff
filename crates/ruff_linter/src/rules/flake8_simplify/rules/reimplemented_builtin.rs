@@ -53,12 +53,12 @@ impl Violation for ReimplementedBuiltin {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReimplementedBuiltin { replacement } = self;
+        let Self { replacement } = self;
         format!("Use `{replacement}` instead of `for` loop")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ReimplementedBuiltin { replacement } = self;
+        let Self { replacement } = self;
         Some(format!("Replace with `{replacement}`"))
     }
 }

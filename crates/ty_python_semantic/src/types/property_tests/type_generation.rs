@@ -75,8 +75,8 @@ pub(crate) enum CallableParams {
 impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
-            CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(params.into_iter().map(|param| {
+            Self::GradualForm => Parameters::gradual_form(),
+            Self::List(params) => Parameters::new(params.into_iter().map(|param| {
                 let mut parameter = match param.kind {
                     ParamKind::PositionalOnly => Parameter::positional_only(param.name),
                     ParamKind::PositionalOrKeyword => {
@@ -131,16 +131,16 @@ fn create_bound_method<'db>(
 impl Ty {
     pub(crate) fn into_type(self, db: &TestDb) -> Type<'_> {
         match self {
-            Ty::Never => Type::Never,
-            Ty::Unknown => Type::unknown(),
-            Ty::None => Type::none(db),
-            Ty::Any => Type::any(),
-            Ty::IntLiteral(n) => Type::IntLiteral(n),
-            Ty::StringLiteral(s) => Type::string_literal(db, s),
-            Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
-            Ty::LiteralString => Type::LiteralString,
-            Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+            Self::Never => Type::Never,
+            Self::Unknown => Type::unknown(),
+            Self::None => Type::none(db),
+            Self::Any => Type::any(),
+            Self::IntLiteral(n) => Type::IntLiteral(n),
+            Self::StringLiteral(s) => Type::string_literal(db, s),
+            Self::BooleanLiteral(b) => Type::BooleanLiteral(b),
+            Self::LiteralString => Type::LiteralString,
+            Self::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
+            Self::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
                 db,
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
@@ -148,7 +148,7 @@ impl Ty {
                     .expect_class_literal(),
                 Name::new(name),
             )),
-            Ty::SingleMemberEnumLiteral => {
+            Self::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
@@ -157,33 +157,33 @@ impl Ty {
                 );
                 ty
             }
-            Ty::BuiltinInstance(s) => builtins_symbol(db, s)
+            Self::BuiltinInstance(s) => builtins_symbol(db, s)
                 .place
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
-            Ty::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
+            Self::AbcInstance(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type()
                 .to_instance(db)
                 .unwrap(),
-            Ty::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
+            Self::AbcClassLiteral(s) => known_module_symbol(db, KnownModule::Abc, s)
                 .place
                 .expect_type(),
-            Ty::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
+            Self::UnittestMockLiteral => known_module_symbol(db, KnownModule::UnittestMock, "Mock")
                 .place
                 .expect_type(),
-            Ty::UnittestMockInstance => Ty::UnittestMockLiteral
+            Self::UnittestMockInstance => Self::UnittestMockLiteral
                 .into_type(db)
                 .to_instance(db)
                 .unwrap(),
-            Ty::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
-            Ty::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
-            Ty::KnownClassInstance(known_class) => known_class.to_instance(db),
-            Ty::Union(tys) => {
+            Self::TypingLiteral => Type::SpecialForm(SpecialFormType::Literal),
+            Self::BuiltinClassLiteral(s) => builtins_symbol(db, s).place.expect_type(),
+            Self::KnownClassInstance(known_class) => known_class.to_instance(db),
+            Self::Union(tys) => {
                 UnionType::from_elements(db, tys.into_iter().map(|ty| ty.into_type(db)))
             }
-            Ty::Intersection { pos, neg } => {
+            Self::Intersection { pos, neg } => {
                 let mut builder = IntersectionBuilder::new(db);
                 for p in pos {
                     builder = builder.add_positive(p.into_type(db));
@@ -193,18 +193,18 @@ impl Ty {
                 }
                 builder.build()
             }
-            Ty::FixedLengthTuple(tys) => {
+            Self::FixedLengthTuple(tys) => {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
                 Type::heterogeneous_tuple(db, elements)
             }
-            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+            Self::VariableLengthTuple(prefix, variable, suffix) => {
                 let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
                 let variable = variable.into_type(db);
                 let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
                 Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
             }
-            Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
-            Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
+            Self::SubclassOfAny => SubclassOfType::subclass_of_any(),
+            Self::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)
                     .place
@@ -212,7 +212,7 @@ impl Ty {
                     .expect_class_literal()
                     .default_specialization(db),
             ),
-            Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
+            Self::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
                 known_module_symbol(db, KnownModule::Abc, s)
                     .place
@@ -220,16 +220,16 @@ impl Ty {
                     .expect_class_literal()
                     .default_specialization(db),
             ),
-            Ty::AlwaysTruthy => Type::AlwaysTruthy,
-            Ty::AlwaysFalsy => Type::AlwaysFalsy,
-            Ty::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
-            Ty::BuiltinsBoundMethod { class, method } => {
+            Self::AlwaysTruthy => Type::AlwaysTruthy,
+            Self::AlwaysFalsy => Type::AlwaysFalsy,
+            Self::BuiltinsFunction(name) => builtins_symbol(db, name).place.expect_type(),
+            Self::BuiltinsBoundMethod { class, method } => {
                 let builtins_class = builtins_symbol(db, class).place.expect_type();
                 let function = builtins_class.member(db, method).place.expect_type();
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => CallableType::single(
+            Self::Callable { params, returns } => CallableType::single(
                 db,
                 Signature::new(
                     params.into_parameters(db),
@@ -469,47 +469,51 @@ fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
 }
 
 impl Arbitrary for Ty {
-    fn arbitrary(g: &mut Gen) -> Ty {
+    fn arbitrary(g: &mut Gen) -> Self {
         const MAX_SIZE: u32 = 2;
         arbitrary_type(g, MAX_SIZE, false)
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
         match self.clone() {
-            Ty::Union(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
+            Self::Union(types) => Box::new(types.shrink().filter_map(|elts| match elts.len() {
                 0 => None,
                 1 => Some(elts.into_iter().next().unwrap()),
-                _ => Some(Ty::Union(elts)),
+                _ => Some(Self::Union(elts)),
             })),
-            Ty::FixedLengthTuple(types) => {
+            Self::FixedLengthTuple(types) => {
                 Box::new(types.shrink().filter_map(|elts| match elts.len() {
                     0 => None,
                     1 => Some(elts.into_iter().next().unwrap()),
-                    _ => Some(Ty::FixedLengthTuple(elts)),
+                    _ => Some(Self::FixedLengthTuple(elts)),
                 }))
             }
-            Ty::VariableLengthTuple(prefix, variable, suffix) => {
+            Self::VariableLengthTuple(prefix, variable, suffix) => {
                 // We shrink the suffix first, then the prefix, then the variable-length type.
                 let suffix_shrunk = suffix.shrink().map({
                     let prefix = prefix.clone();
                     let variable = variable.clone();
-                    move |suffix| Ty::VariableLengthTuple(prefix.clone(), variable.clone(), suffix)
+                    move |suffix| {
+                        Self::VariableLengthTuple(prefix.clone(), variable.clone(), suffix)
+                    }
                 });
                 let prefix_shrunk = prefix.shrink().map({
                     let variable = variable.clone();
                     let suffix = suffix.clone();
-                    move |prefix| Ty::VariableLengthTuple(prefix, variable.clone(), suffix.clone())
+                    move |prefix| {
+                        Self::VariableLengthTuple(prefix, variable.clone(), suffix.clone())
+                    }
                 });
                 let variable_shrunk = variable.shrink().map({
                     let prefix = prefix.clone();
                     let suffix = suffix.clone();
                     move |variable| {
-                        Ty::VariableLengthTuple(prefix.clone(), variable, suffix.clone())
+                        Self::VariableLengthTuple(prefix.clone(), variable, suffix.clone())
                     }
                 });
                 Box::new(suffix_shrunk.chain(prefix_shrunk).chain(variable_shrunk))
             }
-            Ty::Intersection { pos, neg } => {
+            Self::Intersection { pos, neg } => {
                 // Shrinking on intersections is not exhaustive!
                 //
                 // We try to shrink the positive side or the negative side,
@@ -528,16 +532,16 @@ impl Arbitrary for Ty {
                     // intersections with only negative constraints are
                     // more confusing
                     neg.shrink()
-                        .map(move |shrunk_neg| Ty::Intersection {
+                        .map(move |shrunk_neg| Self::Intersection {
                             pos: pos_orig.clone(),
                             neg: shrunk_neg,
                         })
-                        .chain(pos.shrink().map(move |shrunk_pos| Ty::Intersection {
+                        .chain(pos.shrink().map(move |shrunk_pos| Self::Intersection {
                             pos: shrunk_pos,
                             neg: neg_orig.clone(),
                         }))
                         .filter_map(|ty| {
-                            if let Ty::Intersection { pos, neg } = &ty {
+                            if let Self::Intersection { pos, neg } = &ty {
                                 match (pos.len(), neg.len()) {
                                     // an empty intersection does not mean
                                     // anything
@@ -559,9 +563,9 @@ impl Arbitrary for Ty {
 }
 
 impl Arbitrary for FullyStaticTy {
-    fn arbitrary(g: &mut Gen) -> FullyStaticTy {
+    fn arbitrary(g: &mut Gen) -> Self {
         const MAX_SIZE: u32 = 2;
-        FullyStaticTy(arbitrary_type(g, MAX_SIZE, true))
+        Self(arbitrary_type(g, MAX_SIZE, true))
     }
 
     fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {

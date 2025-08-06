@@ -65,7 +65,7 @@ pub(crate) struct BuiltinAttributeShadowing {
 impl Violation for BuiltinAttributeShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinAttributeShadowing { kind, name, row } = self;
+        let Self { kind, name, row } = self;
         match kind {
             Kind::Attribute => {
                 format!("Python builtin is shadowed by class attribute `{name}` from {row}")

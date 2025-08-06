@@ -48,7 +48,7 @@ pub(crate) struct NonUniqueEnums {
 impl Violation for NonUniqueEnums {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonUniqueEnums { value } = self;
+        let Self { value } = self;
         format!("Enum contains duplicate value: `{value}`")
     }
 }

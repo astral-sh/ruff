@@ -44,7 +44,7 @@ pub(crate) struct CamelcaseImportedAsLowercase {
 impl Violation for CamelcaseImportedAsLowercase {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsLowercase { name, asname } = self;
+        let Self { name, asname } = self;
         format!("Camelcase `{name}` imported as lowercase `{asname}`")
     }
 }

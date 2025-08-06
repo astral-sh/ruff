@@ -32,7 +32,7 @@ pub enum StringLiteralKind {
 impl StringLiteralKind {
     /// Checks if this string literal is a docstring.
     pub(crate) const fn is_docstring(self) -> bool {
-        matches!(self, StringLiteralKind::Docstring)
+        matches!(self, Self::Docstring)
     }
 }
 

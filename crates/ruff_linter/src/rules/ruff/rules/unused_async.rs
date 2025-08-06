@@ -38,7 +38,7 @@ pub(crate) struct UnusedAsync {
 impl Violation for UnusedAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedAsync { name } = self;
+        let Self { name } = self;
         format!(
             "Function `{name}` is declared `async`, but doesn't `await` or use `async` features."
         )

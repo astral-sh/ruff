@@ -58,30 +58,22 @@ impl FormatType {
             | PythonType::Tuple
             | PythonType::Generator
             | PythonType::Ellipsis
-            | PythonType::None => matches!(
-                self,
-                FormatType::Unknown | FormatType::String | FormatType::Repr
-            ),
-            PythonType::Number(NumberLike::Complex | NumberLike::Bool) => matches!(
-                self,
-                FormatType::Unknown | FormatType::String | FormatType::Repr
-            ),
+            | PythonType::None => matches!(self, Self::Unknown | Self::String | Self::Repr),
+            PythonType::Number(NumberLike::Complex | NumberLike::Bool) => {
+                matches!(self, Self::Unknown | Self::String | Self::Repr)
+            }
             PythonType::Number(NumberLike::Integer) => matches!(
                 self,
-                FormatType::Unknown
-                    | FormatType::String
-                    | FormatType::Repr
-                    | FormatType::Integer
-                    | FormatType::Float
-                    | FormatType::Number
+                Self::Unknown
+                    | Self::String
+                    | Self::Repr
+                    | Self::Integer
+                    | Self::Float
+                    | Self::Number
             ),
             PythonType::Number(NumberLike::Float) => matches!(
                 self,
-                FormatType::Unknown
-                    | FormatType::String
-                    | FormatType::Repr
-                    | FormatType::Float
-                    | FormatType::Number
+                Self::Unknown | Self::String | Self::Repr | Self::Float | Self::Number
             ),
         }
     }
@@ -90,15 +82,15 @@ impl FormatType {
 impl From<char> for FormatType {
     fn from(format: char) -> Self {
         match format {
-            'r' => FormatType::Repr,
-            's' => FormatType::String,
+            'r' => Self::Repr,
+            's' => Self::String,
             // The python documentation says "d" only works for integers, but it works for floats as
             // well: https://docs.python.org/3/library/string.html#formatstrings
             // I checked the rest of the integer codes, and none of them work with floats
-            'n' | 'd' => FormatType::Number,
-            'b' | 'c' | 'o' | 'x' | 'X' => FormatType::Integer,
-            'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => FormatType::Float,
-            _ => FormatType::Unknown,
+            'n' | 'd' => Self::Number,
+            'b' | 'c' | 'o' | 'x' | 'X' => Self::Integer,
+            'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => Self::Float,
+            _ => Self::Unknown,
         }
     }
 }

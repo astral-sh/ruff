@@ -86,7 +86,7 @@ impl Violation for ReplaceStrEnum {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReplaceStrEnum { name } = self;
+        let Self { name } = self;
         format!("Class {name} inherits from both `str` and `enum.Enum`")
     }
 

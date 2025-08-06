@@ -35,7 +35,7 @@ impl fmt::Display for ParseError {
 
 impl From<LexicalError> for ParseError {
     fn from(error: LexicalError) -> Self {
-        ParseError {
+        Self {
             location: error.location(),
             error: ParseErrorType::Lexical(error.into_error()),
         }
@@ -218,114 +218,108 @@ impl std::error::Error for ParseErrorType {}
 impl std::fmt::Display for ParseErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ParseErrorType::OtherError(msg) => write!(f, "{msg}"),
-            ParseErrorType::ExpectedToken { found, expected } => {
+            Self::OtherError(msg) => write!(f, "{msg}"),
+            Self::ExpectedToken { found, expected } => {
                 write!(f, "Expected {expected}, found {found}",)
             }
-            ParseErrorType::Lexical(lex_error) => write!(f, "{lex_error}"),
-            ParseErrorType::SimpleStatementsOnSameLine => {
+            Self::Lexical(lex_error) => write!(f, "{lex_error}"),
+            Self::SimpleStatementsOnSameLine => {
                 f.write_str("Simple statements must be separated by newlines or semicolons")
             }
-            ParseErrorType::SimpleAndCompoundStatementOnSameLine => f.write_str(
+            Self::SimpleAndCompoundStatementOnSameLine => f.write_str(
                 "Compound statements are not allowed on the same line as simple statements",
             ),
-            ParseErrorType::UnexpectedTokenAfterAsync(kind) => {
+            Self::UnexpectedTokenAfterAsync(kind) => {
                 write!(
                     f,
                     "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
                 )
             }
-            ParseErrorType::InvalidArgumentUnpackingOrder => {
+            Self::InvalidArgumentUnpackingOrder => {
                 f.write_str("Iterable argument unpacking cannot follow keyword argument unpacking")
             }
-            ParseErrorType::IterableUnpackingInComprehension => {
+            Self::IterableUnpackingInComprehension => {
                 f.write_str("Iterable unpacking cannot be used in a comprehension")
             }
-            ParseErrorType::UnparenthesizedNamedExpression => {
+            Self::UnparenthesizedNamedExpression => {
                 f.write_str("Unparenthesized named expression cannot be used here")
             }
-            ParseErrorType::UnparenthesizedTupleExpression => {
+            Self::UnparenthesizedTupleExpression => {
                 f.write_str("Unparenthesized tuple expression cannot be used here")
             }
-            ParseErrorType::UnparenthesizedGeneratorExpression => {
+            Self::UnparenthesizedGeneratorExpression => {
                 f.write_str("Unparenthesized generator expression cannot be used here")
             }
-            ParseErrorType::InvalidYieldExpressionUsage => {
+            Self::InvalidYieldExpressionUsage => {
                 f.write_str("Yield expression cannot be used here")
             }
-            ParseErrorType::InvalidLambdaExpressionUsage => {
+            Self::InvalidLambdaExpressionUsage => {
                 f.write_str("Lambda expression cannot be used here")
             }
-            ParseErrorType::InvalidStarredExpressionUsage => {
+            Self::InvalidStarredExpressionUsage => {
                 f.write_str("Starred expression cannot be used here")
             }
-            ParseErrorType::PositionalAfterKeywordArgument => {
+            Self::PositionalAfterKeywordArgument => {
                 f.write_str("Positional argument cannot follow keyword argument")
             }
-            ParseErrorType::PositionalAfterKeywordUnpacking => {
+            Self::PositionalAfterKeywordUnpacking => {
                 f.write_str("Positional argument cannot follow keyword argument unpacking")
             }
-            ParseErrorType::EmptySlice => f.write_str("Expected index or slice expression"),
-            ParseErrorType::EmptyGlobalNames => {
-                f.write_str("Global statement must have at least one name")
-            }
-            ParseErrorType::EmptyNonlocalNames => {
+            Self::EmptySlice => f.write_str("Expected index or slice expression"),
+            Self::EmptyGlobalNames => f.write_str("Global statement must have at least one name"),
+            Self::EmptyNonlocalNames => {
                 f.write_str("Nonlocal statement must have at least one name")
             }
-            ParseErrorType::EmptyDeleteTargets => {
+            Self::EmptyDeleteTargets => {
                 f.write_str("Delete statement must have at least one target")
             }
-            ParseErrorType::EmptyImportNames => {
-                f.write_str("Expected one or more symbol names after import")
-            }
-            ParseErrorType::EmptyTypeParams => f.write_str("Type parameter list cannot be empty"),
-            ParseErrorType::ParamAfterVarKeywordParam => {
+            Self::EmptyImportNames => f.write_str("Expected one or more symbol names after import"),
+            Self::EmptyTypeParams => f.write_str("Type parameter list cannot be empty"),
+            Self::ParamAfterVarKeywordParam => {
                 f.write_str("Parameter cannot follow var-keyword parameter")
             }
-            ParseErrorType::NonDefaultParamAfterDefaultParam => {
+            Self::NonDefaultParamAfterDefaultParam => {
                 f.write_str("Parameter without a default cannot follow a parameter with a default")
             }
-            ParseErrorType::ExpectedKeywordParam => {
+            Self::ExpectedKeywordParam => {
                 f.write_str("Expected one or more keyword parameter after '*' separator")
             }
-            ParseErrorType::VarParameterWithDefault => {
+            Self::VarParameterWithDefault => {
                 f.write_str("Parameter with '*' or '**' cannot have default value")
             }
-            ParseErrorType::InvalidStarPatternUsage => {
-                f.write_str("Star pattern cannot be used here")
-            }
-            ParseErrorType::ExpectedRealNumber => {
+            Self::InvalidStarPatternUsage => f.write_str("Star pattern cannot be used here"),
+            Self::ExpectedRealNumber => {
                 f.write_str("Expected a real number in complex literal pattern")
             }
-            ParseErrorType::ExpectedImaginaryNumber => {
+            Self::ExpectedImaginaryNumber => {
                 f.write_str("Expected an imaginary number in complex literal pattern")
             }
-            ParseErrorType::ExpectedExpression => f.write_str("Expected an expression"),
-            ParseErrorType::UnexpectedIndentation => f.write_str("Unexpected indentation"),
-            ParseErrorType::InvalidAssignmentTarget => f.write_str("Invalid assignment target"),
-            ParseErrorType::InvalidAnnotatedAssignmentTarget => {
+            Self::ExpectedExpression => f.write_str("Expected an expression"),
+            Self::UnexpectedIndentation => f.write_str("Unexpected indentation"),
+            Self::InvalidAssignmentTarget => f.write_str("Invalid assignment target"),
+            Self::InvalidAnnotatedAssignmentTarget => {
                 f.write_str("Invalid annotated assignment target")
             }
-            ParseErrorType::InvalidNamedAssignmentTarget => {
+            Self::InvalidNamedAssignmentTarget => {
                 f.write_str("Assignment expression target must be an identifier")
             }
-            ParseErrorType::InvalidAugmentedAssignmentTarget => {
+            Self::InvalidAugmentedAssignmentTarget => {
                 f.write_str("Invalid augmented assignment target")
             }
-            ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
+            Self::InvalidDeleteTarget => f.write_str("Invalid delete target"),
+            Self::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "Duplicate keyword argument {arg_name:?}")
             }
-            ParseErrorType::UnexpectedIpythonEscapeCommand => {
+            Self::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
-            ParseErrorType::FStringError(fstring_error) => {
+            Self::FStringError(fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
             }
-            ParseErrorType::TStringError(tstring_error) => {
+            Self::TStringError(tstring_error) => {
                 write!(f, "t-string: {tstring_error}")
             }
-            ParseErrorType::UnexpectedExpressionToken => {
+            Self::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
         }
@@ -1009,8 +1003,8 @@ enum Change {
 impl Display for Change {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Change::Added(version) => write!(f, "added in Python {version}"),
-            Change::Removed(version) => write!(f, "removed in Python {version}"),
+            Self::Added(version) => write!(f, "added in Python {version}"),
+            Self::Removed(version) => write!(f, "removed in Python {version}"),
         }
     }
 }
@@ -1020,40 +1014,24 @@ impl UnsupportedSyntaxErrorKind {
     /// type of [`Change`] (added or removed).
     const fn changed_version(self) -> Change {
         match self {
-            UnsupportedSyntaxErrorKind::Match => Change::Added(PythonVersion::PY310),
-            UnsupportedSyntaxErrorKind::Walrus => Change::Added(PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::ExceptStar => Change::Added(PythonVersion::PY311),
-            UnsupportedSyntaxErrorKind::UnparenthesizedNamedExpr(_) => {
-                Change::Added(PythonVersion::PY39)
-            }
-            UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::RelaxedDecorator { .. } => {
-                Change::Added(PythonVersion::PY39)
-            }
-            UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
-                Change::Added(PythonVersion::PY38)
-            }
-            UnsupportedSyntaxErrorKind::ParenthesizedKeywordArgumentName => {
-                Change::Removed(PythonVersion::PY38)
-            }
-            UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
-            UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
-            UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
-            UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
-            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
-                Change::Added(PythonVersion::PY39)
-            }
-            UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
-                Change::Added(PythonVersion::PY311)
-            }
-            UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
-            UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
-                Change::Added(PythonVersion::PY39)
-            }
-            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
-                Change::Added(PythonVersion::PY314)
-            }
-            UnsupportedSyntaxErrorKind::TemplateStrings => Change::Added(PythonVersion::PY314),
+            Self::Match => Change::Added(PythonVersion::PY310),
+            Self::Walrus => Change::Added(PythonVersion::PY38),
+            Self::ExceptStar => Change::Added(PythonVersion::PY311),
+            Self::UnparenthesizedNamedExpr(_) => Change::Added(PythonVersion::PY39),
+            Self::StarTuple(_) => Change::Added(PythonVersion::PY38),
+            Self::RelaxedDecorator { .. } => Change::Added(PythonVersion::PY39),
+            Self::PositionalOnlyParameter => Change::Added(PythonVersion::PY38),
+            Self::ParenthesizedKeywordArgumentName => Change::Removed(PythonVersion::PY38),
+            Self::TypeParameterList => Change::Added(PythonVersion::PY312),
+            Self::TypeAliasStatement => Change::Added(PythonVersion::PY312),
+            Self::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            Self::Pep701FString(_) => Change::Added(PythonVersion::PY312),
+            Self::ParenthesizedContextManager => Change::Added(PythonVersion::PY39),
+            Self::StarExpressionInIndex => Change::Added(PythonVersion::PY311),
+            Self::StarAnnotation => Change::Added(PythonVersion::PY311),
+            Self::UnparenthesizedUnpackInFor => Change::Added(PythonVersion::PY39),
+            Self::UnparenthesizedExceptionTypes => Change::Added(PythonVersion::PY314),
+            Self::TemplateStrings => Change::Added(PythonVersion::PY314),
         }
     }
 

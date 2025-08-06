@@ -159,12 +159,12 @@ impl From<ClassMemberBoundness> for HasMethod {
     }
 }
 
-impl BitOr<HasMethod> for HasMethod {
+impl BitOr<Self> for HasMethod {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (HasMethod::No, _) => rhs,
+            (Self::No, _) => rhs,
             (_, _) => self,
         }
     }

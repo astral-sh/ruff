@@ -276,21 +276,21 @@ pub(super) enum SingleEntryPredicate {
 
 impl SingleEntryPredicate {
     pub(super) const fn is_done(&self) -> bool {
-        matches!(self, SingleEntryPredicate::Done)
+        matches!(self, Self::Done)
     }
 }
 
 impl Default for SingleEntryPredicate {
     fn default() -> Self {
-        SingleEntryPredicate::Entry { depth: 0 }
+        Self::Entry { depth: 0 }
     }
 }
 
 impl FitsEndPredicate for SingleEntryPredicate {
     fn is_end(&mut self, element: &FormatElement) -> PrintResult<bool> {
         let result = match self {
-            SingleEntryPredicate::Done => true,
-            SingleEntryPredicate::Entry { depth } => match element {
+            Self::Done => true,
+            Self::Entry { depth } => match element {
                 FormatElement::Tag(Tag::StartEntry) => {
                     *depth += 1;
 
@@ -306,7 +306,7 @@ impl FitsEndPredicate for SingleEntryPredicate {
                     let is_end = *depth == 0;
 
                     if is_end {
-                        *self = SingleEntryPredicate::Done;
+                        *self = Self::Done;
                     }
 
                     is_end

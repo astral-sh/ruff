@@ -59,12 +59,12 @@ impl Violation for SysExitAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SysExitAlias { name } = self;
+        let Self { name } = self;
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SysExitAlias { name } = self;
+        let Self { name } = self;
         Some(format!("Replace `{name}` with `sys.exit()`"))
     }
 }

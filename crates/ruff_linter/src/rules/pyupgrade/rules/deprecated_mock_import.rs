@@ -59,7 +59,7 @@ impl AlwaysFixableViolation for DeprecatedMockImport {
     }
 
     fn fix_title(&self) -> String {
-        let DeprecatedMockImport { reference_type } = self;
+        let Self { reference_type } = self;
         match reference_type {
             MockReference::Import => "Import from `unittest.mock` instead".to_string(),
             MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),

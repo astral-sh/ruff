@@ -28,7 +28,7 @@ pub struct Token {
 }
 
 impl Token {
-    pub(crate) fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Token {
+    pub(crate) fn new(kind: TokenKind, range: TextRange, flags: TokenFlags) -> Self {
         Self { kind, range, flags }
     }
 
@@ -317,13 +317,13 @@ impl TokenKind {
     /// Returns `true` if this is an end of file token.
     #[inline]
     pub const fn is_eof(self) -> bool {
-        matches!(self, TokenKind::EndOfFile)
+        matches!(self, Self::EndOfFile)
     }
 
     /// Returns `true` if this is either a newline or non-logical newline token.
     #[inline]
     pub const fn is_any_newline(self) -> bool {
-        matches!(self, TokenKind::Newline | TokenKind::NonLogicalNewline)
+        matches!(self, Self::Newline | Self::NonLogicalNewline)
     }
 
     /// Returns `true` if the token is a keyword (including soft keywords).
@@ -334,7 +334,7 @@ impl TokenKind {
     /// [`is_non_soft_keyword`]: TokenKind::is_non_soft_keyword
     #[inline]
     pub fn is_keyword(self) -> bool {
-        TokenKind::And <= self && self <= TokenKind::Type
+        Self::And <= self && self <= Self::Type
     }
 
     /// Returns `true` if the token is strictly a soft keyword.
@@ -345,7 +345,7 @@ impl TokenKind {
     /// [`is_non_soft_keyword`]: TokenKind::is_non_soft_keyword
     #[inline]
     pub fn is_soft_keyword(self) -> bool {
-        TokenKind::Case <= self && self <= TokenKind::Type
+        Self::Case <= self && self <= Self::Type
     }
 
     /// Returns `true` if the token is strictly a non-soft keyword.
@@ -356,97 +356,97 @@ impl TokenKind {
     /// [`is_soft_keyword`]: TokenKind::is_soft_keyword
     #[inline]
     pub fn is_non_soft_keyword(self) -> bool {
-        TokenKind::And <= self && self <= TokenKind::Yield
+        Self::And <= self && self <= Self::Yield
     }
 
     #[inline]
     pub const fn is_operator(self) -> bool {
         matches!(
             self,
-            TokenKind::Lpar
-                | TokenKind::Rpar
-                | TokenKind::Lsqb
-                | TokenKind::Rsqb
-                | TokenKind::Comma
-                | TokenKind::Semi
-                | TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Star
-                | TokenKind::Slash
-                | TokenKind::Vbar
-                | TokenKind::Amper
-                | TokenKind::Less
-                | TokenKind::Greater
-                | TokenKind::Equal
-                | TokenKind::Dot
-                | TokenKind::Percent
-                | TokenKind::Lbrace
-                | TokenKind::Rbrace
-                | TokenKind::EqEqual
-                | TokenKind::NotEqual
-                | TokenKind::LessEqual
-                | TokenKind::GreaterEqual
-                | TokenKind::Tilde
-                | TokenKind::CircumFlex
-                | TokenKind::LeftShift
-                | TokenKind::RightShift
-                | TokenKind::DoubleStar
-                | TokenKind::PlusEqual
-                | TokenKind::MinusEqual
-                | TokenKind::StarEqual
-                | TokenKind::SlashEqual
-                | TokenKind::PercentEqual
-                | TokenKind::AmperEqual
-                | TokenKind::VbarEqual
-                | TokenKind::CircumflexEqual
-                | TokenKind::LeftShiftEqual
-                | TokenKind::RightShiftEqual
-                | TokenKind::DoubleStarEqual
-                | TokenKind::DoubleSlash
-                | TokenKind::DoubleSlashEqual
-                | TokenKind::At
-                | TokenKind::AtEqual
-                | TokenKind::Rarrow
-                | TokenKind::Ellipsis
-                | TokenKind::ColonEqual
-                | TokenKind::Colon
-                | TokenKind::And
-                | TokenKind::Or
-                | TokenKind::Not
-                | TokenKind::In
-                | TokenKind::Is
+            Self::Lpar
+                | Self::Rpar
+                | Self::Lsqb
+                | Self::Rsqb
+                | Self::Comma
+                | Self::Semi
+                | Self::Plus
+                | Self::Minus
+                | Self::Star
+                | Self::Slash
+                | Self::Vbar
+                | Self::Amper
+                | Self::Less
+                | Self::Greater
+                | Self::Equal
+                | Self::Dot
+                | Self::Percent
+                | Self::Lbrace
+                | Self::Rbrace
+                | Self::EqEqual
+                | Self::NotEqual
+                | Self::LessEqual
+                | Self::GreaterEqual
+                | Self::Tilde
+                | Self::CircumFlex
+                | Self::LeftShift
+                | Self::RightShift
+                | Self::DoubleStar
+                | Self::PlusEqual
+                | Self::MinusEqual
+                | Self::StarEqual
+                | Self::SlashEqual
+                | Self::PercentEqual
+                | Self::AmperEqual
+                | Self::VbarEqual
+                | Self::CircumflexEqual
+                | Self::LeftShiftEqual
+                | Self::RightShiftEqual
+                | Self::DoubleStarEqual
+                | Self::DoubleSlash
+                | Self::DoubleSlashEqual
+                | Self::At
+                | Self::AtEqual
+                | Self::Rarrow
+                | Self::Ellipsis
+                | Self::ColonEqual
+                | Self::Colon
+                | Self::And
+                | Self::Or
+                | Self::Not
+                | Self::In
+                | Self::Is
         )
     }
 
     /// Returns `true` if this is a singleton token i.e., `True`, `False`, or `None`.
     #[inline]
     pub const fn is_singleton(self) -> bool {
-        matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
+        matches!(self, Self::False | Self::True | Self::None)
     }
 
     /// Returns `true` if this is a trivia token i.e., a comment or a non-logical newline.
     #[inline]
     pub const fn is_trivia(&self) -> bool {
-        matches!(self, TokenKind::Comment | TokenKind::NonLogicalNewline)
+        matches!(self, Self::Comment | Self::NonLogicalNewline)
     }
 
     /// Returns `true` if this is a comment token.
     #[inline]
     pub const fn is_comment(&self) -> bool {
-        matches!(self, TokenKind::Comment)
+        matches!(self, Self::Comment)
     }
 
     #[inline]
     pub const fn is_arithmetic(self) -> bool {
         matches!(
             self,
-            TokenKind::DoubleStar
-                | TokenKind::Star
-                | TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Slash
-                | TokenKind::DoubleSlash
-                | TokenKind::At
+            Self::DoubleStar
+                | Self::Star
+                | Self::Plus
+                | Self::Minus
+                | Self::Slash
+                | Self::DoubleSlash
+                | Self::At
         )
     }
 
@@ -454,29 +454,29 @@ impl TokenKind {
     pub const fn is_bitwise_or_shift(self) -> bool {
         matches!(
             self,
-            TokenKind::LeftShift
-                | TokenKind::LeftShiftEqual
-                | TokenKind::RightShift
-                | TokenKind::RightShiftEqual
-                | TokenKind::Amper
-                | TokenKind::AmperEqual
-                | TokenKind::Vbar
-                | TokenKind::VbarEqual
-                | TokenKind::CircumFlex
-                | TokenKind::CircumflexEqual
-                | TokenKind::Tilde
+            Self::LeftShift
+                | Self::LeftShiftEqual
+                | Self::RightShift
+                | Self::RightShiftEqual
+                | Self::Amper
+                | Self::AmperEqual
+                | Self::Vbar
+                | Self::VbarEqual
+                | Self::CircumFlex
+                | Self::CircumflexEqual
+                | Self::Tilde
         )
     }
 
     /// Returns `true` if the current token is a unary arithmetic operator.
     #[inline]
     pub const fn is_unary_arithmetic_operator(self) -> bool {
-        matches!(self, TokenKind::Plus | TokenKind::Minus)
+        matches!(self, Self::Plus | Self::Minus)
     }
 
     #[inline]
     pub const fn is_interpolated_string_end(self) -> bool {
-        matches!(self, TokenKind::FStringEnd | TokenKind::TStringEnd)
+        matches!(self, Self::FStringEnd | Self::TStringEnd)
     }
 
     /// Returns the [`UnaryOp`] that corresponds to this token kind, if it is a unary arithmetic
@@ -488,8 +488,8 @@ impl TokenKind {
     #[inline]
     pub(crate) const fn as_unary_arithmetic_operator(self) -> Option<UnaryOp> {
         Some(match self {
-            TokenKind::Plus => UnaryOp::UAdd,
-            TokenKind::Minus => UnaryOp::USub,
+            Self::Plus => UnaryOp::UAdd,
+            Self::Minus => UnaryOp::USub,
             _ => return None,
         })
     }
@@ -503,10 +503,10 @@ impl TokenKind {
     #[inline]
     pub(crate) const fn as_unary_operator(self) -> Option<UnaryOp> {
         Some(match self {
-            TokenKind::Plus => UnaryOp::UAdd,
-            TokenKind::Minus => UnaryOp::USub,
-            TokenKind::Tilde => UnaryOp::Invert,
-            TokenKind::Not => UnaryOp::Not,
+            Self::Plus => UnaryOp::UAdd,
+            Self::Minus => UnaryOp::USub,
+            Self::Tilde => UnaryOp::Invert,
+            Self::Not => UnaryOp::Not,
             _ => return None,
         })
     }
@@ -516,8 +516,8 @@ impl TokenKind {
     #[inline]
     pub(crate) const fn as_bool_operator(self) -> Option<BoolOp> {
         Some(match self {
-            TokenKind::And => BoolOp::And,
-            TokenKind::Or => BoolOp::Or,
+            Self::And => BoolOp::And,
+            Self::Or => BoolOp::Or,
             _ => return None,
         })
     }
@@ -530,19 +530,19 @@ impl TokenKind {
     /// [`as_augmented_assign_operator`]: TokenKind::as_augmented_assign_operator
     pub(crate) const fn as_binary_operator(self) -> Option<Operator> {
         Some(match self {
-            TokenKind::Plus => Operator::Add,
-            TokenKind::Minus => Operator::Sub,
-            TokenKind::Star => Operator::Mult,
-            TokenKind::At => Operator::MatMult,
-            TokenKind::DoubleStar => Operator::Pow,
-            TokenKind::Slash => Operator::Div,
-            TokenKind::DoubleSlash => Operator::FloorDiv,
-            TokenKind::Percent => Operator::Mod,
-            TokenKind::Amper => Operator::BitAnd,
-            TokenKind::Vbar => Operator::BitOr,
-            TokenKind::CircumFlex => Operator::BitXor,
-            TokenKind::LeftShift => Operator::LShift,
-            TokenKind::RightShift => Operator::RShift,
+            Self::Plus => Operator::Add,
+            Self::Minus => Operator::Sub,
+            Self::Star => Operator::Mult,
+            Self::At => Operator::MatMult,
+            Self::DoubleStar => Operator::Pow,
+            Self::Slash => Operator::Div,
+            Self::DoubleSlash => Operator::FloorDiv,
+            Self::Percent => Operator::Mod,
+            Self::Amper => Operator::BitAnd,
+            Self::Vbar => Operator::BitOr,
+            Self::CircumFlex => Operator::BitXor,
+            Self::LeftShift => Operator::LShift,
+            Self::RightShift => Operator::RShift,
             _ => return None,
         })
     }
@@ -552,19 +552,19 @@ impl TokenKind {
     #[inline]
     pub(crate) const fn as_augmented_assign_operator(self) -> Option<Operator> {
         Some(match self {
-            TokenKind::PlusEqual => Operator::Add,
-            TokenKind::MinusEqual => Operator::Sub,
-            TokenKind::StarEqual => Operator::Mult,
-            TokenKind::AtEqual => Operator::MatMult,
-            TokenKind::DoubleStarEqual => Operator::Pow,
-            TokenKind::SlashEqual => Operator::Div,
-            TokenKind::DoubleSlashEqual => Operator::FloorDiv,
-            TokenKind::PercentEqual => Operator::Mod,
-            TokenKind::AmperEqual => Operator::BitAnd,
-            TokenKind::VbarEqual => Operator::BitOr,
-            TokenKind::CircumflexEqual => Operator::BitXor,
-            TokenKind::LeftShiftEqual => Operator::LShift,
-            TokenKind::RightShiftEqual => Operator::RShift,
+            Self::PlusEqual => Operator::Add,
+            Self::MinusEqual => Operator::Sub,
+            Self::StarEqual => Operator::Mult,
+            Self::AtEqual => Operator::MatMult,
+            Self::DoubleStarEqual => Operator::Pow,
+            Self::SlashEqual => Operator::Div,
+            Self::DoubleSlashEqual => Operator::FloorDiv,
+            Self::PercentEqual => Operator::Mod,
+            Self::AmperEqual => Operator::BitAnd,
+            Self::VbarEqual => Operator::BitOr,
+            Self::CircumflexEqual => Operator::BitXor,
+            Self::LeftShiftEqual => Operator::LShift,
+            Self::RightShiftEqual => Operator::RShift,
             _ => return None,
         })
     }
@@ -574,8 +574,8 @@ impl From<BoolOp> for TokenKind {
     #[inline]
     fn from(op: BoolOp) -> Self {
         match op {
-            BoolOp::And => TokenKind::And,
-            BoolOp::Or => TokenKind::Or,
+            BoolOp::And => Self::And,
+            BoolOp::Or => Self::Or,
         }
     }
 }
@@ -584,10 +584,10 @@ impl From<UnaryOp> for TokenKind {
     #[inline]
     fn from(op: UnaryOp) -> Self {
         match op {
-            UnaryOp::Invert => TokenKind::Tilde,
-            UnaryOp::Not => TokenKind::Not,
-            UnaryOp::UAdd => TokenKind::Plus,
-            UnaryOp::USub => TokenKind::Minus,
+            UnaryOp::Invert => Self::Tilde,
+            UnaryOp::Not => Self::Not,
+            UnaryOp::UAdd => Self::Plus,
+            UnaryOp::USub => Self::Minus,
         }
     }
 }
@@ -596,19 +596,19 @@ impl From<Operator> for TokenKind {
     #[inline]
     fn from(op: Operator) -> Self {
         match op {
-            Operator::Add => TokenKind::Plus,
-            Operator::Sub => TokenKind::Minus,
-            Operator::Mult => TokenKind::Star,
-            Operator::MatMult => TokenKind::At,
-            Operator::Div => TokenKind::Slash,
-            Operator::Mod => TokenKind::Percent,
-            Operator::Pow => TokenKind::DoubleStar,
-            Operator::LShift => TokenKind::LeftShift,
-            Operator::RShift => TokenKind::RightShift,
-            Operator::BitOr => TokenKind::Vbar,
-            Operator::BitXor => TokenKind::CircumFlex,
-            Operator::BitAnd => TokenKind::Amper,
-            Operator::FloorDiv => TokenKind::DoubleSlash,
+            Operator::Add => Self::Plus,
+            Operator::Sub => Self::Minus,
+            Operator::Mult => Self::Star,
+            Operator::MatMult => Self::At,
+            Operator::Div => Self::Slash,
+            Operator::Mod => Self::Percent,
+            Operator::Pow => Self::DoubleStar,
+            Operator::LShift => Self::LeftShift,
+            Operator::RShift => Self::RightShift,
+            Operator::BitOr => Self::Vbar,
+            Operator::BitXor => Self::CircumFlex,
+            Operator::BitAnd => Self::Amper,
+            Operator::FloorDiv => Self::DoubleSlash,
         }
     }
 }
@@ -616,112 +616,112 @@ impl From<Operator> for TokenKind {
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
-            TokenKind::Unknown => "Unknown",
-            TokenKind::Newline => "newline",
-            TokenKind::NonLogicalNewline => "NonLogicalNewline",
-            TokenKind::Indent => "indent",
-            TokenKind::Dedent => "dedent",
-            TokenKind::EndOfFile => "end of file",
-            TokenKind::Name => "name",
-            TokenKind::Int => "int",
-            TokenKind::Float => "float",
-            TokenKind::Complex => "complex",
-            TokenKind::String => "string",
-            TokenKind::FStringStart => "FStringStart",
-            TokenKind::FStringMiddle => "FStringMiddle",
-            TokenKind::FStringEnd => "FStringEnd",
-            TokenKind::TStringStart => "TStringStart",
-            TokenKind::TStringMiddle => "TStringMiddle",
-            TokenKind::TStringEnd => "TStringEnd",
-            TokenKind::IpyEscapeCommand => "IPython escape command",
-            TokenKind::Comment => "comment",
-            TokenKind::Question => "'?'",
-            TokenKind::Exclamation => "'!'",
-            TokenKind::Lpar => "'('",
-            TokenKind::Rpar => "')'",
-            TokenKind::Lsqb => "'['",
-            TokenKind::Rsqb => "']'",
-            TokenKind::Lbrace => "'{'",
-            TokenKind::Rbrace => "'}'",
-            TokenKind::Equal => "'='",
-            TokenKind::ColonEqual => "':='",
-            TokenKind::Dot => "'.'",
-            TokenKind::Colon => "':'",
-            TokenKind::Semi => "';'",
-            TokenKind::Comma => "','",
-            TokenKind::Rarrow => "'->'",
-            TokenKind::Plus => "'+'",
-            TokenKind::Minus => "'-'",
-            TokenKind::Star => "'*'",
-            TokenKind::DoubleStar => "'**'",
-            TokenKind::Slash => "'/'",
-            TokenKind::DoubleSlash => "'//'",
-            TokenKind::Percent => "'%'",
-            TokenKind::Vbar => "'|'",
-            TokenKind::Amper => "'&'",
-            TokenKind::CircumFlex => "'^'",
-            TokenKind::LeftShift => "'<<'",
-            TokenKind::RightShift => "'>>'",
-            TokenKind::Tilde => "'~'",
-            TokenKind::At => "'@'",
-            TokenKind::Less => "'<'",
-            TokenKind::Greater => "'>'",
-            TokenKind::EqEqual => "'=='",
-            TokenKind::NotEqual => "'!='",
-            TokenKind::LessEqual => "'<='",
-            TokenKind::GreaterEqual => "'>='",
-            TokenKind::PlusEqual => "'+='",
-            TokenKind::MinusEqual => "'-='",
-            TokenKind::StarEqual => "'*='",
-            TokenKind::DoubleStarEqual => "'**='",
-            TokenKind::SlashEqual => "'/='",
-            TokenKind::DoubleSlashEqual => "'//='",
-            TokenKind::PercentEqual => "'%='",
-            TokenKind::VbarEqual => "'|='",
-            TokenKind::AmperEqual => "'&='",
-            TokenKind::CircumflexEqual => "'^='",
-            TokenKind::LeftShiftEqual => "'<<='",
-            TokenKind::RightShiftEqual => "'>>='",
-            TokenKind::AtEqual => "'@='",
-            TokenKind::Ellipsis => "'...'",
-            TokenKind::False => "'False'",
-            TokenKind::None => "'None'",
-            TokenKind::True => "'True'",
-            TokenKind::And => "'and'",
-            TokenKind::As => "'as'",
-            TokenKind::Assert => "'assert'",
-            TokenKind::Async => "'async'",
-            TokenKind::Await => "'await'",
-            TokenKind::Break => "'break'",
-            TokenKind::Class => "'class'",
-            TokenKind::Continue => "'continue'",
-            TokenKind::Def => "'def'",
-            TokenKind::Del => "'del'",
-            TokenKind::Elif => "'elif'",
-            TokenKind::Else => "'else'",
-            TokenKind::Except => "'except'",
-            TokenKind::Finally => "'finally'",
-            TokenKind::For => "'for'",
-            TokenKind::From => "'from'",
-            TokenKind::Global => "'global'",
-            TokenKind::If => "'if'",
-            TokenKind::Import => "'import'",
-            TokenKind::In => "'in'",
-            TokenKind::Is => "'is'",
-            TokenKind::Lambda => "'lambda'",
-            TokenKind::Nonlocal => "'nonlocal'",
-            TokenKind::Not => "'not'",
-            TokenKind::Or => "'or'",
-            TokenKind::Pass => "'pass'",
-            TokenKind::Raise => "'raise'",
-            TokenKind::Return => "'return'",
-            TokenKind::Try => "'try'",
-            TokenKind::While => "'while'",
-            TokenKind::Match => "'match'",
-            TokenKind::Type => "'type'",
-            TokenKind::Case => "'case'",
-            TokenKind::With => "'with'",
-            TokenKind::Yield => "'yield'",
+            Self::Unknown => "Unknown",
+            Self::Newline => "newline",
+            Self::NonLogicalNewline => "NonLogicalNewline",
+            Self::Indent => "indent",
+            Self::Dedent => "dedent",
+            Self::EndOfFile => "end of file",
+            Self::Name => "name",
+            Self::Int => "int",
+            Self::Float => "float",
+            Self::Complex => "complex",
+            Self::String => "string",
+            Self::FStringStart => "FStringStart",
+            Self::FStringMiddle => "FStringMiddle",
+            Self::FStringEnd => "FStringEnd",
+            Self::TStringStart => "TStringStart",
+            Self::TStringMiddle => "TStringMiddle",
+            Self::TStringEnd => "TStringEnd",
+            Self::IpyEscapeCommand => "IPython escape command",
+            Self::Comment => "comment",
+            Self::Question => "'?'",
+            Self::Exclamation => "'!'",
+            Self::Lpar => "'('",
+            Self::Rpar => "')'",
+            Self::Lsqb => "'['",
+            Self::Rsqb => "']'",
+            Self::Lbrace => "'{'",
+            Self::Rbrace => "'}'",
+            Self::Equal => "'='",
+            Self::ColonEqual => "':='",
+            Self::Dot => "'.'",
+            Self::Colon => "':'",
+            Self::Semi => "';'",
+            Self::Comma => "','",
+            Self::Rarrow => "'->'",
+            Self::Plus => "'+'",
+            Self::Minus => "'-'",
+            Self::Star => "'*'",
+            Self::DoubleStar => "'**'",
+            Self::Slash => "'/'",
+            Self::DoubleSlash => "'//'",
+            Self::Percent => "'%'",
+            Self::Vbar => "'|'",
+            Self::Amper => "'&'",
+            Self::CircumFlex => "'^'",
+            Self::LeftShift => "'<<'",
+            Self::RightShift => "'>>'",
+            Self::Tilde => "'~'",
+            Self::At => "'@'",
+            Self::Less => "'<'",
+            Self::Greater => "'>'",
+            Self::EqEqual => "'=='",
+            Self::NotEqual => "'!='",
+            Self::LessEqual => "'<='",
+            Self::GreaterEqual => "'>='",
+            Self::PlusEqual => "'+='",
+            Self::MinusEqual => "'-='",
+            Self::StarEqual => "'*='",
+            Self::DoubleStarEqual => "'**='",
+            Self::SlashEqual => "'/='",
+            Self::DoubleSlashEqual => "'//='",
+            Self::PercentEqual => "'%='",
+            Self::VbarEqual => "'|='",
+            Self::AmperEqual => "'&='",
+            Self::CircumflexEqual => "'^='",
+            Self::LeftShiftEqual => "'<<='",
+            Self::RightShiftEqual => "'>>='",
+            Self::AtEqual => "'@='",
+            Self::Ellipsis => "'...'",
+            Self::False => "'False'",
+            Self::None => "'None'",
+            Self::True => "'True'",
+            Self::And => "'and'",
+            Self::As => "'as'",
+            Self::Assert => "'assert'",
+            Self::Async => "'async'",
+            Self::Await => "'await'",
+            Self::Break => "'break'",
+            Self::Class => "'class'",
+            Self::Continue => "'continue'",
+            Self::Def => "'def'",
+            Self::Del => "'del'",
+            Self::Elif => "'elif'",
+            Self::Else => "'else'",
+            Self::Except => "'except'",
+            Self::Finally => "'finally'",
+            Self::For => "'for'",
+            Self::From => "'from'",
+            Self::Global => "'global'",
+            Self::If => "'if'",
+            Self::Import => "'import'",
+            Self::In => "'in'",
+            Self::Is => "'is'",
+            Self::Lambda => "'lambda'",
+            Self::Nonlocal => "'nonlocal'",
+            Self::Not => "'not'",
+            Self::Or => "'or'",
+            Self::Pass => "'pass'",
+            Self::Raise => "'raise'",
+            Self::Return => "'return'",
+            Self::Try => "'try'",
+            Self::While => "'while'",
+            Self::Match => "'match'",
+            Self::Type => "'type'",
+            Self::Case => "'case'",
+            Self::With => "'with'",
+            Self::Yield => "'yield'",
         };
         f.write_str(value)
     }
@@ -758,7 +758,7 @@ impl get_size2::GetSize for TokenFlags {}
 
 impl StringFlags for TokenFlags {
     fn quote_style(self) -> Quote {
-        if self.intersects(TokenFlags::DOUBLE_QUOTES) {
+        if self.intersects(Self::DOUBLE_QUOTES) {
             Quote::Double
         } else {
             Quote::Single
@@ -766,7 +766,7 @@ impl StringFlags for TokenFlags {
     }
 
     fn triple_quotes(self) -> TripleQuotes {
-        if self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) {
+        if self.intersects(Self::TRIPLE_QUOTED_STRING) {
             TripleQuotes::Yes
         } else {
             TripleQuotes::No
@@ -774,35 +774,35 @@ impl StringFlags for TokenFlags {
     }
 
     fn prefix(self) -> AnyStringPrefix {
-        if self.intersects(TokenFlags::F_STRING) {
-            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+        if self.intersects(Self::F_STRING) {
+            if self.intersects(Self::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: false })
-            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+            } else if self.intersects(Self::RAW_STRING_UPPERCASE) {
                 AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true })
             } else {
                 AnyStringPrefix::Format(FStringPrefix::Regular)
             }
-        } else if self.intersects(TokenFlags::T_STRING) {
-            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+        } else if self.intersects(Self::T_STRING) {
+            if self.intersects(Self::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false })
-            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+            } else if self.intersects(Self::RAW_STRING_UPPERCASE) {
                 AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true })
             } else {
                 AnyStringPrefix::Template(TStringPrefix::Regular)
             }
-        } else if self.intersects(TokenFlags::BYTE_STRING) {
-            if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+        } else if self.intersects(Self::BYTE_STRING) {
+            if self.intersects(Self::RAW_STRING_LOWERCASE) {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: false })
-            } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+            } else if self.intersects(Self::RAW_STRING_UPPERCASE) {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Raw { uppercase_r: true })
             } else {
                 AnyStringPrefix::Bytes(ByteStringPrefix::Regular)
             }
-        } else if self.intersects(TokenFlags::RAW_STRING_LOWERCASE) {
+        } else if self.intersects(Self::RAW_STRING_LOWERCASE) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: false })
-        } else if self.intersects(TokenFlags::RAW_STRING_UPPERCASE) {
+        } else if self.intersects(Self::RAW_STRING_UPPERCASE) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Raw { uppercase: true })
-        } else if self.intersects(TokenFlags::UNICODE_STRING) {
+        } else if self.intersects(Self::UNICODE_STRING) {
             AnyStringPrefix::Regular(StringLiteralPrefix::Unicode)
         } else {
             AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
@@ -813,27 +813,27 @@ impl StringFlags for TokenFlags {
 impl TokenFlags {
     /// Returns `true` if the token is an f-string.
     pub(crate) const fn is_f_string(self) -> bool {
-        self.intersects(TokenFlags::F_STRING)
+        self.intersects(Self::F_STRING)
     }
 
     /// Returns `true` if the token is a t-string.
     pub(crate) const fn is_t_string(self) -> bool {
-        self.intersects(TokenFlags::T_STRING)
+        self.intersects(Self::T_STRING)
     }
 
     /// Returns `true` if the token is a t-string.
     pub(crate) const fn is_interpolated_string(self) -> bool {
-        self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
+        self.intersects(Self::T_STRING.union(Self::F_STRING))
     }
 
     /// Returns `true` if the token is a triple-quoted t-string.
     pub(crate) fn is_triple_quoted_interpolated_string(self) -> bool {
-        self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
+        self.intersects(Self::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
     }
 
     /// Returns `true` if the token is a raw string.
     pub(crate) const fn is_raw_string(self) -> bool {
-        self.intersects(TokenFlags::RAW_STRING)
+        self.intersects(Self::RAW_STRING)
     }
 }
 

@@ -50,7 +50,7 @@ pub(crate) struct BadDunderMethodName {
 impl Violation for BadDunderMethodName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadDunderMethodName { name } = self;
+        let Self { name } = self;
         format!("Dunder method `{name}` has no special meaning in Python 3")
     }
 }

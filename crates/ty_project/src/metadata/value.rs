@@ -35,14 +35,14 @@ pub enum ValueSource {
 impl ValueSource {
     pub fn file(&self) -> Option<&SystemPath> {
         match self {
-            ValueSource::File(path) => Some(&**path),
-            ValueSource::Cli => None,
-            ValueSource::PythonVSCodeExtension => None,
+            Self::File(path) => Some(&**path),
+            Self::Cli => None,
+            Self::PythonVSCodeExtension => None,
         }
     }
 
     pub const fn is_cli(&self) -> bool {
-        matches!(self, ValueSource::Cli)
+        matches!(self, Self::Cli)
     }
 }
 

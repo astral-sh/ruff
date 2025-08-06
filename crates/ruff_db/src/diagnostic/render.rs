@@ -62,7 +62,7 @@ impl<'a> DisplayDiagnostic<'a> {
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a> {
+    ) -> Self {
         DisplayDiagnostic {
             config,
             resolver,
@@ -95,7 +95,7 @@ impl<'a> DisplayDiagnostics<'a> {
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diagnostics: &'a [Diagnostic],
-    ) -> DisplayDiagnostics<'a> {
+    ) -> Self {
         DisplayDiagnostics {
             config,
             resolver,
@@ -195,7 +195,7 @@ impl<'a> Resolved<'a> {
         resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
         config: &DisplayDiagnosticConfig,
-    ) -> Resolved<'a> {
+    ) -> Self {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, config, diag));
         for sub in &diag.inner.subs {
@@ -236,7 +236,7 @@ impl<'a> ResolvedDiagnostic<'a> {
         resolver: &'a dyn FileResolver,
         config: &DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-    ) -> ResolvedDiagnostic<'a> {
+    ) -> Self {
         let annotations: Vec<_> = diag
             .inner
             .annotations
@@ -280,10 +280,7 @@ impl<'a> ResolvedDiagnostic<'a> {
     }
 
     /// Resolve a single sub-diagnostic.
-    fn from_sub_diagnostic(
-        resolver: &'a dyn FileResolver,
-        diag: &'a SubDiagnostic,
-    ) -> ResolvedDiagnostic<'a> {
+    fn from_sub_diagnostic(resolver: &'a dyn FileResolver, diag: &'a SubDiagnostic) -> Self {
         let annotations: Vec<_> = diag
             .inner
             .annotations
@@ -431,7 +428,7 @@ impl<'a> ResolvedAnnotation<'a> {
         diagnostic_source: &DiagnosticSource,
         ann: &'a Annotation,
         resolver: &'a dyn FileResolver,
-    ) -> Option<ResolvedAnnotation<'a>> {
+    ) -> Option<Self> {
         let source = diagnostic_source.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
             // An annotation with no range AND no message is probably(?)
@@ -558,7 +555,7 @@ impl<'r> RenderableSnippets<'r> {
         context: usize,
         path: &'r str,
         resolved_snippets: &'a [Vec<&'r ResolvedAnnotation<'r>>],
-    ) -> RenderableSnippets<'r> {
+    ) -> Self {
         assert!(!resolved_snippets.is_empty());
 
         let mut has_primary = false;
@@ -629,7 +626,7 @@ impl<'r> RenderableSnippet<'r> {
     /// # Panics
     ///
     /// When `anns.is_empty()`.
-    fn new<'a>(context: usize, anns: &'a [&'r ResolvedAnnotation<'r>]) -> RenderableSnippet<'r> {
+    fn new<'a>(context: usize, anns: &'a [&'r ResolvedAnnotation<'r>]) -> Self {
         assert!(
             !anns.is_empty(),
             "creating a renderable snippet requires a non-zero number of annotations",
@@ -718,7 +715,7 @@ impl<'r> RenderableAnnotation<'r> {
     /// The lifetime of the resolved annotation does not matter. The `'r`
     /// lifetime parameter here refers to the lifetime of the resolver that
     /// created the given `ResolvedAnnotation`.
-    fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> RenderableAnnotation<'r> {
+    fn new(snippet_start: TextSize, ann: &'_ ResolvedAnnotation<'r>) -> Self {
         let range = ann.range - snippet_start;
         RenderableAnnotation {
             range,
@@ -1048,7 +1045,7 @@ impl<'r> EscapedSourceCode<'r> {
     // See also: <https://github.com/astral-sh/ruff/issues/15509> and
     // `ruff_linter::message::text::SourceCode::fix_up_empty_spans_after_line_terminator`,
     // from which this was adapted.
-    fn fix_up_empty_spans_after_line_terminator(mut self) -> EscapedSourceCode<'r> {
+    fn fix_up_empty_spans_after_line_terminator(mut self) -> Self {
         for ann in &mut self.annotations {
             let range = ann.range;
             if !range.is_empty()
@@ -2566,8 +2563,8 @@ watermelon
         /// Create a new test harness.
         ///
         /// This uses the default diagnostic rendering configuration.
-        pub(super) fn new() -> TestEnvironment {
-            TestEnvironment {
+        pub(super) fn new() -> Self {
+            Self {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::default(),
             }
@@ -2769,7 +2766,7 @@ watermelon
             line_offset_start: &str,
             line_offset_end: &str,
             label: &str,
-        ) -> DiagnosticBuilder<'e> {
+        ) -> Self {
             let span = self.env.span(path, line_offset_start, line_offset_end);
             let mut ann = Annotation::primary(span);
             if !label.is_empty() {
@@ -2792,7 +2789,7 @@ watermelon
             line_offset_start: &str,
             line_offset_end: &str,
             label: &str,
-        ) -> DiagnosticBuilder<'e> {
+        ) -> Self {
             let span = self.env.span(path, line_offset_start, line_offset_end);
             let mut ann = Annotation::secondary(span);
             if !label.is_empty() {
@@ -2803,26 +2800,26 @@ watermelon
         }
 
         /// Set the secondary code on the diagnostic.
-        fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
+        fn secondary_code(mut self, secondary_code: &str) -> Self {
             self.diag
                 .set_secondary_code(SecondaryCode::new(secondary_code.to_string()));
             self
         }
 
         /// Set the fix on the diagnostic.
-        pub(super) fn fix(mut self, fix: Fix) -> DiagnosticBuilder<'e> {
+        pub(super) fn fix(mut self, fix: Fix) -> Self {
             self.diag.set_fix(fix);
             self
         }
 
         /// Set the noqa offset on the diagnostic.
-        fn noqa_offset(mut self, noqa_offset: TextSize) -> DiagnosticBuilder<'e> {
+        fn noqa_offset(mut self, noqa_offset: TextSize) -> Self {
             self.diag.set_noqa_offset(noqa_offset);
             self
         }
 
         /// Adds a "help" sub-diagnostic with the given message.
-        pub(super) fn help(mut self, message: impl IntoDiagnosticMessage) -> DiagnosticBuilder<'e> {
+        pub(super) fn help(mut self, message: impl IntoDiagnosticMessage) -> Self {
             self.diag.help(message);
             self
         }
@@ -2858,7 +2855,7 @@ watermelon
             line_offset_start: &str,
             line_offset_end: &str,
             label: &str,
-        ) -> SubDiagnosticBuilder<'e> {
+        ) -> Self {
             let span = self.env.span(path, line_offset_start, line_offset_end);
             let mut ann = Annotation::primary(span);
             if !label.is_empty() {
@@ -2881,7 +2878,7 @@ watermelon
             line_offset_start: &str,
             line_offset_end: &str,
             label: &str,
-        ) -> SubDiagnosticBuilder<'e> {
+        ) -> Self {
             let span = self.env.span(path, line_offset_start, line_offset_end);
             let mut ann = Annotation::secondary(span);
             if !label.is_empty() {

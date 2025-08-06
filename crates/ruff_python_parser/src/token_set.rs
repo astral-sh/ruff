@@ -5,7 +5,7 @@ use crate::TokenKind;
 pub(crate) struct TokenSet(u128);
 
 impl TokenSet {
-    pub(crate) const fn new<const N: usize>(kinds: [TokenKind; N]) -> TokenSet {
+    pub(crate) const fn new<const N: usize>(kinds: [TokenKind; N]) -> Self {
         let mut res = 0u128;
         let mut i = 0usize;
 
@@ -14,15 +14,15 @@ impl TokenSet {
             res |= mask(kind);
             i += 1;
         }
-        TokenSet(res)
+        Self(res)
     }
 
-    pub(crate) const fn union(self, other: TokenSet) -> TokenSet {
-        TokenSet(self.0 | other.0)
+    pub(crate) const fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
     }
 
-    pub(crate) const fn remove(self, kind: TokenKind) -> TokenSet {
-        TokenSet(self.0 & !mask(kind))
+    pub(crate) const fn remove(self, kind: TokenKind) -> Self {
+        Self(self.0 & !mask(kind))
     }
 
     pub(crate) const fn contains(&self, kind: TokenKind) -> bool {
@@ -36,7 +36,7 @@ const fn mask(kind: TokenKind) -> u128 {
 
 impl<const N: usize> From<[TokenKind; N]> for TokenSet {
     fn from(kinds: [TokenKind; N]) -> Self {
-        TokenSet::new(kinds)
+        Self::new(kinds)
     }
 }
 

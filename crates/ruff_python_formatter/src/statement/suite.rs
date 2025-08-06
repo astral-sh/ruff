@@ -761,7 +761,7 @@ impl FormatRuleWithOptions<Suite, PyFormatContext<'_>> for FormatSuite {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
-    type Format<'a> = FormatRefWithRule<'a, Suite, FormatSuite, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatSuite, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatSuite::default())
@@ -769,7 +769,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Suite {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
-    type Format = FormatOwnedWithRule<Suite, FormatSuite, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatSuite, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatSuite::default())
@@ -791,7 +791,7 @@ impl<'a> DocstringStmt<'a> {
         stmt: &'a Stmt,
         suite_kind: SuiteKind,
         context: &PyFormatContext,
-    ) -> Option<DocstringStmt<'a>> {
+    ) -> Option<Self> {
         // Notebooks don't have a concept of modules, therefore, don't recognise the first string as the module docstring.
         if context.options().source_type().is_ipynb() && suite_kind == SuiteKind::TopLevel {
             return None;

@@ -415,7 +415,7 @@ impl File {
 
     /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`] for
     /// system paths.
-    fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+    fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<Self>) {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return;
         };
@@ -544,8 +544,8 @@ pub enum FileError {
 impl fmt::Display for FileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileError::IsADirectory => f.write_str("Is a directory"),
-            FileError::NotFound => f.write_str("Not found"),
+            Self::IsADirectory => f.write_str("Is a directory"),
+            Self::NotFound => f.write_str("Not found"),
         }
     }
 }

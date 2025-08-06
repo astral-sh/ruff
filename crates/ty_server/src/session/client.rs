@@ -38,7 +38,7 @@ impl Client {
         &self,
         session: &Session,
         params: R::Params,
-        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
+        response_handler: impl FnOnce(&Self, R::Result) + Send + 'static,
     ) where
         R: lsp_types::request::Request,
     {
@@ -62,7 +62,7 @@ impl Client {
     pub(crate) fn send_deferred_request<R>(
         &self,
         params: R::Params,
-        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
+        response_handler: impl FnOnce(&Self, R::Result) + Send + 'static,
     ) where
         R: lsp_types::request::Request,
     {

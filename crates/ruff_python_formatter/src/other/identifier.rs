@@ -14,7 +14,7 @@ impl FormatRule<Identifier, PyFormatContext<'_>> for FormatIdentifier {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Identifier {
-    type Format<'a> = FormatRefWithRule<'a, Identifier, FormatIdentifier, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatIdentifier, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatIdentifier)
@@ -22,7 +22,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Identifier {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Identifier {
-    type Format = FormatOwnedWithRule<Identifier, FormatIdentifier, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatIdentifier, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatIdentifier)

@@ -62,12 +62,12 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfDictGet { contents } = self;
+        let Self { contents } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfDictGet { contents } = self;
+        let Self { contents } = self;
         Some(format!("Replace with `{contents}`"))
     }
 }

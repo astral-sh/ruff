@@ -61,7 +61,7 @@ pub struct OptionString(String);
 
 impl From<String> for OptionString {
     fn from(s: String) -> Self {
-        OptionString(s)
+        Self(s)
     }
 }
 
@@ -73,7 +73,7 @@ impl From<OptionString> for String {
 
 impl From<&str> for OptionString {
     fn from(s: &str) -> Self {
-        OptionString(s.to_string())
+        Self(s.to_string())
     }
 }
 
@@ -91,7 +91,7 @@ impl FromStr for OptionString {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Options::metadata()
             .has(s)
-            .then(|| OptionString(s.to_owned()))
+            .then(|| Self(s.to_owned()))
             .ok_or(())
     }
 }

@@ -91,7 +91,7 @@ pub(crate) struct TooManyPublicMethods {
 impl Violation for TooManyPublicMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyPublicMethods {
+        let Self {
             methods,
             max_methods,
         } = self;

@@ -41,12 +41,12 @@ impl Violation for RedefinedWhileUnused {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedWhileUnused { name, row } = self;
+        let Self { name, row } = self;
         format!("Redefinition of unused `{name}` from {row}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RedefinedWhileUnused { name, .. } = self;
+        let Self { name, .. } = self;
         Some(format!("Remove definition: `{name}`"))
     }
 }

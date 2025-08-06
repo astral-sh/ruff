@@ -107,8 +107,8 @@ impl LspDiagnostics {
     /// Panics if the diagnostics are for a notebook document.
     pub(super) fn expect_text_document(self) -> Vec<Diagnostic> {
         match self {
-            LspDiagnostics::TextDocument(diagnostics) => diagnostics,
-            LspDiagnostics::NotebookDocument(_) => {
+            Self::TextDocument(diagnostics) => diagnostics,
+            Self::NotebookDocument(_) => {
                 panic!("Expected a text document diagnostics, but got notebook diagnostics")
             }
         }

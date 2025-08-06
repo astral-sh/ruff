@@ -157,16 +157,16 @@ impl FileExemption {
     /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
     pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
         match self {
-            FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
+            Self::All(_) => true,
+            Self::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
         }
     }
 
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         match self {
-            FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.contains(&needle),
+            Self::All(_) => true,
+            Self::Codes(codes) => codes.contains(&needle),
         }
     }
 
@@ -174,8 +174,8 @@ impl FileExemption {
     /// exemption.
     pub(crate) fn enumerates(&self, needle: Rule) -> bool {
         let codes = match self {
-            FileExemption::All(codes) => codes,
-            FileExemption::Codes(codes) => codes,
+            Self::All(codes) => codes,
+            Self::Codes(codes) => codes,
         };
         codes.contains(&needle)
     }
@@ -194,9 +194,9 @@ impl<'a> From<&'a FileNoqaDirectives<'a>> for FileExemption {
             .iter()
             .any(|line| matches!(line.parsed_file_exemption, Directive::All(_)))
         {
-            FileExemption::All(codes)
+            Self::All(codes)
         } else {
-            FileExemption::Codes(codes)
+            Self::Codes(codes)
         }
     }
 }
@@ -679,8 +679,8 @@ impl Display for LexicalWarning {
 impl Ranged for LexicalWarning {
     fn range(&self) -> TextRange {
         match *self {
-            LexicalWarning::MissingItem(text_range) => text_range,
-            LexicalWarning::MissingDelimiter(text_range) => text_range,
+            Self::MissingItem(text_range) => text_range,
+            Self::MissingDelimiter(text_range) => text_range,
         }
     }
 }
@@ -700,11 +700,11 @@ pub(crate) enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexicalError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
-            LexicalError::InvalidSuffix => {
+            Self::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
+            Self::InvalidSuffix => {
                 fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
             }
-            LexicalError::InvalidCodeSuffix => {
+            Self::InvalidCodeSuffix => {
                 fmt.write_str("expected code to consist of uppercase letters followed by digits only (e.g. `F401`)")
             }
 
@@ -1204,7 +1204,7 @@ impl NoqaMapping {
 
 impl FromIterator<TextRange> for NoqaMapping {
     fn from_iter<T: IntoIterator<Item = TextRange>>(iter: T) -> Self {
-        let mut mappings = NoqaMapping::default();
+        let mut mappings = Self::default();
 
         for range in iter {
             mappings.push_mapping(range);

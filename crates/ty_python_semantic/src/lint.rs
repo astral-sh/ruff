@@ -58,24 +58,24 @@ pub enum Level {
 
 impl Level {
     pub const fn is_error(self) -> bool {
-        matches!(self, Level::Error)
+        matches!(self, Self::Error)
     }
 
     pub const fn is_warn(self) -> bool {
-        matches!(self, Level::Warn)
+        matches!(self, Self::Warn)
     }
 
     pub const fn is_ignore(self) -> bool {
-        matches!(self, Level::Ignore)
+        matches!(self, Self::Ignore)
     }
 }
 
 impl fmt::Display for Level {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Level::Ignore => f.write_str("ignore"),
-            Level::Warn => f.write_str("warn"),
-            Level::Error => f.write_str("error"),
+            Self::Ignore => f.write_str("ignore"),
+            Self::Warn => f.write_str("warn"),
+            Self::Error => f.write_str("error"),
         }
     }
 }
@@ -86,8 +86,8 @@ impl TryFrom<Level> for Severity {
     fn try_from(level: Level) -> Result<Self, ()> {
         match level {
             Level::Ignore => Err(()),
-            Level::Warn => Ok(Severity::Warning),
-            Level::Error => Ok(Severity::Error),
+            Level::Warn => Ok(Self::Warning),
+            Level::Error => Ok(Self::Error),
         }
     }
 }
@@ -183,27 +183,27 @@ pub enum LintStatus {
 
 impl LintStatus {
     pub const fn preview(since: &'static str) -> Self {
-        LintStatus::Preview { since }
+        Self::Preview { since }
     }
 
     pub const fn stable(since: &'static str) -> Self {
-        LintStatus::Stable { since }
+        Self::Stable { since }
     }
 
     pub const fn deprecated(since: &'static str, reason: &'static str) -> Self {
-        LintStatus::Deprecated { since, reason }
+        Self::Deprecated { since, reason }
     }
 
     pub const fn removed(since: &'static str, reason: &'static str) -> Self {
-        LintStatus::Removed { since, reason }
+        Self::Removed { since, reason }
     }
 
     pub const fn is_removed(&self) -> bool {
-        matches!(self, LintStatus::Removed { .. })
+        matches!(self, Self::Removed { .. })
     }
 
     pub const fn is_deprecated(&self) -> bool {
-        matches!(self, LintStatus::Deprecated { .. })
+        matches!(self, Self::Deprecated { .. })
     }
 }
 
@@ -269,7 +269,7 @@ pub struct LintId {
 
 impl LintId {
     pub const fn of(definition: &'static LintMetadata) -> Self {
-        LintId { definition }
+        Self { definition }
     }
 }
 
@@ -446,9 +446,9 @@ pub enum LintEntry {
 impl LintEntry {
     fn id(self) -> LintId {
         match self {
-            LintEntry::Lint(id) => id,
-            LintEntry::Removed(id) => id,
-            LintEntry::Alias(id) => id,
+            Self::Lint(id) => id,
+            Self::Removed(id) => id,
+            Self::Alias(id) => id,
         }
     }
 }
@@ -456,9 +456,9 @@ impl LintEntry {
 impl From<&'static LintMetadata> for LintEntry {
     fn from(metadata: &'static LintMetadata) -> Self {
         if metadata.status.is_removed() {
-            LintEntry::Removed(LintId::of(metadata))
+            Self::Removed(LintId::of(metadata))
         } else {
-            LintEntry::Lint(LintId::of(metadata))
+            Self::Lint(LintId::of(metadata))
         }
     }
 }
@@ -499,7 +499,7 @@ impl RuleSelection {
             })
             .collect();
 
-        RuleSelection { lints }
+        Self { lints }
     }
 
     /// Returns an iterator over all enabled lints.

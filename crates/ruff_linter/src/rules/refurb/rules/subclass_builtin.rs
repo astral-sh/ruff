@@ -65,7 +65,7 @@ pub(crate) struct SubclassBuiltin {
 impl AlwaysFixableViolation for SubclassBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SubclassBuiltin {
+        let Self {
             subclass,
             replacement,
         } = self;
@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for SubclassBuiltin {
     }
 
     fn fix_title(&self) -> String {
-        let SubclassBuiltin { replacement, .. } = self;
+        let Self { replacement, .. } = self;
         format!("Replace with `collections.{replacement}`")
     }
 }
@@ -131,7 +131,7 @@ enum SupportedBuiltins {
 }
 
 impl SupportedBuiltins {
-    fn from_symbol(value: &str) -> Option<SupportedBuiltins> {
+    fn from_symbol(value: &str) -> Option<Self> {
         match value {
             "str" => Some(Self::Str),
             "dict" => Some(Self::Dict),
@@ -142,9 +142,9 @@ impl SupportedBuiltins {
 
     const fn user_symbol(self) -> &'static str {
         match self {
-            SupportedBuiltins::Dict => "UserDict",
-            SupportedBuiltins::List => "UserList",
-            SupportedBuiltins::Str => "UserString",
+            Self::Dict => "UserDict",
+            Self::List => "UserList",
+            Self::Str => "UserString",
         }
     }
 }

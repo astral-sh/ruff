@@ -64,7 +64,7 @@ impl ScopedDefinitionId {
     /// unbound or undeclared at a given usage site.
     /// When creating a use-def-map builder, we always add an empty `DefinitionState::Undefined` definition
     /// at index 0, so this ID is always present.
-    pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+    pub(super) const UNBOUND: Self = Self::from_u32(0);
 
     fn is_unbound(self) -> bool {
         self == Self::UNBOUND
@@ -96,7 +96,7 @@ pub(super) enum PreviousDefinitions {
 
 impl PreviousDefinitions {
     pub(super) fn are_shadowed(self) -> bool {
-        matches!(self, PreviousDefinitions::AreShadowed)
+        matches!(self, Self::AreShadowed)
     }
 }
 
@@ -430,7 +430,7 @@ impl PlaceState {
     /// Merge another [`PlaceState`] into this one.
     pub(super) fn merge(
         &mut self,
-        b: PlaceState,
+        b: Self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {

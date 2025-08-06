@@ -31,7 +31,7 @@ pub(crate) struct ForwardAnnotationSyntaxError {
 impl Violation for ForwardAnnotationSyntaxError {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ForwardAnnotationSyntaxError { parse_error } = self;
+        let Self { parse_error } = self;
         format!("Syntax error in forward annotation: {parse_error}")
     }
 }

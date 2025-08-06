@@ -46,7 +46,7 @@ pub(crate) struct PercentFormatInvalidFormat {
 impl Violation for PercentFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatInvalidFormat { message } = self;
+        let Self { message } = self;
         format!("`%`-format string has invalid format string: {message}")
     }
 }
@@ -160,13 +160,13 @@ pub(crate) struct PercentFormatExtraNamedArguments {
 impl AlwaysFixableViolation for PercentFormatExtraNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatExtraNamedArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("`%`-format string has unused named argument(s): {message}")
     }
 
     fn fix_title(&self) -> String {
-        let PercentFormatExtraNamedArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("Remove extra named arguments: {message}")
     }
@@ -200,7 +200,7 @@ pub(crate) struct PercentFormatMissingArgument {
 impl Violation for PercentFormatMissingArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatMissingArgument { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("`%`-format string is missing argument(s) for placeholder(s): {message}")
     }
@@ -271,7 +271,7 @@ pub(crate) struct PercentFormatPositionalCountMismatch {
 impl Violation for PercentFormatPositionalCountMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatPositionalCountMismatch { wanted, got } = self;
+        let Self { wanted, got } = self;
         format!("`%`-format string has {wanted} placeholder(s) but {got} substitution(s)")
     }
 }
@@ -338,7 +338,7 @@ pub(crate) struct PercentFormatUnsupportedFormatCharacter {
 impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PercentFormatUnsupportedFormatCharacter { char } = self;
+        let Self { char } = self;
         format!("`%`-format string has unsupported format character `{char}`")
     }
 }
@@ -369,7 +369,7 @@ pub(crate) struct StringDotFormatInvalidFormat {
 impl Violation for StringDotFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatInvalidFormat { message } = self;
+        let Self { message } = self;
         format!("`.format` call has invalid format string: {message}")
     }
 }
@@ -413,13 +413,13 @@ impl Violation for StringDotFormatExtraNamedArguments {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatExtraNamedArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused named argument(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StringDotFormatExtraNamedArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         Some(format!("Remove extra named arguments: {message}"))
     }
@@ -464,13 +464,13 @@ impl Violation for StringDotFormatExtraPositionalArguments {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused arguments at position(s): {message}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         Some(format!(
             "Remove extra positional arguments at position(s): {message}"
@@ -505,7 +505,7 @@ pub(crate) struct StringDotFormatMissingArguments {
 impl Violation for StringDotFormatMissingArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StringDotFormatMissingArguments { missing } = self;
+        let Self { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call is missing argument(s) for placeholder(s): {message}")
     }

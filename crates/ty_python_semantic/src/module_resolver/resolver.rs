@@ -273,7 +273,7 @@ impl SearchPaths {
             }
         });
 
-        Ok(SearchPaths {
+        Ok(Self {
             static_paths,
             site_packages,
             typeshed_versions,
@@ -913,7 +913,7 @@ enum PackageKind {
 
 impl PackageKind {
     pub(crate) const fn is_root(self) -> bool {
-        matches!(self, PackageKind::Root)
+        matches!(self, Self::Root)
     }
 }
 

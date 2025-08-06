@@ -773,8 +773,8 @@ impl ParseSource {
         target_version: PythonVersion,
     ) -> Parsed<ModModule> {
         match self {
-            ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
-            ParseSource::Precomputed(parsed) => parsed,
+            Self::None => parse_unchecked_source(source_kind, source_type, target_version),
+            Self::Precomputed(parsed) => parsed,
         }
     }
 }

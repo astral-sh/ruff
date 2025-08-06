@@ -79,8 +79,8 @@ enum ParamKind {
 impl ParamKind {
     const fn as_str(self) -> &'static str {
         match self {
-            ParamKind::Class => "class",
-            ParamKind::Function => "function",
+            Self::Class => "class",
+            Self::Function => "function",
         }
     }
 }

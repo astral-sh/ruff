@@ -23,12 +23,12 @@ pub(crate) struct ScopedPredicateId(u32);
 
 impl ScopedPredicateId {
     /// A special ID that is used for an "always true" predicate.
-    pub(crate) const ALWAYS_TRUE: ScopedPredicateId = ScopedPredicateId(0xffff_ffff);
+    pub(crate) const ALWAYS_TRUE: Self = Self(0xffff_ffff);
 
     /// A special ID that is used for an "always false" predicate.
-    pub(crate) const ALWAYS_FALSE: ScopedPredicateId = ScopedPredicateId(0xffff_fffe);
+    pub(crate) const ALWAYS_FALSE: Self = Self(0xffff_fffe);
 
-    const SMALLEST_TERMINAL: ScopedPredicateId = Self::ALWAYS_FALSE;
+    const SMALLEST_TERMINAL: Self = Self::ALWAYS_FALSE;
 
     fn is_terminal(self) -> bool {
         self >= Self::SMALLEST_TERMINAL
@@ -125,7 +125,7 @@ pub(crate) enum ClassPatternKind {
 
 impl ClassPatternKind {
     pub(crate) fn is_irrefutable(self) -> bool {
-        matches!(self, ClassPatternKind::Irrefutable)
+        matches!(self, Self::Irrefutable)
     }
 }
 

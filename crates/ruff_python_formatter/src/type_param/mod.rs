@@ -22,7 +22,7 @@ impl FormatRule<TypeParam, PyFormatContext<'_>> for FormatTypeParam {
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format<'a> = FormatRefWithRule<'a, TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatTypeParam, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatTypeParam)
@@ -30,7 +30,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for TypeParam {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for TypeParam {
-    type Format = FormatOwnedWithRule<TypeParam, FormatTypeParam, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatTypeParam, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatTypeParam)

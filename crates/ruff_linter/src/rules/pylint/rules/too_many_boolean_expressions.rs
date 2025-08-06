@@ -34,7 +34,7 @@ pub(crate) struct TooManyBooleanExpressions {
 impl Violation for TooManyBooleanExpressions {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyBooleanExpressions {
+        let Self {
             expressions,
             max_expressions,
         } = self;

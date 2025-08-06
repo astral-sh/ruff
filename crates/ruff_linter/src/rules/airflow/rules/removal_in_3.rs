@@ -51,7 +51,7 @@ impl Violation for Airflow3Removal {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3Removal {
+        let Self {
             deprecated,
             replacement,
         } = self;
@@ -67,7 +67,7 @@ impl Violation for Airflow3Removal {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Airflow3Removal { replacement, .. } = self;
+        let Self { replacement, .. } = self;
         match replacement {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),

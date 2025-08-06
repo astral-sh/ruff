@@ -45,7 +45,7 @@ pub(crate) struct LoadBeforeGlobalDeclaration {
 impl Violation for LoadBeforeGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoadBeforeGlobalDeclaration { name, row } = self;
+        let Self { name, row } = self;
         format!("Name `{name}` is used prior to global declaration on {row}")
     }
 }

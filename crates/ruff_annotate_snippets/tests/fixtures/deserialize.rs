@@ -118,11 +118,7 @@ impl From<RendererDef> for Renderer {
             color,
         } = val;
 
-        let renderer = if color {
-            Renderer::styled()
-        } else {
-            Renderer::plain()
-        };
+        let renderer = if color { Self::styled() } else { Self::plain() };
         renderer
             .anonymized_line_numbers(anonymized_line_numbers)
             .term_width(term_width.unwrap_or(DEFAULT_TERM_WIDTH))

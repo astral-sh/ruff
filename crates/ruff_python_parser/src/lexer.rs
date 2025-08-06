@@ -1572,15 +1572,15 @@ enum State {
 
 impl State {
     const fn is_after_newline(self) -> bool {
-        matches!(self, State::AfterNewline)
+        matches!(self, Self::AfterNewline)
     }
 
     const fn is_new_logical_line(self) -> bool {
-        matches!(self, State::AfterNewline | State::NonEmptyLogicalLine)
+        matches!(self, Self::AfterNewline | Self::NonEmptyLogicalLine)
     }
 
     const fn is_after_equal(self) -> bool {
-        matches!(self, State::AfterEqual)
+        matches!(self, Self::AfterEqual)
     }
 }
 
@@ -1595,19 +1595,19 @@ enum Radix {
 impl Radix {
     const fn as_u32(self) -> u32 {
         match self {
-            Radix::Binary => 2,
-            Radix::Octal => 8,
-            Radix::Decimal => 10,
-            Radix::Hex => 16,
+            Self::Binary => 2,
+            Self::Octal => 8,
+            Self::Decimal => 10,
+            Self::Hex => 16,
         }
     }
 
     const fn is_digit(self, c: char) -> bool {
         match self {
-            Radix::Binary => matches!(c, '0'..='1'),
-            Radix::Octal => matches!(c, '0'..='7'),
-            Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => c.is_ascii_hexdigit(),
+            Self::Binary => matches!(c, '0'..='1'),
+            Self::Octal => matches!(c, '0'..='7'),
+            Self::Decimal => c.is_ascii_digit(),
+            Self::Hex => c.is_ascii_hexdigit(),
         }
     }
 }

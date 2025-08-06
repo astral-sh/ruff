@@ -13,7 +13,7 @@ impl Default for TypeTransformer<'_> {
 
         // This must be Any, not e.g. a todo type, because Any is the normalized form of the
         // dynamic type (that is, todo types are normalized to Any).
-        CycleDetector::new(Type::any())
+        Self::new(Type::any())
     }
 }
 
@@ -39,7 +39,7 @@ pub(crate) struct CycleDetector<T, R> {
 
 impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
     pub(crate) fn new(fallback: R) -> Self {
-        CycleDetector {
+        Self {
             seen: FxIndexSet::default(),
             cache: FxHashMap::default(),
             fallback,

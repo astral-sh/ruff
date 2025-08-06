@@ -328,11 +328,7 @@ enum NeedsSpace {
 
 impl From<bool> for NeedsSpace {
     fn from(value: bool) -> Self {
-        if value {
-            NeedsSpace::Yes
-        } else {
-            NeedsSpace::No
-        }
+        if value { Self::Yes } else { Self::No }
     }
 }
 

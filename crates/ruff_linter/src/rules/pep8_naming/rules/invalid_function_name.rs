@@ -49,7 +49,7 @@ pub(crate) struct InvalidFunctionName {
 impl Violation for InvalidFunctionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidFunctionName { name } = self;
+        let Self { name } = self;
         format!("Function name `{name}` should be lowercase")
     }
 }

@@ -47,7 +47,7 @@ pub(crate) struct HardcodedTempFile {
 impl Violation for HardcodedTempFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedTempFile { string } = self;
+        let Self { string } = self;
         format!(
             "Probable insecure usage of temporary file or directory: \"{}\"",
             string.escape_debug()

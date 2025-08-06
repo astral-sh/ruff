@@ -134,7 +134,7 @@ pub enum OutputFormat {
 
 impl OutputFormat {
     const fn is_cli(self) -> bool {
-        matches!(self, OutputFormat::Cli)
+        matches!(self, Self::Cli)
     }
 }
 

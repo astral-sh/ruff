@@ -44,7 +44,7 @@ pub(crate) struct LoopVariableOverridesIterator {
 impl Violation for LoopVariableOverridesIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LoopVariableOverridesIterator { name } = self;
+        let Self { name } = self;
         format!("Loop control variable `{name}` overrides iterable it iterates")
     }
 }

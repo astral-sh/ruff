@@ -363,20 +363,20 @@ impl std::hash::Hash for Member<'_> {
 
 impl Eq for Member<'_> {}
 
-impl<'db> PartialEq for Member<'db> {
-    fn eq(&self, rhs: &Member<'db>) -> bool {
+impl PartialEq for Member<'_> {
+    fn eq(&self, rhs: &Self) -> bool {
         self.name == rhs.name
     }
 }
 
-impl<'db> Ord for Member<'db> {
-    fn cmp(&self, rhs: &Member<'db>) -> Ordering {
+impl Ord for Member<'_> {
+    fn cmp(&self, rhs: &Self) -> Ordering {
         self.name.cmp(&rhs.name)
     }
 }
 
-impl<'db> PartialOrd for Member<'db> {
-    fn partial_cmp(&self, rhs: &Member<'db>) -> Option<Ordering> {
+impl PartialOrd for Member<'_> {
+    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
         Some(self.cmp(rhs))
     }
 }

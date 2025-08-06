@@ -946,27 +946,27 @@ enum Indentation {
 
 impl Indentation {
     const fn is_empty(self) -> bool {
-        matches!(self, Indentation::Level(0))
+        matches!(self, Self::Level(0))
     }
 
     /// Creates a new indentation level with a zero-indent.
     const fn new() -> Self {
-        Indentation::Level(0)
+        Self::Level(0)
     }
 
     /// Returns the indentation level
     fn level(self) -> u16 {
         match self {
-            Indentation::Level(count) => count,
-            Indentation::Align { level: indent, .. } => indent,
+            Self::Level(count) => count,
+            Self::Align { level: indent, .. } => indent,
         }
     }
 
     /// Returns the number of trailing align spaces or 0 if none
     fn align(self) -> u8 {
         match self {
-            Indentation::Level(_) => 0,
-            Indentation::Align { align, .. } => align.into(),
+            Self::Level(_) => 0,
+            Self::Align { align, .. } => align.into(),
         }
     }
 
@@ -978,15 +978,13 @@ impl Indentation {
     ///   Keeps any  the current value is [`Indent::Align`] and increments the level by one.
     fn increment_level(self, indent_style: IndentStyle) -> Self {
         match self {
-            Indentation::Level(count) => Indentation::Level(count + 1),
+            Self::Level(count) => Self::Level(count + 1),
             // Increase the indent AND convert the align to an indent
-            Indentation::Align { level, .. } if indent_style.is_tab() => {
-                Indentation::Level(level + 2)
-            }
-            Indentation::Align {
+            Self::Align { level, .. } if indent_style.is_tab() => Self::Level(level + 2),
+            Self::Align {
                 level: indent,
                 align,
-            } => Indentation::Align {
+            } => Self::Align {
                 level: indent + 1,
                 align,
             },
@@ -1000,8 +998,8 @@ impl Indentation {
     /// No-op if the level is already zero.
     fn decrement(self) -> Self {
         match self {
-            Indentation::Level(level) => Indentation::Level(level.saturating_sub(1)),
-            Indentation::Align { level, .. } => Indentation::Level(level),
+            Self::Level(level) => Self::Level(level.saturating_sub(1)),
+            Self::Align { level, .. } => Self::Level(level),
         }
     }
 
@@ -1010,13 +1008,13 @@ impl Indentation {
     /// It increments the `level` value if the current value is [`Indent::IndentAlign`].
     fn set_align(self, count: NonZeroU8) -> Self {
         match self {
-            Indentation::Level(indent_count) => Indentation::Align {
+            Self::Level(indent_count) => Self::Align {
                 level: indent_count,
                 align: count,
             },
 
             // Convert the existing align to an indent
-            Indentation::Align { level: indent, .. } => Indentation::Align {
+            Self::Align { level: indent, .. } => Self::Align {
                 level: indent + 1,
                 align: count,
             },
@@ -1026,7 +1024,7 @@ impl Indentation {
 
 impl Default for Indentation {
     fn default() -> Self {
-        Indentation::new()
+        Self::new()
     }
 }
 
@@ -1597,7 +1595,7 @@ enum Fits {
 
 impl From<bool> for Fits {
     fn from(value: bool) -> Self {
-        if value { Fits::Yes } else { Fits::No }
+        if value { Self::Yes } else { Self::No }
     }
 }
 
@@ -1628,7 +1626,7 @@ enum MeasureMode {
 impl MeasureMode {
     /// Returns `true` if this mode allows text exceeding the configured line width.
     const fn allows_text_overflow(self) -> bool {
-        matches!(self, MeasureMode::AllLinesAllowTextOverflow)
+        matches!(self, Self::AllLinesAllowTextOverflow)
     }
 }
 

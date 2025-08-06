@@ -258,7 +258,7 @@ struct LintOptions {
 }
 
 impl LintOptions {
-    fn with_preview(mut self, preview: bool) -> LintOptions {
+    fn with_preview(mut self, preview: bool) -> Self {
         self.preview = Some(preview);
         self
     }
@@ -292,7 +292,7 @@ impl Combine for FormatOptions {
 }
 
 impl FormatOptions {
-    fn with_preview(mut self, preview: bool) -> FormatOptions {
+    fn with_preview(mut self, preview: bool) -> Self {
         self.preview = Some(preview);
         self
     }
@@ -423,9 +423,9 @@ enum RuleSelectorKey {
 impl std::fmt::Display for RuleSelectorKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RuleSelectorKey::Select => f.write_str("lint.select"),
-            RuleSelectorKey::ExtendSelect => f.write_str("lint.extendSelect"),
-            RuleSelectorKey::Ignore => f.write_str("lint.ignore"),
+            Self::Select => f.write_str("lint.select"),
+            Self::ExtendSelect => f.write_str("lint.extendSelect"),
+            Self::Ignore => f.write_str("lint.ignore"),
         }
     }
 }

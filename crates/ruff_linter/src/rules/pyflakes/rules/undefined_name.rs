@@ -35,7 +35,7 @@ pub(crate) struct UndefinedName {
 impl Violation for UndefinedName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedName {
+        let Self {
             name,
             minor_version_builtin_added,
         } = self;

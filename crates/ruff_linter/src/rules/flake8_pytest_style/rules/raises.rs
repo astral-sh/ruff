@@ -109,7 +109,7 @@ pub(crate) struct PytestRaisesTooBroad {
 impl Violation for PytestRaisesTooBroad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestRaisesTooBroad { exception } = self;
+        let Self { exception } = self;
         format!(
             "`pytest.raises({exception})` is too broad, set the `match` parameter or use a more \
              specific exception"

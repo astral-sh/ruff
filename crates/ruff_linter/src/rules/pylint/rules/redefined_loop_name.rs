@@ -58,7 +58,7 @@ pub(crate) struct RedefinedLoopName {
 impl Violation for RedefinedLoopName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedLoopName {
+        let Self {
             name,
             outer_kind,
             inner_kind,
@@ -95,8 +95,8 @@ enum OuterBindingKind {
 impl fmt::Display for OuterBindingKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OuterBindingKind::For => fmt.write_str("`for` loop"),
-            OuterBindingKind::With => fmt.write_str("`with` statement"),
+            Self::For => fmt.write_str("`for` loop"),
+            Self::With => fmt.write_str("`with` statement"),
         }
     }
 }
@@ -111,9 +111,9 @@ enum InnerBindingKind {
 impl fmt::Display for InnerBindingKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            InnerBindingKind::For => fmt.write_str("`for` loop"),
-            InnerBindingKind::With => fmt.write_str("`with` statement"),
-            InnerBindingKind::Assignment => fmt.write_str("assignment"),
+            Self::For => fmt.write_str("`for` loop"),
+            Self::With => fmt.write_str("`with` statement"),
+            Self::Assignment => fmt.write_str("assignment"),
         }
     }
 }
@@ -122,8 +122,7 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
     fn eq(&self, other: &InnerBindingKind) -> bool {
         matches!(
             (self, other),
-            (OuterBindingKind::For, InnerBindingKind::For)
-                | (OuterBindingKind::With, InnerBindingKind::With)
+            (Self::For, InnerBindingKind::For) | (Self::With, InnerBindingKind::With)
         )
     }
 }

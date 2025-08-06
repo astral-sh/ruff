@@ -41,12 +41,12 @@ impl<'a> Message<'a> {
         self
     }
 
-    pub fn footer(mut self, footer: Message<'a>) -> Self {
+    pub fn footer(mut self, footer: Self) -> Self {
         self.footer.push(footer);
         self
     }
 
-    pub fn footers(mut self, footer: impl IntoIterator<Item = Message<'a>>) -> Self {
+    pub fn footers(mut self, footer: impl IntoIterator<Item = Self>) -> Self {
         self.footer.extend(footer);
         self
     }

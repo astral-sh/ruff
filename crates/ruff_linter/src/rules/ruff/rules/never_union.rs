@@ -202,9 +202,9 @@ impl NeverLike {
     fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
         let qualified_name = semantic.resolve_qualified_name(expr)?;
         if semantic.match_typing_qualified_name(&qualified_name, "NoReturn") {
-            Some(NeverLike::NoReturn)
+            Some(Self::NoReturn)
         } else if semantic.match_typing_qualified_name(&qualified_name, "Never") {
-            Some(NeverLike::Never)
+            Some(Self::Never)
         } else {
             None
         }
@@ -214,8 +214,8 @@ impl NeverLike {
 impl std::fmt::Display for NeverLike {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NeverLike::NoReturn => f.write_str("NoReturn"),
-            NeverLike::Never => f.write_str("Never"),
+            Self::NoReturn => f.write_str("NoReturn"),
+            Self::Never => f.write_str("Never"),
         }
     }
 }

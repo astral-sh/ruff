@@ -59,12 +59,12 @@ impl Violation for ConvertNamedTupleFunctionalToClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let Self { name } = self;
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let Self { name } = self;
 
         Some(format!("Convert `{name}` to class syntax"))
     }

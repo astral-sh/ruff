@@ -39,7 +39,7 @@ impl Violation for DuplicateValue {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateValue { value, existing } = self;
+        let Self { value, existing } = self;
         if value == existing {
             format!("Sets should not contain duplicate item `{value}`")
         } else {

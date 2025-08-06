@@ -47,7 +47,7 @@ impl Violation for BlankLineBeforeFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBeforeFunction { num_lines } = self;
+        let Self { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
@@ -93,7 +93,7 @@ impl Violation for BlankLineAfterFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterFunction { num_lines } = self;
+        let Self { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 

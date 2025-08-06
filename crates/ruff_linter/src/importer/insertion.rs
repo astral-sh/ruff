@@ -154,7 +154,7 @@ impl<'a> Insertion<'a> {
         locator: &Locator<'a>,
         stylist: &Stylist,
         tokens: &Tokens,
-    ) -> Insertion<'a> {
+    ) -> Self {
         enum Awaiting {
             Colon(u32),
             Newline,

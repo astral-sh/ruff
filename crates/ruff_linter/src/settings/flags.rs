@@ -13,13 +13,13 @@ pub enum Noqa {
 
 impl Noqa {
     pub const fn is_enabled(self) -> bool {
-        matches!(self, Noqa::Enabled)
+        matches!(self, Self::Enabled)
     }
 }
 
 impl From<bool> for Noqa {
     fn from(value: bool) -> Self {
-        if value { Noqa::Enabled } else { Noqa::Disabled }
+        if value { Self::Enabled } else { Self::Disabled }
     }
 }
 
@@ -31,16 +31,12 @@ pub enum Cache {
 
 impl Cache {
     pub const fn is_enabled(self) -> bool {
-        matches!(self, Cache::Enabled)
+        matches!(self, Self::Enabled)
     }
 }
 
 impl From<bool> for Cache {
     fn from(value: bool) -> Self {
-        if value {
-            Cache::Enabled
-        } else {
-            Cache::Disabled
-        }
+        if value { Self::Enabled } else { Self::Disabled }
     }
 }

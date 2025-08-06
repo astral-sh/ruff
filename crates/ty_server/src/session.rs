@@ -879,7 +879,7 @@ struct DefaultProject(std::sync::OnceLock<ProjectState>);
 
 impl DefaultProject {
     pub(crate) fn new() -> Self {
-        DefaultProject(std::sync::OnceLock::new())
+        Self(std::sync::OnceLock::new())
     }
 
     pub(crate) fn get(

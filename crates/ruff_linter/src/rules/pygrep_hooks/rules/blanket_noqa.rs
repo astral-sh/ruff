@@ -49,7 +49,7 @@ impl Violation for BlanketNOQA {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlanketNOQA {
+        let Self {
             missing_colon,
             file_exemption,
         } = self;

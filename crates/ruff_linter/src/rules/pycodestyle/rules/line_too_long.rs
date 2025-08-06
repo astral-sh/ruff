@@ -75,7 +75,7 @@ pub(crate) struct LineTooLong(usize, usize);
 impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LineTooLong(width, limit) = self;
+        let Self(width, limit) = self;
         format!("Line too long ({width} > {limit})")
     }
 }

@@ -759,7 +759,7 @@ enum AllowStarPattern {
 
 impl AllowStarPattern {
     const fn is_no(self) -> bool {
-        matches!(self, AllowStarPattern::No)
+        matches!(self, Self::No)
     }
 }
 

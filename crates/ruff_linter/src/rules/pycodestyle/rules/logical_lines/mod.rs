@@ -309,7 +309,7 @@ impl Whitespace {
         for c in content.chars() {
             if c == '#' {
                 // Ignore leading whitespace between a token and an end-of-line comment
-                return (Whitespace::None, TextSize::default());
+                return (Self::None, TextSize::default());
             } else if c == '\t' {
                 has_tabs = true;
                 len += c.text_len();
@@ -324,12 +324,12 @@ impl Whitespace {
         }
 
         if has_tabs {
-            (Whitespace::Tab, len)
+            (Self::Tab, len)
         } else {
             match count {
-                0 => (Whitespace::None, len),
-                1 => (Whitespace::Single, len),
-                _ => (Whitespace::Many, len),
+                0 => (Self::None, len),
+                1 => (Self::Single, len),
+                _ => (Self::Many, len),
             }
         }
     }

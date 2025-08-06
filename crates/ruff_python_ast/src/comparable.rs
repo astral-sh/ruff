@@ -294,7 +294,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
 
 impl<'a> From<&'a Box<ast::Pattern>> for Box<ComparablePattern<'a>> {
     fn from(pattern: &'a Box<ast::Pattern>) -> Self {
-        Box::new((pattern.as_ref()).into())
+        Self::new((pattern.as_ref()).into())
     }
 }
 
@@ -1047,7 +1047,7 @@ pub enum ComparableExpr<'a> {
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
-        Box::new((expr.as_ref()).into())
+        Self::new((expr.as_ref()).into())
     }
 }
 

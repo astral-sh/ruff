@@ -126,7 +126,7 @@ pub(crate) struct IfExprWithTwistedArms {
 impl AlwaysFixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfExprWithTwistedArms {
+        let Self {
             expr_body,
             expr_else,
         } = self;
@@ -137,7 +137,7 @@ impl AlwaysFixableViolation for IfExprWithTwistedArms {
     }
 
     fn fix_title(&self) -> String {
-        let IfExprWithTwistedArms {
+        let Self {
             expr_body,
             expr_else,
         } = self;

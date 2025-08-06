@@ -27,7 +27,7 @@ pub(crate) struct TooManyNestedBlocks {
 impl Violation for TooManyNestedBlocks {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyNestedBlocks {
+        let Self {
             nested_blocks,
             max_nested_blocks,
         } = self;

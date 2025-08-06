@@ -136,7 +136,7 @@ impl OperatorPrecedence {
     /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
     /// from right to left.
     pub fn is_right_associative(self) -> bool {
-        matches!(self, OperatorPrecedence::Exponent)
+        matches!(self, Self::Exponent)
     }
 }
 

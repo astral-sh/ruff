@@ -18,7 +18,7 @@ impl Workspaces {
     pub(crate) fn from_workspace_folders(
         workspace_folders: Option<Vec<WorkspaceFolder>>,
         mut workspace_options: WorkspaceOptionsMap,
-    ) -> std::result::Result<Workspaces, WorkspacesError> {
+    ) -> std::result::Result<Self, WorkspacesError> {
         let mut client_options_for_url = |url: &Url| {
             workspace_options.remove(url).unwrap_or_else(|| {
                 tracing::info!(
@@ -51,7 +51,7 @@ impl Workspaces {
                 vec![Workspace::default(uri).with_options(options)]
             };
 
-        Ok(Workspaces(workspaces))
+        Ok(Self(workspaces))
     }
 }
 

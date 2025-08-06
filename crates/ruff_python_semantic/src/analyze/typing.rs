@@ -120,8 +120,8 @@ pub enum ModuleMember {
 impl std::fmt::Display for ModuleMember {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ModuleMember::BuiltIn(name) => std::write!(f, "{name}"),
-            ModuleMember::Member(module, member) => std::write!(f, "{module}.{member}"),
+            Self::BuiltIn(name) => std::write!(f, "{name}"),
+            Self::Member(module, member) => std::write!(f, "{module}.{member}"),
         }
     }
 }

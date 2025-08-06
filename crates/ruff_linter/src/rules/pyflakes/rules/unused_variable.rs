@@ -55,12 +55,12 @@ impl Violation for UnusedVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedVariable { name } = self;
+        let Self { name } = self;
         format!("Local variable `{name}` is assigned to but never used")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedVariable { name } = self;
+        let Self { name } = self;
         Some(format!("Remove assignment to unused variable `{name}`"))
     }
 }

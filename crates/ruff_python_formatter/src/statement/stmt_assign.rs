@@ -1256,8 +1256,8 @@ pub(super) enum AnyAssignmentOperator {
 impl Format<PyFormatContext<'_>> for AnyAssignmentOperator {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self {
-            AnyAssignmentOperator::Assign => token("=").fmt(f),
-            AnyAssignmentOperator::AugAssign(operator) => {
+            Self::Assign => token("=").fmt(f),
+            Self::AugAssign(operator) => {
                 write!(f, [operator.format(), token("=")])
             }
         }

@@ -45,10 +45,8 @@ impl NameImport {
     /// Returns the name under which the member is bound (e.g., given `from foo import bar as baz`, returns `baz`).
     pub fn bound_name(&self) -> &str {
         match self {
-            NameImport::Import(import) => {
-                import.name.as_name.as_deref().unwrap_or(&import.name.name)
-            }
-            NameImport::ImportFrom(import_from) => import_from
+            Self::Import(import) => import.name.as_name.as_deref().unwrap_or(&import.name.name),
+            Self::ImportFrom(import_from) => import_from
                 .name
                 .as_name
                 .as_deref()
@@ -59,8 +57,8 @@ impl NameImport {
     /// Returns the [`QualifiedName`] of the imported name (e.g., given `from foo import bar as baz`, returns `["foo", "bar"]`).
     pub fn qualified_name(&self) -> QualifiedName {
         match self {
-            NameImport::Import(import) => QualifiedName::user_defined(&import.name.name),
-            NameImport::ImportFrom(import_from) => collect_import_from_member(
+            Self::Import(import) => QualifiedName::user_defined(&import.name.name),
+            Self::ImportFrom(import_from) => collect_import_from_member(
                 import_from.level,
                 import_from.module.as_deref(),
                 import_from.name.name.as_str(),
@@ -125,8 +123,8 @@ impl MemberNameImport {
 impl std::fmt::Display for NameImport {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            NameImport::Import(import) => write!(f, "{import}"),
-            NameImport::ImportFrom(import_from) => write!(f, "{import_from}"),
+            Self::Import(import) => write!(f, "{import}"),
+            Self::ImportFrom(import_from) => write!(f, "{import_from}"),
         }
     }
 }
@@ -178,8 +176,8 @@ impl FutureImport for MemberNameImport {
 impl FutureImport for NameImport {
     fn is_future_import(&self) -> bool {
         match self {
-            NameImport::Import(import) => import.is_future_import(),
-            NameImport::ImportFrom(import_from) => import_from.is_future_import(),
+            Self::Import(import) => import.is_future_import(),
+            Self::ImportFrom(import_from) => import_from.is_future_import(),
         }
     }
 }
@@ -195,8 +193,8 @@ impl serde::Serialize for NameImports {
 impl serde::Serialize for NameImport {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            NameImport::Import(import) => serializer.collect_str(import),
-            NameImport::ImportFrom(import_from) => serializer.collect_str(import_from),
+            Self::Import(import) => serializer.collect_str(import),
+            Self::ImportFrom(import_from) => serializer.collect_str(import_from),
         }
     }
 }

@@ -26,54 +26,54 @@ pub enum SourceKind {
 
 impl SourceKind {
     pub fn ipy_notebook(notebook: Notebook) -> Self {
-        SourceKind::IpyNotebook(Box::new(notebook))
+        Self::IpyNotebook(Box::new(notebook))
     }
 
     pub fn as_ipy_notebook(&self) -> Option<&Notebook> {
         match self {
-            SourceKind::IpyNotebook(notebook) => Some(notebook),
-            SourceKind::Python(_) => None,
+            Self::IpyNotebook(notebook) => Some(notebook),
+            Self::Python(_) => None,
         }
     }
 
     pub fn as_python(&self) -> Option<&str> {
         match self {
-            SourceKind::Python(code) => Some(code),
-            SourceKind::IpyNotebook(_) => None,
+            Self::Python(code) => Some(code),
+            Self::IpyNotebook(_) => None,
         }
     }
 
     pub fn expect_python(self) -> String {
         match self {
-            SourceKind::Python(code) => code,
-            SourceKind::IpyNotebook(_) => panic!("expected python code"),
+            Self::Python(code) => code,
+            Self::IpyNotebook(_) => panic!("expected python code"),
         }
     }
 
     pub fn expect_ipy_notebook(self) -> Notebook {
         match self {
-            SourceKind::IpyNotebook(notebook) => *notebook,
-            SourceKind::Python(_) => panic!("expected ipy notebook"),
+            Self::IpyNotebook(notebook) => *notebook,
+            Self::Python(_) => panic!("expected ipy notebook"),
         }
     }
 
     #[must_use]
     pub(crate) fn updated(&self, new_source: String, source_map: &SourceMap) -> Self {
         match self {
-            SourceKind::IpyNotebook(notebook) => {
+            Self::IpyNotebook(notebook) => {
                 let mut cloned = notebook.clone();
                 cloned.update(source_map, new_source);
-                SourceKind::IpyNotebook(cloned)
+                Self::IpyNotebook(cloned)
             }
-            SourceKind::Python(_) => SourceKind::Python(new_source),
+            Self::Python(_) => Self::Python(new_source),
         }
     }
 
     /// Returns the Python source code for this source kind.
     pub fn source_code(&self) -> &str {
         match self {
-            SourceKind::Python(source) => source,
-            SourceKind::IpyNotebook(notebook) => notebook.source_code(),
+            Self::Python(source) => source,
+            Self::IpyNotebook(notebook) => notebook.source_code(),
         }
     }
 
@@ -112,11 +112,11 @@ impl SourceKind {
     /// For Jupyter notebooks, this will write out the notebook as JSON.
     pub fn write(&self, writer: &mut dyn Write) -> Result<(), SourceError> {
         match self {
-            SourceKind::Python(source) => {
+            Self::Python(source) => {
                 writer.write_all(source.as_bytes())?;
                 Ok(())
             }
-            SourceKind::IpyNotebook(notebook) => {
+            Self::IpyNotebook(notebook) => {
                 notebook.write(writer)?;
                 Ok(())
             }
@@ -132,11 +132,11 @@ impl SourceKind {
         path: Option<&'a Path>,
     ) -> Option<SourceKindDiff<'a>> {
         match (self, other) {
-            (SourceKind::Python(src), SourceKind::Python(dst)) => Some(SourceKindDiff {
+            (Self::Python(src), Self::Python(dst)) => Some(SourceKindDiff {
                 kind: DiffKind::Python(src, dst),
                 path,
             }),
-            (SourceKind::IpyNotebook(src), SourceKind::IpyNotebook(dst)) => Some(SourceKindDiff {
+            (Self::IpyNotebook(src), Self::IpyNotebook(dst)) => Some(SourceKindDiff {
                 kind: DiffKind::IpyNotebook(src, dst),
                 path,
             }),

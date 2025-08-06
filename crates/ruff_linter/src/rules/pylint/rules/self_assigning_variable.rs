@@ -31,7 +31,7 @@ pub(crate) struct SelfAssigningVariable {
 impl Violation for SelfAssigningVariable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SelfAssigningVariable { name } = self;
+        let Self { name } = self;
         format!("Self-assignment of variable `{name}`")
     }
 }

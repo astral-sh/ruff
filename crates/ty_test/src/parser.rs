@@ -50,8 +50,8 @@ struct Hash128([u64; 2]);
 impl FromStableHash for Hash128 {
     type Hash = SipHasher128Hash;
 
-    fn from(SipHasher128Hash(hash): SipHasher128Hash) -> Hash128 {
-        Hash128(hash)
+    fn from(SipHasher128Hash(hash): SipHasher128Hash) -> Self {
+        Self(hash)
     }
 }
 
@@ -256,8 +256,8 @@ impl EmbeddedFileSourceMap {
     pub(crate) fn new(
         md_index: &LineIndex,
         dimensions: impl IntoIterator<Item = BacktickOffsets>,
-    ) -> EmbeddedFileSourceMap {
-        EmbeddedFileSourceMap {
+    ) -> Self {
+        Self {
             start_line_and_line_count: dimensions
                 .into_iter()
                 .map(|d| {
@@ -846,8 +846,8 @@ enum MdtestDirective {
 impl std::fmt::Display for MdtestDirective {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            MdtestDirective::SnapshotDiagnostics => f.write_str("snapshotting diagnostics"),
-            MdtestDirective::PullTypesSkip => f.write_str("skipping the pull-types visitor"),
+            Self::SnapshotDiagnostics => f.write_str("snapshotting diagnostics"),
+            Self::PullTypesSkip => f.write_str("skipping the pull-types visitor"),
         }
     }
 }
@@ -866,20 +866,18 @@ bitflags::bitflags! {
 impl MdtestDirectives {
     const fn has_directive_set(self, directive: MdtestDirective) -> bool {
         match directive {
-            MdtestDirective::SnapshotDiagnostics => {
-                self.contains(MdtestDirectives::SNAPSHOT_DIAGNOSTICS)
-            }
-            MdtestDirective::PullTypesSkip => self.contains(MdtestDirectives::PULL_TYPES_SKIP),
+            MdtestDirective::SnapshotDiagnostics => self.contains(Self::SNAPSHOT_DIAGNOSTICS),
+            MdtestDirective::PullTypesSkip => self.contains(Self::PULL_TYPES_SKIP),
         }
     }
 
     fn add_directive(&mut self, directive: MdtestDirective) {
         match directive {
             MdtestDirective::SnapshotDiagnostics => {
-                self.insert(MdtestDirectives::SNAPSHOT_DIAGNOSTICS);
+                self.insert(Self::SNAPSHOT_DIAGNOSTICS);
             }
             MdtestDirective::PullTypesSkip => {
-                self.insert(MdtestDirectives::PULL_TYPES_SKIP);
+                self.insert(Self::PULL_TYPES_SKIP);
             }
         }
     }

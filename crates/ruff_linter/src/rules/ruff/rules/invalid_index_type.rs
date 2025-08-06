@@ -35,7 +35,7 @@ pub(crate) struct InvalidIndexType {
 impl Violation for InvalidIndexType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidIndexType {
+        let Self {
             value_type,
             index_type,
             is_slice,

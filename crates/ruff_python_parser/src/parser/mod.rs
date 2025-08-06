@@ -475,7 +475,7 @@ impl<'src> Parser<'src> {
     fn parse_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        parse_element: impl Fn(&mut Self) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_list(recovery_context_kind, |p| elements.push(parse_element(p)));
@@ -492,7 +492,7 @@ impl<'src> Parser<'src> {
     fn parse_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Self),
     ) {
         let mut progress = ParserProgress::default();
 
@@ -534,7 +534,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list_into_vec<T>(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        parse_element: impl Fn(&mut Self) -> T,
     ) -> Vec<T> {
         let mut elements = Vec::new();
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
@@ -553,7 +553,7 @@ impl<'src> Parser<'src> {
     fn parse_comma_separated_list(
         &mut self,
         recovery_context_kind: RecoveryContextKind,
-        mut parse_element: impl FnMut(&mut Parser<'src>),
+        mut parse_element: impl FnMut(&mut Self),
     ) -> bool {
         let mut progress = ParserProgress::default();
 
@@ -731,14 +731,14 @@ impl SequenceMatchPatternParentheses {
     /// Returns the token kind that closes the parentheses.
     const fn closing_kind(self) -> TokenKind {
         match self {
-            SequenceMatchPatternParentheses::Tuple => TokenKind::Rpar,
-            SequenceMatchPatternParentheses::List => TokenKind::Rsqb,
+            Self::Tuple => TokenKind::Rpar,
+            Self::List => TokenKind::Rsqb,
         }
     }
 
     /// Returns `true` if the parentheses are for a list pattern e.g., `case [a, b]: ...`.
     const fn is_list(self) -> bool {
-        matches!(self, SequenceMatchPatternParentheses::List)
+        matches!(self, Self::List)
     }
 }
 
@@ -754,8 +754,8 @@ impl FunctionKind {
     /// Returns the token that terminates a list of parameters.
     const fn list_terminator(self) -> TokenKind {
         match self {
-            FunctionKind::Lambda => TokenKind::Colon,
-            FunctionKind::FunctionDef => TokenKind::Rpar,
+            Self::Lambda => TokenKind::Colon,
+            Self::FunctionDef => TokenKind::Rpar,
         }
     }
 }
@@ -796,7 +796,7 @@ enum WithItemKind {
 impl WithItemKind {
     /// Returns `true` if the with items are parenthesized.
     const fn is_parenthesized(self) -> bool {
-        matches!(self, WithItemKind::Parenthesized)
+        matches!(self, Self::Parenthesized)
     }
 }
 
@@ -822,11 +822,11 @@ enum InterpolatedStringElementsKind {
 impl InterpolatedStringElementsKind {
     const fn list_terminator(self) -> TokenKind {
         match self {
-            InterpolatedStringElementsKind::Regular(string_kind) => string_kind.end_token(),
+            Self::Regular(string_kind) => string_kind.end_token(),
             // test_ok fstring_format_spec_terminator
             // f"hello {x:} world"
             // f"hello {x:.3f} world"
-            InterpolatedStringElementsKind::FormatSpec => TokenKind::Rbrace,
+            Self::FormatSpec => TokenKind::Rbrace,
         }
     }
 }
@@ -841,18 +841,14 @@ enum Parenthesized {
 
 impl From<bool> for Parenthesized {
     fn from(value: bool) -> Self {
-        if value {
-            Parenthesized::Yes
-        } else {
-            Parenthesized::No
-        }
+        if value { Self::Yes } else { Self::No }
     }
 }
 
 impl Parenthesized {
     /// Returns `true` if the parenthesized value is `Yes`.
     const fn is_yes(self) -> bool {
-        matches!(self, Parenthesized::Yes)
+        matches!(self, Self::Yes)
     }
 }
 
@@ -943,21 +939,21 @@ impl RecoveryContextKind {
     const fn allow_trailing_comma(self) -> bool {
         matches!(
             self,
-            RecoveryContextKind::Slices
-                | RecoveryContextKind::TupleElements(_)
-                | RecoveryContextKind::SetElements
-                | RecoveryContextKind::ListElements
-                | RecoveryContextKind::DictElements
-                | RecoveryContextKind::Arguments
-                | RecoveryContextKind::MatchPatternMapping
-                | RecoveryContextKind::SequenceMatchPattern(_)
-                | RecoveryContextKind::MatchPatternClassArguments
+            Self::Slices
+                | Self::TupleElements(_)
+                | Self::SetElements
+                | Self::ListElements
+                | Self::DictElements
+                | Self::Arguments
+                | Self::MatchPatternMapping
+                | Self::SequenceMatchPattern(_)
+                | Self::MatchPatternClassArguments
                 // Only allow a trailing comma if the with item itself is parenthesized
-                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
-                | RecoveryContextKind::Parameters(_)
-                | RecoveryContextKind::TypeParams
-                | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
+                | Self::WithItems(WithItemKind::Parenthesized)
+                | Self::Parameters(_)
+                | Self::TypeParams
+                | Self::DeleteTargets
+                | Self::ImportFromAsNames(Parenthesized::Yes)
         )
     }
 
@@ -990,19 +986,15 @@ impl RecoveryContextKind {
 
         match self {
             // The parser must consume all tokens until the end
-            RecoveryContextKind::ModuleStatements => None,
-            RecoveryContextKind::BlockStatements => p
+            Self::ModuleStatements => None,
+            Self::BlockStatements => p
                 .at(TokenKind::Dedent)
                 .then_some(ListTerminatorKind::Regular),
 
-            RecoveryContextKind::Elif => {
-                p.at(TokenKind::Else).then_some(ListTerminatorKind::Regular)
-            }
-            RecoveryContextKind::Except => {
-                matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
-                    .then_some(ListTerminatorKind::Regular)
-            }
-            RecoveryContextKind::AssignmentTargets => {
+            Self::Elif => p.at(TokenKind::Else).then_some(ListTerminatorKind::Regular),
+            Self::Except => matches!(p.current_token_kind(), TokenKind::Finally | TokenKind::Else)
+                .then_some(ListTerminatorKind::Regular),
+            Self::AssignmentTargets => {
                 // test_ok assign_targets_terminator
                 // x = y = z = 1; a, b
                 // x = y = z = 1
@@ -1013,7 +1005,7 @@ impl RecoveryContextKind {
 
             // Tokens other than `]` are for better error recovery. For example, recover when we
             // find the `:` of a clause header or the equal of a type assignment.
-            RecoveryContextKind::TypeParams => {
+            Self::TypeParams => {
                 if p.at(TokenKind::Rsqb) {
                     Some(ListTerminatorKind::Regular)
                 } else {
@@ -1026,7 +1018,7 @@ impl RecoveryContextKind {
             }
             // The names of an import statement cannot be parenthesized, so `)` is not a
             // terminator.
-            RecoveryContextKind::ImportNames => {
+            Self::ImportNames => {
                 // test_ok import_stmt_terminator
                 // import a, b; import c, d
                 // import a, b
@@ -1034,7 +1026,7 @@ impl RecoveryContextKind {
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
                     .then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::ImportFromAsNames(_) => {
+            Self::ImportFromAsNames(_) => {
                 // test_ok from_import_stmt_terminator
                 // from a import (b, c)
                 // from a import (b, c); x, y
@@ -1049,20 +1041,20 @@ impl RecoveryContextKind {
             }
             // The elements in a container expression cannot end with a newline
             // as all of them are actually non-logical newlines.
-            RecoveryContextKind::Slices | RecoveryContextKind::ListElements => {
+            Self::Slices | Self::ListElements => {
                 p.at(TokenKind::Rsqb).then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => p
+            Self::SetElements | Self::DictElements => p
                 .at(TokenKind::Rbrace)
                 .then_some(ListTerminatorKind::Regular),
-            RecoveryContextKind::TupleElements(parenthesized) => {
+            Self::TupleElements(parenthesized) => {
                 if parenthesized.is_yes() {
                     p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
                 } else {
                     p.at_sequence_end().then_some(ListTerminatorKind::Regular)
                 }
             }
-            RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
+            Self::SequenceMatchPattern(parentheses) => match parentheses {
                 None => {
                     // test_ok match_sequence_pattern_terminator
                     // match subject:
@@ -1082,16 +1074,14 @@ impl RecoveryContextKind {
                         .then_some(ListTerminatorKind::Regular)
                 }
             },
-            RecoveryContextKind::MatchPatternMapping => p
+            Self::MatchPatternMapping => p
                 .at(TokenKind::Rbrace)
                 .then_some(ListTerminatorKind::Regular),
-            RecoveryContextKind::MatchPatternClassArguments => {
+            Self::MatchPatternClassArguments => {
                 p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::Arguments => {
-                p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular)
-            }
-            RecoveryContextKind::DeleteTargets | RecoveryContextKind::Identifiers => {
+            Self::Arguments => p.at(TokenKind::Rpar).then_some(ListTerminatorKind::Regular),
+            Self::DeleteTargets | Self::Identifiers => {
                 // test_ok del_targets_terminator
                 // del a, b; c, d
                 // del a, b
@@ -1099,7 +1089,7 @@ impl RecoveryContextKind {
                 matches!(p.current_token_kind(), TokenKind::Semi | TokenKind::Newline)
                     .then_some(ListTerminatorKind::Regular)
             }
-            RecoveryContextKind::Parameters(function_kind) => {
+            Self::Parameters(function_kind) => {
                 // `lambda x, y: ...` or `def f(x, y): ...`
                 if p.at(function_kind.list_terminator()) {
                     Some(ListTerminatorKind::Regular)
@@ -1109,7 +1099,7 @@ impl RecoveryContextKind {
                         .then_some(ListTerminatorKind::ErrorRecovery)
                 }
             }
-            RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
+            Self::WithItems(with_item_kind) => match with_item_kind {
                 WithItemKind::Parenthesized => match p.current_token_kind() {
                     TokenKind::Rpar => Some(ListTerminatorKind::Regular),
                     TokenKind::Colon => Some(ListTerminatorKind::ErrorRecovery),
@@ -1119,7 +1109,7 @@ impl RecoveryContextKind {
                     .at(TokenKind::Colon)
                     .then_some(ListTerminatorKind::Regular),
             },
-            RecoveryContextKind::InterpolatedStringElements(kind) => {
+            Self::InterpolatedStringElements(kind) => {
                 if p.at(kind.list_terminator()) {
                     Some(ListTerminatorKind::Regular)
                 } else {
@@ -1141,42 +1131,38 @@ impl RecoveryContextKind {
 
     fn is_list_element(self, p: &Parser) -> bool {
         match self {
-            RecoveryContextKind::ModuleStatements => p.at_stmt(),
-            RecoveryContextKind::BlockStatements => p.at_stmt(),
-            RecoveryContextKind::Elif => p.at(TokenKind::Elif),
-            RecoveryContextKind::Except => p.at(TokenKind::Except),
-            RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
-            RecoveryContextKind::TypeParams => p.at_type_param(),
-            RecoveryContextKind::ImportNames => p.at_name_or_soft_keyword(),
-            RecoveryContextKind::ImportFromAsNames(_) => {
-                p.at(TokenKind::Star) || p.at_name_or_soft_keyword()
-            }
-            RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
-            RecoveryContextKind::ListElements
-            | RecoveryContextKind::SetElements
-            | RecoveryContextKind::TupleElements(_) => p.at_expr(),
-            RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => {
+            Self::ModuleStatements => p.at_stmt(),
+            Self::BlockStatements => p.at_stmt(),
+            Self::Elif => p.at(TokenKind::Elif),
+            Self::Except => p.at(TokenKind::Except),
+            Self::AssignmentTargets => p.at(TokenKind::Equal),
+            Self::TypeParams => p.at_type_param(),
+            Self::ImportNames => p.at_name_or_soft_keyword(),
+            Self::ImportFromAsNames(_) => p.at(TokenKind::Star) || p.at_name_or_soft_keyword(),
+            Self::Slices => p.at(TokenKind::Colon) || p.at_expr(),
+            Self::ListElements | Self::SetElements | Self::TupleElements(_) => p.at_expr(),
+            Self::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
+            Self::SequenceMatchPattern(_) => {
                 // `+` doesn't start any pattern but is here for better error recovery.
                 p.at(TokenKind::Plus) || p.at_pattern_start()
             }
-            RecoveryContextKind::MatchPatternMapping => {
+            Self::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.
                 p.at(TokenKind::Star) || p.at_mapping_pattern_start()
             }
-            RecoveryContextKind::MatchPatternClassArguments => p.at_pattern_start(),
-            RecoveryContextKind::Arguments => p.at_expr(),
-            RecoveryContextKind::DeleteTargets => p.at_expr(),
-            RecoveryContextKind::Identifiers => p.at_name_or_soft_keyword(),
-            RecoveryContextKind::Parameters(_) => {
+            Self::MatchPatternClassArguments => p.at_pattern_start(),
+            Self::Arguments => p.at_expr(),
+            Self::DeleteTargets => p.at_expr(),
+            Self::Identifiers => p.at_name_or_soft_keyword(),
+            Self::Parameters(_) => {
                 matches!(
                     p.current_token_kind(),
                     TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
                 ) || p.at_name_or_soft_keyword()
             }
-            RecoveryContextKind::WithItems(_) => p.at_expr(),
-            RecoveryContextKind::InterpolatedStringElements(elements_kind) => {
+            Self::WithItems(_) => p.at_expr(),
+            Self::InterpolatedStringElements(elements_kind) => {
                 match elements_kind {
                     InterpolatedStringElementsKind::Regular(interpolated_string_kind) => {
                         p.current_token_kind() == interpolated_string_kind.middle_token()
@@ -1198,22 +1184,22 @@ impl RecoveryContextKind {
 
     fn create_error(self, p: &Parser) -> ParseErrorType {
         match self {
-            RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements => {
+            Self::ModuleStatements | Self::BlockStatements => {
                 if p.at(TokenKind::Indent) {
                     ParseErrorType::UnexpectedIndentation
                 } else {
                     ParseErrorType::OtherError("Expected a statement".to_string())
                 }
             }
-            RecoveryContextKind::Elif => ParseErrorType::OtherError(
+            Self::Elif => ParseErrorType::OtherError(
                 "Expected an `elif` or `else` clause, or the end of the `if` statement."
                     .to_string(),
             ),
-            RecoveryContextKind::Except => ParseErrorType::OtherError(
+            Self::Except => ParseErrorType::OtherError(
                 "Expected an `except` or `finally` clause or the end of the `try` statement."
                     .to_string(),
             ),
-            RecoveryContextKind::AssignmentTargets => {
+            Self::AssignmentTargets => {
                 if p.current_token_kind().is_keyword() {
                     ParseErrorType::OtherError(
                         "The keyword is not allowed as a variable declaration name".to_string(),
@@ -1222,57 +1208,53 @@ impl RecoveryContextKind {
                     ParseErrorType::OtherError("Expected an assignment target".to_string())
                 }
             }
-            RecoveryContextKind::TypeParams => ParseErrorType::OtherError(
+            Self::TypeParams => ParseErrorType::OtherError(
                 "Expected a type parameter or the end of the type parameter list".to_string(),
             ),
-            RecoveryContextKind::ImportFromAsNames(parenthesized) => {
+            Self::ImportFromAsNames(parenthesized) => {
                 if parenthesized.is_yes() {
                     ParseErrorType::OtherError("Expected an import name or a ')'".to_string())
                 } else {
                     ParseErrorType::OtherError("Expected an import name".to_string())
                 }
             }
-            RecoveryContextKind::ImportNames => {
-                ParseErrorType::OtherError("Expected an import name".to_string())
-            }
-            RecoveryContextKind::Slices => ParseErrorType::OtherError(
+            Self::ImportNames => ParseErrorType::OtherError("Expected an import name".to_string()),
+            Self::Slices => ParseErrorType::OtherError(
                 "Expected an expression or the end of the slice list".to_string(),
             ),
-            RecoveryContextKind::ListElements => {
+            Self::ListElements => {
                 ParseErrorType::OtherError("Expected an expression or a ']'".to_string())
             }
-            RecoveryContextKind::SetElements | RecoveryContextKind::DictElements => {
+            Self::SetElements | Self::DictElements => {
                 ParseErrorType::OtherError("Expected an expression or a '}'".to_string())
             }
-            RecoveryContextKind::TupleElements(parenthesized) => {
+            Self::TupleElements(parenthesized) => {
                 if parenthesized.is_yes() {
                     ParseErrorType::OtherError("Expected an expression or a ')'".to_string())
                 } else {
                     ParseErrorType::OtherError("Expected an expression".to_string())
                 }
             }
-            RecoveryContextKind::SequenceMatchPattern(_) => ParseErrorType::OtherError(
+            Self::SequenceMatchPattern(_) => ParseErrorType::OtherError(
                 "Expected a pattern or the end of the sequence pattern".to_string(),
             ),
-            RecoveryContextKind::MatchPatternMapping => ParseErrorType::OtherError(
+            Self::MatchPatternMapping => ParseErrorType::OtherError(
                 "Expected a mapping pattern or the end of the mapping pattern".to_string(),
             ),
-            RecoveryContextKind::MatchPatternClassArguments => {
+            Self::MatchPatternClassArguments => {
                 ParseErrorType::OtherError("Expected a pattern or a ')'".to_string())
             }
-            RecoveryContextKind::Arguments => {
+            Self::Arguments => {
                 ParseErrorType::OtherError("Expected an expression or a ')'".to_string())
             }
-            RecoveryContextKind::DeleteTargets => {
+            Self::DeleteTargets => {
                 ParseErrorType::OtherError("Expected a delete target".to_string())
             }
-            RecoveryContextKind::Identifiers => {
-                ParseErrorType::OtherError("Expected an identifier".to_string())
-            }
-            RecoveryContextKind::Parameters(_) => ParseErrorType::OtherError(
+            Self::Identifiers => ParseErrorType::OtherError("Expected an identifier".to_string()),
+            Self::Parameters(_) => ParseErrorType::OtherError(
                 "Expected a parameter or the end of the parameter list".to_string(),
             ),
-            RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
+            Self::WithItems(with_item_kind) => match with_item_kind {
                 WithItemKind::Parenthesized => {
                     ParseErrorType::OtherError("Expected an expression or a ')'".to_string())
                 }
@@ -1280,7 +1262,7 @@ impl RecoveryContextKind {
                     "Expected an expression or the end of the with item list".to_string(),
                 ),
             },
-            RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
+            Self::InterpolatedStringElements(kind) => match kind {
                 InterpolatedStringElementsKind::Regular(string_kind) => ParseErrorType::OtherError(
                     format!("Expected an element of or the end of the {string_kind}"),
                 ),
@@ -1334,62 +1316,54 @@ bitflags! {
 impl RecoveryContext {
     const fn from_kind(kind: RecoveryContextKind) -> Self {
         match kind {
-            RecoveryContextKind::ModuleStatements => RecoveryContext::MODULE_STATEMENTS,
-            RecoveryContextKind::BlockStatements => RecoveryContext::BLOCK_STATEMENTS,
-            RecoveryContextKind::Elif => RecoveryContext::ELIF,
-            RecoveryContextKind::Except => RecoveryContext::EXCEPT,
-            RecoveryContextKind::AssignmentTargets => RecoveryContext::ASSIGNMENT_TARGETS,
-            RecoveryContextKind::TypeParams => RecoveryContext::TYPE_PARAMS,
+            RecoveryContextKind::ModuleStatements => Self::MODULE_STATEMENTS,
+            RecoveryContextKind::BlockStatements => Self::BLOCK_STATEMENTS,
+            RecoveryContextKind::Elif => Self::ELIF,
+            RecoveryContextKind::Except => Self::EXCEPT,
+            RecoveryContextKind::AssignmentTargets => Self::ASSIGNMENT_TARGETS,
+            RecoveryContextKind::TypeParams => Self::TYPE_PARAMS,
             RecoveryContextKind::ImportFromAsNames(parenthesized) => match parenthesized {
-                Parenthesized::Yes => RecoveryContext::IMPORT_FROM_AS_NAMES_PARENTHESIZED,
-                Parenthesized::No => RecoveryContext::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED,
+                Parenthesized::Yes => Self::IMPORT_FROM_AS_NAMES_PARENTHESIZED,
+                Parenthesized::No => Self::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED,
             },
-            RecoveryContextKind::ImportNames => RecoveryContext::IMPORT_NAMES,
-            RecoveryContextKind::Slices => RecoveryContext::SLICES,
-            RecoveryContextKind::ListElements => RecoveryContext::LIST_ELEMENTS,
-            RecoveryContextKind::SetElements => RecoveryContext::SET_ELEMENTS,
-            RecoveryContextKind::DictElements => RecoveryContext::DICT_ELEMENTS,
+            RecoveryContextKind::ImportNames => Self::IMPORT_NAMES,
+            RecoveryContextKind::Slices => Self::SLICES,
+            RecoveryContextKind::ListElements => Self::LIST_ELEMENTS,
+            RecoveryContextKind::SetElements => Self::SET_ELEMENTS,
+            RecoveryContextKind::DictElements => Self::DICT_ELEMENTS,
             RecoveryContextKind::TupleElements(parenthesized) => match parenthesized {
-                Parenthesized::Yes => RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED,
-                Parenthesized::No => RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED,
+                Parenthesized::Yes => Self::TUPLE_ELEMENTS_PARENTHESIZED,
+                Parenthesized::No => Self::TUPLE_ELEMENTS_UNPARENTHESIZED,
             },
             RecoveryContextKind::SequenceMatchPattern(parentheses) => match parentheses {
-                None => RecoveryContext::SEQUENCE_MATCH_PATTERN,
-                Some(SequenceMatchPatternParentheses::List) => {
-                    RecoveryContext::SEQUENCE_MATCH_PATTERN_LIST
-                }
-                Some(SequenceMatchPatternParentheses::Tuple) => {
-                    RecoveryContext::SEQUENCE_MATCH_PATTERN_TUPLE
-                }
+                None => Self::SEQUENCE_MATCH_PATTERN,
+                Some(SequenceMatchPatternParentheses::List) => Self::SEQUENCE_MATCH_PATTERN_LIST,
+                Some(SequenceMatchPatternParentheses::Tuple) => Self::SEQUENCE_MATCH_PATTERN_TUPLE,
             },
-            RecoveryContextKind::MatchPatternMapping => RecoveryContext::MATCH_PATTERN_MAPPING,
-            RecoveryContextKind::MatchPatternClassArguments => {
-                RecoveryContext::MATCH_PATTERN_CLASS_ARGUMENTS
-            }
-            RecoveryContextKind::Arguments => RecoveryContext::ARGUMENTS,
-            RecoveryContextKind::DeleteTargets => RecoveryContext::DELETE,
-            RecoveryContextKind::Identifiers => RecoveryContext::IDENTIFIERS,
+            RecoveryContextKind::MatchPatternMapping => Self::MATCH_PATTERN_MAPPING,
+            RecoveryContextKind::MatchPatternClassArguments => Self::MATCH_PATTERN_CLASS_ARGUMENTS,
+            RecoveryContextKind::Arguments => Self::ARGUMENTS,
+            RecoveryContextKind::DeleteTargets => Self::DELETE,
+            RecoveryContextKind::Identifiers => Self::IDENTIFIERS,
             RecoveryContextKind::Parameters(function_kind) => match function_kind {
-                FunctionKind::Lambda => RecoveryContext::LAMBDA_PARAMETERS,
-                FunctionKind::FunctionDef => RecoveryContext::FUNCTION_PARAMETERS,
+                FunctionKind::Lambda => Self::LAMBDA_PARAMETERS,
+                FunctionKind::FunctionDef => Self::FUNCTION_PARAMETERS,
             },
             RecoveryContextKind::WithItems(with_item_kind) => match with_item_kind {
-                WithItemKind::Parenthesized => RecoveryContext::WITH_ITEMS_PARENTHESIZED,
-                WithItemKind::ParenthesizedExpression => {
-                    RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION
-                }
-                WithItemKind::Unparenthesized => RecoveryContext::WITH_ITEMS_UNPARENTHESIZED,
+                WithItemKind::Parenthesized => Self::WITH_ITEMS_PARENTHESIZED,
+                WithItemKind::ParenthesizedExpression => Self::WITH_ITEMS_PARENTHESIZED_EXPRESSION,
+                WithItemKind::Unparenthesized => Self::WITH_ITEMS_UNPARENTHESIZED,
             },
             RecoveryContextKind::InterpolatedStringElements(kind) => match kind {
                 InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString) => {
-                    RecoveryContext::F_STRING_ELEMENTS
+                    Self::F_STRING_ELEMENTS
                 }
                 InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString) => {
-                    RecoveryContext::T_STRING_ELEMENTS
+                    Self::T_STRING_ELEMENTS
                 }
 
                 InterpolatedStringElementsKind::FormatSpec => {
-                    RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
+                    Self::FT_STRING_ELEMENTS_IN_FORMAT_SPEC
                 }
             },
         }
@@ -1400,71 +1374,59 @@ impl RecoveryContext {
     /// Returns `None` if the `RecoveryContext` is empty or has multiple flags set.
     const fn to_kind(self) -> Option<RecoveryContextKind> {
         Some(match self {
-            RecoveryContext::MODULE_STATEMENTS => RecoveryContextKind::ModuleStatements,
-            RecoveryContext::BLOCK_STATEMENTS => RecoveryContextKind::BlockStatements,
-            RecoveryContext::ELIF => RecoveryContextKind::Elif,
-            RecoveryContext::EXCEPT => RecoveryContextKind::Except,
-            RecoveryContext::ASSIGNMENT_TARGETS => RecoveryContextKind::AssignmentTargets,
-            RecoveryContext::TYPE_PARAMS => RecoveryContextKind::TypeParams,
-            RecoveryContext::IMPORT_FROM_AS_NAMES_PARENTHESIZED => {
+            Self::MODULE_STATEMENTS => RecoveryContextKind::ModuleStatements,
+            Self::BLOCK_STATEMENTS => RecoveryContextKind::BlockStatements,
+            Self::ELIF => RecoveryContextKind::Elif,
+            Self::EXCEPT => RecoveryContextKind::Except,
+            Self::ASSIGNMENT_TARGETS => RecoveryContextKind::AssignmentTargets,
+            Self::TYPE_PARAMS => RecoveryContextKind::TypeParams,
+            Self::IMPORT_FROM_AS_NAMES_PARENTHESIZED => {
                 RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
             }
-            RecoveryContext::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED => {
+            Self::IMPORT_FROM_AS_NAMES_UNPARENTHESIZED => {
                 RecoveryContextKind::ImportFromAsNames(Parenthesized::No)
             }
-            RecoveryContext::IMPORT_NAMES => RecoveryContextKind::ImportNames,
-            RecoveryContext::SLICES => RecoveryContextKind::Slices,
-            RecoveryContext::LIST_ELEMENTS => RecoveryContextKind::ListElements,
-            RecoveryContext::SET_ELEMENTS => RecoveryContextKind::SetElements,
-            RecoveryContext::DICT_ELEMENTS => RecoveryContextKind::DictElements,
-            RecoveryContext::TUPLE_ELEMENTS_PARENTHESIZED => {
+            Self::IMPORT_NAMES => RecoveryContextKind::ImportNames,
+            Self::SLICES => RecoveryContextKind::Slices,
+            Self::LIST_ELEMENTS => RecoveryContextKind::ListElements,
+            Self::SET_ELEMENTS => RecoveryContextKind::SetElements,
+            Self::DICT_ELEMENTS => RecoveryContextKind::DictElements,
+            Self::TUPLE_ELEMENTS_PARENTHESIZED => {
                 RecoveryContextKind::TupleElements(Parenthesized::Yes)
             }
-            RecoveryContext::TUPLE_ELEMENTS_UNPARENTHESIZED => {
+            Self::TUPLE_ELEMENTS_UNPARENTHESIZED => {
                 RecoveryContextKind::TupleElements(Parenthesized::No)
             }
-            RecoveryContext::SEQUENCE_MATCH_PATTERN => {
-                RecoveryContextKind::SequenceMatchPattern(None)
-            }
-            RecoveryContext::SEQUENCE_MATCH_PATTERN_LIST => {
-                RecoveryContextKind::SequenceMatchPattern(Some(
-                    SequenceMatchPatternParentheses::List,
-                ))
-            }
-            RecoveryContext::SEQUENCE_MATCH_PATTERN_TUPLE => {
-                RecoveryContextKind::SequenceMatchPattern(Some(
-                    SequenceMatchPatternParentheses::Tuple,
-                ))
-            }
-            RecoveryContext::MATCH_PATTERN_MAPPING => RecoveryContextKind::MatchPatternMapping,
-            RecoveryContext::MATCH_PATTERN_CLASS_ARGUMENTS => {
-                RecoveryContextKind::MatchPatternClassArguments
-            }
-            RecoveryContext::ARGUMENTS => RecoveryContextKind::Arguments,
-            RecoveryContext::DELETE => RecoveryContextKind::DeleteTargets,
-            RecoveryContext::IDENTIFIERS => RecoveryContextKind::Identifiers,
-            RecoveryContext::FUNCTION_PARAMETERS => {
-                RecoveryContextKind::Parameters(FunctionKind::FunctionDef)
-            }
-            RecoveryContext::LAMBDA_PARAMETERS => {
-                RecoveryContextKind::Parameters(FunctionKind::Lambda)
-            }
-            RecoveryContext::WITH_ITEMS_PARENTHESIZED => {
+            Self::SEQUENCE_MATCH_PATTERN => RecoveryContextKind::SequenceMatchPattern(None),
+            Self::SEQUENCE_MATCH_PATTERN_LIST => RecoveryContextKind::SequenceMatchPattern(Some(
+                SequenceMatchPatternParentheses::List,
+            )),
+            Self::SEQUENCE_MATCH_PATTERN_TUPLE => RecoveryContextKind::SequenceMatchPattern(Some(
+                SequenceMatchPatternParentheses::Tuple,
+            )),
+            Self::MATCH_PATTERN_MAPPING => RecoveryContextKind::MatchPatternMapping,
+            Self::MATCH_PATTERN_CLASS_ARGUMENTS => RecoveryContextKind::MatchPatternClassArguments,
+            Self::ARGUMENTS => RecoveryContextKind::Arguments,
+            Self::DELETE => RecoveryContextKind::DeleteTargets,
+            Self::IDENTIFIERS => RecoveryContextKind::Identifiers,
+            Self::FUNCTION_PARAMETERS => RecoveryContextKind::Parameters(FunctionKind::FunctionDef),
+            Self::LAMBDA_PARAMETERS => RecoveryContextKind::Parameters(FunctionKind::Lambda),
+            Self::WITH_ITEMS_PARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
             }
-            RecoveryContext::WITH_ITEMS_PARENTHESIZED_EXPRESSION => {
+            Self::WITH_ITEMS_PARENTHESIZED_EXPRESSION => {
                 RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression)
             }
-            RecoveryContext::WITH_ITEMS_UNPARENTHESIZED => {
+            Self::WITH_ITEMS_UNPARENTHESIZED => {
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized)
             }
-            RecoveryContext::F_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+            Self::F_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
                 InterpolatedStringElementsKind::Regular(InterpolatedStringKind::FString),
             ),
-            RecoveryContext::T_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
+            Self::T_STRING_ELEMENTS => RecoveryContextKind::InterpolatedStringElements(
                 InterpolatedStringElementsKind::Regular(InterpolatedStringKind::TString),
             ),
-            RecoveryContext::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
+            Self::FT_STRING_ELEMENTS_IN_FORMAT_SPEC => {
                 RecoveryContextKind::InterpolatedStringElements(
                     InterpolatedStringElementsKind::FormatSpec,
                 )

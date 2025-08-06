@@ -43,7 +43,7 @@ impl SuppressionKind {
             let trimmed = segment.trim_whitespace();
             if let Some(command) = trimmed.strip_prefix("fmt:") {
                 if command.trim_whitespace_start() == "skip" {
-                    return Some(SuppressionKind::Skip);
+                    return Some(Self::Skip);
                 }
             }
         }

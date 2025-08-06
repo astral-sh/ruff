@@ -43,12 +43,12 @@ impl Client {
         &self,
         session: &Session,
         params: R::Params,
-        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
+        response_handler: impl FnOnce(&Self, R::Result) + Send + 'static,
     ) -> crate::Result<()>
     where
         R: lsp_types::request::Request,
     {
-        let response_handler = Box::new(move |client: &Client, response: lsp_server::Response| {
+        let response_handler = Box::new(move |client: &Self, response: lsp_server::Response| {
             let _span =
                 tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
                     .entered();

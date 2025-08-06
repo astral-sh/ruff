@@ -70,35 +70,35 @@ impl Borrow<str> for Name {
 impl<'a> From<&'a str> for Name {
     #[inline]
     fn from(s: &'a str) -> Self {
-        Name(s.into())
+        Self(s.into())
     }
 }
 
 impl From<String> for Name {
     #[inline]
     fn from(s: String) -> Self {
-        Name(s.into())
+        Self(s.into())
     }
 }
 
 impl<'a> From<&'a String> for Name {
     #[inline]
     fn from(s: &'a String) -> Self {
-        Name(s.into())
+        Self(s.into())
     }
 }
 
 impl<'a> From<Cow<'a, str>> for Name {
     #[inline]
     fn from(cow: Cow<'a, str>) -> Self {
-        Name(cow.into())
+        Self(cow.into())
     }
 }
 
 impl From<Box<str>> for Name {
     #[inline]
     fn from(b: Box<str>) -> Self {
-        Name(b.into())
+        Self(b.into())
     }
 }
 

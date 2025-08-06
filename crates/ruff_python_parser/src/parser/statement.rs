@@ -77,7 +77,7 @@ const AUGMENTED_ASSIGN_SET: TokenSet = TokenSet::new([
     TokenKind::RightShiftEqual,
 ]);
 
-impl<'src> Parser<'src> {
+impl Parser<'_> {
     /// Returns `true` if the current token is the start of a compound statement.
     pub(super) fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
@@ -3844,7 +3844,7 @@ impl<'src> Parser<'src> {
     fn parse_clauses<T>(
         &mut self,
         clause: Clause,
-        mut parse_clause: impl FnMut(&mut Parser<'src>) -> T,
+        mut parse_clause: impl FnMut(&mut Self) -> T,
     ) -> Vec<T> {
         let mut clauses = Vec::new();
         let mut progress = ParserProgress::default();
@@ -3891,18 +3891,18 @@ enum Clause {
 impl Display for Clause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Clause::If => write!(f, "`if` statement"),
-            Clause::Else => write!(f, "`else` clause"),
-            Clause::ElIf => write!(f, "`elif` clause"),
-            Clause::For => write!(f, "`for` statement"),
-            Clause::With => write!(f, "`with` statement"),
-            Clause::Class => write!(f, "`class` definition"),
-            Clause::While => write!(f, "`while` statement"),
-            Clause::FunctionDef => write!(f, "function definition"),
-            Clause::Case => write!(f, "`case` block"),
-            Clause::Try => write!(f, "`try` statement"),
-            Clause::Except => write!(f, "`except` clause"),
-            Clause::Finally => write!(f, "`finally` clause"),
+            Self::If => write!(f, "`if` statement"),
+            Self::Else => write!(f, "`else` clause"),
+            Self::ElIf => write!(f, "`elif` clause"),
+            Self::For => write!(f, "`for` statement"),
+            Self::With => write!(f, "`with` statement"),
+            Self::Class => write!(f, "`class` definition"),
+            Self::While => write!(f, "`while` statement"),
+            Self::FunctionDef => write!(f, "function definition"),
+            Self::Case => write!(f, "`case` block"),
+            Self::Try => write!(f, "`try` statement"),
+            Self::Except => write!(f, "`except` clause"),
+            Self::Finally => write!(f, "`finally` clause"),
         }
     }
 }
@@ -3972,20 +3972,20 @@ enum ElifOrElse {
 
 impl ElifOrElse {
     const fn is_elif(self) -> bool {
-        matches!(self, ElifOrElse::Elif)
+        matches!(self, Self::Elif)
     }
 
     const fn as_token_kind(self) -> TokenKind {
         match self {
-            ElifOrElse::Elif => TokenKind::Elif,
-            ElifOrElse::Else => TokenKind::Else,
+            Self::Elif => TokenKind::Elif,
+            Self::Else => TokenKind::Else,
         }
     }
 
     const fn as_clause(self) -> Clause {
         match self {
-            ElifOrElse::Elif => Clause::ElIf,
-            ElifOrElse::Else => Clause::Else,
+            Self::Elif => Clause::ElIf,
+            Self::Else => Clause::Else,
         }
     }
 }
@@ -4003,7 +4003,7 @@ enum ExceptClauseKind {
 
 impl ExceptClauseKind {
     const fn is_star(self) -> bool {
-        matches!(self, ExceptClauseKind::Star(..))
+        matches!(self, Self::Star(..))
     }
 }
 

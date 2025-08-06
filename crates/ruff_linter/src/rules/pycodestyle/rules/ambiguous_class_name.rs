@@ -31,7 +31,7 @@ pub(crate) struct AmbiguousClassName(pub String);
 impl Violation for AmbiguousClassName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AmbiguousClassName(name) = self;
+        let Self(name) = self;
         format!("Ambiguous class name: `{name}`")
     }
 }

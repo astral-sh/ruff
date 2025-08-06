@@ -19,16 +19,16 @@ pub(crate) struct StyledChar {
 }
 
 impl StyledChar {
-    pub(crate) const SPACE: Self = StyledChar::new(' ', Style::new());
+    pub(crate) const SPACE: Self = Self::new(' ', Style::new());
 
-    pub(crate) const fn new(ch: char, style: Style) -> StyledChar {
-        StyledChar { ch, style }
+    pub(crate) const fn new(ch: char, style: Style) -> Self {
+        Self { ch, style }
     }
 }
 
 impl StyledBuffer {
-    pub(crate) fn new() -> StyledBuffer {
-        StyledBuffer { lines: vec![] }
+    pub(crate) fn new() -> Self {
+        Self { lines: vec![] }
     }
 
     fn ensure_lines(&mut self, line: usize) {

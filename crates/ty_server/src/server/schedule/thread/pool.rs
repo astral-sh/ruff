@@ -44,7 +44,7 @@ struct Job {
 }
 
 impl Pool {
-    pub(crate) fn new(threads: NonZeroUsize) -> Pool {
+    pub(crate) fn new(threads: NonZeroUsize) -> Self {
         // Override OS defaults to avoid stack overflows on platforms with low stack size defaults.
         const STACK_SIZE: usize = 2 * 1024 * 1024;
         const INITIAL_PRIORITY: ThreadPriority = ThreadPriority::Worker;
@@ -106,7 +106,7 @@ impl Pool {
             handles.push(handle);
         }
 
-        Pool {
+        Self {
             _handles: handles,
             extant_tasks,
             job_sender,

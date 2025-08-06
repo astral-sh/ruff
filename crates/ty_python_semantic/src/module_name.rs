@@ -94,7 +94,7 @@ impl ModuleName {
     /// assert_eq!(ModuleName::new_static("root").unwrap().parent(), None);
     /// ```
     #[must_use]
-    pub fn parent(&self) -> Option<ModuleName> {
+    pub fn parent(&self) -> Option<Self> {
         let (parent, _) = self.0.rsplit_once('.')?;
         Some(Self(parent.to_compact_string()))
     }
@@ -114,7 +114,7 @@ impl ModuleName {
     /// assert!(!ModuleName::new_static("foo_bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     /// ```
     #[must_use]
-    pub fn starts_with(&self, other: &ModuleName) -> bool {
+    pub fn starts_with(&self, other: &Self) -> bool {
         let mut self_components = self.components();
         let other_components = other.components();
 
@@ -171,7 +171,7 @@ impl ModuleName {
     /// assert_eq!(this.relative_to(&parent), None);
     /// ```
     #[must_use]
-    pub fn relative_to(&self, parent: &ModuleName) -> Option<ModuleName> {
+    pub fn relative_to(&self, parent: &Self) -> Option<Self> {
         let relative_name = self.0.strip_prefix(&*parent.0)?.strip_prefix('.')?;
         // At this point, `relative_name` *has* to be a
         // proper suffix of `self`. Otherwise, one of the two
@@ -185,7 +185,7 @@ impl ModuleName {
         // the implementation of `starts_with` diverges from the
         // implementation in this routine. But that seems unlikely.
         debug_assert!(self.starts_with(parent));
-        Some(ModuleName(CompactString::from(relative_name)))
+        Some(Self(CompactString::from(relative_name)))
     }
 
     #[must_use]
@@ -248,7 +248,7 @@ impl ModuleName {
     /// module_name.extend(&ModuleName::new_static("baz.eggs.ham").unwrap());
     /// assert_eq!(&module_name, "foo.bar.baz.eggs.ham");
     /// ```
-    pub fn extend(&mut self, other: &ModuleName) {
+    pub fn extend(&mut self, other: &Self) {
         self.0.push('.');
         self.0.push_str(other);
     }

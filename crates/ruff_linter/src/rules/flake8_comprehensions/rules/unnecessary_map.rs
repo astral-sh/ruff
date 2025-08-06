@@ -53,12 +53,12 @@ impl Violation for UnnecessaryMap {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryMap { object_type } = self;
+        let Self { object_type } = self;
         format!("Unnecessary `map()` usage (rewrite using a {object_type})")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryMap { object_type } = self;
+        let Self { object_type } = self;
         Some(format!("Replace `map()` with a {object_type}"))
     }
 }
@@ -235,10 +235,10 @@ impl ObjectType {
 impl fmt::Display for ObjectType {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ObjectType::Generator => fmt.write_str("generator expression"),
-            ObjectType::List => fmt.write_str("list comprehension"),
-            ObjectType::Set => fmt.write_str("set comprehension"),
-            ObjectType::Dict => fmt.write_str("dict comprehension"),
+            Self::Generator => fmt.write_str("generator expression"),
+            Self::List => fmt.write_str("list comprehension"),
+            Self::Set => fmt.write_str("set comprehension"),
+            Self::Dict => fmt.write_str("dict comprehension"),
         }
     }
 }

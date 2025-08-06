@@ -24,9 +24,9 @@ impl AsyncModule {
 impl std::fmt::Display for AsyncModule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AsyncModule::AnyIo => write!(f, "anyio"),
-            AsyncModule::AsyncIo => write!(f, "asyncio"),
-            AsyncModule::Trio => write!(f, "trio"),
+            Self::AnyIo => write!(f, "anyio"),
+            Self::AsyncIo => write!(f, "asyncio"),
+            Self::Trio => write!(f, "trio"),
         }
     }
 }
@@ -73,29 +73,29 @@ impl MethodName {
     pub(super) fn is_async(self) -> bool {
         matches!(
             self,
-            MethodName::TrioAcloseForcefully
-                | MethodName::TrioCancelShieldedCheckpoint
-                | MethodName::TrioCheckpoint
-                | MethodName::TrioCheckpointIfCancelled
-                | MethodName::TrioOpenFile
-                | MethodName::TrioOpenProcess
-                | MethodName::TrioOpenSslOverTcpListeners
-                | MethodName::TrioOpenSslOverTcpStream
-                | MethodName::TrioOpenTcpListeners
-                | MethodName::TrioOpenTcpStream
-                | MethodName::TrioOpenUnixSocket
-                | MethodName::TrioPermanentlyDetachCoroutineObject
-                | MethodName::TrioReattachDetachedCoroutineObject
-                | MethodName::TrioRunProcess
-                | MethodName::TrioServeListeners
-                | MethodName::TrioServeSslOverTcp
-                | MethodName::TrioServeTcp
-                | MethodName::TrioSleep
-                | MethodName::TrioSleepForever
-                | MethodName::TrioTemporarilyDetachCoroutineObject
-                | MethodName::TrioWaitReadable
-                | MethodName::TrioWaitTaskRescheduled
-                | MethodName::TrioWaitWritable
+            Self::TrioAcloseForcefully
+                | Self::TrioCancelShieldedCheckpoint
+                | Self::TrioCheckpoint
+                | Self::TrioCheckpointIfCancelled
+                | Self::TrioOpenFile
+                | Self::TrioOpenProcess
+                | Self::TrioOpenSslOverTcpListeners
+                | Self::TrioOpenSslOverTcpStream
+                | Self::TrioOpenTcpListeners
+                | Self::TrioOpenTcpStream
+                | Self::TrioOpenUnixSocket
+                | Self::TrioPermanentlyDetachCoroutineObject
+                | Self::TrioReattachDetachedCoroutineObject
+                | Self::TrioRunProcess
+                | Self::TrioServeListeners
+                | Self::TrioServeSslOverTcp
+                | Self::TrioServeTcp
+                | Self::TrioSleep
+                | Self::TrioSleepForever
+                | Self::TrioTemporarilyDetachCoroutineObject
+                | Self::TrioWaitReadable
+                | Self::TrioWaitTaskRescheduled
+                | Self::TrioWaitWritable
         )
     }
 
@@ -103,16 +103,16 @@ impl MethodName {
     pub(super) fn is_timeout_context(self) -> bool {
         matches!(
             self,
-            MethodName::AsyncIoTimeout
-                | MethodName::AsyncIoTimeoutAt
-                | MethodName::AnyIoMoveOnAfter
-                | MethodName::AnyIoFailAfter
-                | MethodName::AnyIoCancelScope
-                | MethodName::TrioMoveOnAfter
-                | MethodName::TrioMoveOnAt
-                | MethodName::TrioFailAfter
-                | MethodName::TrioFailAt
-                | MethodName::TrioCancelScope
+            Self::AsyncIoTimeout
+                | Self::AsyncIoTimeoutAt
+                | Self::AnyIoMoveOnAfter
+                | Self::AnyIoFailAfter
+                | Self::AnyIoCancelScope
+                | Self::TrioMoveOnAfter
+                | Self::TrioMoveOnAt
+                | Self::TrioFailAfter
+                | Self::TrioFailAt
+                | Self::TrioCancelScope
         )
     }
 }
@@ -171,51 +171,51 @@ impl MethodName {
 impl std::fmt::Display for MethodName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MethodName::AsyncIoTimeout => write!(f, "asyncio.timeout"),
-            MethodName::AsyncIoTimeoutAt => write!(f, "asyncio.timeout_at"),
-            MethodName::AnyIoMoveOnAfter => write!(f, "anyio.move_on_after"),
-            MethodName::AnyIoFailAfter => write!(f, "anyio.fail_after"),
-            MethodName::AnyIoCancelScope => write!(f, "anyio.CancelScope"),
-            MethodName::TrioAcloseForcefully => write!(f, "trio.aclose_forcefully"),
-            MethodName::TrioCancelScope => write!(f, "trio.CancelScope"),
-            MethodName::TrioCancelShieldedCheckpoint => {
+            Self::AsyncIoTimeout => write!(f, "asyncio.timeout"),
+            Self::AsyncIoTimeoutAt => write!(f, "asyncio.timeout_at"),
+            Self::AnyIoMoveOnAfter => write!(f, "anyio.move_on_after"),
+            Self::AnyIoFailAfter => write!(f, "anyio.fail_after"),
+            Self::AnyIoCancelScope => write!(f, "anyio.CancelScope"),
+            Self::TrioAcloseForcefully => write!(f, "trio.aclose_forcefully"),
+            Self::TrioCancelScope => write!(f, "trio.CancelScope"),
+            Self::TrioCancelShieldedCheckpoint => {
                 write!(f, "trio.lowlevel.cancel_shielded_checkpoint")
             }
-            MethodName::TrioCheckpoint => write!(f, "trio.lowlevel.checkpoint"),
-            MethodName::TrioCheckpointIfCancelled => {
+            Self::TrioCheckpoint => write!(f, "trio.lowlevel.checkpoint"),
+            Self::TrioCheckpointIfCancelled => {
                 write!(f, "trio.lowlevel.checkpoint_if_cancelled")
             }
-            MethodName::TrioFailAfter => write!(f, "trio.fail_after"),
-            MethodName::TrioFailAt => write!(f, "trio.fail_at"),
-            MethodName::TrioMoveOnAfter => write!(f, "trio.move_on_after"),
-            MethodName::TrioMoveOnAt => write!(f, "trio.move_on_at"),
-            MethodName::TrioOpenFile => write!(f, "trio.open_file"),
-            MethodName::TrioOpenProcess => write!(f, "trio.lowlevel.open_process"),
-            MethodName::TrioOpenSslOverTcpListeners => {
+            Self::TrioFailAfter => write!(f, "trio.fail_after"),
+            Self::TrioFailAt => write!(f, "trio.fail_at"),
+            Self::TrioMoveOnAfter => write!(f, "trio.move_on_after"),
+            Self::TrioMoveOnAt => write!(f, "trio.move_on_at"),
+            Self::TrioOpenFile => write!(f, "trio.open_file"),
+            Self::TrioOpenProcess => write!(f, "trio.lowlevel.open_process"),
+            Self::TrioOpenSslOverTcpListeners => {
                 write!(f, "trio.open_ssl_over_tcp_listeners")
             }
-            MethodName::TrioOpenSslOverTcpStream => write!(f, "trio.open_ssl_over_tcp_stream"),
-            MethodName::TrioOpenTcpListeners => write!(f, "trio.open_tcp_listeners"),
-            MethodName::TrioOpenTcpStream => write!(f, "trio.open_tcp_stream"),
-            MethodName::TrioOpenUnixSocket => write!(f, "trio.open_unix_socket"),
-            MethodName::TrioPermanentlyDetachCoroutineObject => {
+            Self::TrioOpenSslOverTcpStream => write!(f, "trio.open_ssl_over_tcp_stream"),
+            Self::TrioOpenTcpListeners => write!(f, "trio.open_tcp_listeners"),
+            Self::TrioOpenTcpStream => write!(f, "trio.open_tcp_stream"),
+            Self::TrioOpenUnixSocket => write!(f, "trio.open_unix_socket"),
+            Self::TrioPermanentlyDetachCoroutineObject => {
                 write!(f, "trio.lowlevel.permanently_detach_coroutine_object")
             }
-            MethodName::TrioReattachDetachedCoroutineObject => {
+            Self::TrioReattachDetachedCoroutineObject => {
                 write!(f, "trio.lowlevel.reattach_detached_coroutine_object")
             }
-            MethodName::TrioRunProcess => write!(f, "trio.run_process"),
-            MethodName::TrioServeListeners => write!(f, "trio.serve_listeners"),
-            MethodName::TrioServeSslOverTcp => write!(f, "trio.serve_ssl_over_tcp"),
-            MethodName::TrioServeTcp => write!(f, "trio.serve_tcp"),
-            MethodName::TrioSleep => write!(f, "trio.sleep"),
-            MethodName::TrioSleepForever => write!(f, "trio.sleep_forever"),
-            MethodName::TrioTemporarilyDetachCoroutineObject => {
+            Self::TrioRunProcess => write!(f, "trio.run_process"),
+            Self::TrioServeListeners => write!(f, "trio.serve_listeners"),
+            Self::TrioServeSslOverTcp => write!(f, "trio.serve_ssl_over_tcp"),
+            Self::TrioServeTcp => write!(f, "trio.serve_tcp"),
+            Self::TrioSleep => write!(f, "trio.sleep"),
+            Self::TrioSleepForever => write!(f, "trio.sleep_forever"),
+            Self::TrioTemporarilyDetachCoroutineObject => {
                 write!(f, "trio.lowlevel.temporarily_detach_coroutine_object")
             }
-            MethodName::TrioWaitReadable => write!(f, "trio.lowlevel.wait_readable"),
-            MethodName::TrioWaitTaskRescheduled => write!(f, "trio.lowlevel.wait_task_rescheduled"),
-            MethodName::TrioWaitWritable => write!(f, "trio.lowlevel.wait_writable"),
+            Self::TrioWaitReadable => write!(f, "trio.lowlevel.wait_readable"),
+            Self::TrioWaitTaskRescheduled => write!(f, "trio.lowlevel.wait_task_rescheduled"),
+            Self::TrioWaitWritable => write!(f, "trio.lowlevel.wait_writable"),
         }
     }
 }

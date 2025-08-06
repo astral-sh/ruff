@@ -649,7 +649,7 @@ impl DocumentQuery {
     }
 
     pub(crate) fn text_document_language_id(&self) -> Option<LanguageId> {
-        if let DocumentQuery::Text { document, .. } = self {
+        if let Self::Text { document, .. } = self {
             document.language_id()
         } else {
             None

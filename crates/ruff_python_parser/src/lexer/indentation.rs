@@ -67,7 +67,7 @@ impl Indentation {
         }
     }
 
-    pub(super) fn try_compare(self, other: Indentation) -> Result<Ordering, UnexpectedIndentation> {
+    pub(super) fn try_compare(self, other: Self) -> Result<Ordering, UnexpectedIndentation> {
         let column_ordering = self.column.cmp(&other.column);
         let character_ordering = self.character.cmp(&other.character);
 

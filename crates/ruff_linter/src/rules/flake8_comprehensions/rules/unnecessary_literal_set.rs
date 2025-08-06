@@ -41,7 +41,7 @@ pub(crate) struct UnnecessaryLiteralSet {
 impl AlwaysFixableViolation for UnnecessaryLiteralSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralSet { kind } = self;
+        let Self { kind } = self;
         format!("Unnecessary {kind} literal (rewrite as a set literal)")
     }
 

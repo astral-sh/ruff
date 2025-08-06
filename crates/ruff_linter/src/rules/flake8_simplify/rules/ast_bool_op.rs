@@ -100,12 +100,12 @@ pub(crate) struct CompareWithTuple {
 impl AlwaysFixableViolation for CompareWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CompareWithTuple { replacement } = self;
+        let Self { replacement } = self;
         format!("Use `{replacement}` instead of multiple equality comparisons")
     }
 
     fn fix_title(&self) -> String {
-        let CompareWithTuple { replacement } = self;
+        let Self { replacement } = self;
         format!("Replace with `{replacement}`")
     }
 }
@@ -133,7 +133,7 @@ pub(crate) struct ExprAndNotExpr {
 impl AlwaysFixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprAndNotExpr { name } = self;
+        let Self { name } = self;
         format!("Use `False` instead of `{name} and not {name}`")
     }
 
@@ -165,7 +165,7 @@ pub(crate) struct ExprOrNotExpr {
 impl AlwaysFixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprOrNotExpr { name } = self;
+        let Self { name } = self;
         format!("Use `True` instead of `{name} or not {name}`")
     }
 
@@ -218,7 +218,7 @@ pub(crate) struct ExprOrTrue {
 impl AlwaysFixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprOrTrue { expr, remove } = self;
+        let Self { expr, remove } = self;
         let replaced = match remove {
             ContentAround::After => format!("{expr} or ..."),
             ContentAround::Before => format!("... or {expr}"),
@@ -228,7 +228,7 @@ impl AlwaysFixableViolation for ExprOrTrue {
     }
 
     fn fix_title(&self) -> String {
-        let ExprOrTrue { expr, .. } = self;
+        let Self { expr, .. } = self;
         format!("Replace with `{expr}`")
     }
 }
@@ -270,7 +270,7 @@ pub(crate) struct ExprAndFalse {
 impl AlwaysFixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprAndFalse { expr, remove } = self;
+        let Self { expr, remove } = self;
         let replaced = match remove {
             ContentAround::After => format!(r#"{expr} and ..."#),
             ContentAround::Before => format!("... and {expr}"),
@@ -280,7 +280,7 @@ impl AlwaysFixableViolation for ExprAndFalse {
     }
 
     fn fix_title(&self) -> String {
-        let ExprAndFalse { expr, .. } = self;
+        let Self { expr, .. } = self;
         format!("Replace with `{expr}`")
     }
 }

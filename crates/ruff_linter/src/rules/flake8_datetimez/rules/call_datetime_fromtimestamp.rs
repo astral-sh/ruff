@@ -53,7 +53,7 @@ pub(crate) struct CallDatetimeFromtimestamp(DatetimeModuleAntipattern);
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CallDatetimeFromtimestamp(antipattern) = self;
+        let Self(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "`datetime.datetime.fromtimestamp()` called without a `tz` argument".to_string()

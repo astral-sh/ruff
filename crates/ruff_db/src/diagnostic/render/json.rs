@@ -246,7 +246,7 @@ struct JsonLocation {
 
 impl From<LineColumn> for JsonLocation {
     fn from(location: LineColumn) -> Self {
-        JsonLocation {
+        Self {
             row: location.line,
             column: location.column,
         }

@@ -91,7 +91,7 @@ impl TypingReference {
     ///
     /// `TypingReference::Runtime` has the highest precedence, followed by
     /// `TypingReference::Future`, `TypingReference::Quote`, and then `TypingReference::TypingOnly`.
-    fn combine(self, other: TypingReference) -> TypingReference {
+    fn combine(self, other: Self) -> Self {
         self.min(other)
     }
 

@@ -122,7 +122,7 @@ impl Violation for UnusedImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedImport { name, context, .. } = self;
+        let Self { name, context, .. } = self;
         match context {
             UnusedImportContext::ExceptHandler => {
                 format!(
@@ -139,7 +139,7 @@ impl Violation for UnusedImport {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedImport {
+        let Self {
             name,
             module,
             binding,

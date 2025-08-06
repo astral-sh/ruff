@@ -71,7 +71,7 @@ pub(crate) struct DjangoUnorderedBodyContentInModel {
 impl Violation for DjangoUnorderedBodyContentInModel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DjangoUnorderedBodyContentInModel {
+        let Self {
             element_type,
             prev_element_type,
         } = self;
@@ -139,13 +139,13 @@ enum ContentType {
 impl fmt::Display for ContentType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ContentType::FieldDeclaration => f.write_str("field declaration"),
-            ContentType::ManagerDeclaration => f.write_str("manager declaration"),
-            ContentType::MetaClass => f.write_str("`Meta` class"),
-            ContentType::MagicMethod => f.write_str("Magic method"),
-            ContentType::SaveMethod => f.write_str("`save` method"),
-            ContentType::GetAbsoluteUrlMethod => f.write_str("`get_absolute_url` method"),
-            ContentType::CustomMethod => f.write_str("custom method"),
+            Self::FieldDeclaration => f.write_str("field declaration"),
+            Self::ManagerDeclaration => f.write_str("manager declaration"),
+            Self::MetaClass => f.write_str("`Meta` class"),
+            Self::MagicMethod => f.write_str("Magic method"),
+            Self::SaveMethod => f.write_str("`save` method"),
+            Self::GetAbsoluteUrlMethod => f.write_str("`get_absolute_url` method"),
+            Self::CustomMethod => f.write_str("custom method"),
         }
     }
 }

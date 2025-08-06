@@ -42,12 +42,12 @@ pub(crate) struct DuplicateClassFieldDefinition {
 impl AlwaysFixableViolation for DuplicateClassFieldDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateClassFieldDefinition { name } = self;
+        let Self { name } = self;
         format!("Class field `{name}` is defined multiple times")
     }
 
     fn fix_title(&self) -> String {
-        let DuplicateClassFieldDefinition { name } = self;
+        let Self { name } = self;
         format!("Remove duplicate field definition for `{name}`")
     }
 }

@@ -221,11 +221,8 @@ impl TryFrom<&str> for SupportedBuiltins {
 impl SupportedBuiltins {
     fn duplication_variance(self) -> DuplicationVariance {
         match self {
-            SupportedBuiltins::All
-            | SupportedBuiltins::Any
-            | SupportedBuiltins::Min
-            | SupportedBuiltins::Max => DuplicationVariance::Invariant,
-            SupportedBuiltins::Sum => DuplicationVariance::Variant,
+            Self::All | Self::Any | Self::Min | Self::Max => DuplicationVariance::Invariant,
+            Self::Sum => DuplicationVariance::Variant,
         }
     }
 }

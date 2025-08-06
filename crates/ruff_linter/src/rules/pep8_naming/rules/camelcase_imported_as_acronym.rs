@@ -50,7 +50,7 @@ pub(crate) struct CamelcaseImportedAsAcronym {
 impl Violation for CamelcaseImportedAsAcronym {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsAcronym { name, asname } = self;
+        let Self { name, asname } = self;
         format!("CamelCase `{name}` imported as acronym `{asname}`")
     }
 }

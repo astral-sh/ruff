@@ -1052,14 +1052,14 @@ enum OperatorSymbol {
 
 impl OperatorSymbol {
     const fn is_pow(self) -> bool {
-        matches!(self, OperatorSymbol::Binary(ruff_python_ast::Operator::Pow))
+        matches!(self, Self::Binary(ruff_python_ast::Operator::Pow))
     }
 
     fn precedence(self) -> OperatorPrecedence {
         match self {
-            OperatorSymbol::Binary(operator) => OperatorPrecedence::from(operator),
-            OperatorSymbol::Comparator(_) => OperatorPrecedence::Comparator,
-            OperatorSymbol::Bool(_) => OperatorPrecedence::BooleanOperation,
+            Self::Binary(operator) => OperatorPrecedence::from(operator),
+            Self::Comparator(_) => OperatorPrecedence::Comparator,
+            Self::Bool(_) => OperatorPrecedence::BooleanOperation,
         }
     }
 }
@@ -1067,9 +1067,9 @@ impl OperatorSymbol {
 impl Format<PyFormatContext<'_>> for OperatorSymbol {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         match self {
-            OperatorSymbol::Binary(operator) => operator.format().fmt(f),
-            OperatorSymbol::Comparator(operator) => operator.format().fmt(f),
-            OperatorSymbol::Bool(bool) => bool.format().fmt(f),
+            Self::Binary(operator) => operator.format().fmt(f),
+            Self::Comparator(operator) => operator.format().fmt(f),
+            Self::Bool(bool) => bool.format().fmt(f),
         }
     }
 }

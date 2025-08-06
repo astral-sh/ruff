@@ -50,7 +50,7 @@ pub(crate) struct BannedModuleLevelImports {
 impl Violation for BannedModuleLevelImports {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BannedModuleLevelImports { name } = self;
+        let Self { name } = self;
         format!("`{name}` is banned at the module level")
     }
 }

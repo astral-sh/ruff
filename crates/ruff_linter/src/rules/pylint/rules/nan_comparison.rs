@@ -93,8 +93,8 @@ enum Nan {
 impl std::fmt::Display for Nan {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Nan::Math => fmt.write_str("math"),
-            Nan::NumPy => fmt.write_str("numpy"),
+            Self::Math => fmt.write_str("math"),
+            Self::NumPy => fmt.write_str("numpy"),
         }
     }
 }

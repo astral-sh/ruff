@@ -47,7 +47,7 @@ pub(crate) struct ReSubPositionalArgs {
 impl Violation for ReSubPositionalArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReSubPositionalArgs { method } = self;
+        let Self { method } = self;
         let param_name = method.param_name();
         format!(
             "`{method}` should pass `{param_name}` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions"

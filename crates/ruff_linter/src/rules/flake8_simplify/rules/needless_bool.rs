@@ -66,7 +66,7 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, negate } = self;
+        let Self { condition, negate } = self;
         if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
             format!("Return the condition `{condition}` directly")
         } else if *negate {
@@ -77,7 +77,7 @@ impl Violation for NeedlessBool {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NeedlessBool { condition, .. } = self;
+        let Self { condition, .. } = self;
         Some(
             if let Some(condition) = condition.as_ref().and_then(SourceCodeSnippet::full_display) {
                 format!("Replace with `return {condition}`")
@@ -336,7 +336,7 @@ enum Bool {
 
 impl From<bool> for Bool {
     fn from(value: bool) -> Self {
-        if value { Bool::True } else { Bool::False }
+        if value { Self::True } else { Self::False }
     }
 }
 

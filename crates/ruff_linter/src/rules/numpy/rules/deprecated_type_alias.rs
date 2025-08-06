@@ -40,12 +40,12 @@ impl Violation for NumpyDeprecatedTypeAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NumpyDeprecatedTypeAlias { type_name } = self;
+        let Self { type_name } = self;
         format!("Type alias `np.{type_name}` is deprecated, replace with builtin type")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NumpyDeprecatedTypeAlias { type_name } = self;
+        let Self { type_name } = self;
         Some(format!("Replace `np.{type_name}` with builtin type"))
     }
 }

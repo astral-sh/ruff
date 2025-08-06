@@ -47,7 +47,7 @@ pub(crate) struct UndefinedExport {
 impl Violation for UndefinedExport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedExport { name } = self;
+        let Self { name } = self;
         format!("Undefined name `{name}` in `__all__`")
     }
 }

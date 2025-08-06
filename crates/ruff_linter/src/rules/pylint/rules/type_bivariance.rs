@@ -62,7 +62,7 @@ pub(crate) struct TypeBivariance {
 impl Violation for TypeBivariance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeBivariance { kind, param_name } = self;
+        let Self { kind, param_name } = self;
         match param_name {
             None => format!("`{kind}` cannot be both covariant and contravariant"),
             Some(param_name) => {
@@ -143,8 +143,8 @@ enum VarKind {
 impl fmt::Display for VarKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VarKind::TypeVar => fmt.write_str("TypeVar"),
-            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
+            Self::TypeVar => fmt.write_str("TypeVar"),
+            Self::ParamSpec => fmt.write_str("ParamSpec"),
         }
     }
 }

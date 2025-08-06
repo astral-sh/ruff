@@ -42,7 +42,7 @@ pub(crate) struct SslInsecureVersion {
 impl Violation for SslInsecureVersion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SslInsecureVersion { protocol } = self;
+        let Self { protocol } = self;
         format!("Call made with insecure SSL protocol: `{protocol}`")
     }
 }

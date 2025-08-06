@@ -38,22 +38,22 @@ pub(super) struct Builder {
 }
 
 impl Builder {
-    pub(super) fn new(priority: ThreadPriority) -> Builder {
-        Builder {
+    pub(super) fn new(priority: ThreadPriority) -> Self {
+        Self {
             priority,
             inner: jod_thread::Builder::new(),
         }
     }
 
-    pub(super) fn name(self, name: String) -> Builder {
-        Builder {
+    pub(super) fn name(self, name: String) -> Self {
+        Self {
             inner: self.inner.name(name),
             ..self
         }
     }
 
-    pub(super) fn stack_size(self, size: usize) -> Builder {
-        Builder {
+    pub(super) fn stack_size(self, size: usize) -> Self {
+        Self {
             inner: self.inner.stack_size(size),
             ..self
         }

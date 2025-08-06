@@ -104,10 +104,7 @@ pub(crate) enum TestServerError {
 
 impl TestServerError {
     fn is_disconnected(&self) -> bool {
-        matches!(
-            self,
-            TestServerError::RecvTimeoutError(RecvTimeoutError::Disconnected)
-        )
+        matches!(self, Self::RecvTimeoutError(RecvTimeoutError::Disconnected))
     }
 }
 

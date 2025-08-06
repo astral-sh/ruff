@@ -81,7 +81,7 @@ impl Violation for StableTestRule {
 
 impl TestRule for StableTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(StableTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -117,7 +117,7 @@ impl TestRule for StableTestRuleSafeFix {
         let comment = "# fix from stable-test-rule-safe-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
             context
-                .report_diagnostic(StableTestRuleSafeFix, ruff_text_size::TextRange::default())
+                .report_diagnostic(Self, ruff_text_size::TextRange::default())
                 .set_fix(Fix::safe_edit(Edit::insertion(comment, TextSize::new(0))));
         }
     }
@@ -155,10 +155,7 @@ impl TestRule for StableTestRuleUnsafeFix {
         let comment = "# fix from stable-test-rule-unsafe-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
             context
-                .report_diagnostic(
-                    StableTestRuleUnsafeFix,
-                    ruff_text_size::TextRange::default(),
-                )
+                .report_diagnostic(Self, ruff_text_size::TextRange::default())
                 .set_fix(Fix::unsafe_edit(Edit::insertion(comment, TextSize::new(0))));
         }
     }
@@ -196,10 +193,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
         let comment = "# fix from stable-test-rule-display-only-fix\n".to_string();
         if !comment_exists(&comment, locator, comment_ranges) {
             context
-                .report_diagnostic(
-                    StableTestRuleDisplayOnlyFix,
-                    ruff_text_size::TextRange::default(),
-                )
+                .report_diagnostic(Self, ruff_text_size::TextRange::default())
                 .set_fix(Fix::display_only_edit(Edit::insertion(
                     comment,
                     TextSize::new(0),
@@ -237,7 +231,7 @@ impl Violation for PreviewTestRule {
 
 impl TestRule for PreviewTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(PreviewTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -270,7 +264,7 @@ impl Violation for DeprecatedTestRule {
 
 impl TestRule for DeprecatedTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(DeprecatedTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -303,10 +297,7 @@ impl Violation for AnotherDeprecatedTestRule {
 
 impl TestRule for AnotherDeprecatedTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(
-            AnotherDeprecatedTestRule,
-            ruff_text_size::TextRange::default(),
-        );
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -339,7 +330,7 @@ impl Violation for RemovedTestRule {
 
 impl TestRule for RemovedTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(RemovedTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -372,7 +363,7 @@ impl Violation for AnotherRemovedTestRule {
 
 impl TestRule for AnotherRemovedTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(AnotherRemovedTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -405,7 +396,7 @@ impl Violation for RedirectedFromTestRule {
 
 impl TestRule for RedirectedFromTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(RedirectedFromTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -438,7 +429,7 @@ impl Violation for RedirectedToTestRule {
 
 impl TestRule for RedirectedToTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(RedirectedToTestRule, ruff_text_size::TextRange::default());
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }
 
@@ -471,9 +462,6 @@ impl Violation for RedirectedFromPrefixTestRule {
 
 impl TestRule for RedirectedFromPrefixTestRule {
     fn diagnostic(_locator: &Locator, _comment_ranges: &CommentRanges, context: &LintContext) {
-        context.report_diagnostic(
-            RedirectedFromPrefixTestRule,
-            ruff_text_size::TextRange::default(),
-        );
+        context.report_diagnostic(Self, ruff_text_size::TextRange::default());
     }
 }

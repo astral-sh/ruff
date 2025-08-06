@@ -87,7 +87,7 @@ impl Violation for NonPEP695GenericFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP695GenericFunction { name } = self;
+        let Self { name } = self;
         format!("Generic function `{name}` should use type parameters")
     }
 

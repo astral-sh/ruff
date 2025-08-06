@@ -34,7 +34,7 @@ pub(crate) struct UnnecessarySubscriptReversal {
 impl Violation for UnnecessarySubscriptReversal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessarySubscriptReversal { func } = self;
+        let Self { func } = self;
         format!("Unnecessary subscript reversal of iterable within `{func}()`")
     }
 }

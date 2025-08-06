@@ -99,7 +99,7 @@ impl Violation for NonPEP695TypeAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP695TypeAlias {
+        let Self {
             name,
             type_alias_kind,
         } = self;

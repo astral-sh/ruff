@@ -70,12 +70,12 @@ impl Violation for ConvertTypedDictFunctionalToClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let Self { name } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let Self { name } = self;
         Some(format!("Convert `{name}` to class syntax"))
     }
 }

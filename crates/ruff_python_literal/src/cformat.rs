@@ -82,7 +82,7 @@ pub enum CFormatPrecision {
 
 impl From<CFormatQuantity> for CFormatPrecision {
     fn from(quantity: CFormatQuantity) -> Self {
-        CFormatPrecision::Quantity(quantity)
+        Self::Quantity(quantity)
     }
 }
 
@@ -123,7 +123,7 @@ impl FromStr for CFormatSpec {
             return Err((CFormatErrorType::MissingModuloSign, 1));
         }
 
-        CFormatSpec::parse(&mut chars)
+        Self::parse(&mut chars)
     }
 }
 
@@ -142,7 +142,7 @@ impl CFormatSpec {
         consume_length(iter);
         let (format_type, format_char) = parse_format_type(iter)?;
 
-        Ok(CFormatSpec {
+        Ok(Self {
             mapping_key,
             flags,
             min_field_width,

@@ -41,7 +41,7 @@ pub(crate) struct NegateEqualOp {
 impl AlwaysFixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NegateEqualOp { left, right } = self;
+        let Self { left, right } = self;
         format!("Use `{left} != {right}` instead of `not {left} == {right}`")
     }
 
@@ -83,7 +83,7 @@ pub(crate) struct NegateNotEqualOp {
 impl AlwaysFixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NegateNotEqualOp { left, right } = self;
+        let Self { left, right } = self;
         format!("Use `{left} == {right}` instead of `not {left} != {right}`")
     }
 
@@ -119,12 +119,12 @@ pub(crate) struct DoubleNegation {
 impl AlwaysFixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DoubleNegation { expr } = self;
+        let Self { expr } = self;
         format!("Use `{expr}` instead of `not (not {expr})`")
     }
 
     fn fix_title(&self) -> String {
-        let DoubleNegation { expr } = self;
+        let Self { expr } = self;
         format!("Replace with `{expr}`")
     }
 }

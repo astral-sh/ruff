@@ -52,12 +52,12 @@ impl Violation for SuppressibleException {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuppressibleException { exception } = self;
+        let Self { exception } = self;
         format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuppressibleException { exception } = self;
+        let Self { exception } = self;
         Some(format!("Replace with `contextlib.suppress({exception})`"))
     }
 }

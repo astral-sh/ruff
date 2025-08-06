@@ -11,8 +11,8 @@ use crate::schema::{Cell, SourceValue};
 impl fmt::Display for SourceValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SourceValue::String(string) => f.write_str(string),
-            SourceValue::StringArray(string_array) => {
+            Self::String(string) => f.write_str(string),
+            Self::StringArray(string_array) => {
                 for string in string_array {
                     f.write_str(string)?;
                 }
@@ -26,30 +26,30 @@ impl Cell {
     /// Return the [`SourceValue`] of the cell.
     pub fn source(&self) -> &SourceValue {
         match self {
-            Cell::Code(cell) => &cell.source,
-            Cell::Markdown(cell) => &cell.source,
-            Cell::Raw(cell) => &cell.source,
+            Self::Code(cell) => &cell.source,
+            Self::Markdown(cell) => &cell.source,
+            Self::Raw(cell) => &cell.source,
         }
     }
 
     pub fn is_code_cell(&self) -> bool {
-        matches!(self, Cell::Code(_))
+        matches!(self, Self::Code(_))
     }
 
     pub fn metadata(&self) -> &CellMetadata {
         match self {
-            Cell::Code(cell) => &cell.metadata,
-            Cell::Markdown(cell) => &cell.metadata,
-            Cell::Raw(cell) => &cell.metadata,
+            Self::Code(cell) => &cell.metadata,
+            Self::Markdown(cell) => &cell.metadata,
+            Self::Raw(cell) => &cell.metadata,
         }
     }
 
     /// Update the [`SourceValue`] of the cell.
     pub(crate) fn set_source(&mut self, source: SourceValue) {
         match self {
-            Cell::Code(cell) => cell.source = source,
-            Cell::Markdown(cell) => cell.source = source,
-            Cell::Raw(cell) => cell.source = source,
+            Self::Code(cell) => cell.source = source,
+            Self::Markdown(cell) => cell.source = source,
+            Self::Raw(cell) => cell.source = source,
         }
     }
 
@@ -61,7 +61,7 @@ impl Cell {
     /// 3. If the language id is set, it should be `python`
     pub(crate) fn is_valid_python_code_cell(&self) -> bool {
         let source = match self {
-            Cell::Code(cell)
+            Self::Code(cell)
                 if cell
                     .metadata
                     .vscode

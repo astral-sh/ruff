@@ -35,7 +35,7 @@ pub struct TypeshedVersionsParseError {
 
 impl fmt::Display for TypeshedVersionsParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let TypeshedVersionsParseError {
+        let Self {
             line_number,
             reason,
         } = self;

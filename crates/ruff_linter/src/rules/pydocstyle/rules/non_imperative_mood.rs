@@ -58,7 +58,7 @@ pub(crate) struct NonImperativeMood {
 impl Violation for NonImperativeMood {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonImperativeMood { first_line } = self;
+        let Self { first_line } = self;
         format!("First line of docstring should be in imperative mood: \"{first_line}\"")
     }
 }

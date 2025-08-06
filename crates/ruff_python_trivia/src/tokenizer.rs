@@ -482,15 +482,12 @@ impl SimpleTokenKind {
     pub const fn is_trivia(self) -> bool {
         matches!(
             self,
-            SimpleTokenKind::Whitespace
-                | SimpleTokenKind::Newline
-                | SimpleTokenKind::Comment
-                | SimpleTokenKind::Continuation
+            Self::Whitespace | Self::Newline | Self::Comment | Self::Continuation
         )
     }
 
     pub const fn is_comment(self) -> bool {
-        matches!(self, SimpleTokenKind::Comment)
+        matches!(self, Self::Comment)
     }
 }
 

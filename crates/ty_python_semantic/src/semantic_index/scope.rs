@@ -76,11 +76,11 @@ pub struct FileScopeId;
 impl FileScopeId {
     /// Returns the scope id of the module-global scope.
     pub fn global() -> Self {
-        FileScopeId::from_u32(0)
+        Self::from_u32(0)
     }
 
     pub fn is_global(self) -> bool {
-        self == FileScopeId::global()
+        self == Self::global()
     }
 
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
@@ -119,7 +119,7 @@ impl Scope {
         reachability: ScopedReachabilityConstraintId,
         in_type_checking_block: bool,
     ) -> Self {
-        Scope {
+        Self {
             parent,
             node,
             descendants,
@@ -175,11 +175,11 @@ pub(crate) enum ScopeVisibility {
 
 impl ScopeVisibility {
     pub(crate) const fn is_public(self) -> bool {
-        matches!(self, ScopeVisibility::Public)
+        matches!(self, Self::Public)
     }
 
     pub(crate) const fn is_private(self) -> bool {
-        matches!(self, ScopeVisibility::Private)
+        matches!(self, Self::Private)
     }
 }
 
@@ -193,7 +193,7 @@ pub(crate) enum ScopeLaziness {
 
 impl ScopeLaziness {
     pub(crate) const fn is_eager(self) -> bool {
-        matches!(self, ScopeLaziness::Eager)
+        matches!(self, Self::Eager)
     }
 }
 
@@ -215,22 +215,21 @@ impl ScopeKind {
 
     pub(crate) const fn laziness(self) -> ScopeLaziness {
         match self {
-            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => ScopeLaziness::Eager,
-            ScopeKind::Annotation
-            | ScopeKind::Function
-            | ScopeKind::Lambda
-            | ScopeKind::TypeAlias => ScopeLaziness::Lazy,
+            Self::Module | Self::Class | Self::Comprehension => ScopeLaziness::Eager,
+            Self::Annotation | Self::Function | Self::Lambda | Self::TypeAlias => {
+                ScopeLaziness::Lazy
+            }
         }
     }
 
     pub(crate) const fn visibility(self) -> ScopeVisibility {
         match self {
-            ScopeKind::Module | ScopeKind::Class => ScopeVisibility::Public,
-            ScopeKind::Annotation
-            | ScopeKind::TypeAlias
-            | ScopeKind::Function
-            | ScopeKind::Lambda
-            | ScopeKind::Comprehension => ScopeVisibility::Private,
+            Self::Module | Self::Class => ScopeVisibility::Public,
+            Self::Annotation
+            | Self::TypeAlias
+            | Self::Function
+            | Self::Lambda
+            | Self::Comprehension => ScopeVisibility::Private,
         }
     }
 
@@ -239,28 +238,28 @@ impl ScopeKind {
         // symbol table also uses the term "function-like" for these scopes.
         matches!(
             self,
-            ScopeKind::Annotation
-                | ScopeKind::Function
-                | ScopeKind::Lambda
-                | ScopeKind::TypeAlias
-                | ScopeKind::Comprehension
+            Self::Annotation
+                | Self::Function
+                | Self::Lambda
+                | Self::TypeAlias
+                | Self::Comprehension
         )
     }
 
     pub(crate) const fn is_class(self) -> bool {
-        matches!(self, ScopeKind::Class)
+        matches!(self, Self::Class)
     }
 
     pub(crate) const fn is_module(self) -> bool {
-        matches!(self, ScopeKind::Module)
+        matches!(self, Self::Module)
     }
 
     pub(crate) const fn is_type_parameter(self) -> bool {
-        matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
+        matches!(self, Self::Annotation | Self::TypeAlias)
     }
 
     pub(crate) const fn is_non_lambda_function(self) -> bool {
-        matches!(self, ScopeKind::Function)
+        matches!(self, Self::Function)
     }
 }
 

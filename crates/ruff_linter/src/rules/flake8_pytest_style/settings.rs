@@ -90,16 +90,16 @@ pub enum SettingsError {
 impl fmt::Display for SettingsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SettingsError::InvalidRaisesRequireMatchFor(err) => {
+            Self::InvalidRaisesRequireMatchFor(err) => {
                 write!(f, "invalid raises-require-match-for pattern: {err}")
             }
-            SettingsError::InvalidRaisesExtendRequireMatchFor(err) => {
+            Self::InvalidRaisesExtendRequireMatchFor(err) => {
                 write!(f, "invalid raises-extend-require-match-for pattern: {err}")
             }
-            SettingsError::InvalidWarnsRequireMatchFor(err) => {
+            Self::InvalidWarnsRequireMatchFor(err) => {
                 write!(f, "invalid warns-require-match-for pattern: {err}")
             }
-            SettingsError::InvalidWarnsExtendRequireMatchFor(err) => {
+            Self::InvalidWarnsExtendRequireMatchFor(err) => {
                 write!(f, "invalid warns-extend-require-match-for pattern: {err}")
             }
         }
@@ -109,10 +109,10 @@ impl fmt::Display for SettingsError {
 impl Error for SettingsError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            SettingsError::InvalidRaisesRequireMatchFor(err) => Some(err),
-            SettingsError::InvalidRaisesExtendRequireMatchFor(err) => Some(err),
-            SettingsError::InvalidWarnsRequireMatchFor(err) => Some(err),
-            SettingsError::InvalidWarnsExtendRequireMatchFor(err) => Some(err),
+            Self::InvalidRaisesRequireMatchFor(err) => Some(err),
+            Self::InvalidRaisesExtendRequireMatchFor(err) => Some(err),
+            Self::InvalidWarnsRequireMatchFor(err) => Some(err),
+            Self::InvalidWarnsExtendRequireMatchFor(err) => Some(err),
         }
     }
 }

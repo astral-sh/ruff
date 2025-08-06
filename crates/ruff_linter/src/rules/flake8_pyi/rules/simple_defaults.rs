@@ -158,7 +158,7 @@ pub(crate) struct UnannotatedAssignmentInStub {
 impl Violation for UnannotatedAssignmentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnannotatedAssignmentInStub { name } = self;
+        let Self { name } = self;
         format!("Need type annotation for `{name}`")
     }
 }
@@ -189,7 +189,7 @@ pub(crate) struct UnassignedSpecialVariableInStub {
 impl Violation for UnassignedSpecialVariableInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnassignedSpecialVariableInStub { name } = self;
+        let Self { name } = self;
         format!(
             "`{name}` in a stub file must have a value, as it has the same semantics as `{name}` at runtime"
         )
@@ -239,7 +239,7 @@ pub(crate) struct TypeAliasWithoutAnnotation {
 impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeAliasWithoutAnnotation {
+        let Self {
             module,
             name,
             value,

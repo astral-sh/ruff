@@ -33,10 +33,10 @@ impl Ranged for StringType {
 impl From<StringType> for Expr {
     fn from(string: StringType) -> Self {
         match string {
-            StringType::Str(node) => Expr::from(node),
-            StringType::Bytes(node) => Expr::from(node),
-            StringType::FString(node) => Expr::from(node),
-            StringType::TString(node) => Expr::from(node),
+            StringType::Str(node) => Self::from(node),
+            StringType::Bytes(node) => Self::from(node),
+            StringType::FString(node) => Self::from(node),
+            StringType::TString(node) => Self::from(node),
         }
     }
 }
@@ -51,24 +51,24 @@ impl InterpolatedStringKind {
     #[inline]
     pub(crate) const fn start_token(self) -> TokenKind {
         match self {
-            InterpolatedStringKind::FString => TokenKind::FStringStart,
-            InterpolatedStringKind::TString => TokenKind::TStringStart,
+            Self::FString => TokenKind::FStringStart,
+            Self::TString => TokenKind::TStringStart,
         }
     }
 
     #[inline]
     pub(crate) const fn middle_token(self) -> TokenKind {
         match self {
-            InterpolatedStringKind::FString => TokenKind::FStringMiddle,
-            InterpolatedStringKind::TString => TokenKind::TStringMiddle,
+            Self::FString => TokenKind::FStringMiddle,
+            Self::TString => TokenKind::TStringMiddle,
         }
     }
 
     #[inline]
     pub(crate) const fn end_token(self) -> TokenKind {
         match self {
-            InterpolatedStringKind::FString => TokenKind::FStringEnd,
-            InterpolatedStringKind::TString => TokenKind::TStringEnd,
+            Self::FString => TokenKind::FStringEnd,
+            Self::TString => TokenKind::TStringEnd,
         }
     }
 }
@@ -76,8 +76,8 @@ impl InterpolatedStringKind {
 impl fmt::Display for InterpolatedStringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            InterpolatedStringKind::FString => f.write_str("f-string"),
-            InterpolatedStringKind::TString => f.write_str("t-string"),
+            Self::FString => f.write_str("f-string"),
+            Self::TString => f.write_str("t-string"),
         }
     }
 }

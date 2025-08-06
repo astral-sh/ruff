@@ -482,7 +482,7 @@ impl Parse for Rule {
         let rule_path: Path = pat_tuple.parse()?;
         let _: Token!(,) = input.parse()?;
         let rule_name = rule_path.segments.last().unwrap().ident.clone();
-        Ok(Rule {
+        Ok(Self {
             name: rule_name,
             linter,
             code,

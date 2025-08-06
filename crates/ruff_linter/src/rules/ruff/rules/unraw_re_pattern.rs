@@ -106,8 +106,8 @@ impl RegexModule {
 impl Display for RegexModule {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            RegexModule::Re => "re",
-            RegexModule::Regex => "regex",
+            Self::Re => "re",
+            Self::Regex => "regex",
         })
     }
 }

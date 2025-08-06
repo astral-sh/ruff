@@ -50,11 +50,11 @@ pub(crate) enum FormatMode {
 impl FormatMode {
     pub(crate) fn from_cli(cli: &FormatArguments) -> Self {
         if cli.diff {
-            FormatMode::Diff
+            Self::Diff
         } else if cli.check {
-            FormatMode::Check
+            Self::Check
         } else {
-            FormatMode::Write
+            Self::Write
         }
     }
 }
@@ -329,8 +329,8 @@ pub(crate) enum FormattedSource {
 impl From<FormattedSource> for FormatResult {
     fn from(value: FormattedSource) -> Self {
         match value {
-            FormattedSource::Formatted(_) => FormatResult::Formatted,
-            FormattedSource::Unchanged => FormatResult::Unchanged,
+            FormattedSource::Formatted(_) => Self::Formatted,
+            FormattedSource::Unchanged => Self::Unchanged,
         }
     }
 }

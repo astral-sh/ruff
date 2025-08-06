@@ -38,7 +38,7 @@ pub(crate) struct Debugger {
 impl Violation for Debugger {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Debugger { using_type } = self;
+        let Self { using_type } = self;
         match using_type {
             DebuggerUsingType::Call(name) => format!("Trace found: `{name}` used"),
             DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),

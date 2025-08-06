@@ -42,7 +42,7 @@ pub(crate) struct HardcodedPasswordFuncArg {
 impl Violation for HardcodedPasswordFuncArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedPasswordFuncArg { name } = self;
+        let Self { name } = self;
         format!(
             "Possible hardcoded password assigned to argument: \"{}\"",
             name.escape_debug()

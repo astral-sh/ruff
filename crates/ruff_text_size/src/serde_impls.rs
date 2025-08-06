@@ -17,7 +17,7 @@ impl<'de> Deserialize<'de> for TextSize {
     where
         D: Deserializer<'de>,
     {
-        u32::deserialize(deserializer).map(TextSize::from)
+        u32::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -42,6 +42,6 @@ impl<'de> Deserialize<'de> for TextRange {
                 "invalid range: {start:?}..{end:?}"
             )));
         }
-        Ok(TextRange::new(start, end))
+        Ok(Self::new(start, end))
     }
 }

@@ -141,7 +141,7 @@ impl Renamer {
         });
 
         let scope = scope_id.map_or(scope, |scope_id| &semantic.scopes[scope_id]);
-        edits.extend(Renamer::rename_in_scope(
+        edits.extend(Self::rename_in_scope(
             name, target, scope, semantic, stylist,
         ));
 
@@ -173,7 +173,7 @@ impl Renamer {
             .copied()
         {
             let scope = &semantic.scopes[scope_id];
-            edits.extend(Renamer::rename_in_scope(
+            edits.extend(Self::rename_in_scope(
                 name, target, scope, semantic, stylist,
             ));
         }
@@ -204,11 +204,11 @@ impl Renamer {
             let binding = semantic.binding(binding_id);
 
             // Rename the binding.
-            if let Some(edit) = Renamer::rename_binding(binding, name, target) {
+            if let Some(edit) = Self::rename_binding(binding, name, target) {
                 edits.push(edit);
 
                 if let Some(edit) =
-                    Renamer::fixup_assigned_value(binding, semantic, stylist, name, target)
+                    Self::fixup_assigned_value(binding, semantic, stylist, name, target)
                 {
                     edits.push(edit);
                 }
@@ -217,7 +217,7 @@ impl Renamer {
                 if let Some(annotations) = semantic.delayed_annotations(binding_id) {
                     edits.extend(annotations.iter().filter_map(|annotation_id| {
                         let annotation = semantic.binding(*annotation_id);
-                        Renamer::rename_binding(annotation, name, target)
+                        Self::rename_binding(annotation, name, target)
                     }));
                 }
 
@@ -395,10 +395,10 @@ impl ShadowedKind {
     ///
     /// This function is useful for checking whether or not the `target` of a [`Renamer::rename`]
     /// will shadow another binding.
-    pub(crate) fn new(binding: &Binding, new_name: &str, checker: &Checker) -> ShadowedKind {
+    pub(crate) fn new(binding: &Binding, new_name: &str, checker: &Checker) -> Self {
         // Check the kind in order of precedence
         if is_keyword(new_name) {
-            return ShadowedKind::Keyword;
+            return Self::Keyword;
         }
 
         if is_python_builtin(
@@ -406,13 +406,13 @@ impl ShadowedKind {
             checker.target_version().minor,
             checker.source_type.is_ipynb(),
         ) {
-            return ShadowedKind::BuiltIn;
+            return Self::BuiltIn;
         }
 
         let semantic = checker.semantic();
 
         if !semantic.is_available_in_scope(new_name, binding.scope) {
-            return ShadowedKind::Some;
+            return Self::Some;
         }
 
         if binding
@@ -421,18 +421,15 @@ impl ShadowedKind {
             .dedup()
             .any(|scope| !semantic.is_available_in_scope(new_name, scope))
         {
-            return ShadowedKind::Some;
+            return Self::Some;
         }
 
         // Default to no shadowing
-        ShadowedKind::None
+        Self::None
     }
 
     /// Returns `true` if `self` shadows any global, nonlocal, or local symbol, keyword, or builtin.
     pub(crate) const fn shadows_any(self) -> bool {
-        matches!(
-            self,
-            ShadowedKind::Some | ShadowedKind::BuiltIn | ShadowedKind::Keyword
-        )
+        matches!(self, Self::Some | Self::BuiltIn | Self::Keyword)
     }
 }

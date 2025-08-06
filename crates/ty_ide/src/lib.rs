@@ -416,7 +416,7 @@ mod tests {
             &mut self,
             path: impl Into<SystemPathBuf>,
             contents: impl Into<String>,
-        ) -> &mut CursorTestBuilder {
+        ) -> &mut Self {
             const MARKER: &str = "<CURSOR>";
 
             let path = path.into();

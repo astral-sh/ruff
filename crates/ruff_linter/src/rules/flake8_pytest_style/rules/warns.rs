@@ -108,7 +108,7 @@ pub(crate) struct PytestWarnsTooBroad {
 impl Violation for PytestWarnsTooBroad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestWarnsTooBroad { warning } = self;
+        let Self { warning } = self;
         format!(
             "`pytest.warns({warning})` is too broad, set the `match` parameter or use a more \
              specific warning"

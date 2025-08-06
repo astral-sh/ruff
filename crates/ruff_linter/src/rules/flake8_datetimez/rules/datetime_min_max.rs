@@ -46,12 +46,12 @@ pub(crate) struct DatetimeMinMax {
 impl Violation for DatetimeMinMax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DatetimeMinMax { min_max } = self;
+        let Self { min_max } = self;
         format!("Use of `datetime.datetime.{min_max}` without timezone information")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DatetimeMinMax { min_max } = self;
+        let Self { min_max } = self;
         Some(format!(
             "Replace with `datetime.datetime.{min_max}.replace(tzinfo=...)`"
         ))
@@ -111,8 +111,8 @@ enum MinMax {
 impl Display for MinMax {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            MinMax::Min => write!(f, "min"),
-            MinMax::Max => write!(f, "max"),
+            Self::Min => write!(f, "min"),
+            Self::Max => write!(f, "max"),
         }
     }
 }

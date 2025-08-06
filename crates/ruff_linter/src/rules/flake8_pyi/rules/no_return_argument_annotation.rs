@@ -48,7 +48,7 @@ pub(crate) struct NoReturnArgumentAnnotationInStub {
 impl Violation for NoReturnArgumentAnnotationInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoReturnArgumentAnnotationInStub { module } = self;
+        let Self { module } = self;
         format!("Prefer `{module}.Never` over `NoReturn` for argument annotations")
     }
 }
@@ -94,8 +94,8 @@ enum TypingModule {
 impl fmt::Display for TypingModule {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TypingModule::Typing => fmt.write_str("typing"),
-            TypingModule::TypingExtensions => fmt.write_str("typing_extensions"),
+            Self::Typing => fmt.write_str("typing"),
+            Self::TypingExtensions => fmt.write_str("typing_extensions"),
         }
     }
 }

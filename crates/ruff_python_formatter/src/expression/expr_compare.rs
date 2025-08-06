@@ -49,7 +49,7 @@ impl NeedsParentheses for ExprCompare {
 pub struct FormatCmpOp;
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for CmpOp {
-    type Format<'a> = FormatRefWithRule<'a, CmpOp, FormatCmpOp, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatCmpOp, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatCmpOp)
@@ -57,7 +57,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for CmpOp {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for CmpOp {
-    type Format = FormatOwnedWithRule<CmpOp, FormatCmpOp, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatCmpOp, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatCmpOp)

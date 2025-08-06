@@ -1644,7 +1644,7 @@ impl TypeCheckDiagnostics {
         self.diagnostics.push(diagnostic);
     }
 
-    pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
+    pub(super) fn extend(&mut self, other: &Self) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions.extend(&other.used_suppressions);
     }

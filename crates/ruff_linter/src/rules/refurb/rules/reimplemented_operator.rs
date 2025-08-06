@@ -79,12 +79,12 @@ impl Violation for ReimplementedOperator {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReimplementedOperator { operator, target } = self;
+        let Self { operator, target } = self;
         format!("Use `operator.{operator}` instead of defining a {target}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ReimplementedOperator { operator, .. } = self;
+        let Self { operator, .. } = self;
         Some(format!("Replace with `operator.{operator}`"))
     }
 }

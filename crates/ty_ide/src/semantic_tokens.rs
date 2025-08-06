@@ -73,23 +73,23 @@ pub enum SemanticTokenType {
 
 impl SemanticTokenType {
     /// Returns all supported semantic token types as enum variants.
-    pub const fn all() -> [SemanticTokenType; 15] {
+    pub const fn all() -> [Self; 15] {
         [
-            SemanticTokenType::Namespace,
-            SemanticTokenType::Class,
-            SemanticTokenType::Parameter,
-            SemanticTokenType::SelfParameter,
-            SemanticTokenType::ClsParameter,
-            SemanticTokenType::Variable,
-            SemanticTokenType::Property,
-            SemanticTokenType::Function,
-            SemanticTokenType::Method,
-            SemanticTokenType::Keyword,
-            SemanticTokenType::String,
-            SemanticTokenType::Number,
-            SemanticTokenType::Decorator,
-            SemanticTokenType::BuiltinConstant,
-            SemanticTokenType::TypeParameter,
+            Self::Namespace,
+            Self::Class,
+            Self::Parameter,
+            Self::SelfParameter,
+            Self::ClsParameter,
+            Self::Variable,
+            Self::Property,
+            Self::Function,
+            Self::Method,
+            Self::Keyword,
+            Self::String,
+            Self::Number,
+            Self::Decorator,
+            Self::BuiltinConstant,
+            Self::TypeParameter,
         ]
     }
 
@@ -102,21 +102,21 @@ impl SemanticTokenType {
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenTypes>
     pub const fn as_lsp_concept(&self) -> &'static str {
         match self {
-            SemanticTokenType::Namespace => "namespace",
-            SemanticTokenType::Class => "class",
-            SemanticTokenType::Parameter => "parameter",
-            SemanticTokenType::SelfParameter => "selfParameter",
-            SemanticTokenType::ClsParameter => "clsParameter",
-            SemanticTokenType::Variable => "variable",
-            SemanticTokenType::Property => "property",
-            SemanticTokenType::Function => "function",
-            SemanticTokenType::Method => "method",
-            SemanticTokenType::Keyword => "keyword",
-            SemanticTokenType::String => "string",
-            SemanticTokenType::Number => "number",
-            SemanticTokenType::Decorator => "decorator",
-            SemanticTokenType::BuiltinConstant => "builtinConstant",
-            SemanticTokenType::TypeParameter => "typeParameter",
+            Self::Namespace => "namespace",
+            Self::Class => "class",
+            Self::Parameter => "parameter",
+            Self::SelfParameter => "selfParameter",
+            Self::ClsParameter => "clsParameter",
+            Self::Variable => "variable",
+            Self::Property => "property",
+            Self::Function => "function",
+            Self::Method => "method",
+            Self::Keyword => "keyword",
+            Self::String => "string",
+            Self::Number => "number",
+            Self::Decorator => "decorator",
+            Self::BuiltinConstant => "builtinConstant",
+            Self::TypeParameter => "typeParameter",
         }
     }
 }

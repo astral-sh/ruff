@@ -46,12 +46,12 @@ pub(crate) struct UnnecessaryCallAroundSorted {
 impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryCallAroundSorted { func } = self;
+        let Self { func } = self;
         format!("Unnecessary `{func}()` call around `sorted()`")
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryCallAroundSorted { func } = self;
+        let Self { func } = self;
         format!("Remove unnecessary `{func}()` call")
     }
 }

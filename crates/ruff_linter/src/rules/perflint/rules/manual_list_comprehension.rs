@@ -59,7 +59,7 @@ impl Violation for ManualListComprehension {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ManualListComprehension {
+        let Self {
             is_async,
             comprehension_type,
         } = self;

@@ -39,12 +39,12 @@ pub(crate) struct RegexFlagAlias {
 impl AlwaysFixableViolation for RegexFlagAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RegexFlagAlias { flag } = self;
+        let Self { flag } = self;
         format!("Use of regular expression alias `re.{}`", flag.alias())
     }
 
     fn fix_title(&self) -> String {
-        let RegexFlagAlias { flag } = self;
+        let Self { flag } = self;
         format!("Replace with `re.{}`", flag.full_name())
     }
 }

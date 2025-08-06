@@ -46,7 +46,7 @@ pub(crate) struct FileCacheKey {
 }
 
 impl FileCacheKey {
-    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+    pub(crate) fn from_path(path: &Path) -> io::Result<Self> {
         // Construct a cache key for the file
         let metadata = path.metadata()?;
 
@@ -58,7 +58,7 @@ impl FileCacheKey {
         #[cfg(windows)]
         let permissions: u32 = metadata.permissions().readonly().into();
 
-        Ok(FileCacheKey {
+        Ok(Self {
             file_last_modified: FileTime::from_last_modification_time(&metadata),
             file_permissions_mode: permissions,
         })
@@ -110,11 +110,11 @@ impl Cache {
             Ok(file) => file,
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 // No cache exist yet, return an empty cache.
-                return Cache::empty(path, package_root);
+                return Self::empty(path, package_root);
             }
             Err(err) => {
                 warn_user!("Failed to open cache file `{}`: {err}", path.display());
-                return Cache::empty(path, package_root);
+                return Self::empty(path, package_root);
             }
         };
 
@@ -123,7 +123,7 @@ impl Cache {
                 Ok(package) => package,
                 Err(err) => {
                     warn_user!("Failed parse cache file `{}`: {err}", path.display());
-                    return Cache::empty(path, package_root);
+                    return Self::empty(path, package_root);
                 }
             };
 
@@ -136,7 +136,7 @@ impl Cache {
             );
             package.files.clear();
         }
-        Cache::new(path, package)
+        Self::new(path, package)
     }
 
     /// Create an empty `Cache`.
@@ -145,12 +145,12 @@ impl Cache {
             package_root,
             files: FxHashMap::default(),
         };
-        Cache::new(path, package)
+        Self::new(path, package)
     }
 
     #[expect(clippy::cast_possible_truncation)]
     fn new(path: PathBuf, package: PackageCache) -> Self {
-        Cache {
+        Self {
             path,
             package,
             changes: Mutex::new(Vec::new()),
@@ -586,10 +586,10 @@ enum ChangeData {
 impl ChangeData {
     fn apply(self, data: &mut FileCacheData) {
         match self {
-            ChangeData::Lint(new_lint) => {
+            Self::Lint(new_lint) => {
                 data.lint = Some(new_lint);
             }
-            ChangeData::Formatted => {
+            Self::Formatted => {
                 data.formatted = true;
             }
         }

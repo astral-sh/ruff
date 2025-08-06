@@ -76,12 +76,12 @@ pub(crate) struct List<K, V = ()> {
 }
 
 impl<K, V> List<K, V> {
-    pub(crate) const fn empty() -> List<K, V> {
-        List::new(None)
+    pub(crate) const fn empty() -> Self {
+        Self::new(None)
     }
 
-    const fn new(last: Option<ListCellId>) -> List<K, V> {
-        List {
+    const fn new(last: Option<ListCellId>) -> Self {
+        Self {
             last,
             _phantom: PhantomData,
         }
@@ -90,7 +90,7 @@ impl<K, V> List<K, V> {
 
 impl<K, V> Default for List<K, V> {
     fn default() -> Self {
-        List::empty()
+        Self::empty()
     }
 }
 
@@ -150,7 +150,7 @@ pub(crate) struct ListBuilder<K, V = ()> {
 
 impl<K, V> Default for ListBuilder<K, V> {
     fn default() -> Self {
-        ListBuilder {
+        Self {
             storage: ListStorage {
                 cells: IndexVec::default(),
             },

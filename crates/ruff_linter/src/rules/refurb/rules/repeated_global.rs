@@ -106,8 +106,8 @@ enum GlobalKind {
 impl GlobalKind {
     fn from_stmt(stmt: &Stmt) -> Option<Self> {
         match stmt {
-            Stmt::Global(_) => Some(GlobalKind::Global),
-            Stmt::Nonlocal(_) => Some(GlobalKind::NonLocal),
+            Stmt::Global(_) => Some(Self::Global),
+            Stmt::Nonlocal(_) => Some(Self::NonLocal),
             _ => None,
         }
     }
@@ -116,8 +116,8 @@ impl GlobalKind {
 impl std::fmt::Display for GlobalKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GlobalKind::Global => write!(f, "global"),
-            GlobalKind::NonLocal => write!(f, "nonlocal"),
+            Self::Global => write!(f, "global"),
+            Self::NonLocal => write!(f, "nonlocal"),
         }
     }
 }

@@ -130,7 +130,7 @@ struct CacheKeyFieldAttributes {
 
 impl Parse for CacheKeyFieldAttributes {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut attributes = CacheKeyFieldAttributes::default();
+        let mut attributes = Self::default();
 
         let args = input.parse_terminated(Ident::parse, Token![,])?;
 

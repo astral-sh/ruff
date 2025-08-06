@@ -53,7 +53,7 @@ pub(crate) struct SelfOrClsAssignment {
 impl Violation for SelfOrClsAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SelfOrClsAssignment { method_type } = self;
+        let Self { method_type } = self;
 
         format!(
             "Reassigned `{}` variable in {method_type} method",
@@ -141,9 +141,9 @@ enum MethodType {
 impl MethodType {
     const fn arg_name(self) -> &'static str {
         match self {
-            MethodType::Instance => "self",
-            MethodType::Class => "cls",
-            MethodType::New => "cls",
+            Self::Instance => "self",
+            Self::Class => "cls",
+            Self::New => "cls",
         }
     }
 }
@@ -151,9 +151,9 @@ impl MethodType {
 impl std::fmt::Display for MethodType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MethodType::Instance => f.write_str("instance"),
-            MethodType::Class => f.write_str("class"),
-            MethodType::New => f.write_str("`__new__`"),
+            Self::Instance => f.write_str("instance"),
+            Self::Class => f.write_str("class"),
+            Self::New => f.write_str("`__new__`"),
         }
     }
 }

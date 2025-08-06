@@ -638,19 +638,17 @@ pub(crate) enum ResolutionError {
 impl std::fmt::Display for ResolutionError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ResolutionError::ImportAfterUsage => {
+            Self::ImportAfterUsage => {
                 fmt.write_str("Unable to use existing symbol due to late binding")
             }
-            ResolutionError::IncompatibleContext => {
+            Self::IncompatibleContext => {
                 fmt.write_str("Unable to use existing symbol due to incompatible context")
             }
-            ResolutionError::ConflictingName(binding) => std::write!(
+            Self::ConflictingName(binding) => std::write!(
                 fmt,
                 "Unable to insert `{binding}` into scope due to name conflict"
             ),
-            ResolutionError::InvalidEdit => {
-                fmt.write_str("Unable to modify existing import statement")
-            }
+            Self::InvalidEdit => fmt.write_str("Unable to modify existing import statement"),
         }
     }
 }

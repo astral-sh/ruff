@@ -48,8 +48,8 @@ impl TestFiles {
     }
 }
 
-impl AddAssign<TestFiles> for TestFiles {
-    fn add_assign(&mut self, other: TestFiles) {
+impl AddAssign<Self> for TestFiles {
+    fn add_assign(&mut self, other: Self) {
         self.unreferenced.extend(other.unreferenced);
         self.updated.extend(other.updated);
     }
@@ -144,7 +144,7 @@ impl TryFrom<&Path> for TestCollection {
     type Error = anyhow::Error;
 
     fn try_from(path: &Path) -> Result<Self> {
-        let mut tests = TestCollection::default();
+        let mut tests = Self::default();
 
         for entry in walkdir::WalkDir::new(path) {
             let entry = entry?;

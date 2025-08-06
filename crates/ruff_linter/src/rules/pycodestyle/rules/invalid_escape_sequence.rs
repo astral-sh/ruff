@@ -49,7 +49,7 @@ pub(crate) struct InvalidEscapeSequence {
 impl AlwaysFixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidEscapeSequence { ch, .. } = self;
+        let Self { ch, .. } = self;
         format!("Invalid escape sequence: `\\{ch}`")
     }
 

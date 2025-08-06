@@ -403,11 +403,11 @@ enum FileType {
 }
 
 impl FileType {
-    fn from_path(path: &SystemPath) -> FileType {
+    fn from_path(path: &SystemPath) -> Self {
         match path.as_std_path().metadata() {
-            Ok(metadata) if metadata.is_file() => FileType::File,
-            Ok(metadata) if metadata.is_dir() => FileType::Directory,
-            Ok(_) | Err(_) => FileType::Any,
+            Ok(metadata) if metadata.is_file() => Self::File,
+            Ok(metadata) if metadata.is_dir() => Self::Directory,
+            Ok(_) | Err(_) => Self::Any,
         }
     }
 }

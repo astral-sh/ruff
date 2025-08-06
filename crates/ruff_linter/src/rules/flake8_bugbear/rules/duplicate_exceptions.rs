@@ -48,7 +48,7 @@ pub(crate) struct DuplicateTryBlockException {
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateTryBlockException { name, is_star } = self;
+        let Self { name, is_star } = self;
         if *is_star {
             format!("try-except* block with duplicate exception `{name}`")
         } else {
@@ -94,7 +94,7 @@ pub(crate) struct DuplicateHandlerException {
 impl AlwaysFixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateHandlerException { names } = self;
+        let Self { names } = self;
         if let [name] = names.as_slice() {
             format!("Exception handler with duplicate exception: `{name}`")
         } else {

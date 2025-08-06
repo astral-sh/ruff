@@ -62,7 +62,7 @@ pub(crate) struct PrivateMemberAccess {
 impl Violation for PrivateMemberAccess {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PrivateMemberAccess { access } = self;
+        let Self { access } = self;
         format!("Private member accessed: `{access}`")
     }
 }

@@ -39,7 +39,7 @@ pub(crate) struct UselessObjectInheritance {
 impl AlwaysFixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UselessObjectInheritance { name } = self;
+        let Self { name } = self;
         format!("Class `{name}` inherits from `object`")
     }
 

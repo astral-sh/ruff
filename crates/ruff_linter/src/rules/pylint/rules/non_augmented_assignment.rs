@@ -76,7 +76,7 @@ pub(crate) struct NonAugmentedAssignment {
 impl AlwaysFixableViolation for NonAugmentedAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonAugmentedAssignment { operator } = self;
+        let Self { operator } = self;
         format!("Use `{operator}` to perform an augmented assignment directly")
     }
 

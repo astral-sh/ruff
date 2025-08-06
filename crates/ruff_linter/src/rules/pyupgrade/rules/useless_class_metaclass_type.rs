@@ -38,7 +38,7 @@ impl Violation for UselessClassMetaclassType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UselessClassMetaclassType { name } = self;
+        let Self { name } = self;
         format!("Class `{name}` uses `metaclass=type`, which is redundant")
     }
 

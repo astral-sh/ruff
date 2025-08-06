@@ -64,7 +64,7 @@ impl RuffSettings {
     ///
     /// In the absence of a valid configuration file, it gracefully falls back to
     /// editor-only settings.
-    pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
+    pub(crate) fn fallback(editor_settings: &EditorSettings, root: &Path) -> Self {
         struct FallbackTransformer<'a> {
             inner: EditorConfigurationTransformer<'a>,
         }
@@ -97,7 +97,7 @@ impl RuffSettings {
                     ruff_workspace::resolver::ConfigurationOrigin::UserSettings,
                 )
                 .ok()
-                .map(|settings| RuffSettings {
+                .map(|settings| Self {
                     path: Some(user_settings),
                     settings,
                 })
@@ -122,7 +122,7 @@ impl RuffSettings {
 
     /// Constructs [`RuffSettings`] by merging the editor-defined settings with the
     /// default configuration.
-    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> RuffSettings {
+    fn editor_only(editor_settings: &EditorSettings, root: &Path) -> Self {
         Self::with_editor_settings(editor_settings, root, Configuration::default())
             .expect("editor configuration should merge successfully with default configuration")
     }
@@ -132,12 +132,12 @@ impl RuffSettings {
         editor_settings: &EditorSettings,
         root: &Path,
         configuration: Configuration,
-    ) -> anyhow::Result<RuffSettings> {
+    ) -> anyhow::Result<Self> {
         let settings = EditorConfigurationTransformer(editor_settings, root)
             .transform(configuration)
             .into_settings(root)?;
 
-        Ok(RuffSettings {
+        Ok(Self {
             path: None,
             settings,
         })
@@ -166,7 +166,7 @@ impl RuffSettingsIndex {
                 "Using editor-only settings for workspace: {} (skipped indexing)",
                 root.display()
             );
-            return RuffSettingsIndex {
+            return Self {
                 index: BTreeMap::default(),
                 fallback: Arc::new(RuffSettings::editor_only(editor_settings, root)),
             };
@@ -250,7 +250,7 @@ impl RuffSettingsIndex {
                 ));
             }
 
-            return RuffSettingsIndex { index, fallback };
+            return Self { index, fallback };
         }
 
         // Add any settings within the workspace itself
@@ -366,7 +366,7 @@ impl RuffSettingsIndex {
             ));
         }
 
-        RuffSettingsIndex {
+        Self {
             index: index.into_inner().unwrap(),
             fallback,
         }

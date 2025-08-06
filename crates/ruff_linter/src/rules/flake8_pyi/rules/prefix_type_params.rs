@@ -17,9 +17,9 @@ pub(crate) enum VarKind {
 impl fmt::Display for VarKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VarKind::TypeVar => fmt.write_str("TypeVar"),
-            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
-            VarKind::TypeVarTuple => fmt.write_str("TypeVarTuple"),
+            Self::TypeVar => fmt.write_str("TypeVar"),
+            Self::ParamSpec => fmt.write_str("ParamSpec"),
+            Self::TypeVarTuple => fmt.write_str("TypeVarTuple"),
         }
     }
 }
@@ -53,7 +53,7 @@ pub(crate) struct UnprefixedTypeParam {
 impl Violation for UnprefixedTypeParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnprefixedTypeParam { kind } = self;
+        let Self { kind } = self;
         format!("Name of private `{kind}` must start with `_`")
     }
 }

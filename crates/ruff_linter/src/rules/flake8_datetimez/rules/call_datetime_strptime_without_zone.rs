@@ -56,7 +56,7 @@ pub(crate) struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 impl Violation for CallDatetimeStrptimeWithoutZone {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CallDatetimeStrptimeWithoutZone(antipattern) = self;
+        let Self(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "Naive datetime constructed using `datetime.datetime.strptime()` without %z"
@@ -69,7 +69,7 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let CallDatetimeStrptimeWithoutZone(antipattern) = self;
+        let Self(antipattern) = self;
         let title = match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "Call `.replace(tzinfo=<timezone>)` or `.astimezone()` \

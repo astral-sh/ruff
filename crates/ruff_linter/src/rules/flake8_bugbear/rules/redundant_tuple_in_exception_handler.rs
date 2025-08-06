@@ -47,7 +47,7 @@ impl AlwaysFixableViolation for RedundantTupleInExceptionHandler {
     }
 
     fn fix_title(&self) -> String {
-        let RedundantTupleInExceptionHandler { name } = self;
+        let Self { name } = self;
         format!("Replace with `except {name}`")
     }
 }

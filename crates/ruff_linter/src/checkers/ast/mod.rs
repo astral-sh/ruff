@@ -117,8 +117,8 @@ impl DocstringState {
     /// Returns the docstring kind if the state is expecting a docstring.
     const fn expected_kind(self) -> Option<ExpectedDocstringKind> {
         match self {
-            DocstringState::Expected(kind) => Some(kind),
-            DocstringState::Other => None,
+            Self::Expected(kind) => Some(kind),
+            Self::Other => None,
         }
     }
 }
@@ -177,7 +177,7 @@ impl ExpectedDocstringKind {
     /// Returns the semantic model flag that represents the current docstring state.
     const fn as_flag(self) -> SemanticModelFlags {
         match self {
-            ExpectedDocstringKind::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
+            Self::Attribute => SemanticModelFlags::ATTRIBUTE_DOCSTRING,
             _ => SemanticModelFlags::PEP_257_DOCSTRING,
         }
     }

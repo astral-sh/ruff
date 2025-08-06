@@ -98,7 +98,7 @@ impl Violation for NonSelfReturnType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonSelfReturnType {
+        let Self {
             class_name,
             method_name,
         } = self;

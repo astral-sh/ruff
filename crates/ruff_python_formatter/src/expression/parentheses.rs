@@ -73,7 +73,7 @@ pub(crate) enum Parenthesize {
 
 impl Parenthesize {
     pub(crate) const fn is_optional(self) -> bool {
-        matches!(self, Parenthesize::Optional)
+        matches!(self, Self::Optional)
     }
 }
 
@@ -149,7 +149,7 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
     right: &'static str,
 }
 
-impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
+impl<'content> FormatParenthesized<'content, '_> {
     /// Inserts any dangling comments that should be placed immediately after the open parenthesis.
     /// For example:
     /// ```python
@@ -159,15 +159,12 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     ///     3,
     /// ]
     /// ```
-    pub(crate) fn with_dangling_comments(
-        self,
-        comments: &'content [SourceComment],
-    ) -> FormatParenthesized<'content, 'ast> {
+    pub(crate) fn with_dangling_comments(self, comments: &'content [SourceComment]) -> Self {
         FormatParenthesized { comments, ..self }
     }
 
     /// Whether to indent the content within the parentheses.
-    pub(crate) fn with_hugging(self, hug: bool) -> FormatParenthesized<'content, 'ast> {
+    pub(crate) fn with_hugging(self, hug: bool) -> Self {
         FormatParenthesized { hug, ..self }
     }
 }
@@ -282,15 +279,15 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
         match f.context().node_level() {
             NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
                 match self {
-                    InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
-                    InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
+                    Self::SoftLineBreak => Ok(()),
+                    Self::SoftLineBreakOrSpace => space().fmt(f),
                 }
             }
             NodeLevel::Expression(Some(parentheses_id)) => match self {
-                InParenthesesOnlyLineBreak::SoftLineBreak => if_group_breaks(&soft_line_break())
+                Self::SoftLineBreak => if_group_breaks(&soft_line_break())
                     .with_group_id(Some(parentheses_id))
                     .fmt(f),
-                InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => write!(
+                Self::SoftLineBreakOrSpace => write!(
                     f,
                     [
                         if_group_breaks(&soft_line_break_or_space())
@@ -301,8 +298,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
             },
             NodeLevel::ParenthesizedExpression => {
                 f.write_element(FormatElement::Line(match self {
-                    InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
-                    InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
+                    Self::SoftLineBreak => LineMode::Soft,
+                    Self::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
                 }));
                 Ok(())
             }

@@ -64,7 +64,7 @@ impl Violation for DefaultFactoryKwarg {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let DefaultFactoryKwarg { default_factory } = self;
+        let Self { default_factory } = self;
         if let Some(default_factory) = default_factory.full_display() {
             Some(format!("Replace with `defaultdict({default_factory})`"))
         } else {

@@ -89,7 +89,7 @@ impl Workspace {
         root: &str,
         position_encoding: PositionEncoding,
         options: JsValue,
-    ) -> Result<Workspace, Error> {
+    ) -> Result<Self, Error> {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
@@ -1031,9 +1031,9 @@ pub enum DocumentHighlightKind {
 impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
     fn from(kind: ty_ide::ReferenceKind) -> Self {
         match kind {
-            ty_ide::ReferenceKind::Read => DocumentHighlightKind::Read,
-            ty_ide::ReferenceKind::Write => DocumentHighlightKind::Write,
-            ty_ide::ReferenceKind::Other => DocumentHighlightKind::Text,
+            ty_ide::ReferenceKind::Read => Self::Read,
+            ty_ide::ReferenceKind::Write => Self::Write,
+            ty_ide::ReferenceKind::Other => Self::Text,
         }
     }
 }

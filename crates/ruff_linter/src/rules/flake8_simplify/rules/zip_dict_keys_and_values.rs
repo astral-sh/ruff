@@ -41,7 +41,7 @@ pub(crate) struct ZipDictKeysAndValues {
 impl AlwaysFixableViolation for ZipDictKeysAndValues {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ZipDictKeysAndValues { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Use `{expected}` instead of `{actual}`")
         } else {
@@ -50,7 +50,7 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
     }
 
     fn fix_title(&self) -> String {
-        let ZipDictKeysAndValues { expected, actual } = self;
+        let Self { expected, actual } = self;
         if let (Some(expected), Some(actual)) = (expected.full_display(), actual.full_display()) {
             format!("Replace `{actual}` with `{expected}`")
         } else {

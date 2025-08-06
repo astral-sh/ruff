@@ -36,12 +36,12 @@ impl Violation for ManualFromImport {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ManualFromImport { module, name } = self;
+        let Self { module, name } = self;
         format!("Use `from {module} import {name}` in lieu of alias")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ManualFromImport { module, name } = self;
+        let Self { module, name } = self;
         Some(format!("Replace with `from {module} import {name}`"))
     }
 }

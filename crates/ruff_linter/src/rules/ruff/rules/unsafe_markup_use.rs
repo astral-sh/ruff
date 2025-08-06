@@ -80,7 +80,7 @@ pub(crate) struct RuffUnsafeMarkupUse {
 impl Violation for RuffUnsafeMarkupUse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuffUnsafeMarkupUse { name } = self;
+        let Self { name } = self;
         format!("Unsafe use of `{name}` detected")
     }
 }

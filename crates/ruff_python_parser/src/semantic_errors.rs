@@ -1359,10 +1359,10 @@ pub enum AwaitOutsideAsyncFunctionKind {
 impl Display for AwaitOutsideAsyncFunctionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            AwaitOutsideAsyncFunctionKind::Await => "`await`",
-            AwaitOutsideAsyncFunctionKind::AsyncFor => "`async for`",
-            AwaitOutsideAsyncFunctionKind::AsyncWith => "`async with`",
-            AwaitOutsideAsyncFunctionKind::AsyncComprehension => "asynchronous comprehension",
+            Self::Await => "`await`",
+            Self::AsyncFor => "`async for`",
+            Self::AsyncWith => "`async with`",
+            Self::AsyncComprehension => "asynchronous comprehension",
         })
     }
 }
@@ -1383,9 +1383,9 @@ impl YieldOutsideFunctionKind {
 impl Display for YieldOutsideFunctionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            YieldOutsideFunctionKind::Yield => "yield",
-            YieldOutsideFunctionKind::YieldFrom => "yield from",
-            YieldOutsideFunctionKind::Await => "await",
+            Self::Yield => "yield",
+            Self::YieldFrom => "yield from",
+            Self::Await => "await",
         })
     }
 }
@@ -1404,13 +1404,13 @@ pub enum InvalidExpressionPosition {
 impl Display for InvalidExpressionPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            InvalidExpressionPosition::TypeVarBound => "TypeVar bound",
-            InvalidExpressionPosition::TypeVarDefault => "TypeVar default",
-            InvalidExpressionPosition::TypeVarTupleDefault => "TypeVarTuple default",
-            InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
-            InvalidExpressionPosition::TypeAnnotation => "type annotation",
-            InvalidExpressionPosition::GenericDefinition => "generic definition",
-            InvalidExpressionPosition::TypeAlias => "type alias",
+            Self::TypeVarBound => "TypeVar bound",
+            Self::TypeVarDefault => "TypeVar default",
+            Self::TypeVarTupleDefault => "TypeVarTuple default",
+            Self::ParamSpecDefault => "ParamSpec default",
+            Self::TypeAnnotation => "type annotation",
+            Self::GenericDefinition => "generic definition",
+            Self::TypeAlias => "type alias",
         })
     }
 }
@@ -1425,9 +1425,9 @@ pub enum InvalidExpressionKind {
 impl Display for InvalidExpressionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            InvalidExpressionKind::Yield => "yield expression",
-            InvalidExpressionKind::NamedExpr => "named expression",
-            InvalidExpressionKind::Await => "await expression",
+            Self::Yield => "yield expression",
+            Self::NamedExpr => "named expression",
+            Self::Await => "await expression",
         })
     }
 }

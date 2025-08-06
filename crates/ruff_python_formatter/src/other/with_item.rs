@@ -78,7 +78,7 @@ pub struct FormatWithItem {
 
 impl Default for WithItemLayout {
     fn default() -> Self {
-        WithItemLayout::ParenthesizedContextManagers { single: false }
+        Self::ParenthesizedContextManagers { single: false }
     }
 }
 

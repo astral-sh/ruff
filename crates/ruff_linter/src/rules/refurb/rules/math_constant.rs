@@ -38,12 +38,12 @@ impl Violation for MathConstant {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MathConstant { literal, constant } = self;
+        let Self { literal, constant } = self;
         format!("Replace `{literal}` with `math.{constant}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let MathConstant { constant, .. } = self;
+        let Self { constant, .. } = self;
         Some(format!("Use `math.{constant}`"))
     }
 }
@@ -119,9 +119,9 @@ impl Constant {
 
     fn name(self) -> &'static str {
         match self {
-            Constant::Pi => "pi",
-            Constant::E => "e",
-            Constant::Tau => "tau",
+            Self::Pi => "pi",
+            Self::E => "e",
+            Self::Tau => "tau",
         }
     }
 }

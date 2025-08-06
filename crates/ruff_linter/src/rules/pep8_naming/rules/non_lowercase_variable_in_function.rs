@@ -46,7 +46,7 @@ pub(crate) struct NonLowercaseVariableInFunction {
 impl Violation for NonLowercaseVariableInFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonLowercaseVariableInFunction { name } = self;
+        let Self { name } = self;
         format!("Variable `{name}` in function should be lowercase")
     }
 }

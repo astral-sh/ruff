@@ -38,7 +38,7 @@ pub(crate) struct RequestWithNoCertValidation {
 impl Violation for RequestWithNoCertValidation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RequestWithNoCertValidation { string } = self;
+        let Self { string } = self;
         format!(
             "Probable use of `{string}` call with `verify=False` disabling SSL certificate checks"
         )

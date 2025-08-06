@@ -21,7 +21,7 @@ where
     O: FormatOptions,
 {
     fn from(options: &'a O) -> Self {
-        PrinterOptions::default()
+        Self::default()
             .with_indent(options.indent_style())
             .with_line_width(options.line_width())
     }
@@ -81,7 +81,7 @@ impl From<LineWidth> for PrintWidth {
 
 impl From<PrintWidth> for u32 {
     fn from(width: PrintWidth) -> Self {
-        u32::from(width.0)
+        Self::from(width.0)
     }
 }
 
@@ -108,11 +108,11 @@ pub enum SourceMapGeneration {
 
 impl SourceMapGeneration {
     pub const fn is_enabled(self) -> bool {
-        matches!(self, SourceMapGeneration::Enabled)
+        matches!(self, Self::Enabled)
     }
 
     pub const fn is_disabled(self) -> bool {
-        matches!(self, SourceMapGeneration::Disabled)
+        matches!(self, Self::Disabled)
     }
 }
 
@@ -134,9 +134,9 @@ impl LineEnding {
     #[inline]
     pub const fn as_str(&self) -> &'static str {
         match self {
-            LineEnding::LineFeed => "\n",
-            LineEnding::CarriageReturnLineFeed => "\r\n",
-            LineEnding::CarriageReturn => "\r",
+            Self::LineFeed => "\n",
+            Self::CarriageReturnLineFeed => "\r\n",
+            Self::CarriageReturn => "\r",
         }
     }
 }

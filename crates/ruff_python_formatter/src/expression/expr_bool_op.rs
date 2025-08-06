@@ -34,7 +34,7 @@ impl NeedsParentheses for ExprBoolOp {
 pub struct FormatBoolOp;
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for BoolOp {
-    type Format<'a> = FormatRefWithRule<'a, BoolOp, FormatBoolOp, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatBoolOp, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatBoolOp)
@@ -42,7 +42,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for BoolOp {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for BoolOp {
-    type Format = FormatOwnedWithRule<BoolOp, FormatBoolOp, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatBoolOp, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatBoolOp)

@@ -106,8 +106,8 @@ enum TypingModule {
 impl TypingModule {
     fn as_str(self) -> &'static str {
         match self {
-            TypingModule::Typing => "typing",
-            TypingModule::TypingExtensions => "typing_extensions",
+            Self::Typing => "typing",
+            Self::TypingExtensions => "typing_extensions",
         }
     }
 }

@@ -41,7 +41,7 @@ impl Margin {
         //    |                     ^^^^^^^^^
         // ```
 
-        let mut m = Margin {
+        let mut m = Self {
             whitespace_left: whitespace_left.saturating_sub(ELLIPSIS_PASSING),
             span_left: span_left.saturating_sub(ELLIPSIS_PASSING),
             span_right: span_right + ELLIPSIS_PASSING,

@@ -64,10 +64,10 @@ impl InterpolatedStringLayout {
     }
 
     pub(crate) const fn is_flat(self) -> bool {
-        matches!(self, InterpolatedStringLayout::Flat)
+        matches!(self, Self::Flat)
     }
 
     pub(crate) const fn is_multiline(self) -> bool {
-        matches!(self, InterpolatedStringLayout::Multiline)
+        matches!(self, Self::Multiline)
     }
 }

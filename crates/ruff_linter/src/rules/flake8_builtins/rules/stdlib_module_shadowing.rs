@@ -60,7 +60,7 @@ pub(crate) struct StdlibModuleShadowing {
 impl Violation for StdlibModuleShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StdlibModuleShadowing { name } = self;
+        let Self { name } = self;
         format!("Module `{name}` shadows a Python standard-library module")
     }
 }

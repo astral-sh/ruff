@@ -218,8 +218,8 @@ enum EnumerateSubset {
 impl fmt::Display for EnumerateSubset {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            EnumerateSubset::Indices => write!(f, "indices"),
-            EnumerateSubset::Values => write!(f, "values"),
+            Self::Indices => write!(f, "indices"),
+            Self::Values => write!(f, "values"),
         }
     }
 }

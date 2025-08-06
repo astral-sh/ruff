@@ -128,17 +128,14 @@ impl ProjectMetadata {
     /// 1. The closest `pyproject.toml` with a `tool.ty` section or `ty.toml`.
     /// 1. The closest `pyproject.toml`.
     /// 1. Fallback to use `path` as the root and use the default settings.
-    pub fn discover(
-        path: &SystemPath,
-        system: &dyn System,
-    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+    pub fn discover(path: &SystemPath, system: &dyn System) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
             return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
         }
 
-        let mut closest_project: Option<ProjectMetadata> = None;
+        let mut closest_project: Option<Self> = None;
 
         for project_root in path.ancestors() {
             let pyproject_path = project_root.join("pyproject.toml");
@@ -188,7 +185,7 @@ impl ProjectMetadata {
 
                 tracing::debug!("Found project at '{}'", project_root);
 
-                let metadata = ProjectMetadata::from_options(
+                let metadata = Self::from_options(
                     options,
                     project_root.to_path_buf(),
                     pyproject
@@ -207,14 +204,13 @@ impl ProjectMetadata {
 
             if let Some(pyproject) = pyproject {
                 let has_ty_section = pyproject.ty().is_some();
-                let metadata =
-                    ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
-                        .map_err(
-                            |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
-                                source: err,
-                                path: pyproject_path,
-                            },
-                        )?;
+                let metadata = Self::from_pyproject(pyproject, project_root.to_path_buf())
+                    .map_err(
+                        |err| ProjectMetadataError::InvalidRequiresPythonConstraint {
+                            source: err,
+                            path: pyproject_path,
+                        },
+                    )?;
 
                 if has_ty_section {
                     tracing::debug!("Found project at '{}'", project_root);

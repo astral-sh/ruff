@@ -250,7 +250,7 @@ pub enum QuoteStyle {
 
 impl QuoteStyle {
     pub const fn is_preserve(self) -> bool {
-        matches!(self, QuoteStyle::Preserve)
+        matches!(self, Self::Preserve)
     }
 }
 
@@ -334,7 +334,7 @@ pub enum PreviewMode {
 
 impl PreviewMode {
     pub const fn is_enabled(self) -> bool {
-        matches!(self, PreviewMode::Enabled)
+        matches!(self, Self::Enabled)
     }
 }
 
@@ -360,7 +360,7 @@ pub enum DocstringCode {
 
 impl DocstringCode {
     pub const fn is_enabled(self) -> bool {
-        matches!(self, DocstringCode::Enabled)
+        matches!(self, Self::Enabled)
     }
 }
 
@@ -436,8 +436,8 @@ mod schema {
 impl fmt::Debug for DocstringCodeLineWidth {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            DocstringCodeLineWidth::Fixed(v) => v.value().fmt(f),
-            DocstringCodeLineWidth::Dynamic => "dynamic".fmt(f),
+            Self::Fixed(v) => v.value().fmt(f),
+            Self::Dynamic => "dynamic".fmt(f),
         }
     }
 }

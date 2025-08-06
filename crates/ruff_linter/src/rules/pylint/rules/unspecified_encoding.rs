@@ -63,7 +63,7 @@ pub(crate) struct UnspecifiedEncoding {
 impl AlwaysFixableViolation for UnspecifiedEncoding {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnspecifiedEncoding {
+        let Self {
             function_name,
             mode,
         } = self;

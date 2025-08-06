@@ -56,12 +56,12 @@ pub(crate) struct MultipleStartsEndsWith {
 impl AlwaysFixableViolation for MultipleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MultipleStartsEndsWith { attr } = self;
+        let Self { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
     }
 
     fn fix_title(&self) -> String {
-        let MultipleStartsEndsWith { attr } = self;
+        let Self { attr } = self;
         format!("Merge into a single `{attr}` call")
     }
 }

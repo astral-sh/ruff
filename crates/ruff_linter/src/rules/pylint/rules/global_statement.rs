@@ -47,7 +47,7 @@ pub(crate) struct GlobalStatement {
 impl Violation for GlobalStatement {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let GlobalStatement { name } = self;
+        let Self { name } = self;
         format!("Using the global statement to update `{name}` is discouraged")
     }
 }

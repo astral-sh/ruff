@@ -61,7 +61,7 @@ pub(crate) struct AbstractBaseClassWithoutAbstractMethod {
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AbstractBaseClassWithoutAbstractMethod { name } = self;
+        let Self { name } = self;
         format!("`{name}` is an abstract base class, but it has no abstract methods or properties")
     }
 }
@@ -106,7 +106,7 @@ pub(crate) struct EmptyMethodWithoutAbstractDecorator {
 impl Violation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EmptyMethodWithoutAbstractDecorator { name } = self;
+        let Self { name } = self;
         format!(
             "`{name}` is an empty method in an abstract base class, but has no abstract decorator"
         )

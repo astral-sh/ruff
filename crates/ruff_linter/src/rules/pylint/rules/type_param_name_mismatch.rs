@@ -48,7 +48,7 @@ pub(crate) struct TypeParamNameMismatch {
 impl Violation for TypeParamNameMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeParamNameMismatch {
+        let Self {
             kind,
             var_name,
             param_name,
@@ -140,10 +140,10 @@ enum VarKind {
 impl fmt::Display for VarKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            VarKind::TypeVar => fmt.write_str("TypeVar"),
-            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
-            VarKind::TypeVarTuple => fmt.write_str("TypeVarTuple"),
-            VarKind::NewType => fmt.write_str("NewType"),
+            Self::TypeVar => fmt.write_str("TypeVar"),
+            Self::ParamSpec => fmt.write_str("ParamSpec"),
+            Self::TypeVarTuple => fmt.write_str("TypeVarTuple"),
+            Self::NewType => fmt.write_str("NewType"),
         }
     }
 }

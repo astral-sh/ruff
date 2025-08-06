@@ -43,7 +43,7 @@ pub(crate) struct LowercaseImportedAsNonLowercase {
 impl Violation for LowercaseImportedAsNonLowercase {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let LowercaseImportedAsNonLowercase { name, asname } = self;
+        let Self { name, asname } = self;
         format!("Lowercase `{name}` imported as non-lowercase `{asname}`")
     }
 }

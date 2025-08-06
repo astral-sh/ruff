@@ -12,40 +12,40 @@ pub struct PythonVersion {
 }
 
 impl PythonVersion {
-    pub const PY37: PythonVersion = PythonVersion { major: 3, minor: 7 };
-    pub const PY38: PythonVersion = PythonVersion { major: 3, minor: 8 };
-    pub const PY39: PythonVersion = PythonVersion { major: 3, minor: 9 };
-    pub const PY310: PythonVersion = PythonVersion {
+    pub const PY37: Self = Self { major: 3, minor: 7 };
+    pub const PY38: Self = Self { major: 3, minor: 8 };
+    pub const PY39: Self = Self { major: 3, minor: 9 };
+    pub const PY310: Self = Self {
         major: 3,
         minor: 10,
     };
-    pub const PY311: PythonVersion = PythonVersion {
+    pub const PY311: Self = Self {
         major: 3,
         minor: 11,
     };
-    pub const PY312: PythonVersion = PythonVersion {
+    pub const PY312: Self = Self {
         major: 3,
         minor: 12,
     };
-    pub const PY313: PythonVersion = PythonVersion {
+    pub const PY313: Self = Self {
         major: 3,
         minor: 13,
     };
-    pub const PY314: PythonVersion = PythonVersion {
+    pub const PY314: Self = Self {
         major: 3,
         minor: 14,
     };
 
-    pub fn iter() -> impl Iterator<Item = PythonVersion> {
+    pub fn iter() -> impl Iterator<Item = Self> {
         [
-            PythonVersion::PY37,
-            PythonVersion::PY38,
-            PythonVersion::PY39,
-            PythonVersion::PY310,
-            PythonVersion::PY311,
-            PythonVersion::PY312,
-            PythonVersion::PY313,
-            PythonVersion::PY314,
+            Self::PY37,
+            Self::PY38,
+            Self::PY39,
+            Self::PY310,
+            Self::PY311,
+            Self::PY312,
+            Self::PY313,
+            Self::PY314,
         ]
         .into_iter()
     }
@@ -77,7 +77,7 @@ impl PythonVersion {
     }
 
     pub fn free_threaded_build_available(self) -> bool {
-        self >= PythonVersion::PY313
+        self >= Self::PY313
     }
 
     /// Return `true` if the current version supports [PEP 701].
@@ -107,7 +107,7 @@ impl From<(u8, u8)> for PythonVersion {
 
 impl fmt::Display for PythonVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let PythonVersion { major, minor } = self;
+        let Self { major, minor } = self;
         write!(f, "{major}.{minor}")
     }
 }

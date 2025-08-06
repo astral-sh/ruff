@@ -53,7 +53,7 @@ impl Replacement {
             modified_end = modified_line_start;
         }
 
-        Replacement {
+        Self {
             source_range: TextRange::new(source_start, source_end),
             modified_range: TextRange::new(modified_start, modified_end),
         }

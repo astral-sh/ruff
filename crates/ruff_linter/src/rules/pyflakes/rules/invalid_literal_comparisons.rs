@@ -132,8 +132,8 @@ enum IsCmpOp {
 impl From<&CmpOp> for IsCmpOp {
     fn from(cmp_op: &CmpOp) -> Self {
         match cmp_op {
-            CmpOp::Is => IsCmpOp::Is,
-            CmpOp::IsNot => IsCmpOp::IsNot,
+            CmpOp::Is => Self::Is,
+            CmpOp::IsNot => Self::IsNot,
             _ => panic!("Expected CmpOp::Is | CmpOp::IsNot"),
         }
     }

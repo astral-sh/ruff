@@ -39,12 +39,12 @@ impl Violation for TypeOfPrimitive {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TypeOfPrimitive { primitive } = self;
+        let Self { primitive } = self;
         format!("Use `{}` instead of `type(...)`", primitive.builtin())
     }
 
     fn fix_title(&self) -> Option<String> {
-        let TypeOfPrimitive { primitive } = self;
+        let Self { primitive } = self;
         Some(format!(
             "Replace `type(...)` with `{}`",
             primitive.builtin()

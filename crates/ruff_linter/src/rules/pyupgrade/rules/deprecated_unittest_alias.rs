@@ -47,12 +47,12 @@ pub(crate) struct DeprecatedUnittestAlias {
 impl AlwaysFixableViolation for DeprecatedUnittestAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DeprecatedUnittestAlias { alias, target } = self;
+        let Self { alias, target } = self;
         format!("`{alias}` is deprecated, use `{target}`")
     }
 
     fn fix_title(&self) -> String {
-        let DeprecatedUnittestAlias { alias, target } = self;
+        let Self { alias, target } = self;
         format!("Replace `{target}` with `{alias}`")
     }
 }

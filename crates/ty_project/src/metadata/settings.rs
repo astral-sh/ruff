@@ -191,8 +191,8 @@ pub enum FileSettings {
 impl FileSettings {
     pub fn rules<'a>(&'a self, db: &'a dyn Db) -> &'a RuleSelection {
         match self {
-            FileSettings::Global => db.project().settings(db).rules(),
-            FileSettings::File(override_settings) => &override_settings.rules,
+            Self::Global => db.project().settings(db).rules(),
+            Self::File(override_settings) => &override_settings.rules,
         }
     }
 }

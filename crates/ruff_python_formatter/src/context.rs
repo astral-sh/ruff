@@ -90,7 +90,7 @@ impl<'a> PyFormatContext<'a> {
     ///
     /// The quote character given should correspond to the quote character used
     /// for the docstring containing the code snippets.
-    pub(crate) fn in_docstring(self, quote: Quote) -> PyFormatContext<'a> {
+    pub(crate) fn in_docstring(self, quote: Quote) -> Self {
         PyFormatContext {
             docstring: Some(quote),
             ..self
@@ -152,10 +152,8 @@ pub(crate) enum InterpolatedStringState {
 impl InterpolatedStringState {
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
-            InterpolatedStringState::InsideInterpolatedElement(context) => {
-                Some(context.is_multiline())
-            }
-            InterpolatedStringState::Outside => None,
+            Self::InsideInterpolatedElement(context) => Some(context.is_multiline()),
+            Self::Outside => None,
         }
     }
 }
@@ -198,13 +196,13 @@ impl NodeLevel {
     pub(crate) const fn is_parenthesized(self) -> bool {
         matches!(
             self,
-            NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
+            Self::Expression(Some(_)) | Self::ParenthesizedExpression
         )
     }
 
     /// Returns `true` if this is the last top-level statement in the module.
     pub(crate) const fn is_last_top_level_statement(self) -> bool {
-        matches!(self, NodeLevel::TopLevel(TopLevelStatementPosition::Last))
+        matches!(self, Self::TopLevel(TopLevelStatementPosition::Last))
     }
 }
 
@@ -291,13 +289,13 @@ pub(crate) struct IndentLevel {
 
 impl IndentLevel {
     /// Returns a new indent level for the given value.
-    pub(crate) fn new(level: u16) -> IndentLevel {
-        IndentLevel { level }
+    pub(crate) fn new(level: u16) -> Self {
+        Self { level }
     }
 
     /// Returns the next indent level.
-    pub(crate) fn increment(self) -> IndentLevel {
-        IndentLevel {
+    pub(crate) fn increment(self) -> Self {
+        Self {
             level: self.level.saturating_add(1),
         }
     }

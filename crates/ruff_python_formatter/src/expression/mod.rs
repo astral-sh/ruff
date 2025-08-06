@@ -465,45 +465,45 @@ impl NeedsParentheses for Expr {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         match self {
-            Expr::BoolOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Named(expr) => expr.needs_parentheses(parent, context),
-            Expr::BinOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::UnaryOp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Lambda(expr) => expr.needs_parentheses(parent, context),
-            Expr::If(expr) => expr.needs_parentheses(parent, context),
-            Expr::Dict(expr) => expr.needs_parentheses(parent, context),
-            Expr::Set(expr) => expr.needs_parentheses(parent, context),
-            Expr::ListComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::SetComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::DictComp(expr) => expr.needs_parentheses(parent, context),
-            Expr::Generator(expr) => expr.needs_parentheses(parent, context),
-            Expr::Await(expr) => expr.needs_parentheses(parent, context),
-            Expr::Yield(expr) => expr.needs_parentheses(parent, context),
-            Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
-            Expr::Compare(expr) => expr.needs_parentheses(parent, context),
-            Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FString(expr) => expr.needs_parentheses(parent, context),
-            Expr::TString(expr) => expr.needs_parentheses(parent, context),
-            Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::BooleanLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::NoneLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::EllipsisLiteral(expr) => expr.needs_parentheses(parent, context),
-            Expr::Attribute(expr) => expr.needs_parentheses(parent, context),
-            Expr::Subscript(expr) => expr.needs_parentheses(parent, context),
-            Expr::Starred(expr) => expr.needs_parentheses(parent, context),
-            Expr::Name(expr) => expr.needs_parentheses(parent, context),
-            Expr::List(expr) => expr.needs_parentheses(parent, context),
-            Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
-            Expr::Slice(expr) => expr.needs_parentheses(parent, context),
-            Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
+            Self::BoolOp(expr) => expr.needs_parentheses(parent, context),
+            Self::Named(expr) => expr.needs_parentheses(parent, context),
+            Self::BinOp(expr) => expr.needs_parentheses(parent, context),
+            Self::UnaryOp(expr) => expr.needs_parentheses(parent, context),
+            Self::Lambda(expr) => expr.needs_parentheses(parent, context),
+            Self::If(expr) => expr.needs_parentheses(parent, context),
+            Self::Dict(expr) => expr.needs_parentheses(parent, context),
+            Self::Set(expr) => expr.needs_parentheses(parent, context),
+            Self::ListComp(expr) => expr.needs_parentheses(parent, context),
+            Self::SetComp(expr) => expr.needs_parentheses(parent, context),
+            Self::DictComp(expr) => expr.needs_parentheses(parent, context),
+            Self::Generator(expr) => expr.needs_parentheses(parent, context),
+            Self::Await(expr) => expr.needs_parentheses(parent, context),
+            Self::Yield(expr) => expr.needs_parentheses(parent, context),
+            Self::YieldFrom(expr) => expr.needs_parentheses(parent, context),
+            Self::Compare(expr) => expr.needs_parentheses(parent, context),
+            Self::Call(expr) => expr.needs_parentheses(parent, context),
+            Self::FString(expr) => expr.needs_parentheses(parent, context),
+            Self::TString(expr) => expr.needs_parentheses(parent, context),
+            Self::StringLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::BooleanLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::NoneLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::EllipsisLiteral(expr) => expr.needs_parentheses(parent, context),
+            Self::Attribute(expr) => expr.needs_parentheses(parent, context),
+            Self::Subscript(expr) => expr.needs_parentheses(parent, context),
+            Self::Starred(expr) => expr.needs_parentheses(parent, context),
+            Self::Name(expr) => expr.needs_parentheses(parent, context),
+            Self::List(expr) => expr.needs_parentheses(parent, context),
+            Self::Tuple(expr) => expr.needs_parentheses(parent, context),
+            Self::Slice(expr) => expr.needs_parentheses(parent, context),
+            Self::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
         }
     }
 }
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
-    type Format<'a> = FormatRefWithRule<'a, Expr, FormatExpr, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatExpr, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatExpr::default())
@@ -511,7 +511,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Expr {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
-    type Format = FormatOwnedWithRule<Expr, FormatExpr, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatExpr, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatExpr::default())
@@ -834,7 +834,7 @@ enum First<'a> {
 
 impl<'a> First<'a> {
     #[inline]
-    fn set_if_none(&mut self, first: First<'a>) {
+    fn set_if_none(&mut self, first: Self) {
         if matches!(self, First::None) {
             *self = first;
         }
@@ -947,9 +947,9 @@ impl CallChainLayout {
             }
         }
         if attributes_after_parentheses < 2 {
-            CallChainLayout::NonFluent
+            Self::NonFluent
         } else {
-            CallChainLayout::Fluent
+            Self::Fluent
         }
     }
 
@@ -959,20 +959,20 @@ impl CallChainLayout {
         self,
         item: impl Into<ExprRef<'a>>,
         f: &mut PyFormatter,
-    ) -> CallChainLayout {
+    ) -> Self {
         match self {
-            CallChainLayout::Default => {
+            Self::Default => {
                 if f.context().node_level().is_parenthesized() {
-                    CallChainLayout::from_expression(
+                    Self::from_expression(
                         item.into(),
                         f.context().comments().ranges(),
                         f.context().source(),
                     )
                 } else {
-                    CallChainLayout::NonFluent
+                    Self::NonFluent
                 }
             }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+            layout @ (Self::Fluent | Self::NonFluent) => layout,
         }
     }
 }
@@ -987,7 +987,7 @@ pub(crate) enum OwnParentheses {
 
 impl OwnParentheses {
     const fn is_non_empty(self) -> bool {
-        matches!(self, OwnParentheses::NonEmpty)
+        matches!(self, Self::NonEmpty)
     }
 }
 
@@ -1168,17 +1168,17 @@ enum OperatorPrecedence {
 impl From<Operator> for OperatorPrecedence {
     fn from(value: Operator) -> Self {
         match value {
-            Operator::Add | Operator::Sub => OperatorPrecedence::Additive,
+            Operator::Add | Operator::Sub => Self::Additive,
             Operator::Mult
             | Operator::MatMult
             | Operator::Div
             | Operator::Mod
-            | Operator::FloorDiv => OperatorPrecedence::Multiplicative,
-            Operator::Pow => OperatorPrecedence::Exponential,
-            Operator::LShift | Operator::RShift => OperatorPrecedence::Shift,
-            Operator::BitOr => OperatorPrecedence::BitwiseOr,
-            Operator::BitXor => OperatorPrecedence::BitwiseXor,
-            Operator::BitAnd => OperatorPrecedence::BitwiseAnd,
+            | Operator::FloorDiv => Self::Multiplicative,
+            Operator::Pow => Self::Exponential,
+            Operator::LShift | Operator::RShift => Self::Shift,
+            Operator::BitOr => Self::BitwiseOr,
+            Operator::BitXor => Self::BitwiseXor,
+            Operator::BitAnd => Self::BitwiseAnd,
         }
     }
 }

@@ -41,7 +41,7 @@ pub(crate) struct RequestWithoutTimeout {
 impl Violation for RequestWithoutTimeout {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RequestWithoutTimeout { implicit, module } = self;
+        let Self { implicit, module } = self;
         if *implicit {
             format!("Probable use of `{module}` call without timeout")
         } else {

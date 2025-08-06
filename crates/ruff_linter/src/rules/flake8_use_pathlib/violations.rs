@@ -191,7 +191,7 @@ pub(crate) struct OsPathJoin {
 impl Violation for OsPathJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OsPathJoin { module, joiner } = self;
+        let Self { module, joiner } = self;
         match joiner {
             Joiner::Slash => {
                 format!("`os.{module}.join()` should be replaced by `Path` with `/` operator")

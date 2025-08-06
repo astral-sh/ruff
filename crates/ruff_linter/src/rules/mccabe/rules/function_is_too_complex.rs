@@ -57,7 +57,7 @@ pub(crate) struct ComplexStructure {
 impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComplexStructure {
+        let Self {
             name,
             complexity,
             max_complexity,

@@ -41,7 +41,7 @@ impl Violation for FStringNumberFormat {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FStringNumberFormat { replacement, base } = self;
+        let Self { replacement, base } = self;
         let function_name = base.function_name();
 
         if let Some(display) = replacement
@@ -211,27 +211,27 @@ impl Base {
     /// Returns the shorthand for the base.
     fn shorthand(self) -> &'static str {
         match self {
-            Base::Hex => "x",
-            Base::Bin => "b",
-            Base::Oct => "o",
+            Self::Hex => "x",
+            Self::Bin => "b",
+            Self::Oct => "o",
         }
     }
 
     /// Returns the builtin function name for the base.
     fn function_name(self) -> &'static str {
         match self {
-            Base::Hex => "hex",
-            Base::Bin => "bin",
-            Base::Oct => "oct",
+            Self::Hex => "hex",
+            Self::Bin => "bin",
+            Self::Oct => "oct",
         }
     }
 
     /// Parses the base from a string.
     fn from_str(s: &str) -> Option<Self> {
         match s {
-            "hex" => Some(Base::Hex),
-            "bin" => Some(Base::Bin),
-            "oct" => Some(Base::Oct),
+            "hex" => Some(Self::Hex),
+            "bin" => Some(Self::Bin),
+            "oct" => Some(Self::Oct),
             _ => None,
         }
     }

@@ -73,7 +73,7 @@ pub(crate) struct PytestIncorrectMarkParenthesesStyle {
 impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestIncorrectMarkParenthesesStyle {
+        let Self {
             mark_name,
             expected_parens,
             actual_parens,

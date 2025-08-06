@@ -74,7 +74,7 @@ impl Violation for UnnecessaryDunderCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryDunderCall {
+        let Self {
             method,
             replacement,
         } = self;
@@ -87,7 +87,7 @@ impl Violation for UnnecessaryDunderCall {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryDunderCall { replacement, .. } = self;
+        let Self { replacement, .. } = self;
         replacement.clone()
     }
 }

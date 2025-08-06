@@ -42,7 +42,7 @@ pub(crate) struct SslWithBadDefaults {
 impl Violation for SslWithBadDefaults {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SslWithBadDefaults { protocol } = self;
+        let Self { protocol } = self;
         format!("Argument default set to insecure SSL protocol: `{protocol}`")
     }
 }

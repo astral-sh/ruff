@@ -130,14 +130,14 @@ enum EditOperationKind {
 
 impl EditOperationKind {
     pub(crate) const fn is_insertion(self) -> bool {
-        matches!(self, EditOperationKind::Insertion)
+        matches!(self, Self::Insertion)
     }
 
     pub(crate) const fn is_deletion(self) -> bool {
-        matches!(self, EditOperationKind::Deletion)
+        matches!(self, Self::Deletion)
     }
 
     pub(crate) const fn is_replacement(self) -> bool {
-        matches!(self, EditOperationKind::Replacement)
+        matches!(self, Self::Replacement)
     }
 }

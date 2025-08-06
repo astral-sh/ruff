@@ -124,7 +124,7 @@ impl Indentation {
 
 impl Default for Indentation {
     fn default() -> Self {
-        Indentation("    ".to_string())
+        Self("    ".to_string())
     }
 }
 

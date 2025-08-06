@@ -124,13 +124,13 @@ pub enum ParseError {
 impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
-            RuleSelector::All => ("", "ALL"),
-            RuleSelector::C => ("", "C"),
-            RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+            Self::All => ("", "ALL"),
+            Self::C => ("", "C"),
+            Self::T => ("", "T"),
+            Self::Prefix { prefix, .. } | Self::Rule { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
-            RuleSelector::Linter(l) => (l.common_prefix(), ""),
+            Self::Linter(l) => (l.common_prefix(), ""),
         }
     }
 }
@@ -182,20 +182,20 @@ impl RuleSelector {
     /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
         match self {
-            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+            Self::All => RuleSelectorIter::All(Rule::iter()),
 
-            RuleSelector::C => RuleSelectorIter::Chain(
+            Self::C => RuleSelectorIter::Chain(
                 Linter::Flake8Comprehensions
                     .rules()
                     .chain(Linter::McCabe.rules()),
             ),
-            RuleSelector::T => RuleSelectorIter::Chain(
+            Self::T => RuleSelectorIter::Chain(
                 Linter::Flake8Debugger
                     .rules()
                     .chain(Linter::Flake8Print.rules()),
             ),
-            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+            Self::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
+            Self::Prefix { prefix, .. } | Self::Rule { prefix, .. } => {
                 RuleSelectorIter::Vec(prefix.clone().rules())
             }
         }
@@ -216,7 +216,7 @@ impl RuleSelector {
                 }
                 // Deprecated rules are excluded in preview mode and with 'All' option unless explicitly selected
                 RuleGroup::Deprecated => {
-                    (!preview_enabled || self.is_exact()) && !matches!(self, RuleSelector::All)
+                    (!preview_enabled || self.is_exact()) && !matches!(self, Self::All)
                 }
                 // Removed rules are included if explicitly selected but will error downstream
                 RuleGroup::Removed => self.is_exact(),
@@ -241,9 +241,9 @@ impl Iterator for RuleSelectorIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Chain(iter) => iter.next(),
-            RuleSelectorIter::Vec(iter) => iter.next(),
+            Self::All(iter) => iter.next(),
+            Self::Chain(iter) => iter.next(),
+            Self::Vec(iter) => iter.next(),
         }
     }
 }
@@ -304,7 +304,7 @@ mod schema {
                     .filter(|p| {
                         // Exclude any prefixes where all of the rules are removed
                         if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
-                            RuleSelector::parse_no_redirect(p)
+                            Self::parse_no_redirect(p)
                         {
                             !prefix.rules().all(|rule| rule.is_removed())
                         } else {
@@ -334,12 +334,12 @@ mod schema {
 impl RuleSelector {
     pub fn specificity(&self) -> Specificity {
         match self {
-            RuleSelector::All => Specificity::All,
-            RuleSelector::T => Specificity::LinterGroup,
-            RuleSelector::C => Specificity::LinterGroup,
-            RuleSelector::Linter(..) => Specificity::Linter,
-            RuleSelector::Rule { .. } => Specificity::Rule,
-            RuleSelector::Prefix { prefix, .. } => {
+            Self::All => Specificity::All,
+            Self::T => Specificity::LinterGroup,
+            Self::C => Specificity::LinterGroup,
+            Self::Linter(..) => Specificity::Linter,
+            Self::Rule { .. } => Specificity::Rule,
+            Self::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
                     1 => Specificity::Prefix1Char,

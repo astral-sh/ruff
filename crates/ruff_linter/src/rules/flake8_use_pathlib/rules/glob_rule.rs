@@ -58,7 +58,7 @@ pub(crate) struct Glob {
 impl Violation for Glob {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Glob { function } = self;
+        let Self { function } = self;
         format!("Replace `{function}` with `Path.glob` or `Path.rglob`")
     }
 }

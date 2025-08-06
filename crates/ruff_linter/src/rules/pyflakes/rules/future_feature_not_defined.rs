@@ -25,7 +25,7 @@ pub(crate) struct FutureFeatureNotDefined {
 impl Violation for FutureFeatureNotDefined {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FutureFeatureNotDefined { name } = self;
+        let Self { name } = self;
         format!("Future feature `{name}` is not defined")
     }
 }

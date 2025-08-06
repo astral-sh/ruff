@@ -200,7 +200,7 @@ impl ScopeId {
     /// Returns the ID for the global scope
     #[inline]
     pub const fn global() -> Self {
-        ScopeId::from_u32(0)
+        Self::from_u32(0)
     }
 
     /// Returns `true` if this is the id of the global scope

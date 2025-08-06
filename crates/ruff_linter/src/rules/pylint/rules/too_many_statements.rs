@@ -56,7 +56,7 @@ pub(crate) struct TooManyStatements {
 impl Violation for TooManyStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyStatements {
+        let Self {
             statements,
             max_statements,
         } = self;

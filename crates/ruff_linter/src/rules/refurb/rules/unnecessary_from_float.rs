@@ -70,7 +70,7 @@ impl Violation for UnnecessaryFromFloat {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryFromFloat {
+        let Self {
             method_name,
             constructor,
         } = self;
@@ -78,7 +78,7 @@ impl Violation for UnnecessaryFromFloat {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnnecessaryFromFloat { constructor, .. } = self;
+        let Self { constructor, .. } = self;
         Some(format!("Replace with `{constructor}` constructor"))
     }
 }
@@ -306,8 +306,8 @@ enum MethodName {
 impl std::fmt::Display for MethodName {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            MethodName::FromFloat => fmt.write_str("from_float"),
-            MethodName::FromDecimal => fmt.write_str("from_decimal"),
+            Self::FromFloat => fmt.write_str("from_float"),
+            Self::FromDecimal => fmt.write_str("from_decimal"),
         }
     }
 }
@@ -321,8 +321,8 @@ enum Constructor {
 impl std::fmt::Display for Constructor {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Constructor::Decimal => fmt.write_str("Decimal"),
-            Constructor::Fraction => fmt.write_str("Fraction"),
+            Self::Decimal => fmt.write_str("Decimal"),
+            Self::Fraction => fmt.write_str("Fraction"),
         }
     }
 }

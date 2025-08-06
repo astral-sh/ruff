@@ -44,7 +44,7 @@ pub(crate) struct BadOpenMode {
 impl Violation for BadOpenMode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadOpenMode { mode } = self;
+        let Self { mode } = self;
         format!("`{mode}` is not a valid mode for `open`")
     }
 }

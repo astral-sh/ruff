@@ -466,7 +466,7 @@ impl<'db> Signature<'db> {
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
         let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
             self_type
                 .unwrap_or(Type::unknown())
@@ -541,12 +541,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Implementation of subtyping and assignability for signature.
-    fn has_relation_to(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        relation: TypeRelation,
-    ) -> bool {
+    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.

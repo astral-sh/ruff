@@ -48,7 +48,7 @@ pub(crate) struct BuiltinImportShadowing {
 impl Violation for BuiltinImportShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinImportShadowing { name } = self;
+        let Self { name } = self;
         format!("Import `{name}` is shadowing a Python builtin")
     }
 }

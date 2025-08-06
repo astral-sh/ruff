@@ -243,10 +243,10 @@ pub enum ModuleKind {
 
 impl ModuleKind {
     pub const fn is_package(self) -> bool {
-        matches!(self, ModuleKind::Package)
+        matches!(self, Self::Package)
     }
     pub const fn is_module(self) -> bool {
-        matches!(self, ModuleKind::Module)
+        matches!(self, Self::Module)
     }
 }
 

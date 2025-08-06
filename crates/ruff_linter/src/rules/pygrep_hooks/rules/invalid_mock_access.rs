@@ -41,7 +41,7 @@ pub(crate) struct InvalidMockAccess {
 impl Violation for InvalidMockAccess {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidMockAccess { reason } = self;
+        let Self { reason } = self;
         match reason {
             Reason::UncalledMethod(name) => format!("Mock method should be called: `{name}`"),
             Reason::NonExistentMethod(name) => format!("Non-existent mock method: `{name}`"),

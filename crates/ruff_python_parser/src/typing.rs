@@ -46,7 +46,7 @@ pub enum AnnotationKind {
 impl AnnotationKind {
     /// Returns `true` if the annotation kind is simple.
     pub const fn is_simple(self) -> bool {
-        matches!(self, AnnotationKind::Simple)
+        matches!(self, Self::Simple)
     }
 }
 

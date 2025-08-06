@@ -72,7 +72,7 @@ impl TryFrom<&str> for FormatSummary {
             }
         }
 
-        Ok(FormatSummary {
+        Ok(Self {
             autos,
             indices,
             keywords,

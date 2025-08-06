@@ -483,7 +483,7 @@ enum SuppressionTarget {
 
 impl SuppressionTarget {
     const fn is_lint(self) -> bool {
-        matches!(self, SuppressionTarget::Lint(_))
+        matches!(self, Self::Lint(_))
     }
 }
 
@@ -851,13 +851,13 @@ enum SuppressionKind {
 
 impl SuppressionKind {
     const fn is_type_ignore(self) -> bool {
-        matches!(self, SuppressionKind::TypeIgnore)
+        matches!(self, Self::TypeIgnore)
     }
 
     fn len_utf8(self) -> usize {
         match self {
-            SuppressionKind::TypeIgnore => "type".len(),
-            SuppressionKind::Ty => "ty".len(),
+            Self::TypeIgnore => "type".len(),
+            Self::Ty => "ty".len(),
         }
     }
 }
@@ -865,8 +865,8 @@ impl SuppressionKind {
 impl fmt::Display for SuppressionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            SuppressionKind::TypeIgnore => f.write_str("type: ignore"),
-            SuppressionKind::Ty => f.write_str("ty: ignore"),
+            Self::TypeIgnore => f.write_str("type: ignore"),
+            Self::Ty => f.write_str("ty: ignore"),
         }
     }
 }

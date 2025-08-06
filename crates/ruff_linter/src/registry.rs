@@ -249,100 +249,100 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
-            Rule::BidirectionalUnicode
-            | Rule::BlankLineWithWhitespace
-            | Rule::DocLineTooLong
-            | Rule::IndentedFormFeed
-            | Rule::LineTooLong
-            | Rule::MissingCopyrightNotice
-            | Rule::MissingNewlineAtEndOfFile
-            | Rule::MixedSpacesAndTabs
-            | Rule::TrailingWhitespace => LintSource::PhysicalLines,
-            Rule::AmbiguousUnicodeCharacterComment
-            | Rule::BlanketTypeIgnore
-            | Rule::BlankLineAfterDecorator
-            | Rule::BlankLineBetweenMethods
-            | Rule::BlankLinesAfterFunctionOrClass
-            | Rule::BlankLinesBeforeNestedDefinition
-            | Rule::BlankLinesTopLevel
-            | Rule::CommentedOutCode
-            | Rule::EmptyComment
-            | Rule::ExtraneousParentheses
-            | Rule::InvalidCharacterBackspace
-            | Rule::InvalidCharacterEsc
-            | Rule::InvalidCharacterNul
-            | Rule::InvalidCharacterSub
-            | Rule::InvalidCharacterZeroWidthSpace
-            | Rule::InvalidTodoCapitalization
-            | Rule::InvalidTodoTag
-            | Rule::LineContainsFixme
-            | Rule::LineContainsHack
-            | Rule::LineContainsTodo
-            | Rule::LineContainsXxx
-            | Rule::MissingSpaceAfterTodoColon
-            | Rule::MissingTodoAuthor
-            | Rule::MissingTodoColon
-            | Rule::MissingTodoDescription
-            | Rule::MissingTodoLink
-            | Rule::MissingTrailingComma
-            | Rule::MultiLineImplicitStringConcatenation
-            | Rule::MultipleStatementsOnOneLineColon
-            | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::ProhibitedTrailingComma
-            | Rule::ShebangLeadingWhitespace
-            | Rule::ShebangMissingExecutableFile
-            | Rule::ShebangMissingPython
-            | Rule::ShebangNotExecutable
-            | Rule::ShebangNotFirstLine
-            | Rule::SingleLineImplicitStringConcatenation
-            | Rule::TabIndentation
-            | Rule::TooManyBlankLines
-            | Rule::TooManyNewlinesAtEndOfFile
-            | Rule::TrailingCommaOnBareTuple
-            | Rule::TypeCommentInStub
-            | Rule::UselessSemicolon
-            | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
-            Rule::IOError => LintSource::Io,
-            Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
-            Rule::ImplicitNamespacePackage
-            | Rule::InvalidModuleName
-            | Rule::StdlibModuleShadowing => LintSource::Filesystem,
-            Rule::IndentationWithInvalidMultiple
-            | Rule::IndentationWithInvalidMultipleComment
-            | Rule::MissingWhitespace
-            | Rule::MissingWhitespaceAfterKeyword
-            | Rule::MissingWhitespaceAroundArithmeticOperator
-            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
-            | Rule::MissingWhitespaceAroundModuloOperator
-            | Rule::MissingWhitespaceAroundOperator
-            | Rule::MissingWhitespaceAroundParameterEquals
-            | Rule::MultipleLeadingHashesForBlockComment
-            | Rule::MultipleSpacesAfterComma
-            | Rule::MultipleSpacesAfterKeyword
-            | Rule::MultipleSpacesAfterOperator
-            | Rule::MultipleSpacesBeforeKeyword
-            | Rule::MultipleSpacesBeforeOperator
-            | Rule::NoIndentedBlock
-            | Rule::NoIndentedBlockComment
-            | Rule::NoSpaceAfterBlockComment
-            | Rule::NoSpaceAfterInlineComment
-            | Rule::OverIndented
-            | Rule::RedundantBackslash
-            | Rule::TabAfterComma
-            | Rule::TabAfterKeyword
-            | Rule::TabAfterOperator
-            | Rule::TabBeforeKeyword
-            | Rule::TabBeforeOperator
-            | Rule::TooFewSpacesBeforeInlineComment
-            | Rule::UnexpectedIndentation
-            | Rule::UnexpectedIndentationComment
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
-            | Rule::WhitespaceAfterOpenBracket
-            | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforeParameters
-            | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
+            Self::InvalidPyprojectToml => LintSource::PyprojectToml,
+            Self::BlanketNOQA | Self::RedirectedNOQA | Self::UnusedNOQA => LintSource::Noqa,
+            Self::BidirectionalUnicode
+            | Self::BlankLineWithWhitespace
+            | Self::DocLineTooLong
+            | Self::IndentedFormFeed
+            | Self::LineTooLong
+            | Self::MissingCopyrightNotice
+            | Self::MissingNewlineAtEndOfFile
+            | Self::MixedSpacesAndTabs
+            | Self::TrailingWhitespace => LintSource::PhysicalLines,
+            Self::AmbiguousUnicodeCharacterComment
+            | Self::BlanketTypeIgnore
+            | Self::BlankLineAfterDecorator
+            | Self::BlankLineBetweenMethods
+            | Self::BlankLinesAfterFunctionOrClass
+            | Self::BlankLinesBeforeNestedDefinition
+            | Self::BlankLinesTopLevel
+            | Self::CommentedOutCode
+            | Self::EmptyComment
+            | Self::ExtraneousParentheses
+            | Self::InvalidCharacterBackspace
+            | Self::InvalidCharacterEsc
+            | Self::InvalidCharacterNul
+            | Self::InvalidCharacterSub
+            | Self::InvalidCharacterZeroWidthSpace
+            | Self::InvalidTodoCapitalization
+            | Self::InvalidTodoTag
+            | Self::LineContainsFixme
+            | Self::LineContainsHack
+            | Self::LineContainsTodo
+            | Self::LineContainsXxx
+            | Self::MissingSpaceAfterTodoColon
+            | Self::MissingTodoAuthor
+            | Self::MissingTodoColon
+            | Self::MissingTodoDescription
+            | Self::MissingTodoLink
+            | Self::MissingTrailingComma
+            | Self::MultiLineImplicitStringConcatenation
+            | Self::MultipleStatementsOnOneLineColon
+            | Self::MultipleStatementsOnOneLineSemicolon
+            | Self::ProhibitedTrailingComma
+            | Self::ShebangLeadingWhitespace
+            | Self::ShebangMissingExecutableFile
+            | Self::ShebangMissingPython
+            | Self::ShebangNotExecutable
+            | Self::ShebangNotFirstLine
+            | Self::SingleLineImplicitStringConcatenation
+            | Self::TabIndentation
+            | Self::TooManyBlankLines
+            | Self::TooManyNewlinesAtEndOfFile
+            | Self::TrailingCommaOnBareTuple
+            | Self::TypeCommentInStub
+            | Self::UselessSemicolon
+            | Self::UTF8EncodingDeclaration => LintSource::Tokens,
+            Self::IOError => LintSource::Io,
+            Self::UnsortedImports | Self::MissingRequiredImport => LintSource::Imports,
+            Self::ImplicitNamespacePackage
+            | Self::InvalidModuleName
+            | Self::StdlibModuleShadowing => LintSource::Filesystem,
+            Self::IndentationWithInvalidMultiple
+            | Self::IndentationWithInvalidMultipleComment
+            | Self::MissingWhitespace
+            | Self::MissingWhitespaceAfterKeyword
+            | Self::MissingWhitespaceAroundArithmeticOperator
+            | Self::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Self::MissingWhitespaceAroundModuloOperator
+            | Self::MissingWhitespaceAroundOperator
+            | Self::MissingWhitespaceAroundParameterEquals
+            | Self::MultipleLeadingHashesForBlockComment
+            | Self::MultipleSpacesAfterComma
+            | Self::MultipleSpacesAfterKeyword
+            | Self::MultipleSpacesAfterOperator
+            | Self::MultipleSpacesBeforeKeyword
+            | Self::MultipleSpacesBeforeOperator
+            | Self::NoIndentedBlock
+            | Self::NoIndentedBlockComment
+            | Self::NoSpaceAfterBlockComment
+            | Self::NoSpaceAfterInlineComment
+            | Self::OverIndented
+            | Self::RedundantBackslash
+            | Self::TabAfterComma
+            | Self::TabAfterKeyword
+            | Self::TabAfterOperator
+            | Self::TabBeforeKeyword
+            | Self::TabBeforeOperator
+            | Self::TooFewSpacesBeforeInlineComment
+            | Self::UnexpectedIndentation
+            | Self::UnexpectedIndentationComment
+            | Self::UnexpectedSpacesAroundKeywordParameterEquals
+            | Self::WhitespaceAfterOpenBracket
+            | Self::WhitespaceBeforeCloseBracket
+            | Self::WhitespaceBeforeParameters
+            | Self::WhitespaceBeforePunctuation => LintSource::LogicalLines,
             _ => LintSource::Ast,
         }
     }

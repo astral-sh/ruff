@@ -41,7 +41,7 @@ impl Violation for NumpyDeprecatedFunction {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NumpyDeprecatedFunction {
+        let Self {
             existing,
             replacement,
         } = self;
@@ -49,7 +49,7 @@ impl Violation for NumpyDeprecatedFunction {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let NumpyDeprecatedFunction { replacement, .. } = self;
+        let Self { replacement, .. } = self;
         Some(format!("Replace with `np.{replacement}`"))
     }
 }

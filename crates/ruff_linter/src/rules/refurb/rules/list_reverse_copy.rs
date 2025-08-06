@@ -54,12 +54,12 @@ pub(crate) struct ListReverseCopy {
 impl AlwaysFixableViolation for ListReverseCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ListReverseCopy { name } = self;
+        let Self { name } = self;
         format!("Use of assignment of `reversed` on list `{name}`")
     }
 
     fn fix_title(&self) -> String {
-        let ListReverseCopy { name } = self;
+        let Self { name } = self;
         format!("Replace with `{name}.reverse()`")
     }
 }

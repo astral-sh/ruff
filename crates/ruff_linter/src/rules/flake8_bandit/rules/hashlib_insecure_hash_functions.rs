@@ -71,7 +71,7 @@ pub(crate) struct HashlibInsecureHashFunction {
 impl Violation for HashlibInsecureHashFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HashlibInsecureHashFunction { library, string } = self;
+        let Self { library, string } = self;
         format!("Probable use of insecure hash functions in `{library}`: `{string}`")
     }
 }

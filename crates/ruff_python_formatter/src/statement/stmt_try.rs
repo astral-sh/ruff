@@ -23,7 +23,7 @@ pub struct FormatExceptHandler {
 }
 
 impl FormatRuleWithOptions<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
-    type Options = FormatExceptHandler;
+    type Options = Self;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.except_handler_kind = options.except_handler_kind;
@@ -48,7 +48,7 @@ impl FormatRule<ExceptHandler, PyFormatContext<'_>> for FormatExceptHandler {
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for ExceptHandler {
     type Format<'a>
-        = FormatRefWithRule<'a, ExceptHandler, FormatExceptHandler, PyFormatContext<'ast>>
+        = FormatRefWithRule<'a, Self, FormatExceptHandler, PyFormatContext<'ast>>
     where
         Self: 'a;
 
@@ -180,9 +180,9 @@ enum CaseKind {
 impl CaseKind {
     fn keyword(self) -> &'static str {
         match self {
-            CaseKind::Try => "try",
-            CaseKind::Else => "else",
-            CaseKind::Finally => "finally",
+            Self::Try => "try",
+            Self::Else => "else",
+            Self::Finally => "finally",
         }
     }
 }

@@ -18,10 +18,10 @@ enum EqCmpOp {
 }
 
 impl EqCmpOp {
-    fn try_from(value: CmpOp) -> Option<EqCmpOp> {
+    fn try_from(value: CmpOp) -> Option<Self> {
         match value {
-            CmpOp::Eq => Some(EqCmpOp::Eq),
-            CmpOp::NotEq => Some(EqCmpOp::NotEq),
+            CmpOp::Eq => Some(Self::Eq),
+            CmpOp::NotEq => Some(Self::NotEq),
             _ => None,
         }
     }
@@ -63,7 +63,7 @@ pub(crate) struct NoneComparison(EqCmpOp);
 impl AlwaysFixableViolation for NoneComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoneComparison(op) = self;
+        let Self(op) = self;
         match op {
             EqCmpOp::Eq => "Comparison to `None` should be `cond is None`".to_string(),
             EqCmpOp::NotEq => "Comparison to `None` should be `cond is not None`".to_string(),
@@ -71,7 +71,7 @@ impl AlwaysFixableViolation for NoneComparison {
     }
 
     fn fix_title(&self) -> String {
-        let NoneComparison(op) = self;
+        let Self(op) = self;
         let title = match op {
             EqCmpOp::Eq => "Replace with `cond is None`",
             EqCmpOp::NotEq => "Replace with `cond is not None`",
@@ -129,7 +129,7 @@ pub(crate) struct TrueFalseComparison {
 impl AlwaysFixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TrueFalseComparison { value, op, cond } = self;
+        let Self { value, op, cond } = self;
         let Some(cond) = cond else {
             return "Avoid equality comparisons to `True` or `False`".to_string();
         };
@@ -153,7 +153,7 @@ impl AlwaysFixableViolation for TrueFalseComparison {
     }
 
     fn fix_title(&self) -> String {
-        let TrueFalseComparison { value, op, cond } = self;
+        let Self { value, op, cond } = self;
         let Some(cond) = cond.as_ref().and_then(|cond| cond.full_display()) else {
             return "Replace comparison".to_string();
         };

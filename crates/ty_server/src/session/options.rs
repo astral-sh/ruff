@@ -75,13 +75,13 @@ pub enum DiagnosticMode {
 
 impl DiagnosticMode {
     pub(crate) fn is_workspace(self) -> bool {
-        matches!(self, DiagnosticMode::Workspace)
+        matches!(self, Self::Workspace)
     }
 
     pub(crate) fn into_check_mode(self) -> CheckMode {
         match self {
-            DiagnosticMode::OpenFilesOnly => CheckMode::OpenFiles,
-            DiagnosticMode::Workspace => CheckMode::AllFiles,
+            Self::OpenFilesOnly => CheckMode::OpenFiles,
+            Self::Workspace => CheckMode::AllFiles,
         }
     }
 }

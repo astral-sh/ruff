@@ -61,8 +61,8 @@ impl ChangeEvent {
     /// Creates a new [`Changed`] event for the file content at the given path.
     ///
     /// [`Changed`]: ChangeEvent::Changed
-    pub fn file_content_changed(path: SystemPathBuf) -> ChangeEvent {
-        ChangeEvent::Changed {
+    pub fn file_content_changed(path: SystemPathBuf) -> Self {
+        Self::Changed {
             path,
             kind: ChangedKind::FileContent,
         }
@@ -74,28 +74,28 @@ impl ChangeEvent {
 
     pub fn system_path(&self) -> Option<&SystemPath> {
         match self {
-            ChangeEvent::Opened(path)
-            | ChangeEvent::Created { path, .. }
-            | ChangeEvent::Changed { path, .. }
-            | ChangeEvent::Deleted { path, .. } => Some(path),
+            Self::Opened(path)
+            | Self::Created { path, .. }
+            | Self::Changed { path, .. }
+            | Self::Deleted { path, .. } => Some(path),
             _ => None,
         }
     }
 
     pub const fn is_rescan(&self) -> bool {
-        matches!(self, ChangeEvent::Rescan)
+        matches!(self, Self::Rescan)
     }
 
     pub const fn is_created(&self) -> bool {
-        matches!(self, ChangeEvent::Created { .. })
+        matches!(self, Self::Created { .. })
     }
 
     pub const fn is_changed(&self) -> bool {
-        matches!(self, ChangeEvent::Changed { .. })
+        matches!(self, Self::Changed { .. })
     }
 
     pub const fn is_deleted(&self) -> bool {
-        matches!(self, ChangeEvent::Deleted { .. })
+        matches!(self, Self::Deleted { .. })
     }
 }
 

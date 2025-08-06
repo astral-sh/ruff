@@ -45,12 +45,12 @@ impl Violation for UnconventionalImportAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnconventionalImportAlias { name, asname } = self;
+        let Self { name, asname } = self;
         format!("`{name}` should be imported as `{asname}`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnconventionalImportAlias { name, asname } = self;
+        let Self { name, asname } = self;
         Some(format!("Alias `{name}` to `{asname}`"))
     }
 }

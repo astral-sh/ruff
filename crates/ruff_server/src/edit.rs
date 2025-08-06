@@ -54,9 +54,7 @@ impl DocumentKey {
     /// Converts the key back into its original URL.
     pub(crate) fn into_url(self) -> Url {
         match self {
-            DocumentKey::NotebookCell(url)
-            | DocumentKey::Notebook(url)
-            | DocumentKey::Text(url) => url,
+            Self::NotebookCell(url) | Self::Notebook(url) | Self::Text(url) => url,
         }
     }
 }
@@ -80,9 +78,9 @@ pub(crate) enum WorkspaceEditTracker {
 impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
     fn from(value: PositionEncoding) -> Self {
         match value {
-            PositionEncoding::UTF8 => lsp_types::PositionEncodingKind::UTF8,
-            PositionEncoding::UTF16 => lsp_types::PositionEncodingKind::UTF16,
-            PositionEncoding::UTF32 => lsp_types::PositionEncodingKind::UTF32,
+            PositionEncoding::UTF8 => Self::UTF8,
+            PositionEncoding::UTF16 => Self::UTF16,
+            PositionEncoding::UTF32 => Self::UTF32,
         }
     }
 }
@@ -92,11 +90,11 @@ impl TryFrom<&lsp_types::PositionEncodingKind> for PositionEncoding {
 
     fn try_from(value: &PositionEncodingKind) -> Result<Self, Self::Error> {
         Ok(if value == &PositionEncodingKind::UTF8 {
-            PositionEncoding::UTF8
+            Self::UTF8
         } else if value == &PositionEncodingKind::UTF16 {
-            PositionEncoding::UTF16
+            Self::UTF16
         } else if value == &PositionEncodingKind::UTF32 {
-            PositionEncoding::UTF32
+            Self::UTF32
         } else {
             return Err(());
         })

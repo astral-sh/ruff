@@ -9,6 +9,6 @@ impl NodeKey {
     where
         N: HasNodeIndex,
     {
-        NodeKey(node.node_index().load())
+        Self(node.node_index().load())
     }
 }

@@ -35,7 +35,7 @@ impl Violation for IOError {
     #![allow(clippy::useless_format)]
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IOError { message } = self;
+        let Self { message } = self;
         format!("{message}")
     }
 }

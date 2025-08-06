@@ -40,7 +40,7 @@ pub(crate) struct UnnecessaryLiteralDict {
 impl AlwaysFixableViolation for UnnecessaryLiteralDict {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralDict { obj_type } = self;
+        let Self { obj_type } = self;
         format!("Unnecessary {obj_type} literal (rewrite as a dict literal)")
     }
 

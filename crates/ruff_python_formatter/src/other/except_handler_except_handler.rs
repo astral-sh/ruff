@@ -24,7 +24,7 @@ pub struct FormatExceptHandlerExceptHandler {
 impl FormatRuleWithOptions<ExceptHandlerExceptHandler, PyFormatContext<'_>>
     for FormatExceptHandlerExceptHandler
 {
-    type Options = FormatExceptHandlerExceptHandler;
+    type Options = Self;
 
     fn with_options(mut self, options: Self::Options) -> Self {
         self.except_handler_kind = options.except_handler_kind;

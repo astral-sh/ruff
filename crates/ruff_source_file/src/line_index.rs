@@ -547,7 +547,7 @@ enum IndexKind {
 
 impl IndexKind {
     const fn is_ascii(self) -> bool {
-        matches!(self, IndexKind::Ascii)
+        matches!(self, Self::Ascii)
     }
 }
 
@@ -648,7 +648,7 @@ const fn unwrap<T: Copy>(option: Option<T>) -> T {
 impl FromStr for OneIndexed {
     type Err = ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(OneIndexed(NonZeroUsize::from_str(s)?))
+        Ok(Self(NonZeroUsize::from_str(s)?))
     }
 }
 

@@ -47,7 +47,7 @@ pub(crate) struct UnnecessaryCollectionCall {
 impl AlwaysFixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryCollectionCall { kind } = self;
+        let Self { kind } = self;
         format!("Unnecessary `{kind}()` call (rewrite as a literal)")
     }
 

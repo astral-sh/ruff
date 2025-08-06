@@ -59,7 +59,7 @@ impl<'db> Bindings<'db> {
     /// empty.
     pub(crate) fn from_union<I>(callable_type: Type<'db>, elements: I) -> Self
     where
-        I: IntoIterator<Item = Bindings<'db>>,
+        I: IntoIterator<Item = Self>,
     {
         let elements: SmallVec<_> = elements
             .into_iter()
@@ -1075,7 +1075,7 @@ impl<'a, 'db> IntoIterator for &'a mut Bindings<'db> {
 }
 
 impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
-    fn from(from: CallableBinding<'db>) -> Bindings<'db> {
+    fn from(from: CallableBinding<'db>) -> Self {
         Bindings {
             callable_type: from.callable_type,
             elements: smallvec_inline![from],
@@ -1086,7 +1086,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
 }
 
 impl<'db> From<Binding<'db>> for Bindings<'db> {
-    fn from(from: Binding<'db>) -> Bindings<'db> {
+    fn from(from: Binding<'db>) -> Self {
         let callable_type = from.callable_type;
         let signature_type = from.signature_type;
         let callable_binding = CallableBinding {
@@ -2241,7 +2241,7 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
-    pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Binding<'db> {
+    pub(crate) fn single(signature_type: Type<'db>, signature: Signature<'db>) -> Self {
         Binding {
             signature,
             callable_type: signature_type,
@@ -2498,7 +2498,7 @@ impl CallableBindingSnapshotter {
     /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
         debug_assert!(indexes.len() > 1);
-        CallableBindingSnapshotter(indexes)
+        Self(indexes)
     }
 
     /// Takes a snapshot of the current state of the matched overload bindings.
@@ -2539,7 +2539,7 @@ pub(crate) struct CallableDescription<'a> {
 }
 
 impl<'db> CallableDescription<'db> {
-    fn new(db: &'db dyn Db, callable_type: Type<'db>) -> Option<CallableDescription<'db>> {
+    fn new(db: &'db dyn Db, callable_type: Type<'db>) -> Option<Self> {
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: "function",
@@ -3010,9 +3010,9 @@ enum FunctionKind {
 impl fmt::Display for FunctionKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FunctionKind::Function => write!(f, "function"),
-            FunctionKind::BoundMethod => write!(f, "bound method"),
-            FunctionKind::MethodWrapper => write!(f, "method wrapper `__get__` of function"),
+            Self::Function => write!(f, "function"),
+            Self::BoundMethod => write!(f, "bound method"),
+            Self::MethodWrapper => write!(f, "method wrapper `__get__` of function"),
         }
     }
 }

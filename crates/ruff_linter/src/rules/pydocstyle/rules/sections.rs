@@ -96,12 +96,12 @@ pub(crate) struct OverindentedSection {
 impl AlwaysFixableViolation for OverindentedSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OverindentedSection { name } = self;
+        let Self { name } = self;
         format!("Section is over-indented (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let OverindentedSection { name } = self;
+        let Self { name } = self;
         format!("Remove over-indentation from \"{name}\"")
     }
 }
@@ -199,12 +199,12 @@ pub(crate) struct OverindentedSectionUnderline {
 impl AlwaysFixableViolation for OverindentedSectionUnderline {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let OverindentedSectionUnderline { name } = self;
+        let Self { name } = self;
         format!("Section underline is over-indented (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let OverindentedSectionUnderline { name } = self;
+        let Self { name } = self;
         format!("Remove over-indentation from \"{name}\" underline")
     }
 }
@@ -282,12 +282,12 @@ pub(crate) struct NonCapitalizedSectionName {
 impl AlwaysFixableViolation for NonCapitalizedSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonCapitalizedSectionName { name } = self;
+        let Self { name } = self;
         format!("Section name should be properly capitalized (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let NonCapitalizedSectionName { name } = self;
+        let Self { name } = self;
         format!("Capitalize \"{name}\"")
     }
 }
@@ -380,12 +380,12 @@ pub(crate) struct MissingNewLineAfterSectionName {
 impl AlwaysFixableViolation for MissingNewLineAfterSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingNewLineAfterSectionName { name } = self;
+        let Self { name } = self;
         format!("Section name should end with a newline (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MissingNewLineAfterSectionName { name } = self;
+        let Self { name } = self;
         format!("Add newline after \"{name}\"")
     }
 }
@@ -483,12 +483,12 @@ pub(crate) struct MissingDashedUnderlineAfterSection {
 impl AlwaysFixableViolation for MissingDashedUnderlineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingDashedUnderlineAfterSection { name } = self;
+        let Self { name } = self;
         format!("Missing dashed underline after section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MissingDashedUnderlineAfterSection { name } = self;
+        let Self { name } = self;
         format!("Add dashed line under \"{name}\"")
     }
 }
@@ -589,12 +589,12 @@ pub(crate) struct MissingSectionUnderlineAfterName {
 impl AlwaysFixableViolation for MissingSectionUnderlineAfterName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingSectionUnderlineAfterName { name } = self;
+        let Self { name } = self;
         format!("Section underline should be in the line following the section's name (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MissingSectionUnderlineAfterName { name } = self;
+        let Self { name } = self;
         format!("Add underline to \"{name}\"")
     }
 }
@@ -693,12 +693,12 @@ pub(crate) struct MismatchedSectionUnderlineLength {
 impl AlwaysFixableViolation for MismatchedSectionUnderlineLength {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MismatchedSectionUnderlineLength { name } = self;
+        let Self { name } = self;
         format!("Section underline should match the length of its name (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MismatchedSectionUnderlineLength { name } = self;
+        let Self { name } = self;
         format!("Adjust underline length to match \"{name}\"")
     }
 }
@@ -790,12 +790,12 @@ pub(crate) struct NoBlankLineAfterSection {
 impl AlwaysFixableViolation for NoBlankLineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineAfterSection { name } = self;
+        let Self { name } = self;
         format!("Missing blank line after section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let NoBlankLineAfterSection { name } = self;
+        let Self { name } = self;
         format!("Add blank line after \"{name}\"")
     }
 }
@@ -883,12 +883,12 @@ pub(crate) struct NoBlankLineBeforeSection {
 impl AlwaysFixableViolation for NoBlankLineBeforeSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLineBeforeSection { name } = self;
+        let Self { name } = self;
         format!("Missing blank line before section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let NoBlankLineBeforeSection { name } = self;
+        let Self { name } = self;
         format!("Add blank line before \"{name}\"")
     }
 }
@@ -978,12 +978,12 @@ pub(crate) struct MissingBlankLineAfterLastSection {
 impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingBlankLineAfterLastSection { name } = self;
+        let Self { name } = self;
         format!("Missing blank line after last section (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MissingBlankLineAfterLastSection { name } = self;
+        let Self { name } = self;
         format!("Add blank line after \"{name}\"")
     }
 }
@@ -1067,7 +1067,7 @@ pub(crate) struct EmptyDocstringSection {
 impl Violation for EmptyDocstringSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EmptyDocstringSection { name } = self;
+        let Self { name } = self;
         format!("Section has no content (\"{name}\")")
     }
 }
@@ -1144,12 +1144,12 @@ pub(crate) struct MissingSectionNameColon {
 impl AlwaysFixableViolation for MissingSectionNameColon {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingSectionNameColon { name } = self;
+        let Self { name } = self;
         format!("Section name should end with a colon (\"{name}\")")
     }
 
     fn fix_title(&self) -> String {
-        let MissingSectionNameColon { name } = self;
+        let Self { name } = self;
         format!("Add colon to \"{name}\"")
     }
 }
@@ -1232,7 +1232,7 @@ pub(crate) struct UndocumentedParam {
 impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndocumentedParam { definition, names } = self;
+        let Self { definition, names } = self;
         if names.len() == 1 {
             let name = &names[0];
             format!("Missing argument description in the docstring for `{definition}`: `{name}`")
@@ -1311,7 +1311,7 @@ pub(crate) struct BlankLinesBetweenHeaderAndContent {
 impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesBetweenHeaderAndContent { name } = self;
+        let Self { name } = self;
         format!("No blank lines allowed between a section header and its content (\"{name}\")")
     }
 

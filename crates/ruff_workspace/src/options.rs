@@ -3147,7 +3147,7 @@ pub struct PydocstyleOptions {
 
 impl PydocstyleOptions {
     pub fn into_settings(self) -> pydocstyle::settings::Settings {
-        let PydocstyleOptions {
+        let Self {
             convention,
             ignore_decorators,
             property_decorators,
@@ -3924,7 +3924,7 @@ pub struct LintOptionsWire {
 }
 
 impl From<LintOptionsWire> for LintOptions {
-    fn from(value: LintOptionsWire) -> LintOptions {
+    fn from(value: LintOptionsWire) -> Self {
         let LintOptionsWire {
             allowed_confusables,
             dummy_variable_rgx,
@@ -3979,7 +3979,7 @@ impl From<LintOptionsWire> for LintOptions {
             future_annotations,
         } = value;
 
-        LintOptions {
+        Self {
             #[expect(deprecated)]
             common: LintCommonOptions {
                 allowed_confusables,

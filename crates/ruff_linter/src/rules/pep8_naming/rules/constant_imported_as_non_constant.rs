@@ -57,7 +57,7 @@ pub(crate) struct ConstantImportedAsNonConstant {
 impl Violation for ConstantImportedAsNonConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConstantImportedAsNonConstant { name, asname } = self;
+        let Self { name, asname } = self;
         format!("Constant `{name}` imported as non-constant `{asname}`")
     }
 }

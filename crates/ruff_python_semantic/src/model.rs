@@ -2141,20 +2141,20 @@ pub enum TypingOnlyBindingsStatus {
 
 impl TypingOnlyBindingsStatus {
     pub const fn is_allowed(self) -> bool {
-        matches!(self, TypingOnlyBindingsStatus::Allowed)
+        matches!(self, Self::Allowed)
     }
 
     pub const fn is_disallowed(self) -> bool {
-        matches!(self, TypingOnlyBindingsStatus::Disallowed)
+        matches!(self, Self::Disallowed)
     }
 }
 
 impl From<bool> for TypingOnlyBindingsStatus {
     fn from(value: bool) -> Self {
         if value {
-            TypingOnlyBindingsStatus::Allowed
+            Self::Allowed
         } else {
-            TypingOnlyBindingsStatus::Disallowed
+            Self::Disallowed
         }
     }
 }

@@ -37,7 +37,7 @@ impl Violation for ByteStringUsage {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ByteStringUsage { origin } = self;
+        let Self { origin } = self;
         format!("Do not use `{origin}.ByteString`, which has unclear semantics and is deprecated")
     }
 }

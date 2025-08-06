@@ -64,7 +64,7 @@ impl Violation for RelativeImports {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RelativeImports { strictness } = self;
+        let Self { strictness } = self;
         Some(match strictness {
             Strictness::Parents => {
                 "Replace relative imports from parent modules with absolute imports".to_string()

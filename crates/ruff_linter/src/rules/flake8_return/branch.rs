@@ -9,8 +9,8 @@ pub(crate) enum Branch {
 impl fmt::Display for Branch {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Branch::Elif => fmt.write_str("elif"),
-            Branch::Else => fmt.write_str("else"),
+            Self::Elif => fmt.write_str("elif"),
+            Self::Else => fmt.write_str("else"),
         }
     }
 }

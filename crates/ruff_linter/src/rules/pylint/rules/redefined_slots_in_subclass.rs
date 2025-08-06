@@ -46,7 +46,7 @@ pub(crate) struct RedefinedSlotsInSubclass {
 impl Violation for RedefinedSlotsInSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedSlotsInSubclass { base, slot_name } = self;
+        let Self { base, slot_name } = self;
         format!("Slot `{slot_name}` redefined from base class `{base}`")
     }
 }

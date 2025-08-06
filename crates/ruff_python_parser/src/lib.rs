@@ -382,7 +382,7 @@ impl<T> Parsed<T> {
     ///
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
-    pub fn as_result(&self) -> Result<&Parsed<T>, &[ParseError]> {
+    pub fn as_result(&self) -> Result<&Self, &[ParseError]> {
         if self.has_valid_syntax() {
             Ok(self)
         } else {
@@ -395,7 +395,7 @@ impl<T> Parsed<T> {
     ///
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
-    pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
+    pub(crate) fn into_result(self) -> Result<Self, ParseError> {
         if self.has_valid_syntax() {
             Ok(self)
         } else {
@@ -480,8 +480,8 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    pub(crate) fn new(tokens: Vec<Token>) -> Tokens {
-        Tokens { raw: tokens }
+    pub(crate) fn new(tokens: Vec<Token>) -> Self {
+        Self { raw: tokens }
     }
 
     /// Returns an iterator over all the tokens that provides context.
@@ -745,13 +745,13 @@ impl Iterator for TokenAt {
 
     fn next(&mut self) -> Option<Self::Item> {
         match *self {
-            TokenAt::None => None,
-            TokenAt::Single(token) => {
-                *self = TokenAt::None;
+            Self::None => None,
+            Self::Single(token) => {
+                *self = Self::None;
                 Some(token)
             }
-            TokenAt::Between(first, second) => {
-                *self = TokenAt::Single(second);
+            Self::Between(first, second) => {
+                *self = Self::Single(second);
                 Some(first)
             }
         }
@@ -768,7 +768,7 @@ impl From<&Tokens> for CommentRanges {
                 ranges.push(token.range());
             }
         }
-        CommentRanges::new(ranges)
+        Self::new(ranges)
     }
 }
 
@@ -785,7 +785,7 @@ pub struct TokenIterWithContext<'a> {
 }
 
 impl<'a> TokenIterWithContext<'a> {
-    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+    fn new(tokens: &'a [Token]) -> Self {
         TokenIterWithContext {
             inner: tokens.iter(),
             nesting: 0,
@@ -873,9 +873,9 @@ impl std::str::FromStr for Mode {
     type Err = ModeParseError;
     fn from_str(s: &str) -> Result<Self, ModeParseError> {
         match s {
-            "exec" | "single" => Ok(Mode::Module),
-            "eval" => Ok(Mode::Expression),
-            "ipython" => Ok(Mode::Ipython),
+            "exec" | "single" => Ok(Self::Module),
+            "eval" => Ok(Self::Expression),
+            "ipython" => Ok(Self::Ipython),
             _ => Err(ModeParseError),
         }
     }
@@ -889,8 +889,8 @@ pub trait AsMode {
 impl AsMode for PySourceType {
     fn as_mode(&self) -> Mode {
         match self {
-            PySourceType::Python | PySourceType::Stub => Mode::Module,
-            PySourceType::Ipynb => Mode::Ipython,
+            Self::Python | Self::Stub => Mode::Module,
+            Self::Ipynb => Mode::Ipython,
         }
     }
 }

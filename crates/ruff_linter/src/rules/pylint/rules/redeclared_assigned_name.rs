@@ -35,7 +35,7 @@ pub(crate) struct RedeclaredAssignedName {
 impl Violation for RedeclaredAssignedName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedeclaredAssignedName { name } = self;
+        let Self { name } = self;
         format!("Redeclared variable `{name}` in assignment")
     }
 }

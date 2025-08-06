@@ -48,7 +48,7 @@ pub(crate) struct DjangoNullableModelStringField {
 impl Violation for DjangoNullableModelStringField {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DjangoNullableModelStringField { field_name } = self;
+        let Self { field_name } = self;
         format!("Avoid using `null=True` on string-based fields such as `{field_name}`")
     }
 }

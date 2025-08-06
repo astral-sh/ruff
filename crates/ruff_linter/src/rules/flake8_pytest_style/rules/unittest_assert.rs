@@ -65,47 +65,47 @@ pub(crate) enum UnittestAssert {
 impl std::fmt::Display for UnittestAssert {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UnittestAssert::AlmostEqual => write!(f, "assertAlmostEqual"),
-            UnittestAssert::AlmostEquals => write!(f, "assertAlmostEquals"),
-            UnittestAssert::CountEqual => write!(f, "assertCountEqual"),
-            UnittestAssert::DictContainsSubset => write!(f, "assertDictContainsSubset"),
-            UnittestAssert::DictEqual => write!(f, "assertDictEqual"),
-            UnittestAssert::Equal => write!(f, "assertEqual"),
-            UnittestAssert::Equals => write!(f, "assertEquals"),
-            UnittestAssert::FailIf => write!(f, "failIf"),
-            UnittestAssert::FailIfAlmostEqual => write!(f, "failIfAlmostEqual"),
-            UnittestAssert::FailIfEqual => write!(f, "failIfEqual"),
-            UnittestAssert::FailUnless => write!(f, "failUnless"),
-            UnittestAssert::FailUnlessAlmostEqual => write!(f, "failUnlessAlmostEqual"),
-            UnittestAssert::FailUnlessEqual => write!(f, "failUnlessEqual"),
-            UnittestAssert::False => write!(f, "assertFalse"),
-            UnittestAssert::Greater => write!(f, "assertGreater"),
-            UnittestAssert::GreaterEqual => write!(f, "assertGreaterEqual"),
-            UnittestAssert::In => write!(f, "assertIn"),
-            UnittestAssert::Is => write!(f, "assertIs"),
-            UnittestAssert::IsInstance => write!(f, "assertIsInstance"),
-            UnittestAssert::IsNone => write!(f, "assertIsNone"),
-            UnittestAssert::IsNot => write!(f, "assertIsNot"),
-            UnittestAssert::IsNotNone => write!(f, "assertIsNotNone"),
-            UnittestAssert::Less => write!(f, "assertLess"),
-            UnittestAssert::LessEqual => write!(f, "assertLessEqual"),
-            UnittestAssert::ListEqual => write!(f, "assertListEqual"),
-            UnittestAssert::MultiLineEqual => write!(f, "assertMultiLineEqual"),
-            UnittestAssert::NotAlmostEqual => write!(f, "assertNotAlmostEqual"),
-            UnittestAssert::NotAlmostEquals => write!(f, "assertNotAlmostEquals"),
-            UnittestAssert::NotEqual => write!(f, "assertNotEqual"),
-            UnittestAssert::NotEquals => write!(f, "assertNotEquals"),
-            UnittestAssert::NotIn => write!(f, "assertNotIn"),
-            UnittestAssert::NotIsInstance => write!(f, "assertNotIsInstance"),
-            UnittestAssert::NotRegex => write!(f, "assertNotRegex"),
-            UnittestAssert::NotRegexpMatches => write!(f, "assertNotRegexpMatches"),
-            UnittestAssert::Regex => write!(f, "assertRegex"),
-            UnittestAssert::RegexpMatches => write!(f, "assertRegexpMatches"),
-            UnittestAssert::SequenceEqual => write!(f, "assertSequenceEqual"),
-            UnittestAssert::SetEqual => write!(f, "assertSetEqual"),
-            UnittestAssert::True => write!(f, "assertTrue"),
-            UnittestAssert::TupleEqual => write!(f, "assertTupleEqual"),
-            UnittestAssert::Underscore => write!(f, "assert_"),
+            Self::AlmostEqual => write!(f, "assertAlmostEqual"),
+            Self::AlmostEquals => write!(f, "assertAlmostEquals"),
+            Self::CountEqual => write!(f, "assertCountEqual"),
+            Self::DictContainsSubset => write!(f, "assertDictContainsSubset"),
+            Self::DictEqual => write!(f, "assertDictEqual"),
+            Self::Equal => write!(f, "assertEqual"),
+            Self::Equals => write!(f, "assertEquals"),
+            Self::FailIf => write!(f, "failIf"),
+            Self::FailIfAlmostEqual => write!(f, "failIfAlmostEqual"),
+            Self::FailIfEqual => write!(f, "failIfEqual"),
+            Self::FailUnless => write!(f, "failUnless"),
+            Self::FailUnlessAlmostEqual => write!(f, "failUnlessAlmostEqual"),
+            Self::FailUnlessEqual => write!(f, "failUnlessEqual"),
+            Self::False => write!(f, "assertFalse"),
+            Self::Greater => write!(f, "assertGreater"),
+            Self::GreaterEqual => write!(f, "assertGreaterEqual"),
+            Self::In => write!(f, "assertIn"),
+            Self::Is => write!(f, "assertIs"),
+            Self::IsInstance => write!(f, "assertIsInstance"),
+            Self::IsNone => write!(f, "assertIsNone"),
+            Self::IsNot => write!(f, "assertIsNot"),
+            Self::IsNotNone => write!(f, "assertIsNotNone"),
+            Self::Less => write!(f, "assertLess"),
+            Self::LessEqual => write!(f, "assertLessEqual"),
+            Self::ListEqual => write!(f, "assertListEqual"),
+            Self::MultiLineEqual => write!(f, "assertMultiLineEqual"),
+            Self::NotAlmostEqual => write!(f, "assertNotAlmostEqual"),
+            Self::NotAlmostEquals => write!(f, "assertNotAlmostEquals"),
+            Self::NotEqual => write!(f, "assertNotEqual"),
+            Self::NotEquals => write!(f, "assertNotEquals"),
+            Self::NotIn => write!(f, "assertNotIn"),
+            Self::NotIsInstance => write!(f, "assertNotIsInstance"),
+            Self::NotRegex => write!(f, "assertNotRegex"),
+            Self::NotRegexpMatches => write!(f, "assertNotRegexpMatches"),
+            Self::Regex => write!(f, "assertRegex"),
+            Self::RegexpMatches => write!(f, "assertRegexpMatches"),
+            Self::SequenceEqual => write!(f, "assertSequenceEqual"),
+            Self::SetEqual => write!(f, "assertSetEqual"),
+            Self::True => write!(f, "assertTrue"),
+            Self::TupleEqual => write!(f, "assertTupleEqual"),
+            Self::Underscore => write!(f, "assert_"),
         }
     }
 }
@@ -115,47 +115,47 @@ impl TryFrom<&str> for UnittestAssert {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "assertAlmostEqual" => Ok(UnittestAssert::AlmostEqual),
-            "assertAlmostEquals" => Ok(UnittestAssert::AlmostEquals),
-            "assertCountEqual" => Ok(UnittestAssert::CountEqual),
-            "assertDictContainsSubset" => Ok(UnittestAssert::DictContainsSubset),
-            "assertDictEqual" => Ok(UnittestAssert::DictEqual),
-            "assertEqual" => Ok(UnittestAssert::Equal),
-            "assertEquals" => Ok(UnittestAssert::Equals),
-            "failIf" => Ok(UnittestAssert::FailIf),
-            "failIfAlmostEqual" => Ok(UnittestAssert::FailIfAlmostEqual),
-            "failIfEqual" => Ok(UnittestAssert::FailIfEqual),
-            "failUnless" => Ok(UnittestAssert::FailUnless),
-            "failUnlessAlmostEqual" => Ok(UnittestAssert::FailUnlessAlmostEqual),
-            "failUnlessEqual" => Ok(UnittestAssert::FailUnlessEqual),
-            "assertFalse" => Ok(UnittestAssert::False),
-            "assertGreater" => Ok(UnittestAssert::Greater),
-            "assertGreaterEqual" => Ok(UnittestAssert::GreaterEqual),
-            "assertIn" => Ok(UnittestAssert::In),
-            "assertIs" => Ok(UnittestAssert::Is),
-            "assertIsInstance" => Ok(UnittestAssert::IsInstance),
-            "assertIsNone" => Ok(UnittestAssert::IsNone),
-            "assertIsNot" => Ok(UnittestAssert::IsNot),
-            "assertIsNotNone" => Ok(UnittestAssert::IsNotNone),
-            "assertLess" => Ok(UnittestAssert::Less),
-            "assertLessEqual" => Ok(UnittestAssert::LessEqual),
-            "assertListEqual" => Ok(UnittestAssert::ListEqual),
-            "assertMultiLineEqual" => Ok(UnittestAssert::MultiLineEqual),
-            "assertNotAlmostEqual" => Ok(UnittestAssert::NotAlmostEqual),
-            "assertNotAlmostEquals" => Ok(UnittestAssert::NotAlmostEquals),
-            "assertNotEqual" => Ok(UnittestAssert::NotEqual),
-            "assertNotEquals" => Ok(UnittestAssert::NotEquals),
-            "assertNotIn" => Ok(UnittestAssert::NotIn),
-            "assertNotIsInstance" => Ok(UnittestAssert::NotIsInstance),
-            "assertNotRegex" => Ok(UnittestAssert::NotRegex),
-            "assertNotRegexpMatches" => Ok(UnittestAssert::NotRegexpMatches),
-            "assertRegex" => Ok(UnittestAssert::Regex),
-            "assertRegexpMatches" => Ok(UnittestAssert::RegexpMatches),
-            "assertSequenceEqual" => Ok(UnittestAssert::SequenceEqual),
-            "assertSetEqual" => Ok(UnittestAssert::SetEqual),
-            "assertTrue" => Ok(UnittestAssert::True),
-            "assertTupleEqual" => Ok(UnittestAssert::TupleEqual),
-            "assert_" => Ok(UnittestAssert::Underscore),
+            "assertAlmostEqual" => Ok(Self::AlmostEqual),
+            "assertAlmostEquals" => Ok(Self::AlmostEquals),
+            "assertCountEqual" => Ok(Self::CountEqual),
+            "assertDictContainsSubset" => Ok(Self::DictContainsSubset),
+            "assertDictEqual" => Ok(Self::DictEqual),
+            "assertEqual" => Ok(Self::Equal),
+            "assertEquals" => Ok(Self::Equals),
+            "failIf" => Ok(Self::FailIf),
+            "failIfAlmostEqual" => Ok(Self::FailIfAlmostEqual),
+            "failIfEqual" => Ok(Self::FailIfEqual),
+            "failUnless" => Ok(Self::FailUnless),
+            "failUnlessAlmostEqual" => Ok(Self::FailUnlessAlmostEqual),
+            "failUnlessEqual" => Ok(Self::FailUnlessEqual),
+            "assertFalse" => Ok(Self::False),
+            "assertGreater" => Ok(Self::Greater),
+            "assertGreaterEqual" => Ok(Self::GreaterEqual),
+            "assertIn" => Ok(Self::In),
+            "assertIs" => Ok(Self::Is),
+            "assertIsInstance" => Ok(Self::IsInstance),
+            "assertIsNone" => Ok(Self::IsNone),
+            "assertIsNot" => Ok(Self::IsNot),
+            "assertIsNotNone" => Ok(Self::IsNotNone),
+            "assertLess" => Ok(Self::Less),
+            "assertLessEqual" => Ok(Self::LessEqual),
+            "assertListEqual" => Ok(Self::ListEqual),
+            "assertMultiLineEqual" => Ok(Self::MultiLineEqual),
+            "assertNotAlmostEqual" => Ok(Self::NotAlmostEqual),
+            "assertNotAlmostEquals" => Ok(Self::NotAlmostEquals),
+            "assertNotEqual" => Ok(Self::NotEqual),
+            "assertNotEquals" => Ok(Self::NotEquals),
+            "assertNotIn" => Ok(Self::NotIn),
+            "assertNotIsInstance" => Ok(Self::NotIsInstance),
+            "assertNotRegex" => Ok(Self::NotRegex),
+            "assertNotRegexpMatches" => Ok(Self::NotRegexpMatches),
+            "assertRegex" => Ok(Self::Regex),
+            "assertRegexpMatches" => Ok(Self::RegexpMatches),
+            "assertSequenceEqual" => Ok(Self::SequenceEqual),
+            "assertSetEqual" => Ok(Self::SetEqual),
+            "assertTrue" => Ok(Self::True),
+            "assertTupleEqual" => Ok(Self::TupleEqual),
+            "assert_" => Ok(Self::Underscore),
             _ => Err(format!("Unknown unittest assert method: {value}")),
         }
     }
@@ -183,47 +183,47 @@ fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {
 impl UnittestAssert {
     fn arg_spec(&self) -> &[&str] {
         match self {
-            UnittestAssert::AlmostEqual => &["first", "second", "places", "msg", "delta"],
-            UnittestAssert::AlmostEquals => &["first", "second", "places", "msg", "delta"],
-            UnittestAssert::CountEqual => &["first", "second", "msg"],
-            UnittestAssert::DictContainsSubset => &["subset", "dictionary", "msg"],
-            UnittestAssert::DictEqual => &["first", "second", "msg"],
-            UnittestAssert::Equal => &["first", "second", "msg"],
-            UnittestAssert::Equals => &["first", "second", "msg"],
-            UnittestAssert::False => &["expr", "msg"],
-            UnittestAssert::Greater => &["first", "second", "msg"],
-            UnittestAssert::GreaterEqual => &["first", "second", "msg"],
-            UnittestAssert::In => &["member", "container", "msg"],
-            UnittestAssert::Is => &["first", "second", "msg"],
-            UnittestAssert::IsInstance => &["obj", "cls", "msg"],
-            UnittestAssert::IsNone => &["expr", "msg"],
-            UnittestAssert::IsNot => &["first", "second", "msg"],
-            UnittestAssert::IsNotNone => &["expr", "msg"],
-            UnittestAssert::Less => &["first", "second", "msg"],
-            UnittestAssert::LessEqual => &["first", "second", "msg"],
-            UnittestAssert::ListEqual => &["first", "second", "msg"],
-            UnittestAssert::MultiLineEqual => &["first", "second", "msg"],
-            UnittestAssert::NotAlmostEqual => &["first", "second", "msg"],
-            UnittestAssert::NotAlmostEquals => &["first", "second", "msg"],
-            UnittestAssert::NotEqual => &["first", "second", "msg"],
-            UnittestAssert::NotEquals => &["first", "second", "msg"],
-            UnittestAssert::NotIn => &["member", "container", "msg"],
-            UnittestAssert::NotIsInstance => &["obj", "cls", "msg"],
-            UnittestAssert::NotRegex => &["text", "regex", "msg"],
-            UnittestAssert::NotRegexpMatches => &["text", "regex", "msg"],
-            UnittestAssert::Regex => &["text", "regex", "msg"],
-            UnittestAssert::RegexpMatches => &["text", "regex", "msg"],
-            UnittestAssert::SequenceEqual => &["first", "second", "msg", "seq_type"],
-            UnittestAssert::SetEqual => &["first", "second", "msg"],
-            UnittestAssert::True => &["expr", "msg"],
-            UnittestAssert::TupleEqual => &["first", "second", "msg"],
-            UnittestAssert::Underscore => &["expr", "msg"],
-            UnittestAssert::FailIf => &["expr", "msg"],
-            UnittestAssert::FailIfAlmostEqual => &["first", "second", "msg"],
-            UnittestAssert::FailIfEqual => &["first", "second", "msg"],
-            UnittestAssert::FailUnless => &["expr", "msg"],
-            UnittestAssert::FailUnlessAlmostEqual => &["first", "second", "places", "msg", "delta"],
-            UnittestAssert::FailUnlessEqual => &["first", "second", "places", "msg", "delta"],
+            Self::AlmostEqual => &["first", "second", "places", "msg", "delta"],
+            Self::AlmostEquals => &["first", "second", "places", "msg", "delta"],
+            Self::CountEqual => &["first", "second", "msg"],
+            Self::DictContainsSubset => &["subset", "dictionary", "msg"],
+            Self::DictEqual => &["first", "second", "msg"],
+            Self::Equal => &["first", "second", "msg"],
+            Self::Equals => &["first", "second", "msg"],
+            Self::False => &["expr", "msg"],
+            Self::Greater => &["first", "second", "msg"],
+            Self::GreaterEqual => &["first", "second", "msg"],
+            Self::In => &["member", "container", "msg"],
+            Self::Is => &["first", "second", "msg"],
+            Self::IsInstance => &["obj", "cls", "msg"],
+            Self::IsNone => &["expr", "msg"],
+            Self::IsNot => &["first", "second", "msg"],
+            Self::IsNotNone => &["expr", "msg"],
+            Self::Less => &["first", "second", "msg"],
+            Self::LessEqual => &["first", "second", "msg"],
+            Self::ListEqual => &["first", "second", "msg"],
+            Self::MultiLineEqual => &["first", "second", "msg"],
+            Self::NotAlmostEqual => &["first", "second", "msg"],
+            Self::NotAlmostEquals => &["first", "second", "msg"],
+            Self::NotEqual => &["first", "second", "msg"],
+            Self::NotEquals => &["first", "second", "msg"],
+            Self::NotIn => &["member", "container", "msg"],
+            Self::NotIsInstance => &["obj", "cls", "msg"],
+            Self::NotRegex => &["text", "regex", "msg"],
+            Self::NotRegexpMatches => &["text", "regex", "msg"],
+            Self::Regex => &["text", "regex", "msg"],
+            Self::RegexpMatches => &["text", "regex", "msg"],
+            Self::SequenceEqual => &["first", "second", "msg", "seq_type"],
+            Self::SetEqual => &["first", "second", "msg"],
+            Self::True => &["expr", "msg"],
+            Self::TupleEqual => &["first", "second", "msg"],
+            Self::Underscore => &["expr", "msg"],
+            Self::FailIf => &["expr", "msg"],
+            Self::FailIfAlmostEqual => &["first", "second", "msg"],
+            Self::FailIfEqual => &["first", "second", "msg"],
+            Self::FailUnless => &["expr", "msg"],
+            Self::FailUnlessAlmostEqual => &["first", "second", "places", "msg", "delta"],
+            Self::FailUnlessEqual => &["first", "second", "places", "msg", "delta"],
         }
     }
 
@@ -281,42 +281,37 @@ impl UnittestAssert {
     pub(crate) fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
-            UnittestAssert::True
-            | UnittestAssert::False
-            | UnittestAssert::FailUnless
-            | UnittestAssert::FailIf => {
+            Self::True | Self::False | Self::FailUnless | Self::FailIf => {
                 let expr = *args
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                Ok(
-                    if matches!(self, UnittestAssert::False | UnittestAssert::FailIf) {
-                        assert(
-                            &Expr::UnaryOp(ast::ExprUnaryOp {
-                                op: UnaryOp::Not,
-                                operand: Box::new(expr.clone()),
-                                range: TextRange::default(),
-                                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-                            }),
-                            msg,
-                        )
-                    } else {
-                        assert(expr, msg)
-                    },
-                )
+                Ok(if matches!(self, Self::False | Self::FailIf) {
+                    assert(
+                        &Expr::UnaryOp(ast::ExprUnaryOp {
+                            op: UnaryOp::Not,
+                            operand: Box::new(expr.clone()),
+                            range: TextRange::default(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        }),
+                        msg,
+                    )
+                } else {
+                    assert(expr, msg)
+                })
             }
-            UnittestAssert::Equal
-            | UnittestAssert::Equals
-            | UnittestAssert::FailUnlessEqual
-            | UnittestAssert::NotEqual
-            | UnittestAssert::NotEquals
-            | UnittestAssert::FailIfEqual
-            | UnittestAssert::Greater
-            | UnittestAssert::GreaterEqual
-            | UnittestAssert::Less
-            | UnittestAssert::LessEqual
-            | UnittestAssert::Is
-            | UnittestAssert::IsNot => {
+            Self::Equal
+            | Self::Equals
+            | Self::FailUnlessEqual
+            | Self::NotEqual
+            | Self::NotEquals
+            | Self::FailIfEqual
+            | Self::Greater
+            | Self::GreaterEqual
+            | Self::Less
+            | Self::LessEqual
+            | Self::Is
+            | Self::IsNot => {
                 let first = args
                     .get("first")
                     .ok_or_else(|| anyhow!("Missing argument `first`"))?;
@@ -325,24 +320,20 @@ impl UnittestAssert {
                     .ok_or_else(|| anyhow!("Missing argument `second`"))?;
                 let msg = args.get("msg").copied();
                 let cmp_op = match self {
-                    UnittestAssert::Equal
-                    | UnittestAssert::Equals
-                    | UnittestAssert::FailUnlessEqual => CmpOp::Eq,
-                    UnittestAssert::NotEqual
-                    | UnittestAssert::NotEquals
-                    | UnittestAssert::FailIfEqual => CmpOp::NotEq,
-                    UnittestAssert::Greater => CmpOp::Gt,
-                    UnittestAssert::GreaterEqual => CmpOp::GtE,
-                    UnittestAssert::Less => CmpOp::Lt,
-                    UnittestAssert::LessEqual => CmpOp::LtE,
-                    UnittestAssert::Is => CmpOp::Is,
-                    UnittestAssert::IsNot => CmpOp::IsNot,
+                    Self::Equal | Self::Equals | Self::FailUnlessEqual => CmpOp::Eq,
+                    Self::NotEqual | Self::NotEquals | Self::FailIfEqual => CmpOp::NotEq,
+                    Self::Greater => CmpOp::Gt,
+                    Self::GreaterEqual => CmpOp::GtE,
+                    Self::Less => CmpOp::Lt,
+                    Self::LessEqual => CmpOp::LtE,
+                    Self::Is => CmpOp::Is,
+                    Self::IsNot => CmpOp::IsNot,
                     _ => unreachable!(),
                 };
                 let expr = compare(first, cmp_op, second);
                 Ok(assert(&expr, msg))
             }
-            UnittestAssert::In | UnittestAssert::NotIn => {
+            Self::In | Self::NotIn => {
                 let member = args
                     .get("member")
                     .ok_or_else(|| anyhow!("Missing argument `member`"))?;
@@ -350,7 +341,7 @@ impl UnittestAssert {
                     .get("container")
                     .ok_or_else(|| anyhow!("Missing argument `container`"))?;
                 let msg = args.get("msg").copied();
-                let cmp_op = if matches!(self, UnittestAssert::In) {
+                let cmp_op = if matches!(self, Self::In) {
                     CmpOp::In
                 } else {
                     CmpOp::NotIn
@@ -358,12 +349,12 @@ impl UnittestAssert {
                 let expr = compare(member, cmp_op, container);
                 Ok(assert(&expr, msg))
             }
-            UnittestAssert::IsNone | UnittestAssert::IsNotNone => {
+            Self::IsNone | Self::IsNotNone => {
                 let expr = args
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                let cmp_op = if matches!(self, UnittestAssert::IsNone) {
+                let cmp_op = if matches!(self, Self::IsNone) {
                     CmpOp::Is
                 } else {
                     CmpOp::IsNot
@@ -375,7 +366,7 @@ impl UnittestAssert {
                 let expr = compare(expr, cmp_op, &node);
                 Ok(assert(&expr, msg))
             }
-            UnittestAssert::IsInstance | UnittestAssert::NotIsInstance => {
+            Self::IsInstance | Self::NotIsInstance => {
                 let obj = args
                     .get("obj")
                     .ok_or_else(|| anyhow!("Missing argument `obj`"))?;
@@ -401,7 +392,7 @@ impl UnittestAssert {
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 };
                 let isinstance = node1.into();
-                if matches!(self, UnittestAssert::IsInstance) {
+                if matches!(self, Self::IsInstance) {
                     Ok(assert(&isinstance, msg))
                 } else {
                     let node = ast::ExprUnaryOp {
@@ -414,10 +405,7 @@ impl UnittestAssert {
                     Ok(assert(&expr, msg))
                 }
             }
-            UnittestAssert::Regex
-            | UnittestAssert::RegexpMatches
-            | UnittestAssert::NotRegex
-            | UnittestAssert::NotRegexpMatches => {
+            Self::Regex | Self::RegexpMatches | Self::NotRegex | Self::NotRegexpMatches => {
                 let text = args
                     .get("text")
                     .ok_or_else(|| anyhow!("Missing argument `text`"))?;
@@ -450,7 +438,7 @@ impl UnittestAssert {
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
                 };
                 let re_search = node2.into();
-                if matches!(self, UnittestAssert::Regex | UnittestAssert::RegexpMatches) {
+                if matches!(self, Self::Regex | Self::RegexpMatches) {
                     Ok(assert(&re_search, msg))
                 } else {
                     let node = ast::ExprUnaryOp {

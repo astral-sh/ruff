@@ -42,7 +42,7 @@ pub(crate) struct ErrorSuffixOnExceptionName {
 impl Violation for ErrorSuffixOnExceptionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ErrorSuffixOnExceptionName { name } = self;
+        let Self { name } = self;
         format!("Exception name `{name}` should be named with an Error suffix")
     }
 }

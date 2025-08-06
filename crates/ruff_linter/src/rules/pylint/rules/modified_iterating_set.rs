@@ -53,12 +53,12 @@ pub(crate) struct ModifiedIteratingSet {
 impl AlwaysFixableViolation for ModifiedIteratingSet {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ModifiedIteratingSet { name } = self;
+        let Self { name } = self;
         format!("Iterated set `{name}` is modified within the `for` loop",)
     }
 
     fn fix_title(&self) -> String {
-        let ModifiedIteratingSet { name } = self;
+        let Self { name } = self;
         format!("Iterate over a copy of `{name}`")
     }
 }

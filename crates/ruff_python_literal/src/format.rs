@@ -32,23 +32,23 @@ impl FormatParse for FormatConversion {
 }
 
 impl FormatConversion {
-    pub fn from_char(c: char) -> Option<FormatConversion> {
+    pub fn from_char(c: char) -> Option<Self> {
         match c {
-            's' => Some(FormatConversion::Str),
-            'r' => Some(FormatConversion::Repr),
-            'a' => Some(FormatConversion::Ascii),
-            'b' => Some(FormatConversion::Bytes),
+            's' => Some(Self::Str),
+            'r' => Some(Self::Repr),
+            'a' => Some(Self::Ascii),
+            'b' => Some(Self::Bytes),
             _ => None,
         }
     }
 
-    fn from_string(text: &str) -> Option<FormatConversion> {
+    fn from_string(text: &str) -> Option<Self> {
         let mut chars = text.chars();
         if chars.next() != Some('!') {
             return None;
         }
 
-        FormatConversion::from_char(chars.next()?)
+        Self::from_char(chars.next()?)
     }
 }
 
@@ -61,12 +61,12 @@ pub enum FormatAlign {
 }
 
 impl FormatAlign {
-    fn from_char(c: char) -> Option<FormatAlign> {
+    fn from_char(c: char) -> Option<Self> {
         match c {
-            '<' => Some(FormatAlign::Left),
-            '>' => Some(FormatAlign::Right),
-            '=' => Some(FormatAlign::AfterSign),
-            '^' => Some(FormatAlign::Center),
+            '<' => Some(Self::Left),
+            '>' => Some(Self::Right),
+            '=' => Some(Self::AfterSign),
+            '^' => Some(Self::Center),
             _ => None,
         }
     }
@@ -135,7 +135,7 @@ pub enum FormatType {
 }
 
 impl From<&FormatType> for char {
-    fn from(from: &FormatType) -> char {
+    fn from(from: &FormatType) -> Self {
         match from {
             FormatType::String => 's',
             FormatType::Binary => 'b',
@@ -356,7 +356,7 @@ impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
         let placeholders = parse_nested_placeholders(text)?;
         if !placeholders.is_empty() {
-            return Ok(FormatSpec::Dynamic(DynamicFormatSpec { placeholders }));
+            return Ok(Self::Dynamic(DynamicFormatSpec { placeholders }));
         }
 
         let (conversion, text) = FormatConversion::parse(text);
@@ -388,7 +388,7 @@ impl FormatSpec {
             align = align.or(Some(FormatAlign::AfterSign));
         }
 
-        Ok(FormatSpec::Static(StaticFormatSpec {
+        Ok(Self::Static(StaticFormatSpec {
             conversion,
             fill,
             align,
@@ -467,7 +467,7 @@ impl Error for FormatParseError {}
 impl FromStr for FormatSpec {
     type Err = FormatSpecError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        FormatSpec::parse(s)
+        Self::parse(s)
     }
 }
 
@@ -481,7 +481,7 @@ pub enum FieldNamePart {
 impl FieldNamePart {
     fn parse_part(
         chars: &mut impl PeekingNext<Item = char>,
-    ) -> Result<Option<FieldNamePart>, FormatParseError> {
+    ) -> Result<Option<Self>, FormatParseError> {
         chars
             .next()
             .map(|ch| match ch {
@@ -493,7 +493,7 @@ impl FieldNamePart {
                     if attribute.is_empty() {
                         Err(FormatParseError::EmptyAttribute)
                     } else {
-                        Ok(FieldNamePart::Attribute(attribute))
+                        Ok(Self::Attribute(attribute))
                     }
                 }
                 '[' => {
@@ -503,9 +503,9 @@ impl FieldNamePart {
                             return if index.is_empty() {
                                 Err(FormatParseError::EmptyAttribute)
                             } else if let Ok(index) = index.parse::<usize>() {
-                                Ok(FieldNamePart::Index(index))
+                                Ok(Self::Index(index))
                             } else {
-                                Ok(FieldNamePart::StringIndex(index))
+                                Ok(Self::StringIndex(index))
                             };
                         }
                         index.push(ch);
@@ -532,7 +532,7 @@ pub struct FieldName {
 }
 
 impl FieldName {
-    pub fn parse(text: &str) -> Result<FieldName, FormatParseError> {
+    pub fn parse(text: &str) -> Result<Self, FormatParseError> {
         let mut chars = text.chars().peekable();
         let mut first = String::new();
         for ch in chars.peeking_take_while(|ch| *ch != '.' && *ch != '[') {
@@ -552,7 +552,7 @@ impl FieldName {
             parts.push(part);
         }
 
-        Ok(FieldName { field_type, parts })
+        Ok(Self { field_type, parts })
     }
 }
 
@@ -593,7 +593,7 @@ impl FormatString {
         let mut cur_text = text;
         let mut result_string = String::new();
         while !cur_text.is_empty() {
-            match FormatString::parse_literal_single(cur_text) {
+            match Self::parse_literal_single(cur_text) {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
                     cur_text = remaining;
@@ -671,7 +671,7 @@ impl FormatString {
                     continue;
                 }
                 let (_, right) = text.split_at(idx + 1);
-                let format_part = FormatString::parse_part_in_brackets(&left)?;
+                let format_part = Self::parse_part_in_brackets(&left)?;
                 return Ok((format_part, right));
             }
             left.push(c);
@@ -694,14 +694,14 @@ impl<'a> FromTemplate<'a> for FormatString {
         while !cur_text.is_empty() {
             // Try to parse both literals and bracketed format parts until we
             // run out of text
-            cur_text = FormatString::parse_literal(cur_text)
-                .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
+            cur_text = Self::parse_literal(cur_text)
+                .or_else(|_| Self::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
                 .map(|(part, new_text)| {
                     parts.push(part);
                     new_text
                 })?;
         }
-        Ok(FormatString {
+        Ok(Self {
             format_parts: parts,
         })
     }

@@ -99,7 +99,7 @@ impl Violation for ImplicitOptional {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let ImplicitOptional { conversion_type } = self;
+        let Self { conversion_type } = self;
         Some(format!("Convert to `{conversion_type}`"))
     }
 }

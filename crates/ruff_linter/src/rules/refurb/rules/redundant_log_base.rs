@@ -61,13 +61,13 @@ impl Violation for RedundantLogBase {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantLogBase { base, arg } = self;
+        let Self { base, arg } = self;
         let log_function = base.to_log_function();
         format!("Prefer `math.{log_function}({arg})` over `math.log` with a redundant base")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RedundantLogBase { base, arg } = self;
+        let Self { base, arg } = self;
         let log_function = base.to_log_function();
         Some(format!("Replace with `math.{log_function}({arg})`"))
     }
@@ -125,9 +125,9 @@ enum Base {
 impl Base {
     fn to_log_function(self) -> &'static str {
         match self {
-            Base::E => "log",
-            Base::Two => "log2",
-            Base::Ten => "log10",
+            Self::E => "log",
+            Self::Two => "log2",
+            Self::Ten => "log10",
         }
     }
 }

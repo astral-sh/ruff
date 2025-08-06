@@ -51,7 +51,7 @@ pub(crate) struct InvalidArgumentName {
 impl Violation for InvalidArgumentName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidArgumentName { name } = self;
+        let Self { name } = self;
         format!("Argument name `{name}` should be lowercase")
     }
 }

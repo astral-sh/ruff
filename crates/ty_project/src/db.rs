@@ -184,8 +184,8 @@ pub enum CheckMode {
 impl fmt::Display for CheckMode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CheckMode::OpenFiles => write!(f, "open files"),
-            CheckMode::AllFiles => write!(f, "all files"),
+            Self::OpenFiles => write!(f, "open files"),
+            Self::AllFiles => write!(f, "all files"),
         }
     }
 }

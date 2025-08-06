@@ -123,7 +123,7 @@ enum LoggingCallType {
 impl LoggingCallType {
     fn from_attribute(attr: &str) -> Option<Self> {
         if attr == "log" {
-            Some(LoggingCallType::LogCall)
+            Some(Self::LogCall)
         } else {
             LoggingLevel::from_attribute(attr).map(LoggingCallType::LevelCall)
         }

@@ -60,7 +60,7 @@ pub(crate) struct TooManyReturnStatements {
 impl Violation for TooManyReturnStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyReturnStatements {
+        let Self {
             returns,
             max_returns,
         } = self;

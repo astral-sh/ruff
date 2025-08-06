@@ -47,7 +47,7 @@ pub(crate) struct CallDatetimeWithoutTzinfo(DatetimeModuleAntipattern);
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CallDatetimeWithoutTzinfo(antipattern) = self;
+        let Self(antipattern) = self;
         match antipattern {
             DatetimeModuleAntipattern::NoTzArgumentPassed => {
                 "`datetime.datetime()` called without a `tzinfo` argument".to_string()

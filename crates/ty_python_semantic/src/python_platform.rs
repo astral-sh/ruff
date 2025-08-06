@@ -23,8 +23,8 @@ pub enum PythonPlatform {
 impl From<String> for PythonPlatform {
     fn from(platform: String) -> Self {
         match platform.as_str() {
-            "all" => PythonPlatform::All,
-            _ => PythonPlatform::Identifier(platform.to_string()),
+            "all" => Self::All,
+            _ => Self::Identifier(platform.to_string()),
         }
     }
 }
@@ -32,8 +32,8 @@ impl From<String> for PythonPlatform {
 impl Display for PythonPlatform {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            PythonPlatform::All => f.write_str("all"),
-            PythonPlatform::Identifier(name) => f.write_str(name),
+            Self::All => f.write_str("all"),
+            Self::Identifier(name) => f.write_str(name),
         }
     }
 }
@@ -41,15 +41,15 @@ impl Display for PythonPlatform {
 impl Default for PythonPlatform {
     fn default() -> Self {
         if cfg!(target_os = "windows") {
-            PythonPlatform::Identifier("win32".to_string())
+            Self::Identifier("win32".to_string())
         } else if cfg!(target_os = "macos") {
-            PythonPlatform::Identifier("darwin".to_string())
+            Self::Identifier("darwin".to_string())
         } else if cfg!(target_os = "android") {
-            PythonPlatform::Identifier("android".to_string())
+            Self::Identifier("android".to_string())
         } else if cfg!(target_os = "ios") {
-            PythonPlatform::Identifier("ios".to_string())
+            Self::Identifier("ios".to_string())
         } else {
-            PythonPlatform::Identifier("linux".to_string())
+            Self::Identifier("linux".to_string())
         }
     }
 }
@@ -123,7 +123,7 @@ mod schema {
                     ..SubschemaValidation::default()
                 })),
                 metadata: Some(Box::new(Metadata {
-                    description: Some(<PythonPlatform as RustDoc>::rust_doc().to_string()),
+                    description: Some(<Self as RustDoc>::rust_doc().to_string()),
                     ..Metadata::default()
                 })),
 

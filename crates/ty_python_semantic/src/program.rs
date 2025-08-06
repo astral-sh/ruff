@@ -45,7 +45,7 @@ impl Program {
 
         search_paths.try_register_static_roots(db);
 
-        Program::builder(python_version, python_platform, search_paths)
+        Self::builder(python_version, python_platform, search_paths)
             .durability(Durability::HIGH)
             .new(db)
     }
@@ -184,12 +184,12 @@ impl SearchPathSettings {
     pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
         Self {
             src_roots,
-            ..SearchPathSettings::empty()
+            ..Self::empty()
         }
     }
 
     pub fn empty() -> Self {
-        SearchPathSettings {
+        Self {
             src_roots: vec![],
             extra_paths: vec![],
             custom_typeshed: None,

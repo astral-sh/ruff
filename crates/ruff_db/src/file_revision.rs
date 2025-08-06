@@ -33,13 +33,13 @@ impl FileRevision {
 
 impl From<u128> for FileRevision {
     fn from(value: u128) -> Self {
-        FileRevision(value)
+        Self(value)
     }
 }
 
 impl From<u64> for FileRevision {
     fn from(value: u64) -> Self {
-        FileRevision(u128::from(value))
+        Self(u128::from(value))
     }
 }
 
@@ -49,7 +49,7 @@ impl From<filetime::FileTime> for FileRevision {
         let seconds = seconds << 64;
         let nanos = u128::from(value.nanoseconds());
 
-        FileRevision(seconds | nanos)
+        Self(seconds | nanos)
     }
 }
 

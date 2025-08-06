@@ -97,8 +97,8 @@ enum Container {
 impl Container {
     const fn as_str(self) -> &'static str {
         match self {
-            Container::List => "list",
-            Container::Dict => "dict",
+            Self::List => "list",
+            Self::Dict => "dict",
         }
     }
 }

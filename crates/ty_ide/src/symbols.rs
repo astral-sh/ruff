@@ -55,18 +55,18 @@ impl SymbolKind {
     /// Returns the string representation of the symbol kind.
     pub fn to_string(self) -> &'static str {
         match self {
-            SymbolKind::Module => "Module",
-            SymbolKind::Class => "Class",
-            SymbolKind::Method => "Method",
-            SymbolKind::Function => "Function",
-            SymbolKind::Variable => "Variable",
-            SymbolKind::Constant => "Constant",
-            SymbolKind::Property => "Property",
-            SymbolKind::Field => "Field",
-            SymbolKind::Constructor => "Constructor",
-            SymbolKind::Parameter => "Parameter",
-            SymbolKind::TypeParameter => "TypeParameter",
-            SymbolKind::Import => "Import",
+            Self::Module => "Module",
+            Self::Class => "Class",
+            Self::Method => "Method",
+            Self::Function => "Function",
+            Self::Variable => "Variable",
+            Self::Constant => "Constant",
+            Self::Property => "Property",
+            Self::Field => "Field",
+            Self::Constructor => "Constructor",
+            Self::Parameter => "Parameter",
+            Self::TypeParameter => "TypeParameter",
+            Self::Import => "Import",
         }
     }
 }

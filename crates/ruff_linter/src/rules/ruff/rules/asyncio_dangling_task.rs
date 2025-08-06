@@ -61,7 +61,7 @@ pub(crate) struct AsyncioDanglingTask {
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AsyncioDanglingTask { expr, method } = self;
+        let Self { expr, method } = self;
         format!("Store a reference to the return value of `{expr}.{method}`")
     }
 }
@@ -173,8 +173,8 @@ enum Method {
 impl fmt::Display for Method {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Method::CreateTask => fmt.write_str("create_task"),
-            Method::EnsureFuture => fmt.write_str("ensure_future"),
+            Self::CreateTask => fmt.write_str("create_task"),
+            Self::EnsureFuture => fmt.write_str("ensure_future"),
         }
     }
 }

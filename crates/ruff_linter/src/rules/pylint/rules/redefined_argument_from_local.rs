@@ -40,7 +40,7 @@ pub(crate) struct RedefinedArgumentFromLocal {
 impl Violation for RedefinedArgumentFromLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedArgumentFromLocal { name } = self;
+        let Self { name } = self;
         format!("Redefining argument with the local name `{name}`")
     }
 }

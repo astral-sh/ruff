@@ -59,7 +59,7 @@ pub(crate) struct CamelcaseImportedAsConstant {
 impl Violation for CamelcaseImportedAsConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CamelcaseImportedAsConstant { name, asname } = self;
+        let Self { name, asname } = self;
         format!("Camelcase `{name}` imported as constant `{asname}`")
     }
 }

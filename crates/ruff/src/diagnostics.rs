@@ -110,7 +110,7 @@ impl Diagnostics {
 }
 
 impl Add for Diagnostics {
-    type Output = Diagnostics;
+    type Output = Self;
 
     fn add(mut self, other: Self) -> Self::Output {
         self += other;

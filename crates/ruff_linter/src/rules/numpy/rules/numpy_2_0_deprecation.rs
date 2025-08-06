@@ -61,7 +61,7 @@ impl Violation for Numpy2Deprecation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Numpy2Deprecation {
+        let Self {
             existing,
             migration_guide,
             code_action: _,
@@ -75,7 +75,7 @@ impl Violation for Numpy2Deprecation {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Numpy2Deprecation {
+        let Self {
             existing: _,
             migration_guide: _,
             code_action,

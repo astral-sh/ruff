@@ -40,7 +40,7 @@ pub(crate) struct UndefinedLocal {
 impl Violation for UndefinedLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UndefinedLocal { name } = self;
+        let Self { name } = self;
         format!("Local variable `{name}` referenced before assignment")
     }
 }

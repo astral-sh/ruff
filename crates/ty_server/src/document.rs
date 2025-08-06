@@ -55,8 +55,8 @@ impl DocumentKey {
     /// Returns the file path associated with the key.
     pub(crate) fn path(&self) -> &AnySystemPath {
         match self {
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path,
-            DocumentKey::NotebookCell { notebook_path, .. } => notebook_path,
+            Self::Notebook(path) | Self::Text(path) => path,
+            Self::NotebookCell { notebook_path, .. } => notebook_path,
         }
     }
 
@@ -72,8 +72,8 @@ impl DocumentKey {
     /// For other document types, converts the path to a URL.
     pub(crate) fn to_url(&self) -> Option<Url> {
         match self {
-            DocumentKey::NotebookCell { cell_url, .. } => Some(cell_url.clone()),
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path.to_url(),
+            Self::NotebookCell { cell_url, .. } => Some(cell_url.clone()),
+            Self::Notebook(path) | Self::Text(path) => path.to_url(),
         }
     }
 }
@@ -93,9 +93,9 @@ impl std::fmt::Display for DocumentKey {
 impl From<PositionEncoding> for PositionEncodingKind {
     fn from(value: PositionEncoding) -> Self {
         match value {
-            PositionEncoding::UTF8 => PositionEncodingKind::UTF8,
-            PositionEncoding::UTF16 => PositionEncodingKind::UTF16,
-            PositionEncoding::UTF32 => PositionEncodingKind::UTF32,
+            PositionEncoding::UTF8 => Self::UTF8,
+            PositionEncoding::UTF16 => Self::UTF16,
+            PositionEncoding::UTF32 => Self::UTF32,
         }
     }
 }
@@ -105,11 +105,11 @@ impl TryFrom<&PositionEncodingKind> for PositionEncoding {
 
     fn try_from(value: &PositionEncodingKind) -> Result<Self, Self::Error> {
         Ok(if value == &PositionEncodingKind::UTF8 {
-            PositionEncoding::UTF8
+            Self::UTF8
         } else if value == &PositionEncodingKind::UTF16 {
-            PositionEncoding::UTF16
+            Self::UTF16
         } else if value == &PositionEncodingKind::UTF32 {
-            PositionEncoding::UTF32
+            Self::UTF32
         } else {
             return Err(());
         })

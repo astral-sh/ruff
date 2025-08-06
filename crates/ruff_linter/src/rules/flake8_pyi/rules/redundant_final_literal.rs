@@ -43,7 +43,7 @@ impl Violation for RedundantFinalLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantFinalLiteral { literal } = self;
+        let Self { literal } = self;
         format!(
             "`Final[Literal[{literal}]]` can be replaced with a bare `Final`",
             literal = literal.truncated_display()

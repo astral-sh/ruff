@@ -37,7 +37,7 @@ pub(crate) struct RedundantOpenModes {
 impl AlwaysFixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantOpenModes { replacement } = self;
+        let Self { replacement } = self;
         if replacement.is_empty() {
             "Unnecessary mode argument".to_string()
         } else {
@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for RedundantOpenModes {
     }
 
     fn fix_title(&self) -> String {
-        let RedundantOpenModes { replacement } = self;
+        let Self { replacement } = self;
         if replacement.is_empty() {
             "Remove mode argument".to_string()
         } else {

@@ -275,7 +275,7 @@ impl QuoteMetadata {
                 Self::from_str(text, part.flags(), preferred_quote)
             }
             StringLikePart::FString(fstring) => {
-                let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
+                let metadata = Self::from_str("", part.flags(), preferred_quote);
 
                 metadata.merge_interpolated_string_elements(
                     &fstring.elements,
@@ -285,7 +285,7 @@ impl QuoteMetadata {
                 )
             }
             StringLikePart::TString(tstring) => {
-                let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
+                let metadata = Self::from_str("", part.flags(), preferred_quote);
 
                 metadata.merge_interpolated_string_elements(
                     &tstring.elements,
@@ -346,7 +346,7 @@ impl QuoteMetadata {
     /// E.g. it's okay to merge triple and raw strings from a single `FString` part's literals
     /// but it isn't safe to merge raw and triple quoted strings from different parts of an implicit
     /// concatenated string. Where safe means, it may lead to incorrect results.
-    pub(super) fn merge(self, other: &QuoteMetadata) -> Option<QuoteMetadata> {
+    pub(super) fn merge(self, other: &Self) -> Option<Self> {
         let kind = match (self.kind, other.kind) {
             (
                 QuoteMetadataKind::Regular {
@@ -415,7 +415,7 @@ impl QuoteMetadata {
             match element {
                 InterpolatedStringElement::Literal(literal) => {
                     merged = merged
-                        .merge(&QuoteMetadata::from_str(
+                        .merge(&Self::from_str(
                             context.source().slice(literal),
                             flags,
                             preferred_quote,
@@ -784,12 +784,12 @@ enum UnicodeEscape {
 }
 
 impl UnicodeEscape {
-    fn new(first: char, allow_unicode: bool) -> Option<UnicodeEscape> {
+    fn new(first: char, allow_unicode: bool) -> Option<Self> {
         Some(match first {
-            'x' => UnicodeEscape::Hex(2),
-            'u' if allow_unicode => UnicodeEscape::Hex(4),
-            'U' if allow_unicode => UnicodeEscape::Hex(8),
-            'N' if allow_unicode => UnicodeEscape::CharacterName,
+            'x' => Self::Hex(2),
+            'u' if allow_unicode => Self::Hex(4),
+            'U' if allow_unicode => Self::Hex(8),
+            'N' if allow_unicode => Self::CharacterName,
             _ => return None,
         })
     }
@@ -802,7 +802,7 @@ impl UnicodeEscape {
         let mut normalised = String::new();
 
         let len = match self {
-            UnicodeEscape::Hex(len) => {
+            Self::Hex(len) => {
                 // It's not a valid escape sequence if the input string has fewer characters
                 // left than required by the escape sequence.
                 if input.len() < len {
@@ -834,7 +834,7 @@ impl UnicodeEscape {
 
                 len
             }
-            UnicodeEscape::CharacterName => {
+            Self::CharacterName => {
                 let mut char_indices = input.char_indices();
 
                 if !matches!(char_indices.next(), Some((_, '{'))) {

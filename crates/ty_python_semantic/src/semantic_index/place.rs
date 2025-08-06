@@ -25,7 +25,7 @@ impl PlaceExpr {
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
     pub(crate) fn from_expr_name(name: &ast::ExprName) -> Self {
-        PlaceExpr::Symbol(Symbol::new(name.id.clone()))
+        Self::Symbol(Symbol::new(name.id.clone()))
     }
 
     /// Tries to create a `PlaceExpr` from an expression.
@@ -44,10 +44,10 @@ impl PlaceExpr {
             match current {
                 ast::ExprRef::Name(name) => {
                     if segments.is_empty() {
-                        return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        return Some(Self::Symbol(Symbol::new(name.id.clone())));
                     }
 
-                    return Some(PlaceExpr::Member(Member::new(MemberExpr::new(
+                    return Some(Self::Member(Member::new(MemberExpr::new(
                         name.id.clone(),
                         segments,
                     ))));
@@ -420,15 +420,15 @@ impl PlaceTableBuilder {
 
 impl ScopedPlaceId {
     pub const fn is_symbol(self) -> bool {
-        matches!(self, ScopedPlaceId::Symbol(_))
+        matches!(self, Self::Symbol(_))
     }
 
     pub const fn is_member(self) -> bool {
-        matches!(self, ScopedPlaceId::Member(_))
+        matches!(self, Self::Member(_))
     }
 
     pub const fn as_symbol(self) -> Option<ScopedSymbolId> {
-        if let ScopedPlaceId::Symbol(id) = self {
+        if let Self::Symbol(id) = self {
             Some(id)
         } else {
             None
@@ -437,15 +437,15 @@ impl ScopedPlaceId {
 
     pub const fn expect_symbol(self) -> ScopedSymbolId {
         match self {
-            ScopedPlaceId::Symbol(symbol) => symbol,
-            ScopedPlaceId::Member(_) => {
+            Self::Symbol(symbol) => symbol,
+            Self::Member(_) => {
                 panic!("Expected ScopedPlaceId::Symbol, found ScopedPlaceId::Member")
             }
         }
     }
 
     pub const fn as_member(self) -> Option<ScopedMemberId> {
-        if let ScopedPlaceId::Member(id) = self {
+        if let Self::Member(id) = self {
             Some(id)
         } else {
             None

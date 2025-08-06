@@ -580,21 +580,17 @@ enum Suppressed {
 
 impl Suppressed {
     const fn is_no(self) -> bool {
-        matches!(self, Suppressed::No)
+        matches!(self, Self::No)
     }
 
     const fn is_yes(self) -> bool {
-        matches!(self, Suppressed::Yes)
+        matches!(self, Self::Yes)
     }
 }
 
 impl From<bool> for Suppressed {
     fn from(value: bool) -> Self {
-        if value {
-            Suppressed::Yes
-        } else {
-            Suppressed::No
-        }
+        if value { Self::Yes } else { Self::No }
     }
 }
 

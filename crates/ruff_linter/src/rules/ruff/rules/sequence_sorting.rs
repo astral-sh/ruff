@@ -360,7 +360,7 @@ pub(super) enum CommentComplexity {
 
 impl CommentComplexity {
     pub(super) const fn is_complex(self) -> bool {
-        matches!(self, CommentComplexity::Complex)
+        matches!(self, Self::Complex)
     }
 }
 
@@ -405,7 +405,7 @@ impl<'a> MultilineStringSequenceValue<'a> {
         locator: &Locator,
         tokens: &Tokens,
         string_items: &[&'a str],
-    ) -> Option<MultilineStringSequenceValue<'a>> {
+    ) -> Option<Self> {
         // Parse the multiline string sequence using the raw tokens.
         // See the docs for `collect_string_sequence_lines()` for why we have to
         // use the raw tokens, rather than just the AST, to do this parsing.

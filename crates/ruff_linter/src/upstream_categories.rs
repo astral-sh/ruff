@@ -62,8 +62,8 @@ impl Rule {
 impl Linter {
     pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategoryAndPrefix]> {
         match self {
-            Linter::Pycodestyle => Some(&[E, W]),
-            Linter::Pylint => Some(&[C, E, R, W]),
+            Self::Pycodestyle => Some(&[E, W]),
+            Self::Pylint => Some(&[C, E, R, W]),
             _ => None,
         }
     }

@@ -123,7 +123,7 @@ pub(crate) struct BlankLinesTopLevel {
 impl AlwaysFixableViolation for BlankLinesTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesTopLevel {
+        let Self {
             actual_blank_lines,
             expected_blank_lines,
         } = self;
@@ -189,7 +189,7 @@ pub(crate) struct TooManyBlankLines {
 impl AlwaysFixableViolation for TooManyBlankLines {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyBlankLines { actual_blank_lines } = self;
+        let Self { actual_blank_lines } = self;
 
         format!("Too many blank lines ({actual_blank_lines})")
     }
@@ -286,7 +286,7 @@ pub(crate) struct BlankLinesAfterFunctionOrClass {
 impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesAfterFunctionOrClass {
+        let Self {
             actual_blank_lines: blank_lines,
         } = self;
         format!("Expected 2 blank lines after class or function definition, found ({blank_lines})")
@@ -403,7 +403,7 @@ impl<'a> LinePreprocessor<'a> {
         locator: &'a Locator,
         indent_width: IndentWidth,
         cell_offsets: Option<&'a CellOffsets>,
-    ) -> LinePreprocessor<'a> {
+    ) -> Self {
         LinePreprocessor {
             tokens: tokens.iter_with_context(),
             locator,
@@ -556,13 +556,13 @@ enum BlankLines {
 impl BlankLines {
     fn add(&mut self, line_range: TextRange) {
         match self {
-            BlankLines::Zero => {
-                *self = BlankLines::Many {
+            Self::Zero => {
+                *self = Self::Many {
                     count: NonZeroU32::MIN,
                     range: line_range,
                 }
             }
-            BlankLines::Many { count, range } => {
+            Self::Many { count, range } => {
                 *count = count.saturating_add(1);
                 *range = TextRange::new(range.start(), line_range.end());
             }
@@ -571,15 +571,15 @@ impl BlankLines {
 
     fn count(&self) -> u32 {
         match self {
-            BlankLines::Zero => 0,
-            BlankLines::Many { count, .. } => count.get(),
+            Self::Zero => 0,
+            Self::Many { count, .. } => count.get(),
         }
     }
 
     fn range(&self) -> Option<TextRange> {
         match self {
-            BlankLines::Zero => None,
-            BlankLines::Many { range, .. } => Some(*range),
+            Self::Zero => None,
+            Self::Many { range, .. } => Some(*range),
         }
     }
 }
@@ -632,19 +632,19 @@ enum Follows {
 impl Follows {
     // Allow a function/method to follow a function/method with a dummy body.
     const fn follows_def_with_dummy_body(self) -> bool {
-        matches!(self, Follows::DummyDef)
+        matches!(self, Self::DummyDef)
     }
 }
 
 impl Follows {
     const fn is_any_def(self) -> bool {
-        matches!(self, Follows::Def | Follows::DummyDef)
+        matches!(self, Self::Def | Self::DummyDef)
     }
 }
 
 impl Follows {
     const fn is_any_import(self) -> bool {
-        matches!(self, Follows::Import | Follows::FromImport)
+        matches!(self, Self::Import | Self::FromImport)
     }
 }
 
@@ -661,25 +661,25 @@ enum Status {
 impl Status {
     fn update(&mut self, line: &LogicalLineInfo) {
         match *self {
-            Status::Inside(nesting_indent) => {
+            Self::Inside(nesting_indent) => {
                 if line.indent_length <= nesting_indent {
                     if line.is_comment_only {
-                        *self = Status::CommentAfter(nesting_indent);
+                        *self = Self::CommentAfter(nesting_indent);
                     } else {
-                        *self = Status::Outside;
+                        *self = Self::Outside;
                     }
                 }
             }
-            Status::CommentAfter(indent) => {
+            Self::CommentAfter(indent) => {
                 if !line.is_comment_only {
                     if line.indent_length > indent {
-                        *self = Status::Inside(indent);
+                        *self = Self::Inside(indent);
                     } else {
-                        *self = Status::Outside;
+                        *self = Self::Outside;
                     }
                 }
             }
-            Status::Outside => {
+            Self::Outside => {
                 // Nothing to do
             }
         }
@@ -702,7 +702,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         context: &'a LintContext<'b>,
-    ) -> BlankLinesChecker<'a, 'b> {
+    ) -> Self {
         BlankLinesChecker {
             stylist,
             locator,
@@ -1105,9 +1105,6 @@ enum LogicalLineKind {
 
 impl LogicalLineKind {
     fn is_class_function_or_decorator(self) -> bool {
-        matches!(
-            self,
-            LogicalLineKind::Class | LogicalLineKind::Function | LogicalLineKind::Decorator
-        )
+        matches!(self, Self::Class | Self::Function | Self::Decorator)
     }
 }

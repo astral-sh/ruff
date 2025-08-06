@@ -14,7 +14,7 @@ impl VendoredPath {
         let path = path.as_ref();
         // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
         // *const Utf8Path to a *const VendoredPath is valid.
-        unsafe { &*(path as *const Utf8Path as *const VendoredPath) }
+        unsafe { &*(path as *const Utf8Path as *const Self) }
     }
 
     pub fn file_name(&self) -> Option<&str> {
@@ -52,12 +52,12 @@ impl VendoredPath {
     }
 
     #[must_use]
-    pub fn join(&self, other: impl AsRef<VendoredPath>) -> VendoredPathBuf {
+    pub fn join(&self, other: impl AsRef<Self>) -> VendoredPathBuf {
         VendoredPathBuf(self.0.join(other.as_ref()))
     }
 
     #[must_use]
-    pub fn ends_with(&self, suffix: impl AsRef<VendoredPath>) -> bool {
+    pub fn ends_with(&self, suffix: impl AsRef<Self>) -> bool {
         self.0.ends_with(suffix.as_ref())
     }
 
@@ -71,10 +71,7 @@ impl VendoredPath {
         self.0.file_stem()
     }
 
-    pub fn strip_prefix(
-        &self,
-        prefix: impl AsRef<VendoredPath>,
-    ) -> Result<&Self, path::StripPrefixError> {
+    pub fn strip_prefix(&self, prefix: impl AsRef<Self>) -> Result<&Self, path::StripPrefixError> {
         self.0.strip_prefix(prefix.as_ref()).map(Self::new)
     }
 }
@@ -130,9 +127,9 @@ impl AsRef<VendoredPath> for VendoredPathBuf {
     }
 }
 
-impl AsRef<VendoredPath> for VendoredPath {
+impl AsRef<Self> for VendoredPath {
     #[inline]
-    fn as_ref(&self) -> &VendoredPath {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
@@ -205,7 +202,7 @@ impl TryFrom<path::PathBuf> for VendoredPathBuf {
     type Error = camino::FromPathBufError;
 
     fn try_from(value: path::PathBuf) -> Result<Self, Self::Error> {
-        Ok(VendoredPathBuf(camino::Utf8PathBuf::try_from(value)?))
+        Ok(Self(camino::Utf8PathBuf::try_from(value)?))
     }
 }
 

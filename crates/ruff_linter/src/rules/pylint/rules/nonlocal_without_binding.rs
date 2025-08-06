@@ -41,7 +41,7 @@ pub(crate) struct NonlocalWithoutBinding {
 impl Violation for NonlocalWithoutBinding {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonlocalWithoutBinding { name } = self;
+        let Self { name } = self;
         format!("Nonlocal name `{name}` found without binding")
     }
 }

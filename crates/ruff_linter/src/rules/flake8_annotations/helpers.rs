@@ -124,7 +124,7 @@ impl AutoPythonType {
     ) -> Option<(Expr, Vec<Edit>)> {
         let target_version = checker.target_version();
         match self {
-            AutoPythonType::Never => {
+            Self::Never => {
                 let member = if target_version >= PythonVersion::PY311 {
                     "Never"
                 } else {
@@ -142,11 +142,11 @@ impl AutoPythonType {
                 });
                 Some((expr, vec![no_return_edit]))
             }
-            AutoPythonType::Atom(python_type) => {
+            Self::Atom(python_type) => {
                 let expr = type_expr(python_type)?;
                 Some((expr, vec![]))
             }
-            AutoPythonType::Union(python_types) => {
+            Self::Union(python_types) => {
                 if target_version >= PythonVersion::PY310 {
                     // Aggregate all the individual types (e.g., `int`, `float`).
                     let names = python_types

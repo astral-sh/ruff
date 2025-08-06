@@ -236,7 +236,7 @@ impl Default for VendoredFileSystem {
             writer.finish().unwrap();
         }
 
-        VendoredFileSystem::new(bytes).unwrap()
+        Self::new(bytes).unwrap()
     }
 }
 
@@ -281,11 +281,11 @@ pub enum FileType {
 }
 
 impl FileType {
-    fn from_zip_file_name(name: &str) -> FileType {
+    fn from_zip_file_name(name: &str) -> Self {
         if name.ends_with('/') {
-            FileType::Directory
+            Self::Directory
         } else {
-            FileType::File
+            Self::File
         }
     }
 

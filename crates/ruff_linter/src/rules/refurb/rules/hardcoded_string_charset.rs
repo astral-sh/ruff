@@ -40,7 +40,7 @@ impl AlwaysFixableViolation for HardcodedStringCharset {
     }
 
     fn fix_title(&self) -> String {
-        let HardcodedStringCharset { name } = self;
+        let Self { name } = self;
         format!("Replace hardcoded charset with `string.{name}`")
     }
 }

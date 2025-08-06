@@ -27,7 +27,7 @@ pub enum Convention {
 impl Convention {
     pub const fn rules_to_be_ignored(self) -> &'static [Rule] {
         match self {
-            Convention::Google => &[
+            Self::Google => &[
                 Rule::IncorrectBlankLineBeforeClass,
                 Rule::IncorrectBlankLineAfterClass,
                 Rule::MultiLineSummarySecondLine,
@@ -41,7 +41,7 @@ impl Convention {
                 Rule::MismatchedSectionUnderlineLength,
                 Rule::MissingBlankLineAfterLastSection,
             ],
-            Convention::Numpy => &[
+            Self::Numpy => &[
                 Rule::UndocumentedPublicInit,
                 Rule::IncorrectBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
@@ -52,7 +52,7 @@ impl Convention {
                 Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
             ],
-            Convention::Pep257 => &[
+            Self::Pep257 => &[
                 Rule::IncorrectBlankLineBeforeClass,
                 Rule::MultiLineSummaryFirstLine,
                 Rule::MultiLineSummarySecondLine,

@@ -40,7 +40,7 @@ pub struct UniversalNewlineIterator<'a> {
 }
 
 impl<'a> UniversalNewlineIterator<'a> {
-    pub fn with_offset(text: &'a str, offset: TextSize) -> UniversalNewlineIterator<'a> {
+    pub fn with_offset(text: &'a str, offset: TextSize) -> Self {
         UniversalNewlineIterator {
             text,
             offset,
@@ -48,7 +48,7 @@ impl<'a> UniversalNewlineIterator<'a> {
         }
     }
 
-    pub fn from(text: &'a str) -> UniversalNewlineIterator<'a> {
+    pub fn from(text: &'a str) -> Self {
         Self::with_offset(text, TextSize::default())
     }
 }
@@ -161,7 +161,7 @@ pub struct NewlineWithTrailingNewline<'a> {
 }
 
 impl<'a> NewlineWithTrailingNewline<'a> {
-    pub fn from(input: &'a str) -> NewlineWithTrailingNewline<'a> {
+    pub fn from(input: &'a str) -> Self {
         Self::with_offset(input, TextSize::default())
     }
 
@@ -305,35 +305,31 @@ pub enum LineEnding {
 
 impl Default for LineEnding {
     fn default() -> Self {
-        if cfg!(windows) {
-            LineEnding::CrLf
-        } else {
-            LineEnding::Lf
-        }
+        if cfg!(windows) { Self::CrLf } else { Self::Lf }
     }
 }
 
 impl LineEnding {
     pub const fn as_str(&self) -> &'static str {
         match self {
-            LineEnding::Lf => "\n",
-            LineEnding::CrLf => "\r\n",
-            LineEnding::Cr => "\r",
+            Self::Lf => "\n",
+            Self::CrLf => "\r\n",
+            Self::Cr => "\r",
         }
     }
 
     #[expect(clippy::len_without_is_empty)]
     pub const fn len(&self) -> usize {
         match self {
-            LineEnding::Lf | LineEnding::Cr => 1,
-            LineEnding::CrLf => 2,
+            Self::Lf | Self::Cr => 1,
+            Self::CrLf => 2,
         }
     }
 
     pub const fn text_len(&self) -> TextSize {
         match self {
-            LineEnding::Lf | LineEnding::Cr => TextSize::new(1),
-            LineEnding::CrLf => TextSize::new(2),
+            Self::Lf | Self::Cr => TextSize::new(1),
+            Self::CrLf => TextSize::new(2),
         }
     }
 }

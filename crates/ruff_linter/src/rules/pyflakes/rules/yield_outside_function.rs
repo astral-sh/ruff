@@ -15,9 +15,9 @@ pub(crate) enum DeferralKeyword {
 impl fmt::Display for DeferralKeyword {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DeferralKeyword::Yield => fmt.write_str("yield"),
-            DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
-            DeferralKeyword::Await => fmt.write_str("await"),
+            Self::Yield => fmt.write_str("yield"),
+            Self::YieldFrom => fmt.write_str("yield from"),
+            Self::Await => fmt.write_str("await"),
         }
     }
 }
@@ -69,7 +69,7 @@ impl YieldOutsideFunction {
 impl Violation for YieldOutsideFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let YieldOutsideFunction { keyword } = self;
+        let Self { keyword } = self;
         format!("`{keyword}` statement outside of a function")
     }
 }

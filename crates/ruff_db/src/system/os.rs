@@ -587,11 +587,11 @@ fn ignore_to_walk_directory_error(
 impl From<std::fs::FileType> for FileType {
     fn from(file_type: std::fs::FileType) -> Self {
         if file_type.is_file() {
-            FileType::File
+            Self::File
         } else if file_type.is_dir() {
-            FileType::Directory
+            Self::Directory
         } else {
-            FileType::Symlink
+            Self::Symlink
         }
     }
 }
@@ -599,9 +599,9 @@ impl From<std::fs::FileType> for FileType {
 impl From<WalkState> for ignore::WalkState {
     fn from(value: WalkState) -> Self {
         match value {
-            WalkState::Continue => ignore::WalkState::Continue,
-            WalkState::Skip => ignore::WalkState::Skip,
-            WalkState::Quit => ignore::WalkState::Quit,
+            WalkState::Continue => Self::Continue,
+            WalkState::Skip => Self::Skip,
+            WalkState::Quit => Self::Quit,
         }
     }
 }

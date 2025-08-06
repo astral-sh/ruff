@@ -147,7 +147,7 @@ impl<T> TestCaseBuilder<T> {
 }
 
 impl TestCaseBuilder<UnspecifiedTypeshed> {
-    pub(crate) fn new() -> TestCaseBuilder<UnspecifiedTypeshed> {
+    pub(crate) fn new() -> Self {
         Self {
             typeshed_option: UnspecifiedTypeshed,
             python_version: PythonVersion::default(),
@@ -159,7 +159,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
 
     /// Use the vendored stdlib stubs included in the Ruff binary for this test case
     pub(crate) fn with_vendored_typeshed(self) -> TestCaseBuilder<VendoredTypeshed> {
-        let TestCaseBuilder {
+        let Self {
             typeshed_option: _,
             python_version,
             python_platform,
@@ -180,7 +180,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         self,
         typeshed: MockedTypeshed,
     ) -> TestCaseBuilder<MockedTypeshed> {
-        let TestCaseBuilder {
+        let Self {
             typeshed_option: _,
             python_version,
             python_platform,
@@ -218,7 +218,7 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
 
 impl TestCaseBuilder<MockedTypeshed> {
     pub(crate) fn build(self) -> TestCase<SystemPathBuf> {
-        let TestCaseBuilder {
+        let Self {
             typeshed_option,
             python_version,
             python_platform,
@@ -280,7 +280,7 @@ impl TestCaseBuilder<MockedTypeshed> {
 
 impl TestCaseBuilder<VendoredTypeshed> {
     pub(crate) fn build(self) -> TestCase<VendoredPathBuf> {
-        let TestCaseBuilder {
+        let Self {
             typeshed_option: VendoredTypeshed,
             python_version,
             python_platform,

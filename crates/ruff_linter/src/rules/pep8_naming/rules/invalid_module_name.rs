@@ -45,7 +45,7 @@ pub(crate) struct InvalidModuleName {
 impl Violation for InvalidModuleName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidModuleName { name } = self;
+        let Self { name } = self;
         format!("Invalid module name: '{name}'")
     }
 }

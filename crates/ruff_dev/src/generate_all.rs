@@ -30,7 +30,7 @@ pub(crate) enum Mode {
 
 impl Mode {
     pub(crate) const fn is_dry_run(self) -> bool {
-        matches!(self, Mode::DryRun)
+        matches!(self, Self::DryRun)
     }
 }
 

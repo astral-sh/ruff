@@ -55,7 +55,7 @@ pub(crate) struct IntOnSlicedStr {
 impl AlwaysFixableViolation for IntOnSlicedStr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IntOnSlicedStr { base } = self;
+        let Self { base } = self;
         format!("Use of `int` with explicit `base={base}` after removing prefix")
     }
 

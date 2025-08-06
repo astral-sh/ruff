@@ -31,7 +31,7 @@ pub(crate) struct AmbiguousFunctionName(pub String);
 impl Violation for AmbiguousFunctionName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AmbiguousFunctionName(name) = self;
+        let Self(name) = self;
         format!("Ambiguous function name: `{name}`")
     }
 }

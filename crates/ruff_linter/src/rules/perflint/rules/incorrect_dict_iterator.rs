@@ -51,12 +51,12 @@ pub(crate) struct IncorrectDictIterator {
 impl AlwaysFixableViolation for IncorrectDictIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IncorrectDictIterator { subset } = self;
+        let Self { subset } = self;
         format!("When using only the {subset} of a dict use the `{subset}()` method")
     }
 
     fn fix_title(&self) -> String {
-        let IncorrectDictIterator { subset } = self;
+        let Self { subset } = self;
         format!("Replace `.items()` with `.{subset}()`")
     }
 }
@@ -147,8 +147,8 @@ enum DictSubset {
 impl fmt::Display for DictSubset {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DictSubset::Keys => fmt.write_str("keys"),
-            DictSubset::Values => fmt.write_str("values"),
+            Self::Keys => fmt.write_str("keys"),
+            Self::Values => fmt.write_str("values"),
         }
     }
 }

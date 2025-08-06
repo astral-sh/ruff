@@ -106,10 +106,10 @@ pub(super) enum OpenMode {
 impl OpenMode {
     pub(super) fn pathlib_method(self) -> Name {
         match self {
-            OpenMode::ReadText => Name::new_static("read_text"),
-            OpenMode::ReadBytes => Name::new_static("read_bytes"),
-            OpenMode::WriteText => Name::new_static("write_text"),
-            OpenMode::WriteBytes => Name::new_static("write_bytes"),
+            Self::ReadText => Name::new_static("read_text"),
+            Self::ReadBytes => Name::new_static("read_bytes"),
+            Self::WriteText => Name::new_static("write_text"),
+            Self::WriteBytes => Name::new_static("write_bytes"),
         }
     }
 }

@@ -1,7 +1,7 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::source::line_index;
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
+use ruff_python_ast::{ExprRef, HasNodeIndex, name::Name};
 use ruff_source_file::LineIndex;
 
 use crate::Db;
@@ -165,7 +165,7 @@ pub enum NameKind {
 }
 
 impl NameKind {
-    pub fn classify(name: &Name) -> NameKind {
+    pub fn classify(name: &Name) -> Self {
         // Dunder needs a prefix and suffix double underscore.
         // When there's only a prefix double underscore, this
         // results in explicit name mangling. We let that be
@@ -173,11 +173,11 @@ impl NameKind {
         //
         // Ref: <https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers>
         if name.starts_with("__") && name.ends_with("__") {
-            NameKind::Dunder
+            Self::Dunder
         } else if name.starts_with('_') {
-            NameKind::Sunder
+            Self::Sunder
         } else {
-            NameKind::Normal
+            Self::Normal
         }
     }
 }
@@ -355,39 +355,39 @@ impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 impl HasType for ast::Expr {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
         match self {
-            Expr::BoolOp(inner) => inner.inferred_type(model),
-            Expr::Named(inner) => inner.inferred_type(model),
-            Expr::BinOp(inner) => inner.inferred_type(model),
-            Expr::UnaryOp(inner) => inner.inferred_type(model),
-            Expr::Lambda(inner) => inner.inferred_type(model),
-            Expr::If(inner) => inner.inferred_type(model),
-            Expr::Dict(inner) => inner.inferred_type(model),
-            Expr::Set(inner) => inner.inferred_type(model),
-            Expr::ListComp(inner) => inner.inferred_type(model),
-            Expr::SetComp(inner) => inner.inferred_type(model),
-            Expr::DictComp(inner) => inner.inferred_type(model),
-            Expr::Generator(inner) => inner.inferred_type(model),
-            Expr::Await(inner) => inner.inferred_type(model),
-            Expr::Yield(inner) => inner.inferred_type(model),
-            Expr::YieldFrom(inner) => inner.inferred_type(model),
-            Expr::Compare(inner) => inner.inferred_type(model),
-            Expr::Call(inner) => inner.inferred_type(model),
-            Expr::FString(inner) => inner.inferred_type(model),
-            Expr::TString(inner) => inner.inferred_type(model),
-            Expr::StringLiteral(inner) => inner.inferred_type(model),
-            Expr::BytesLiteral(inner) => inner.inferred_type(model),
-            Expr::NumberLiteral(inner) => inner.inferred_type(model),
-            Expr::BooleanLiteral(inner) => inner.inferred_type(model),
-            Expr::NoneLiteral(inner) => inner.inferred_type(model),
-            Expr::EllipsisLiteral(inner) => inner.inferred_type(model),
-            Expr::Attribute(inner) => inner.inferred_type(model),
-            Expr::Subscript(inner) => inner.inferred_type(model),
-            Expr::Starred(inner) => inner.inferred_type(model),
-            Expr::Name(inner) => inner.inferred_type(model),
-            Expr::List(inner) => inner.inferred_type(model),
-            Expr::Tuple(inner) => inner.inferred_type(model),
-            Expr::Slice(inner) => inner.inferred_type(model),
-            Expr::IpyEscapeCommand(inner) => inner.inferred_type(model),
+            Self::BoolOp(inner) => inner.inferred_type(model),
+            Self::Named(inner) => inner.inferred_type(model),
+            Self::BinOp(inner) => inner.inferred_type(model),
+            Self::UnaryOp(inner) => inner.inferred_type(model),
+            Self::Lambda(inner) => inner.inferred_type(model),
+            Self::If(inner) => inner.inferred_type(model),
+            Self::Dict(inner) => inner.inferred_type(model),
+            Self::Set(inner) => inner.inferred_type(model),
+            Self::ListComp(inner) => inner.inferred_type(model),
+            Self::SetComp(inner) => inner.inferred_type(model),
+            Self::DictComp(inner) => inner.inferred_type(model),
+            Self::Generator(inner) => inner.inferred_type(model),
+            Self::Await(inner) => inner.inferred_type(model),
+            Self::Yield(inner) => inner.inferred_type(model),
+            Self::YieldFrom(inner) => inner.inferred_type(model),
+            Self::Compare(inner) => inner.inferred_type(model),
+            Self::Call(inner) => inner.inferred_type(model),
+            Self::FString(inner) => inner.inferred_type(model),
+            Self::TString(inner) => inner.inferred_type(model),
+            Self::StringLiteral(inner) => inner.inferred_type(model),
+            Self::BytesLiteral(inner) => inner.inferred_type(model),
+            Self::NumberLiteral(inner) => inner.inferred_type(model),
+            Self::BooleanLiteral(inner) => inner.inferred_type(model),
+            Self::NoneLiteral(inner) => inner.inferred_type(model),
+            Self::EllipsisLiteral(inner) => inner.inferred_type(model),
+            Self::Attribute(inner) => inner.inferred_type(model),
+            Self::Subscript(inner) => inner.inferred_type(model),
+            Self::Starred(inner) => inner.inferred_type(model),
+            Self::Name(inner) => inner.inferred_type(model),
+            Self::List(inner) => inner.inferred_type(model),
+            Self::Tuple(inner) => inner.inferred_type(model),
+            Self::Slice(inner) => inner.inferred_type(model),
+            Self::IpyEscapeCommand(inner) => inner.inferred_type(model),
         }
     }
 }

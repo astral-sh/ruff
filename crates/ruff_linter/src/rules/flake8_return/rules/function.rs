@@ -177,7 +177,7 @@ pub(crate) struct UnnecessaryAssign {
 impl AlwaysFixableViolation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryAssign { name } = self;
+        let Self { name } = self;
         format!("Unnecessary assignment to `{name}` before `return` statement")
     }
 
@@ -220,12 +220,12 @@ impl Violation for SuperfluousElseReturn {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseReturn { branch } = self;
+        let Self { branch } = self;
         format!("Unnecessary `{branch}` after `return` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseReturn { branch } = self;
+        let Self { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -264,12 +264,12 @@ impl Violation for SuperfluousElseRaise {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseRaise { branch } = self;
+        let Self { branch } = self;
         format!("Unnecessary `{branch}` after `raise` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseRaise { branch } = self;
+        let Self { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -310,12 +310,12 @@ impl Violation for SuperfluousElseContinue {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseContinue { branch } = self;
+        let Self { branch } = self;
         format!("Unnecessary `{branch}` after `continue` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseContinue { branch } = self;
+        let Self { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }
@@ -356,12 +356,12 @@ impl Violation for SuperfluousElseBreak {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SuperfluousElseBreak { branch } = self;
+        let Self { branch } = self;
         format!("Unnecessary `{branch}` after `break` statement")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SuperfluousElseBreak { branch } = self;
+        let Self { branch } = self;
         Some(format!("Remove unnecessary `{branch}`"))
     }
 }

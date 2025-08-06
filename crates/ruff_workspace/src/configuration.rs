@@ -711,7 +711,7 @@ impl LintConfiguration {
             options.common.ignore_init_module_imports
         };
 
-        Ok(LintConfiguration {
+        Ok(Self {
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()

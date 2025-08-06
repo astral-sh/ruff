@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
     }
 
     fn fix_title(&self) -> String {
-        let TimeoutErrorAlias { name } = self;
+        let Self { name } = self;
         match name {
             None => "Replace with builtin `TimeoutError`".to_string(),
             Some(name) => format!("Replace `{name}` with builtin `TimeoutError`"),

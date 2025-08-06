@@ -10905,8 +10905,8 @@ enum GenericContextError {
 impl GenericContextError {
     const fn into_type<'db>(self) -> Type<'db> {
         match self {
-            GenericContextError::InvalidArgument => Type::unknown(),
-            GenericContextError::NotYetSupported => todo_type!("ParamSpecs and TypeVarTuples"),
+            Self::InvalidArgument => Type::unknown(),
+            Self::NotYetSupported => todo_type!("ParamSpecs and TypeVarTuples"),
         }
     }
 }
@@ -10953,24 +10953,17 @@ enum DeferredExpressionState {
 
 impl DeferredExpressionState {
     const fn is_deferred(self) -> bool {
-        matches!(
-            self,
-            DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation(_)
-        )
+        matches!(self, Self::Deferred | Self::InStringAnnotation(_))
     }
 
     const fn in_string_annotation(self) -> bool {
-        matches!(self, DeferredExpressionState::InStringAnnotation(_))
+        matches!(self, Self::InStringAnnotation(_))
     }
 }
 
 impl From<bool> for DeferredExpressionState {
     fn from(value: bool) -> Self {
-        if value {
-            DeferredExpressionState::Deferred
-        } else {
-            DeferredExpressionState::None
-        }
+        if value { Self::Deferred } else { Self::None }
     }
 }
 
@@ -10987,12 +10980,12 @@ enum RichCompareOperator {
 impl From<RichCompareOperator> for ast::CmpOp {
     fn from(value: RichCompareOperator) -> Self {
         match value {
-            RichCompareOperator::Eq => ast::CmpOp::Eq,
-            RichCompareOperator::Ne => ast::CmpOp::NotEq,
-            RichCompareOperator::Lt => ast::CmpOp::Lt,
-            RichCompareOperator::Le => ast::CmpOp::LtE,
-            RichCompareOperator::Gt => ast::CmpOp::Gt,
-            RichCompareOperator::Ge => ast::CmpOp::GtE,
+            RichCompareOperator::Eq => Self::Eq,
+            RichCompareOperator::Ne => Self::NotEq,
+            RichCompareOperator::Lt => Self::Lt,
+            RichCompareOperator::Le => Self::LtE,
+            RichCompareOperator::Gt => Self::Gt,
+            RichCompareOperator::Ge => Self::GtE,
         }
     }
 }
@@ -11001,24 +10994,24 @@ impl RichCompareOperator {
     #[must_use]
     const fn dunder(self) -> &'static str {
         match self {
-            RichCompareOperator::Eq => "__eq__",
-            RichCompareOperator::Ne => "__ne__",
-            RichCompareOperator::Lt => "__lt__",
-            RichCompareOperator::Le => "__le__",
-            RichCompareOperator::Gt => "__gt__",
-            RichCompareOperator::Ge => "__ge__",
+            Self::Eq => "__eq__",
+            Self::Ne => "__ne__",
+            Self::Lt => "__lt__",
+            Self::Le => "__le__",
+            Self::Gt => "__gt__",
+            Self::Ge => "__ge__",
         }
     }
 
     #[must_use]
     const fn reflect(self) -> Self {
         match self {
-            RichCompareOperator::Eq => RichCompareOperator::Eq,
-            RichCompareOperator::Ne => RichCompareOperator::Ne,
-            RichCompareOperator::Lt => RichCompareOperator::Gt,
-            RichCompareOperator::Le => RichCompareOperator::Ge,
-            RichCompareOperator::Gt => RichCompareOperator::Lt,
-            RichCompareOperator::Ge => RichCompareOperator::Le,
+            Self::Eq => Self::Eq,
+            Self::Ne => Self::Ne,
+            Self::Lt => Self::Gt,
+            Self::Le => Self::Ge,
+            Self::Gt => Self::Lt,
+            Self::Ge => Self::Le,
         }
     }
 }
@@ -11032,8 +11025,8 @@ enum MembershipTestCompareOperator {
 impl From<MembershipTestCompareOperator> for ast::CmpOp {
     fn from(value: MembershipTestCompareOperator) -> Self {
         match value {
-            MembershipTestCompareOperator::In => ast::CmpOp::In,
-            MembershipTestCompareOperator::NotIn => ast::CmpOp::NotIn,
+            MembershipTestCompareOperator::In => Self::In,
+            MembershipTestCompareOperator::NotIn => Self::NotIn,
         }
     }
 }

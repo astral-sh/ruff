@@ -51,7 +51,7 @@ pub(crate) struct AnyEqNeAnnotation {
 impl AlwaysFixableViolation for AnyEqNeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AnyEqNeAnnotation { method_name } = self;
+        let Self { method_name } = self;
         format!("Prefer `object` to `Any` for the second parameter to `{method_name}`")
     }
 

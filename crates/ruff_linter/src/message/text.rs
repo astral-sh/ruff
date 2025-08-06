@@ -348,7 +348,7 @@ struct SourceCode<'a> {
     annotation_range: TextRange,
 }
 
-impl<'a> SourceCode<'a> {
+impl SourceCode<'_> {
     /// This attempts to "fix up" the span on `SourceCode` in the case where
     /// it's an empty span immediately following a line terminator.
     ///
@@ -363,7 +363,7 @@ impl<'a> SourceCode<'a> {
     /// This forces `annotate-snippets` to point to the right place.
     ///
     /// See also: <https://github.com/astral-sh/ruff/issues/15509>
-    fn fix_up_empty_spans_after_line_terminator(self) -> SourceCode<'a> {
+    fn fix_up_empty_spans_after_line_terminator(self) -> Self {
         if !self.annotation_range.is_empty()
             || self.annotation_range.start() == TextSize::from(0)
             || self.annotation_range.start() >= self.text.text_len()

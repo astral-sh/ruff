@@ -52,7 +52,7 @@ impl Violation for SingleItemMembershipTest {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let SingleItemMembershipTest { membership_test } = self;
+        let Self { membership_test } = self;
         match membership_test {
             MembershipTest::In => Some("Convert to equality test".to_string()),
             MembershipTest::NotIn => Some("Convert to inequality test".to_string()),
@@ -166,8 +166,8 @@ impl MembershipTest {
     /// Returns the replacement comparison operator for this membership test.
     fn replacement_op(self) -> CmpOp {
         match self {
-            MembershipTest::In => CmpOp::Eq,
-            MembershipTest::NotIn => CmpOp::NotEq,
+            Self::In => CmpOp::Eq,
+            Self::NotIn => CmpOp::NotEq,
         }
     }
 }

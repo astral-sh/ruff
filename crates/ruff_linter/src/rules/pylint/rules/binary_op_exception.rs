@@ -15,8 +15,8 @@ enum BoolOp {
 impl From<&ast::BoolOp> for BoolOp {
     fn from(op: &ast::BoolOp) -> Self {
         match op {
-            ast::BoolOp::And => BoolOp::And,
-            ast::BoolOp::Or => BoolOp::Or,
+            ast::BoolOp::And => Self::And,
+            ast::BoolOp::Or => Self::Or,
         }
     }
 }

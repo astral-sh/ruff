@@ -48,7 +48,7 @@ pub(crate) struct JumpStatementInFinally {
 impl Violation for JumpStatementInFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let JumpStatementInFinally { name } = self;
+        let Self { name } = self;
         format!("`{name}` inside `finally` blocks cause exceptions to be silenced")
     }
 }

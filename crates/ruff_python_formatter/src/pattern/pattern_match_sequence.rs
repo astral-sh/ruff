@@ -82,7 +82,7 @@ pub(crate) enum SequenceType {
 }
 
 impl SequenceType {
-    pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> SequenceType {
+    pub(crate) fn from_pattern(pattern: &PatternMatchSequence, source: &str) -> Self {
         let before_first_pattern = &source[TextRange::new(
             pattern.start(),
             pattern
@@ -101,13 +101,13 @@ impl SequenceType {
         )];
 
         if before_first_pattern.starts_with('[') && !after_last_pattern.ends_with(',') {
-            SequenceType::List
+            Self::List
         } else if before_first_pattern.starts_with('(') {
             // If the pattern is empty, it must be a parenthesized tuple with no members. (This
             // branch exists to differentiate between a tuple with and without its own parentheses,
             // but a tuple without its own parentheses must have at least one member.)
             let Some(elt) = pattern.patterns.first() else {
-                return SequenceType::Tuple;
+                return Self::Tuple;
             };
 
             // Count the number of open parentheses between the start of the pattern and the first
@@ -139,16 +139,16 @@ impl SequenceType {
                     .count();
 
             if open_parentheses_count > close_parentheses_count {
-                SequenceType::Tuple
+                Self::Tuple
             } else {
-                SequenceType::TupleNoParens
+                Self::TupleNoParens
             }
         } else {
-            SequenceType::TupleNoParens
+            Self::TupleNoParens
         }
     }
 
     pub(crate) fn is_parenthesized(self) -> bool {
-        matches!(self, SequenceType::List | SequenceType::Tuple)
+        matches!(self, Self::List | Self::Tuple)
     }
 }

@@ -54,7 +54,7 @@ pub(crate) struct AmbiguousUnicodeCharacterString {
 impl Violation for AmbiguousUnicodeCharacterString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterString {
+        let Self {
             confusable,
             representant,
         } = self;
@@ -107,7 +107,7 @@ pub(crate) struct AmbiguousUnicodeCharacterDocstring {
 impl Violation for AmbiguousUnicodeCharacterDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterDocstring {
+        let Self {
             confusable,
             representant,
         } = self;
@@ -160,7 +160,7 @@ pub(crate) struct AmbiguousUnicodeCharacterComment {
 impl Violation for AmbiguousUnicodeCharacterComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AmbiguousUnicodeCharacterComment {
+        let Self {
             confusable,
             representant,
         } = self;
@@ -311,7 +311,7 @@ impl WordFlags {
     ///
     /// See: [VS Code](https://github.com/microsoft/vscode/issues/143720#issuecomment-1048757234)
     const fn is_candidate_word(self) -> bool {
-        self.contains(WordFlags::ASCII) || !self.contains(WordFlags::UNAMBIGUOUS_UNICODE)
+        self.contains(Self::ASCII) || !self.contains(Self::UNAMBIGUOUS_UNICODE)
     }
 }
 
@@ -372,7 +372,7 @@ struct NamedUnicode(char);
 
 impl fmt::Display for NamedUnicode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let NamedUnicode(c) = self;
+        let Self(c) = self;
         if let Some(name) = unicode_names2::name(*c) {
             write!(f, "`{c}` ({name})")
         } else {

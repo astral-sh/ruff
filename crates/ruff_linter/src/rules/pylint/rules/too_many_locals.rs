@@ -28,7 +28,7 @@ pub(crate) struct TooManyLocals {
 impl Violation for TooManyLocals {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyLocals {
+        let Self {
             current_amount,
             max_amount,
         } = self;

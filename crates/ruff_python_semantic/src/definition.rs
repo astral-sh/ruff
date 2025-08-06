@@ -25,7 +25,7 @@ impl DefinitionId {
     /// Returns the ID for the module definition.
     #[inline]
     pub const fn module() -> Self {
-        DefinitionId::from_u32(0)
+        Self::from_u32(0)
     }
 }
 

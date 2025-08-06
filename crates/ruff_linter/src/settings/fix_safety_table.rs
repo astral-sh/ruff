@@ -76,7 +76,7 @@ impl FixSafetyTable {
                 .collect()
         };
 
-        FixSafetyTable {
+        Self {
             forced_safe: safety_override_map
                 .iter()
                 .filter_map(|(rule, o)| match o {

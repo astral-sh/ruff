@@ -37,7 +37,7 @@ pub(crate) struct UnnecessaryBuiltinImport {
 impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryBuiltinImport { names } = self;
+        let Self { names } = self;
         if names.len() == 1 {
             let import = &names[0];
             format!("Unnecessary builtin import: `{import}`")

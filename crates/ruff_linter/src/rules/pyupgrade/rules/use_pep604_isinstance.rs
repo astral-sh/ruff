@@ -17,8 +17,8 @@ pub(crate) enum CallKind {
 impl fmt::Display for CallKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CallKind::Isinstance => fmt.write_str("isinstance"),
-            CallKind::Issubclass => fmt.write_str("issubclass"),
+            Self::Isinstance => fmt.write_str("isinstance"),
+            Self::Issubclass => fmt.write_str("issubclass"),
         }
     }
 }
@@ -26,8 +26,8 @@ impl fmt::Display for CallKind {
 impl CallKind {
     pub(crate) fn from_name(name: &str) -> Option<Self> {
         match name {
-            "isinstance" => Some(CallKind::Isinstance),
-            "issubclass" => Some(CallKind::Issubclass),
+            "isinstance" => Some(Self::Isinstance),
+            "issubclass" => Some(Self::Issubclass),
             _ => None,
         }
     }

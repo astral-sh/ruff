@@ -25,8 +25,8 @@ pub struct AtomicNodeIndex(AtomicU32);
 
 impl AtomicNodeIndex {
     /// Returns a placeholder `AtomicNodeIndex`.
-    pub const fn dummy() -> AtomicNodeIndex {
-        AtomicNodeIndex(AtomicU32::new(u32::MAX))
+    pub const fn dummy() -> Self {
+        Self(AtomicU32::new(u32::MAX))
     }
 
     /// Load the current value of the `AtomicNodeIndex`.
@@ -57,19 +57,19 @@ impl NodeIndex {
 
 impl From<u32> for NodeIndex {
     fn from(value: u32) -> Self {
-        NodeIndex(value)
+        Self(value)
     }
 }
 
 impl From<u32> for AtomicNodeIndex {
     fn from(value: u32) -> Self {
-        AtomicNodeIndex(AtomicU32::from(value))
+        Self(AtomicU32::from(value))
     }
 }
 
 impl std::fmt::Debug for AtomicNodeIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if *self == AtomicNodeIndex::dummy() {
+        if *self == Self::dummy() {
             f.debug_tuple("AtomicNodeIndex").finish_non_exhaustive()
         } else {
             f.debug_tuple("AtomicNodeIndex").field(&self.0).finish()

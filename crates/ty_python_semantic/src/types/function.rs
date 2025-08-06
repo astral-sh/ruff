@@ -124,19 +124,19 @@ impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
         match decorator_type {
             Type::FunctionLiteral(function) => match function.known(db) {
-                Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
-                Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
-                Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
-                Some(KnownFunction::Final) => FunctionDecorators::FINAL,
-                Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
-                _ => FunctionDecorators::empty(),
+                Some(KnownFunction::NoTypeCheck) => Self::NO_TYPE_CHECK,
+                Some(KnownFunction::Overload) => Self::OVERLOAD,
+                Some(KnownFunction::AbstractMethod) => Self::ABSTRACT_METHOD,
+                Some(KnownFunction::Final) => Self::FINAL,
+                Some(KnownFunction::Override) => Self::OVERRIDE,
+                _ => Self::empty(),
             },
             Type::ClassLiteral(class) => match class.known(db) {
-                Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
-                Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
-                _ => FunctionDecorators::empty(),
+                Some(KnownClass::Classmethod) => Self::CLASSMETHOD,
+                Some(KnownClass::Staticmethod) => Self::STATICMETHOD,
+                _ => Self::empty(),
             },
-            _ => FunctionDecorators::empty(),
+            _ => Self::empty(),
         }
     }
 
@@ -144,11 +144,9 @@ impl FunctionDecorators {
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Self {
-        types
-            .into_iter()
-            .fold(FunctionDecorators::empty(), |acc, ty| {
-                acc | FunctionDecorators::from_decorator_type(db, ty)
-            })
+        types.into_iter().fold(Self::empty(), |acc, ty| {
+            acc | Self::from_decorator_type(db, ty)
+        })
     }
 }
 
@@ -1181,7 +1179,7 @@ impl KnownFunction {
         let parameter_types = overload.parameter_types();
 
         match self {
-            KnownFunction::RevealType => {
+            Self::RevealType => {
                 let revealed_type = overload
                     .arguments_for_parameter(call_arguments, 0)
                     .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
@@ -1198,7 +1196,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::HasMember => {
+            Self::HasMember => {
                 let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
                     return;
                 };
@@ -1208,7 +1206,7 @@ impl KnownFunction {
                 ));
             }
 
-            KnownFunction::AssertType => {
+            Self::AssertType => {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
@@ -1238,7 +1236,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::AssertNever => {
+            Self::AssertNever => {
                 let [Some(actual_ty)] = parameter_types else {
                     return;
                 };
@@ -1263,7 +1261,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::StaticAssert => {
+            Self::StaticAssert => {
                 let [Some(parameter_ty), message] = parameter_types else {
                     return;
                 };
@@ -1325,7 +1323,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::Cast => {
+            Self::Cast => {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
@@ -1344,7 +1342,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::GetProtocolMembers => {
+            Self::GetProtocolMembers => {
                 let [Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
@@ -1354,7 +1352,7 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
 
-            KnownFunction::RevealProtocolInterface => {
+            Self::RevealProtocolInterface => {
                 let [Some(param_type)] = parameter_types else {
                     return;
                 };
@@ -1381,7 +1379,7 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+            Self::IsInstance | Self::IsSubclass => {
                 let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
                 };
@@ -1397,14 +1395,14 @@ impl KnownFunction {
                     }
                 }
 
-                if self == KnownFunction::IsInstance {
+                if self == Self::IsInstance {
                     overload.set_return_type(
                         is_instance_truthiness(db, *first_arg, *class).into_type(db),
                     );
                 }
             }
 
-            known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
+            known @ (Self::DunderImport | Self::ImportModule) => {
                 let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
                 else {
                     return;
@@ -1416,7 +1414,7 @@ impl KnownFunction {
 
                 let module_name = full_module_name.value(db);
 
-                if known == KnownFunction::DunderImport && module_name.contains('.') {
+                if known == Self::DunderImport && module_name.contains('.') {
                     // `__import__("collections.abc")` returns the `collections` module.
                     // `importlib.import_module("collections.abc")` returns the `collections.abc` module.
                     // ty doesn't have a way to represent the return type of the former yet.

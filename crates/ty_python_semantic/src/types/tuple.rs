@@ -38,36 +38,36 @@ pub(crate) enum TupleLength {
 }
 
 impl TupleLength {
-    pub(crate) const fn unknown() -> TupleLength {
-        TupleLength::Variable(0, 0)
+    pub(crate) const fn unknown() -> Self {
+        Self::Variable(0, 0)
     }
 
     pub(crate) fn is_variable(self) -> bool {
-        matches!(self, TupleLength::Variable(_, _))
+        matches!(self, Self::Variable(_, _))
     }
 
     /// Returns the minimum and maximum length of this tuple. (The maximum length will be `None`
     /// for a tuple with a variable-length portion.)
     pub(crate) fn size_hint(self) -> (usize, Option<usize>) {
         match self {
-            TupleLength::Fixed(len) => (len, Some(len)),
-            TupleLength::Variable(prefix, suffix) => (prefix + suffix, None),
+            Self::Fixed(len) => (len, Some(len)),
+            Self::Variable(prefix, suffix) => (prefix + suffix, None),
         }
     }
 
     /// Returns the minimum length of this tuple.
     pub(crate) fn minimum(self) -> usize {
         match self {
-            TupleLength::Fixed(len) => len,
-            TupleLength::Variable(prefix, suffix) => prefix + suffix,
+            Self::Fixed(len) => len,
+            Self::Variable(prefix, suffix) => prefix + suffix,
         }
     }
 
     /// Returns the maximum length of this tuple, if any.
     pub(crate) fn maximum(self) -> Option<usize> {
         match self {
-            TupleLength::Fixed(len) => Some(len),
-            TupleLength::Variable(_, _) => None,
+            Self::Fixed(len) => Some(len),
+            Self::Variable(_, _) => None,
         }
     }
 
@@ -79,17 +79,15 @@ impl TupleLength {
             // have the same length. For two differently sized fixed-length tuples, however,
             // neither tuple length is more precise than the other: the two tuple lengths are
             // entirely disjoint.
-            (TupleLength::Fixed(left), TupleLength::Fixed(right)) => {
-                (left == right).then_some(self)
-            }
+            (Self::Fixed(left), Self::Fixed(right)) => (left == right).then_some(self),
 
             // A fixed-length tuple is more precise than a variable-length one.
-            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(..))
-            | (TupleLength::Variable(..), fixed @ TupleLength::Fixed(_)) => Some(fixed),
+            (fixed @ Self::Fixed(_), Self::Variable(..))
+            | (Self::Variable(..), fixed @ Self::Fixed(_)) => Some(fixed),
 
             // For two variable-length tuples, the tuple with the larger number
             // of required items is more precise.
-            (TupleLength::Variable(..), TupleLength::Variable(..)) => {
+            (Self::Variable(..), Self::Variable(..)) => {
                 Some(match self.minimum().cmp(&other.minimum()) {
                     Ordering::Less => other,
                     Ordering::Equal | Ordering::Greater => self,
@@ -101,8 +99,8 @@ impl TupleLength {
     pub(crate) fn display_minimum(self) -> String {
         let minimum_length = self.minimum();
         match self {
-            TupleLength::Fixed(_) => minimum_length.to_string(),
-            TupleLength::Variable(_, _) => format!("at least {minimum_length}"),
+            Self::Fixed(_) => minimum_length.to_string(),
+            Self::Variable(_, _) => format!("at least {minimum_length}"),
         }
     }
 
@@ -115,8 +113,8 @@ impl TupleLength {
 
     pub(crate) fn into_fixed_length(self) -> Option<usize> {
         match self {
-            TupleLength::Fixed(len) => Some(len),
-            TupleLength::Variable(_, _) => None,
+            Self::Fixed(len) => Some(len),
+            Self::Variable(_, _) => None,
         }
     }
 }
@@ -152,14 +150,14 @@ impl<'db> Type<'db> {
         Self::Tuple(tuple)
     }
 
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Self) -> Self {
         Type::tuple(TupleType::homogeneous(db, element))
     }
 
     pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
     where
         I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
+        T: Into<Self>,
     {
         Type::tuple(TupleType::from_elements(
             db,
@@ -368,7 +366,7 @@ impl<T> FixedLengthTuple<T> {
 impl<'db> FixedLengthTuple<Type<'db>> {
     fn concat(&self, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
         match other {
-            TupleSpec::Fixed(other) => TupleSpec::Fixed(FixedLengthTuple::from_elements(
+            TupleSpec::Fixed(other) => TupleSpec::Fixed(Self::from_elements(
                 self.elements().chain(other.elements()).copied(),
             )),
 
@@ -661,7 +659,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
 
     fn concat(&self, db: &'db dyn Db, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
         match other {
-            TupleSpec::Fixed(other) => VariableLengthTuple::mixed(
+            TupleSpec::Fixed(other) => Self::mixed(
                 self.prefix_elements().copied(),
                 self.variable,
                 self.suffix_elements().chain(other.elements()).copied(),
@@ -674,7 +672,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         .chain([self.variable, other.variable])
                         .chain(other.prefix_elements().copied()),
                 );
-                VariableLengthTuple::mixed(
+                Self::mixed(
                     self.prefix_elements().copied(),
                     variable,
                     other.suffix_elements().copied(),
@@ -721,7 +719,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 );
                 let suffix = std::iter::repeat_n(self.variable, suffix_underflow)
                     .chain(self.suffix_elements().copied().skip(suffix_overflow));
-                Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
+                Ok(Self::mixed(prefix, variable, suffix))
             }
         }
     }
@@ -994,14 +992,14 @@ impl<T> Tuple<T> {
     }
 
     pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
+        Self::Fixed(FixedLengthTuple::with_capacity(capacity))
     }
 
     /// Returns an iterator of all of the fixed-length element types of this tuple.
     pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.elements()),
-            Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),
+            Self::Fixed(tuple) => Either::Left(tuple.elements()),
+            Self::Variable(tuple) => Either::Right(tuple.fixed_elements()),
         }
     }
 
@@ -1009,27 +1007,27 @@ impl<T> Tuple<T> {
     /// elements, and does not distinguish between fixed- and variable-length elements.
     pub(crate) fn all_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.all_elements()),
-            Tuple::Variable(tuple) => Either::Right(tuple.all_elements()),
+            Self::Fixed(tuple) => Either::Left(tuple.all_elements()),
+            Self::Variable(tuple) => Either::Right(tuple.all_elements()),
         }
     }
 
     pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.into_all_elements_with_kind()),
-            Tuple::Variable(tuple) => Either::Right(tuple.into_all_elements_with_kind()),
+            Self::Fixed(tuple) => Either::Left(tuple.into_all_elements_with_kind()),
+            Self::Variable(tuple) => Either::Right(tuple.into_all_elements_with_kind()),
         }
     }
 
     pub(crate) const fn is_variadic(&self) -> bool {
-        matches!(self, Tuple::Variable(_))
+        matches!(self, Self::Variable(_))
     }
 
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> TupleLength {
         match self {
-            Tuple::Fixed(tuple) => TupleLength::Fixed(tuple.len()),
-            Tuple::Variable(tuple) => tuple.len(),
+            Self::Fixed(tuple) => TupleLength::Fixed(tuple.len()),
+            Self::Variable(tuple) => tuple.len(),
         }
     }
 
@@ -1046,15 +1044,15 @@ impl<T> Tuple<T> {
 
     pub(crate) fn is_empty(&self) -> bool {
         match self {
-            Tuple::Fixed(tuple) => tuple.is_empty(),
-            Tuple::Variable(_) => false,
+            Self::Fixed(tuple) => tuple.is_empty(),
+            Self::Variable(_) => false,
         }
     }
 
     pub(crate) fn push(&mut self, element: T) {
         match self {
-            Tuple::Fixed(tuple) => tuple.push(element),
-            Tuple::Variable(tuple) => tuple.push(element),
+            Self::Fixed(tuple) => tuple.push(element),
+            Self::Variable(tuple) => tuple.push(element),
         }
     }
 }
@@ -1232,13 +1230,13 @@ impl<'db> Tuple<Type<'db>> {
 
 impl<T> From<FixedLengthTuple<T>> for Tuple<T> {
     fn from(tuple: FixedLengthTuple<T>) -> Self {
-        Tuple::Fixed(tuple)
+        Self::Fixed(tuple)
     }
 }
 
 impl<T> From<VariableLengthTuple<T>> for Tuple<T> {
     fn from(tuple: VariableLengthTuple<T>) -> Self {
-        Tuple::Variable(tuple)
+        Self::Variable(tuple)
     }
 }
 
@@ -1250,10 +1248,10 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_value = unsafe { &mut *old_pointer };
         match (old_value, new_value) {
-            (Tuple::Fixed(old), Tuple::Fixed(new)) => unsafe {
+            (Self::Fixed(old), Self::Fixed(new)) => unsafe {
                 FixedLengthTuple::maybe_update(old, new)
             },
-            (Tuple::Variable(old), Tuple::Variable(new)) => unsafe {
+            (Self::Variable(old), Self::Variable(new)) => unsafe {
                 VariableLengthTuple::maybe_update(old, new)
             },
             (old_value, new_value) => {

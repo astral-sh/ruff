@@ -61,8 +61,8 @@ impl TryFrom<char> for Quote {
 
     fn try_from(value: char) -> Result<Self, Self::Error> {
         match value {
-            '\'' => Ok(Quote::Single),
-            '"' => Ok(Quote::Double),
+            '\'' => Ok(Self::Single),
+            '"' => Ok(Self::Double),
             _ => Err(()),
         }
     }

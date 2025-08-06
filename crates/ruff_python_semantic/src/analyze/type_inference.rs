@@ -69,73 +69,63 @@ impl From<&Expr> for ResolvedPythonType {
     fn from(expr: &Expr) -> Self {
         match expr {
             // Primitives.
-            Expr::Dict(_) => ResolvedPythonType::Atom(PythonType::Dict),
-            Expr::DictComp(_) => ResolvedPythonType::Atom(PythonType::Dict),
-            Expr::Set(_) => ResolvedPythonType::Atom(PythonType::Set),
-            Expr::SetComp(_) => ResolvedPythonType::Atom(PythonType::Set),
-            Expr::List(_) => ResolvedPythonType::Atom(PythonType::List),
-            Expr::ListComp(_) => ResolvedPythonType::Atom(PythonType::List),
-            Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
-            Expr::Generator(_) => ResolvedPythonType::Atom(PythonType::Generator),
-            Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::TString(_) => ResolvedPythonType::Unknown,
-            Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
+            Expr::Dict(_) => Self::Atom(PythonType::Dict),
+            Expr::DictComp(_) => Self::Atom(PythonType::Dict),
+            Expr::Set(_) => Self::Atom(PythonType::Set),
+            Expr::SetComp(_) => Self::Atom(PythonType::Set),
+            Expr::List(_) => Self::Atom(PythonType::List),
+            Expr::ListComp(_) => Self::Atom(PythonType::List),
+            Expr::Tuple(_) => Self::Atom(PythonType::Tuple),
+            Expr::Generator(_) => Self::Atom(PythonType::Generator),
+            Expr::FString(_) => Self::Atom(PythonType::String),
+            Expr::TString(_) => Self::Unknown,
+            Expr::StringLiteral(_) => Self::Atom(PythonType::String),
+            Expr::BytesLiteral(_) => Self::Atom(PythonType::Bytes),
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-                ast::Number::Int(_) => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
-                }
-                ast::Number::Float(_) => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
-                }
-                ast::Number::Complex { .. } => {
-                    ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
-                }
+                ast::Number::Int(_) => Self::Atom(PythonType::Number(NumberLike::Integer)),
+                ast::Number::Float(_) => Self::Atom(PythonType::Number(NumberLike::Float)),
+                ast::Number::Complex { .. } => Self::Atom(PythonType::Number(NumberLike::Complex)),
             },
-            Expr::BooleanLiteral(_) => {
-                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
-            }
-            Expr::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
-            Expr::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
+            Expr::BooleanLiteral(_) => Self::Atom(PythonType::Number(NumberLike::Bool)),
+            Expr::NoneLiteral(_) => Self::Atom(PythonType::None),
+            Expr::EllipsisLiteral(_) => Self::Atom(PythonType::Ellipsis),
             // Simple container expressions.
-            Expr::Named(ast::ExprNamed { value, .. }) => ResolvedPythonType::from(value.as_ref()),
+            Expr::Named(ast::ExprNamed { value, .. }) => Self::from(value.as_ref()),
             Expr::If(ast::ExprIf { body, orelse, .. }) => {
-                let body = ResolvedPythonType::from(body.as_ref());
-                let orelse = ResolvedPythonType::from(orelse.as_ref());
+                let body = Self::from(body.as_ref());
+                let orelse = Self::from(orelse.as_ref());
                 body.union(orelse)
             }
 
             // Boolean operators.
             Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values
                 .iter()
-                .map(ResolvedPythonType::from)
-                .reduce(ResolvedPythonType::union)
-                .unwrap_or(ResolvedPythonType::Unknown),
+                .map(Self::from)
+                .reduce(Self::union)
+                .unwrap_or(Self::Unknown),
 
             // Unary operators.
             Expr::UnaryOp(ast::ExprUnaryOp { operand, op, .. }) => match op {
-                UnaryOp::Invert => match ResolvedPythonType::from(operand.as_ref()) {
-                    ResolvedPythonType::Atom(PythonType::Number(
-                        NumberLike::Bool | NumberLike::Integer,
-                    )) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
-                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                    _ => ResolvedPythonType::Unknown,
+                UnaryOp::Invert => match Self::from(operand.as_ref()) {
+                    Self::Atom(PythonType::Number(NumberLike::Bool | NumberLike::Integer)) => {
+                        Self::Atom(PythonType::Number(NumberLike::Integer))
+                    }
+                    Self::Atom(_) => Self::TypeError,
+                    _ => Self::Unknown,
                 },
                 // Ex) `not 1.0`
-                UnaryOp::Not => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
+                UnaryOp::Not => Self::Atom(PythonType::Number(NumberLike::Bool)),
                 // Ex) `+1` or `-1`
-                UnaryOp::UAdd | UnaryOp::USub => match ResolvedPythonType::from(operand.as_ref()) {
-                    ResolvedPythonType::Atom(PythonType::Number(number)) => {
-                        ResolvedPythonType::Atom(PythonType::Number(
-                            if number == NumberLike::Bool {
-                                NumberLike::Integer
-                            } else {
-                                number
-                            },
-                        ))
+                UnaryOp::UAdd | UnaryOp::USub => match Self::from(operand.as_ref()) {
+                    Self::Atom(PythonType::Number(number)) => {
+                        Self::Atom(PythonType::Number(if number == NumberLike::Bool {
+                            NumberLike::Integer
+                        } else {
+                            number
+                        }))
                     }
-                    ResolvedPythonType::Atom(_) => ResolvedPythonType::TypeError,
-                    _ => ResolvedPythonType::Unknown,
+                    Self::Atom(_) => Self::TypeError,
+                    _ => Self::Unknown,
                 },
             },
 
@@ -145,199 +135,168 @@ impl From<&Expr> for ResolvedPythonType {
             }) => {
                 match op {
                     Operator::Add => {
-                        match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
-                        ) {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
                             // Ex) `"Hello" + "world"`
-                            (
-                                ResolvedPythonType::Atom(PythonType::String),
-                                ResolvedPythonType::Atom(PythonType::String),
-                            ) => return ResolvedPythonType::Atom(PythonType::String),
+                            (Self::Atom(PythonType::String), Self::Atom(PythonType::String)) => {
+                                return Self::Atom(PythonType::String);
+                            }
                             // Ex) `b"Hello" + b"world"`
-                            (
-                                ResolvedPythonType::Atom(PythonType::Bytes),
-                                ResolvedPythonType::Atom(PythonType::Bytes),
-                            ) => return ResolvedPythonType::Atom(PythonType::Bytes),
+                            (Self::Atom(PythonType::Bytes), Self::Atom(PythonType::Bytes)) => {
+                                return Self::Atom(PythonType::Bytes);
+                            }
                             // Ex) `[1] + [2]`
-                            (
-                                ResolvedPythonType::Atom(PythonType::List),
-                                ResolvedPythonType::Atom(PythonType::List),
-                            ) => return ResolvedPythonType::Atom(PythonType::List),
+                            (Self::Atom(PythonType::List), Self::Atom(PythonType::List)) => {
+                                return Self::Atom(PythonType::List);
+                            }
                             // Ex) `(1, 2) + (3, 4)`
-                            (
-                                ResolvedPythonType::Atom(PythonType::Tuple),
-                                ResolvedPythonType::Atom(PythonType::Tuple),
-                            ) => return ResolvedPythonType::Atom(PythonType::Tuple),
+                            (Self::Atom(PythonType::Tuple), Self::Atom(PythonType::Tuple)) => {
+                                return Self::Atom(PythonType::Tuple);
+                            }
                             // Ex) `1 + 1.0`
                             (
-                                ResolvedPythonType::Atom(PythonType::Number(left)),
-                                ResolvedPythonType::Atom(PythonType::Number(right)),
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
                             ) => {
-                                return ResolvedPythonType::Atom(PythonType::Number(
-                                    left.coerce(right),
-                                ));
+                                return Self::Atom(PythonType::Number(left.coerce(right)));
                             }
                             // Ex) `"a" + 1`
-                            (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                                return ResolvedPythonType::TypeError;
+                            (Self::Atom(_), Self::Atom(_)) => {
+                                return Self::TypeError;
                             }
                             _ => {}
                         }
                     }
                     Operator::Sub => {
-                        match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
-                        ) {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
                             // Ex) `1 - 1`
                             (
-                                ResolvedPythonType::Atom(PythonType::Number(left)),
-                                ResolvedPythonType::Atom(PythonType::Number(right)),
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
                             ) => {
-                                return ResolvedPythonType::Atom(PythonType::Number(
-                                    left.coerce(right),
-                                ));
+                                return Self::Atom(PythonType::Number(left.coerce(right)));
                             }
                             // Ex) `{1, 2} - {2}`
-                            (
-                                ResolvedPythonType::Atom(PythonType::Set),
-                                ResolvedPythonType::Atom(PythonType::Set),
-                            ) => return ResolvedPythonType::Atom(PythonType::Set),
+                            (Self::Atom(PythonType::Set), Self::Atom(PythonType::Set)) => {
+                                return Self::Atom(PythonType::Set);
+                            }
                             // Ex) `"a" - "b"`
-                            (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                                return ResolvedPythonType::TypeError;
+                            (Self::Atom(_), Self::Atom(_)) => {
+                                return Self::TypeError;
                             }
                             _ => {}
                         }
                     }
                     // Ex) "a" % "b"
-                    Operator::Mod => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
-                    ) {
-                        // Ex) `"Hello" % "world"`
-                        (ResolvedPythonType::Atom(PythonType::String), _) => {
-                            return ResolvedPythonType::Atom(PythonType::String);
+                    Operator::Mod => {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
+                            // Ex) `"Hello" % "world"`
+                            (Self::Atom(PythonType::String), _) => {
+                                return Self::Atom(PythonType::String);
+                            }
+                            // Ex) `b"Hello" % b"world"`
+                            (Self::Atom(PythonType::Bytes), _) => {
+                                return Self::Atom(PythonType::Bytes);
+                            }
+                            // Ex) `1 % 2`
+                            (
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
+                            ) => {
+                                return Self::Atom(PythonType::Number(left.coerce(right)));
+                            }
+                            _ => {}
                         }
-                        // Ex) `b"Hello" % b"world"`
-                        (ResolvedPythonType::Atom(PythonType::Bytes), _) => {
-                            return ResolvedPythonType::Atom(PythonType::Bytes);
-                        }
-                        // Ex) `1 % 2`
-                        (
-                            ResolvedPythonType::Atom(PythonType::Number(left)),
-                            ResolvedPythonType::Atom(PythonType::Number(right)),
-                        ) => {
-                            return ResolvedPythonType::Atom(PythonType::Number(
-                                left.coerce(right),
-                            ));
-                        }
-                        _ => {}
-                    },
-                    Operator::Mult => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
-                    ) {
+                    }
+                    Operator::Mult => match (Self::from(left.as_ref()), Self::from(right.as_ref()))
+                    {
                         // Ex) `2 * 4`
                         (
-                            ResolvedPythonType::Atom(PythonType::Number(left)),
-                            ResolvedPythonType::Atom(PythonType::Number(right)),
+                            Self::Atom(PythonType::Number(left)),
+                            Self::Atom(PythonType::Number(right)),
                         ) => {
-                            return ResolvedPythonType::Atom(PythonType::Number(
-                                left.coerce(right),
-                            ));
+                            return Self::Atom(PythonType::Number(left.coerce(right)));
                         }
                         // Ex) `"1" * 2` or `2 * "1"`
                         (
-                            ResolvedPythonType::Atom(PythonType::String),
-                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
+                            Self::Atom(PythonType::String),
+                            Self::Atom(PythonType::Number(NumberLike::Integer)),
                         )
                         | (
-                            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer)),
-                            ResolvedPythonType::Atom(PythonType::String),
-                        ) => return ResolvedPythonType::Atom(PythonType::String),
-                        (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                            return ResolvedPythonType::TypeError;
+                            Self::Atom(PythonType::Number(NumberLike::Integer)),
+                            Self::Atom(PythonType::String),
+                        ) => return Self::Atom(PythonType::String),
+                        (Self::Atom(_), Self::Atom(_)) => {
+                            return Self::TypeError;
                         }
                         _ => {}
                     },
                     // Standard arithmetic operators, which coerce to the "highest" number type.
-                    Operator::FloorDiv | Operator::Pow => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
-                    ) {
-                        // Ex) `2 ** 4`
-                        (
-                            ResolvedPythonType::Atom(PythonType::Number(left)),
-                            ResolvedPythonType::Atom(PythonType::Number(right)),
-                        ) => {
-                            return ResolvedPythonType::Atom(PythonType::Number(
-                                left.coerce(right),
-                            ));
+                    Operator::FloorDiv | Operator::Pow => {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
+                            // Ex) `2 ** 4`
+                            (
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
+                            ) => {
+                                return Self::Atom(PythonType::Number(left.coerce(right)));
+                            }
+                            (Self::Atom(_), Self::Atom(_)) => {
+                                return Self::TypeError;
+                            }
+                            _ => {}
                         }
-                        (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                            return ResolvedPythonType::TypeError;
-                        }
-                        _ => {}
-                    },
+                    }
                     // Division, which returns at least `float`.
-                    Operator::Div => match (
-                        ResolvedPythonType::from(left.as_ref()),
-                        ResolvedPythonType::from(right.as_ref()),
-                    ) {
-                        // Ex) `1 / 2`
-                        (
-                            ResolvedPythonType::Atom(PythonType::Number(left)),
-                            ResolvedPythonType::Atom(PythonType::Number(right)),
-                        ) => {
-                            let resolved = left.coerce(right);
-                            return ResolvedPythonType::Atom(PythonType::Number(
-                                if resolved == NumberLike::Integer {
-                                    NumberLike::Float
-                                } else {
-                                    resolved
-                                },
-                            ));
+                    Operator::Div => {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
+                            // Ex) `1 / 2`
+                            (
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
+                            ) => {
+                                let resolved = left.coerce(right);
+                                return Self::Atom(PythonType::Number(
+                                    if resolved == NumberLike::Integer {
+                                        NumberLike::Float
+                                    } else {
+                                        resolved
+                                    },
+                                ));
+                            }
+                            (Self::Atom(_), Self::Atom(_)) => {
+                                return Self::TypeError;
+                            }
+                            _ => {}
                         }
-                        (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                            return ResolvedPythonType::TypeError;
-                        }
-                        _ => {}
-                    },
+                    }
                     // Bitwise operators, which only work on `int` and `bool`.
                     Operator::BitAnd
                     | Operator::BitOr
                     | Operator::BitXor
                     | Operator::LShift
                     | Operator::RShift => {
-                        match (
-                            ResolvedPythonType::from(left.as_ref()),
-                            ResolvedPythonType::from(right.as_ref()),
-                        ) {
+                        match (Self::from(left.as_ref()), Self::from(right.as_ref())) {
                             // Ex) `1 & 2`
                             (
-                                ResolvedPythonType::Atom(PythonType::Number(left)),
-                                ResolvedPythonType::Atom(PythonType::Number(right)),
+                                Self::Atom(PythonType::Number(left)),
+                                Self::Atom(PythonType::Number(right)),
                             ) => {
                                 let resolved = left.coerce(right);
                                 return if resolved == NumberLike::Integer {
-                                    ResolvedPythonType::Atom(PythonType::Number(
-                                        NumberLike::Integer,
-                                    ))
+                                    Self::Atom(PythonType::Number(NumberLike::Integer))
                                 } else {
-                                    ResolvedPythonType::TypeError
+                                    Self::TypeError
                                 };
                             }
-                            (ResolvedPythonType::Atom(_), ResolvedPythonType::Atom(_)) => {
-                                return ResolvedPythonType::TypeError;
+                            (Self::Atom(_), Self::Atom(_)) => {
+                                return Self::TypeError;
                             }
                             _ => {}
                         }
                     }
                     Operator::MatMult => {}
                 }
-                ResolvedPythonType::Unknown
+                Self::Unknown
             }
             Expr::Lambda(_)
             | Expr::Await(_)
@@ -350,7 +309,7 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::Starred(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => ResolvedPythonType::Unknown,
+            | Expr::IpyEscapeCommand(_) => Self::Unknown,
         }
     }
 }
@@ -389,37 +348,27 @@ impl PythonType {
     /// Returns `true` if `self` is a subtype of `other`.
     fn is_subtype_of(self, other: Self) -> bool {
         match (self, other) {
-            (PythonType::String, PythonType::String) => true,
-            (PythonType::Bytes, PythonType::Bytes) => true,
-            (PythonType::None, PythonType::None) => true,
-            (PythonType::Ellipsis, PythonType::Ellipsis) => true,
+            (Self::String, Self::String) => true,
+            (Self::Bytes, Self::Bytes) => true,
+            (Self::None, Self::None) => true,
+            (Self::Ellipsis, Self::Ellipsis) => true,
             // The Numeric Tower (https://peps.python.org/pep-3141/)
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Bool)) => true,
-            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Integer)) => {
-                true
-            }
-            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Float)) => true,
-            (PythonType::Number(NumberLike::Complex), PythonType::Number(NumberLike::Complex)) => {
-                true
-            }
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Integer)) => true,
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Float)) => true,
-            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Complex)) => true,
-            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Float)) => {
-                true
-            }
-            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Complex)) => {
-                true
-            }
-            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Complex)) => {
-                true
-            }
+            (Self::Number(NumberLike::Bool), Self::Number(NumberLike::Bool)) => true,
+            (Self::Number(NumberLike::Integer), Self::Number(NumberLike::Integer)) => true,
+            (Self::Number(NumberLike::Float), Self::Number(NumberLike::Float)) => true,
+            (Self::Number(NumberLike::Complex), Self::Number(NumberLike::Complex)) => true,
+            (Self::Number(NumberLike::Bool), Self::Number(NumberLike::Integer)) => true,
+            (Self::Number(NumberLike::Bool), Self::Number(NumberLike::Float)) => true,
+            (Self::Number(NumberLike::Bool), Self::Number(NumberLike::Complex)) => true,
+            (Self::Number(NumberLike::Integer), Self::Number(NumberLike::Float)) => true,
+            (Self::Number(NumberLike::Integer), Self::Number(NumberLike::Complex)) => true,
+            (Self::Number(NumberLike::Float), Self::Number(NumberLike::Complex)) => true,
             // This simple type hierarchy doesn't support generics.
-            (PythonType::Dict, PythonType::Dict) => true,
-            (PythonType::List, PythonType::List) => true,
-            (PythonType::Set, PythonType::Set) => true,
-            (PythonType::Tuple, PythonType::Tuple) => true,
-            (PythonType::Generator, PythonType::Generator) => true,
+            (Self::Dict, Self::Dict) => true,
+            (Self::List, Self::List) => true,
+            (Self::Set, Self::Set) => true,
+            (Self::Tuple, Self::Tuple) => true,
+            (Self::Generator, Self::Generator) => true,
             _ => false,
         }
     }
@@ -441,11 +390,11 @@ pub enum NumberLike {
 impl NumberLike {
     /// Coerces two number-like types to the "highest" number-like type.
     #[must_use]
-    pub fn coerce(self, other: NumberLike) -> NumberLike {
+    pub fn coerce(self, other: Self) -> Self {
         match (self, other) {
-            (NumberLike::Complex, _) | (_, NumberLike::Complex) => NumberLike::Complex,
-            (NumberLike::Float, _) | (_, NumberLike::Float) => NumberLike::Float,
-            _ => NumberLike::Integer,
+            (Self::Complex, _) | (_, Self::Complex) => Self::Complex,
+            (Self::Float, _) | (_, Self::Float) => Self::Float,
+            _ => Self::Integer,
         }
     }
 }

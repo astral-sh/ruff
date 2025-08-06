@@ -11,8 +11,8 @@ pub(crate) enum SectionStyle {
 impl SectionStyle {
     pub(crate) fn sections(&self) -> &[SectionKind] {
         match self {
-            SectionStyle::Numpy => NUMPY_SECTIONS,
-            SectionStyle::Google => GOOGLE_SECTIONS,
+            Self::Numpy => NUMPY_SECTIONS,
+            Self::Google => GOOGLE_SECTIONS,
         }
     }
 }

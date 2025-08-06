@@ -173,12 +173,8 @@ impl ClassInfoConstraintFunction {
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class: ClassLiteral<'db>| match self {
-            ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.default_specialization(db))
-            }
-            ClassInfoConstraintFunction::IsSubclass => {
-                SubclassOfType::from(db, class.default_specialization(db))
-            }
+            Self::IsInstance => Type::instance(db, class.default_specialization(db)),
+            Self::IsSubclass => SubclassOfType::from(db, class.default_specialization(db)),
         };
 
         match classinfo {

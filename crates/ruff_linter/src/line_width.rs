@@ -69,8 +69,8 @@ impl std::fmt::Debug for ParseLineWidthError {
 impl std::fmt::Display for ParseLineWidthError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParseLineWidthError::ParseError(err) => std::fmt::Display::fmt(err, fmt),
-            ParseLineWidthError::TryFromIntError(err) => std::fmt::Display::fmt(err, fmt),
+            Self::ParseError(err) => std::fmt::Display::fmt(err, fmt),
+            Self::TryFromIntError(err) => std::fmt::Display::fmt(err, fmt),
         }
     }
 }
@@ -96,7 +96,7 @@ impl TryFrom<u16> for LineLength {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match NonZeroU16::try_from(value) {
-            Ok(value) if value.get() <= Self::MAX => Ok(LineLength(value)),
+            Ok(value) if value.get() <= Self::MAX => Ok(Self(value)),
             Ok(_) | Err(_) => Err(LineLengthFromIntError(value)),
         }
     }
@@ -172,7 +172,7 @@ impl LineWidthBuilder {
 
     /// Creates a new `LineWidth` with the given tab size.
     pub fn new(tab_size: IndentWidth) -> Self {
-        LineWidthBuilder {
+        Self {
             width: 0,
             column: 0,
             tab_size,

@@ -31,12 +31,12 @@ pub(crate) struct StrOrReprDefinedInStub {
 impl AlwaysFixableViolation for StrOrReprDefinedInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StrOrReprDefinedInStub { name } = self;
+        let Self { name } = self;
         format!("Defining `{name}` in a stub is almost always redundant")
     }
 
     fn fix_title(&self) -> String {
-        let StrOrReprDefinedInStub { name } = self;
+        let Self { name } = self;
         format!("Remove definition of `{name}`")
     }
 }

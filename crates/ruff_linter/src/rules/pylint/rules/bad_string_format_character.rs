@@ -34,7 +34,7 @@ pub(crate) struct BadStringFormatCharacter {
 impl Violation for BadStringFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadStringFormatCharacter { format_char } = self;
+        let Self { format_char } = self;
         format!("Unsupported format character '{format_char}'")
     }
 }

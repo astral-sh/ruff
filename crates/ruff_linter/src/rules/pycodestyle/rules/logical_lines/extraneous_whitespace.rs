@@ -38,12 +38,12 @@ pub(crate) struct WhitespaceAfterOpenBracket {
 impl AlwaysFixableViolation for WhitespaceAfterOpenBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let WhitespaceAfterOpenBracket { symbol } = self;
+        let Self { symbol } = self;
         format!("Whitespace after '{symbol}'")
     }
 
     fn fix_title(&self) -> String {
-        let WhitespaceAfterOpenBracket { symbol } = self;
+        let Self { symbol } = self;
         format!("Remove whitespace before '{symbol}'")
     }
 }
@@ -77,12 +77,12 @@ pub(crate) struct WhitespaceBeforeCloseBracket {
 impl AlwaysFixableViolation for WhitespaceBeforeCloseBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let WhitespaceBeforeCloseBracket { symbol } = self;
+        let Self { symbol } = self;
         format!("Whitespace before '{symbol}'")
     }
 
     fn fix_title(&self) -> String {
-        let WhitespaceBeforeCloseBracket { symbol } = self;
+        let Self { symbol } = self;
         format!("Remove whitespace before '{symbol}'")
     }
 }
@@ -114,12 +114,12 @@ pub(crate) struct WhitespaceBeforePunctuation {
 impl AlwaysFixableViolation for WhitespaceBeforePunctuation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let WhitespaceBeforePunctuation { symbol } = self;
+        let Self { symbol } = self;
         format!("Whitespace before '{symbol}'")
     }
 
     fn fix_title(&self) -> String {
-        let WhitespaceBeforePunctuation { symbol } = self;
+        let Self { symbol } = self;
         format!("Remove whitespace before '{symbol}'")
     }
 }
@@ -326,17 +326,17 @@ enum BracketOrPunctuation {
 }
 
 impl BracketOrPunctuation {
-    fn from_kind(kind: TokenKind) -> Option<BracketOrPunctuation> {
+    fn from_kind(kind: TokenKind) -> Option<Self> {
         match kind {
-            TokenKind::Lbrace => Some(BracketOrPunctuation::OpenBracket('{')),
-            TokenKind::Lpar => Some(BracketOrPunctuation::OpenBracket('(')),
-            TokenKind::Lsqb => Some(BracketOrPunctuation::OpenBracket('[')),
-            TokenKind::Rbrace => Some(BracketOrPunctuation::CloseBracket('}')),
-            TokenKind::Rpar => Some(BracketOrPunctuation::CloseBracket(')')),
-            TokenKind::Rsqb => Some(BracketOrPunctuation::CloseBracket(']')),
-            TokenKind::Comma => Some(BracketOrPunctuation::Punctuation(',')),
-            TokenKind::Colon => Some(BracketOrPunctuation::Punctuation(':')),
-            TokenKind::Semi => Some(BracketOrPunctuation::Punctuation(';')),
+            TokenKind::Lbrace => Some(Self::OpenBracket('{')),
+            TokenKind::Lpar => Some(Self::OpenBracket('(')),
+            TokenKind::Lsqb => Some(Self::OpenBracket('[')),
+            TokenKind::Rbrace => Some(Self::CloseBracket('}')),
+            TokenKind::Rpar => Some(Self::CloseBracket(')')),
+            TokenKind::Rsqb => Some(Self::CloseBracket(']')),
+            TokenKind::Comma => Some(Self::Punctuation(',')),
+            TokenKind::Colon => Some(Self::Punctuation(':')),
+            TokenKind::Semi => Some(Self::Punctuation(';')),
             _ => None,
         }
     }

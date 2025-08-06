@@ -340,10 +340,10 @@ impl FromStr for TodoDirectiveKind {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "fixme" => Ok(TodoDirectiveKind::Fixme),
-            "hack" => Ok(TodoDirectiveKind::Hack),
-            "todo" => Ok(TodoDirectiveKind::Todo),
-            "xxx" => Ok(TodoDirectiveKind::Xxx),
+            "fixme" => Ok(Self::Fixme),
+            "hack" => Ok(Self::Hack),
+            "todo" => Ok(Self::Todo),
+            "xxx" => Ok(Self::Xxx),
             _ => Err(()),
         }
     }
@@ -352,9 +352,9 @@ impl FromStr for TodoDirectiveKind {
 impl TodoDirectiveKind {
     fn len(&self) -> TextSize {
         match self {
-            TodoDirectiveKind::Xxx => TextSize::new(3),
-            TodoDirectiveKind::Hack | TodoDirectiveKind::Todo => TextSize::new(4),
-            TodoDirectiveKind::Fixme => TextSize::new(5),
+            Self::Xxx => TextSize::new(3),
+            Self::Hack | Self::Todo => TextSize::new(4),
+            Self::Fixme => TextSize::new(5),
         }
     }
 }

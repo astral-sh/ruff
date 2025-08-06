@@ -166,14 +166,14 @@ impl<'a, I: Idx, T> IntoIterator for &'a mut IndexVec<I, T> {
 impl<I: Idx, T> Default for IndexVec<I, T> {
     #[inline]
     fn default() -> Self {
-        IndexVec::new()
+        Self::new()
     }
 }
 
 impl<I: Idx, T, const N: usize> From<[T; N]> for IndexVec<I, T> {
     #[inline]
     fn from(array: [T; N]) -> Self {
-        IndexVec::from_raw(array.into())
+        Self::from_raw(array.into())
     }
 }
 
@@ -190,7 +190,7 @@ where
 {
     #[expect(unsafe_code)]
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_vec: &mut IndexVec<I, T> = unsafe { &mut *old_pointer };
+        let old_vec: &mut Self = unsafe { &mut *old_pointer };
         unsafe { salsa::Update::maybe_update(&raw mut old_vec.raw, new_value.raw) }
     }
 }

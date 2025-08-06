@@ -50,7 +50,7 @@ pub(crate) struct TooManyPositionalArguments {
 impl Violation for TooManyPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyPositionalArguments { c_pos, max_pos } = self;
+        let Self { c_pos, max_pos } = self;
         format!("Too many positional arguments ({c_pos}/{max_pos})")
     }
 }

@@ -88,12 +88,12 @@ pub(crate) struct PytestFixtureIncorrectParenthesesStyle {
 impl AlwaysFixableViolation for PytestFixtureIncorrectParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixtureIncorrectParenthesesStyle { expected, actual } = self;
+        let Self { expected, actual } = self;
         format!("Use `@pytest.fixture{expected}` over `@pytest.fixture{actual}`")
     }
 
     fn fix_title(&self) -> String {
-        let PytestFixtureIncorrectParenthesesStyle { expected, .. } = self;
+        let Self { expected, .. } = self;
         match expected {
             Parentheses::None => "Remove parentheses".to_string(),
             Parentheses::Empty => "Add parentheses".to_string(),
@@ -138,7 +138,7 @@ pub(crate) struct PytestFixturePositionalArgs {
 impl Violation for PytestFixturePositionalArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixturePositionalArgs { function } = self;
+        let Self { function } = self;
         format!("Configuration for fixture `{function}` specified via positional args, use kwargs")
     }
 }
@@ -366,7 +366,7 @@ pub(crate) struct PytestFixtureParamWithoutValue {
 impl Violation for PytestFixtureParamWithoutValue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestFixtureParamWithoutValue { name } = self;
+        let Self { name } = self;
         format!(
             "Fixture `{name}` without value is injected as parameter, use \
              `@pytest.mark.usefixtures` instead"
@@ -521,7 +521,7 @@ pub(crate) struct PytestUselessYieldFixture {
 impl AlwaysFixableViolation for PytestUselessYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestUselessYieldFixture { name } = self;
+        let Self { name } = self;
         format!("No teardown in fixture `{name}`, use `return` instead of `yield`")
     }
 

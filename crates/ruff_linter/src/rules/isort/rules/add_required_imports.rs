@@ -44,12 +44,12 @@ pub(crate) struct MissingRequiredImport(pub String);
 impl AlwaysFixableViolation for MissingRequiredImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingRequiredImport(name) = self;
+        let Self(name) = self;
         format!("Missing required import: `{name}`")
     }
 
     fn fix_title(&self) -> String {
-        let MissingRequiredImport(name) = self;
+        let Self(name) = self;
         format!("Insert required import: `{name}`")
     }
 }

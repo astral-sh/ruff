@@ -324,7 +324,7 @@ pub enum OutputFormat {
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
-    fn from(format: OutputFormat) -> ty_project::metadata::options::OutputFormat {
+    fn from(format: OutputFormat) -> Self {
         match format {
             OutputFormat::Full => Self::Full,
             OutputFormat::Concise => Self::Concise,

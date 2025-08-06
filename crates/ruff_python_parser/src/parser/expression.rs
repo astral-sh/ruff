@@ -114,7 +114,7 @@ pub(super) const END_EXPR_SET: TokenSet = TokenSet::new([
 /// Tokens that can appear at the end of a sequence.
 const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
 
-impl<'src> Parser<'src> {
+impl Parser<'_> {
     /// Returns `true` if the parser is at a name or keyword (including soft keyword) token.
     pub(super) fn at_name_or_keyword(&self) -> bool {
         self.at(TokenKind::Name) || self.current_token_kind().is_keyword()
@@ -2157,7 +2157,7 @@ impl<'src> Parser<'src> {
         first_element: Expr,
         start: TextSize,
         parenthesized: Parenthesized,
-        mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
+        mut parse_func: impl FnMut(&mut Self) -> ParsedExpr,
     ) -> ast::ExprTuple {
         // TODO(dhruvmanila): Can we remove `parse_func` and use `parenthesized` to
         // determine the parsing function?
@@ -2830,7 +2830,7 @@ impl ParsedExpr {
 impl From<Expr> for ParsedExpr {
     #[inline]
     fn from(expr: Expr) -> Self {
-        ParsedExpr {
+        Self {
             expr,
             is_parenthesized: false,
         }
@@ -2862,11 +2862,11 @@ enum BinaryLikeOperator {
 impl BinaryLikeOperator {
     /// Attempts to convert the two tokens into the corresponding binary-like operator. Returns
     /// [None] if it's not a binary-like operator.
-    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<BinaryLikeOperator> {
+    fn try_from_tokens(current: TokenKind, next: TokenKind) -> Option<Self> {
         if let Some(bool_op) = current.as_bool_operator() {
-            Some(BinaryLikeOperator::Boolean(bool_op))
+            Some(Self::Boolean(bool_op))
         } else if let Some(bin_op) = current.as_binary_operator() {
-            Some(BinaryLikeOperator::Binary(bin_op))
+            Some(Self::Binary(bin_op))
         } else {
             helpers::token_kind_to_cmp_op([current, next]).map(BinaryLikeOperator::Comparison)
         }
@@ -2876,9 +2876,9 @@ impl BinaryLikeOperator {
     /// isn't an operator token.
     fn precedence(&self) -> OperatorPrecedence {
         match self {
-            BinaryLikeOperator::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
-            BinaryLikeOperator::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
-            BinaryLikeOperator::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
+            Self::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
+            Self::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
+            Self::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
         }
     }
 }
@@ -2925,20 +2925,18 @@ bitflags! {
 impl ExpressionContext {
     /// Create a new context allowing starred expression at conditional precedence.
     pub(super) fn starred_conditional() -> Self {
-        ExpressionContext::default()
-            .with_starred_expression_allowed(StarredExpressionPrecedence::Conditional)
+        Self::default().with_starred_expression_allowed(StarredExpressionPrecedence::Conditional)
     }
 
     /// Create a new context allowing starred expression at bitwise OR precedence.
     pub(super) fn starred_bitwise_or() -> Self {
-        ExpressionContext::default()
-            .with_starred_expression_allowed(StarredExpressionPrecedence::BitwiseOr)
+        Self::default().with_starred_expression_allowed(StarredExpressionPrecedence::BitwiseOr)
     }
 
     /// Create a new context allowing starred expression at bitwise OR precedence or yield
     /// expression.
     pub(super) fn yield_or_starred_bitwise_or() -> Self {
-        ExpressionContext::starred_bitwise_or().with_yield_expression_allowed()
+        Self::starred_bitwise_or().with_yield_expression_allowed()
     }
 
     /// Returns a new [`ExpressionContext`] which allows starred expression with the given
@@ -2953,17 +2951,17 @@ impl ExpressionContext {
                 flags -= ExpressionContextFlags::STARRED_BITWISE_OR_PRECEDENCE;
             }
         }
-        ExpressionContext(flags)
+        Self(flags)
     }
 
     /// Returns a new [`ExpressionContext`] which allows yield expression.
     fn with_yield_expression_allowed(self) -> Self {
-        ExpressionContext(self.0 | ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
+        Self(self.0 | ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
     }
 
     /// Returns a new [`ExpressionContext`] which excludes `in` as part of a comparison expression.
     pub(super) fn with_in_excluded(self) -> Self {
-        ExpressionContext(self.0 | ExpressionContextFlags::EXCLUDE_IN)
+        Self(self.0 | ExpressionContextFlags::EXCLUDE_IN)
     }
 
     /// Returns `true` if the `in` keyword should be excluded from a comparison expression.

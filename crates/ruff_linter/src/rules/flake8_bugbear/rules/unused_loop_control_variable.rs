@@ -53,7 +53,7 @@ impl Violation for UnusedLoopControlVariable {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedLoopControlVariable {
+        let Self {
             name, certainty, ..
         } = self;
         match certainty {
@@ -67,7 +67,7 @@ impl Violation for UnusedLoopControlVariable {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let UnusedLoopControlVariable { rename, name, .. } = self;
+        let Self { rename, name, .. } = self;
 
         rename
             .as_ref()

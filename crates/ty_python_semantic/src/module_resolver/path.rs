@@ -68,7 +68,7 @@ impl ModulePath {
 
     #[must_use]
     pub(super) fn is_directory(&self, resolver: &ResolverContext) -> bool {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -104,7 +104,7 @@ impl ModulePath {
 
     #[must_use]
     pub(super) fn is_regular_package(&self, resolver: &ResolverContext) -> bool {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -143,7 +143,7 @@ impl ModulePath {
     }
 
     pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -162,7 +162,7 @@ impl ModulePath {
     #[must_use]
     pub(super) fn to_file(&self, resolver: &ResolverContext) -> Option<File> {
         let db = resolver.db;
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -196,7 +196,7 @@ impl ModulePath {
 
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
-        let ModulePath {
+        let Self {
             search_path: _,
             relative_path,
         } = self;
@@ -228,11 +228,11 @@ impl ModulePath {
 
     #[must_use]
     pub(crate) fn with_pyi_extension(&self) -> Self {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
-        ModulePath {
+        Self {
             search_path: search_path.clone(),
             relative_path: relative_path.with_extension("pyi"),
         }
@@ -243,11 +243,11 @@ impl ModulePath {
         if self.is_standard_library() {
             return None;
         }
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
-        Some(ModulePath {
+        Some(Self {
             search_path: search_path.clone(),
             relative_path: relative_path.with_extension("py"),
         })
@@ -256,7 +256,7 @@ impl ModulePath {
 
 impl PartialEq<SystemPathBuf> for ModulePath {
     fn eq(&self, other: &SystemPathBuf) -> bool {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -275,7 +275,7 @@ impl PartialEq<ModulePath> for SystemPathBuf {
 
 impl PartialEq<VendoredPathBuf> for ModulePath {
     fn eq(&self, other: &VendoredPathBuf) -> bool {
-        let ModulePath {
+        let Self {
             search_path,
             relative_path,
         } = self;
@@ -712,7 +712,7 @@ mod tests {
 
     impl ModulePath {
         #[must_use]
-        fn join(&self, component: &str) -> ModulePath {
+        fn join(&self, component: &str) -> Self {
             let mut result = self.clone();
             result.push(component);
             result

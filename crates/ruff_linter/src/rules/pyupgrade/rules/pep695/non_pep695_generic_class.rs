@@ -95,7 +95,7 @@ impl Violation for NonPEP695GenericClass {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP695GenericClass { name } = self;
+        let Self { name } = self;
         format!("Generic class `{name}` uses `Generic` subclass instead of type parameters")
     }
 

@@ -225,9 +225,9 @@ impl CaseSensitivity {
 impl fmt::Display for CaseSensitivity {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            CaseSensitivity::Unknown => f.write_str("unknown"),
-            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
-            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
+            Self::Unknown => f.write_str("unknown"),
+            Self::CaseSensitive => f.write_str("case-sensitive"),
+            Self::CaseInsensitive => f.write_str("case-insensitive"),
         }
     }
 }
@@ -320,15 +320,15 @@ pub enum FileType {
 
 impl FileType {
     pub const fn is_file(self) -> bool {
-        matches!(self, FileType::File)
+        matches!(self, Self::File)
     }
 
     pub const fn is_directory(self) -> bool {
-        matches!(self, FileType::Directory)
+        matches!(self, Self::Directory)
     }
 
     pub const fn is_symlink(self) -> bool {
-        matches!(self, FileType::Symlink)
+        matches!(self, Self::Symlink)
     }
 }
 

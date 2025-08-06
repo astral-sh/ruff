@@ -64,12 +64,12 @@ pub(crate) struct UnnecessaryComprehension {
 impl AlwaysFixableViolation for UnnecessaryComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryComprehension { kind } = self;
+        let Self { kind } = self;
         format!("Unnecessary {kind} comprehension (rewrite using `{kind}()`)")
     }
 
     fn fix_title(&self) -> String {
-        let UnnecessaryComprehension { kind } = self;
+        let Self { kind } = self;
         format!("Rewrite using `{kind}()`")
     }
 }

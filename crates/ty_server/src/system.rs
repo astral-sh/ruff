@@ -63,11 +63,11 @@ impl AnySystemPath {
     /// * If the URL is not a valid UTF-8 string.
     pub(crate) fn try_from_url(url: &Url) -> std::result::Result<Self, ()> {
         if url.scheme() == "file" {
-            Ok(AnySystemPath::System(
+            Ok(Self::System(
                 SystemPathBuf::from_path_buf(url.to_file_path()?).map_err(|_| ())?,
             ))
         } else {
-            Ok(AnySystemPath::SystemVirtual(
+            Ok(Self::SystemVirtual(
                 SystemVirtualPath::new(url.as_str()).to_path_buf(),
             ))
         }
@@ -75,26 +75,24 @@ impl AnySystemPath {
 
     pub(crate) const fn as_system(&self) -> Option<&SystemPathBuf> {
         match self {
-            AnySystemPath::System(system_path_buf) => Some(system_path_buf),
-            AnySystemPath::SystemVirtual(_) => None,
+            Self::System(system_path_buf) => Some(system_path_buf),
+            Self::SystemVirtual(_) => None,
         }
     }
 
     /// Returns the extension of the path, if any.
     pub(crate) fn extension(&self) -> Option<&str> {
         match self {
-            AnySystemPath::System(system_path) => system_path.extension(),
-            AnySystemPath::SystemVirtual(virtual_path) => virtual_path.extension(),
+            Self::System(system_path) => system_path.extension(),
+            Self::SystemVirtual(virtual_path) => virtual_path.extension(),
         }
     }
 
     /// Converts the path to a URL.
     pub(crate) fn to_url(&self) -> Option<Url> {
         match self {
-            AnySystemPath::System(system_path) => {
-                Url::from_file_path(system_path.as_std_path()).ok()
-            }
-            AnySystemPath::SystemVirtual(virtual_path) => Url::parse(virtual_path.as_str()).ok(),
+            Self::System(system_path) => Url::from_file_path(system_path.as_std_path()).ok(),
+            Self::SystemVirtual(virtual_path) => Url::parse(virtual_path.as_str()).ok(),
         }
     }
 }
@@ -102,8 +100,8 @@ impl AnySystemPath {
 impl fmt::Display for AnySystemPath {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AnySystemPath::System(system_path) => write!(f, "{system_path}"),
-            AnySystemPath::SystemVirtual(virtual_path) => write!(f, "{virtual_path}"),
+            Self::System(system_path) => write!(f, "{system_path}"),
+            Self::SystemVirtual(virtual_path) => write!(f, "{virtual_path}"),
         }
     }
 }

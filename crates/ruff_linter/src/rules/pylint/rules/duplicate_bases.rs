@@ -65,7 +65,7 @@ impl Violation for DuplicateBases {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateBases { base, class } = self;
+        let Self { base, class } = self;
         format!("Duplicate base `{base}` for class `{class}`")
     }
 

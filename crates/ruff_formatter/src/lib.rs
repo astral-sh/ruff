@@ -74,20 +74,20 @@ pub enum IndentStyle {
 impl IndentStyle {
     /// Returns `true` if this is an [`IndentStyle::Tab`].
     pub const fn is_tab(&self) -> bool {
-        matches!(self, IndentStyle::Tab)
+        matches!(self, Self::Tab)
     }
 
     /// Returns `true` if this is an [`IndentStyle::Space`].
     pub const fn is_space(&self) -> bool {
-        matches!(self, IndentStyle::Space)
+        matches!(self, Self::Space)
     }
 }
 
 impl std::fmt::Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndentStyle::Tab => std::write!(f, "tab"),
-            IndentStyle::Space => std::write!(f, "space"),
+            Self::Tab => std::write!(f, "tab"),
+            Self::Space => std::write!(f, "space"),
         }
     }
 }
@@ -162,7 +162,7 @@ impl Display for LineWidth {
 impl TryFrom<u16> for LineWidth {
     type Error = TryFromIntError;
 
-    fn try_from(value: u16) -> Result<LineWidth, Self::Error> {
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
         NonZeroU16::try_from(value).map(LineWidth)
     }
 }
@@ -175,7 +175,7 @@ impl From<LineWidth> for u16 {
 
 impl From<LineWidth> for u32 {
     fn from(value: LineWidth) -> Self {
-        u32::from(value.0.get())
+        Self::from(value.0.get())
     }
 }
 

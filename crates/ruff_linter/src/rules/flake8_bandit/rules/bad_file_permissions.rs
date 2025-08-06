@@ -42,7 +42,7 @@ pub(crate) struct BadFilePermissions {
 impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadFilePermissions { reason } = self;
+        let Self { reason } = self;
         match reason {
             Reason::Permissive(mask) => {
                 format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory")

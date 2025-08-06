@@ -25,7 +25,7 @@ impl FilePath {
     /// Create a new path to a file on the file system.
     #[must_use]
     pub fn system(path: impl AsRef<SystemPath>) -> Self {
-        FilePath::System(path.as_ref().to_path_buf())
+        Self::System(path.as_ref().to_path_buf())
     }
 
     /// Returns `Some` if the path is a file system path that points to a path on disk.
@@ -33,8 +33,8 @@ impl FilePath {
     #[inline]
     pub fn into_system_path_buf(self) -> Option<SystemPathBuf> {
         match self {
-            FilePath::System(path) => Some(path),
-            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
+            Self::System(path) => Some(path),
+            Self::Vendored(_) | Self::SystemVirtual(_) => None,
         }
     }
 
@@ -42,8 +42,8 @@ impl FilePath {
     #[inline]
     pub fn as_system_path(&self) -> Option<&SystemPath> {
         match self {
-            FilePath::System(path) => Some(path.as_path()),
-            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
+            Self::System(path) => Some(path.as_path()),
+            Self::Vendored(_) | Self::SystemVirtual(_) => None,
         }
     }
 
@@ -51,7 +51,7 @@ impl FilePath {
     #[must_use]
     #[inline]
     pub const fn is_system_path(&self) -> bool {
-        matches!(self, FilePath::System(_))
+        matches!(self, Self::System(_))
     }
 
     /// Returns `true` if the path is a file system path that is virtual i.e., it doesn't exists on
@@ -59,31 +59,31 @@ impl FilePath {
     #[must_use]
     #[inline]
     pub const fn is_system_virtual_path(&self) -> bool {
-        matches!(self, FilePath::SystemVirtual(_))
+        matches!(self, Self::SystemVirtual(_))
     }
 
     /// Returns `true` if the path is a vendored path.
     #[must_use]
     #[inline]
     pub const fn is_vendored_path(&self) -> bool {
-        matches!(self, FilePath::Vendored(_))
+        matches!(self, Self::Vendored(_))
     }
 
     #[must_use]
     #[inline]
     pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match self {
-            FilePath::Vendored(path) => Some(path.as_path()),
-            FilePath::System(_) | FilePath::SystemVirtual(_) => None,
+            Self::Vendored(path) => Some(path.as_path()),
+            Self::System(_) | Self::SystemVirtual(_) => None,
         }
     }
 
     /// Yields the underlying [`str`] slice.
     pub fn as_str(&self) -> &str {
         match self {
-            FilePath::System(path) => path.as_str(),
-            FilePath::Vendored(path) => path.as_str(),
-            FilePath::SystemVirtual(path) => path.as_str(),
+            Self::System(path) => path.as_str(),
+            Self::Vendored(path) => path.as_str(),
+            Self::SystemVirtual(path) => path.as_str(),
         }
     }
 
@@ -96,18 +96,18 @@ impl FilePath {
     #[inline]
     pub fn to_file(&self, db: &dyn Db) -> Option<File> {
         match self {
-            FilePath::System(path) => system_path_to_file(db, path).ok(),
-            FilePath::Vendored(path) => vendored_path_to_file(db, path).ok(),
-            FilePath::SystemVirtual(_) => None,
+            Self::System(path) => system_path_to_file(db, path).ok(),
+            Self::Vendored(path) => vendored_path_to_file(db, path).ok(),
+            Self::SystemVirtual(_) => None,
         }
     }
 
     #[must_use]
     pub fn extension(&self) -> Option<&str> {
         match self {
-            FilePath::System(path) => path.extension(),
-            FilePath::Vendored(path) => path.extension(),
-            FilePath::SystemVirtual(_) => None,
+            Self::System(path) => path.extension(),
+            Self::Vendored(path) => path.extension(),
+            Self::SystemVirtual(_) => None,
         }
     }
 }
@@ -126,7 +126,7 @@ impl From<SystemPathBuf> for FilePath {
 
 impl From<&SystemPath> for FilePath {
     fn from(value: &SystemPath) -> Self {
-        FilePath::System(value.to_path_buf())
+        Self::System(value.to_path_buf())
     }
 }
 
@@ -144,13 +144,13 @@ impl From<&VendoredPath> for FilePath {
 
 impl From<&SystemVirtualPath> for FilePath {
     fn from(value: &SystemVirtualPath) -> Self {
-        FilePath::SystemVirtual(value.to_path_buf())
+        Self::SystemVirtual(value.to_path_buf())
     }
 }
 
 impl From<SystemVirtualPathBuf> for FilePath {
     fn from(value: SystemVirtualPathBuf) -> Self {
-        FilePath::SystemVirtual(value)
+        Self::SystemVirtual(value)
     }
 }
 
@@ -214,9 +214,9 @@ impl PartialEq<FilePath> for VendoredPathBuf {
 impl Display for FilePath {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            FilePath::System(path) => std::fmt::Display::fmt(path, f),
-            FilePath::SystemVirtual(path) => std::fmt::Display::fmt(path, f),
-            FilePath::Vendored(path) => std::fmt::Display::fmt(path, f),
+            Self::System(path) => std::fmt::Display::fmt(path, f),
+            Self::SystemVirtual(path) => std::fmt::Display::fmt(path, f),
+            Self::Vendored(path) => std::fmt::Display::fmt(path, f),
         }
     }
 }

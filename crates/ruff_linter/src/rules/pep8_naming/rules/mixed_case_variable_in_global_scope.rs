@@ -59,7 +59,7 @@ pub(crate) struct MixedCaseVariableInGlobalScope {
 impl Violation for MixedCaseVariableInGlobalScope {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MixedCaseVariableInGlobalScope { name } = self;
+        let Self { name } = self;
         format!("Variable `{name}` in global scope should not be mixedCase")
     }
 }

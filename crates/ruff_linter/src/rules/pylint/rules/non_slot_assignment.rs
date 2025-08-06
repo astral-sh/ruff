@@ -54,7 +54,7 @@ pub(crate) struct NonSlotAssignment {
 impl Violation for NonSlotAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonSlotAssignment { name } = self;
+        let Self { name } = self;
         format!("Attribute `{name}` is not defined in class's `__slots__`")
     }
 }

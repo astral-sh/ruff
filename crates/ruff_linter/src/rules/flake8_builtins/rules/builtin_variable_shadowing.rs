@@ -51,7 +51,7 @@ pub(crate) struct BuiltinVariableShadowing {
 impl Violation for BuiltinVariableShadowing {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BuiltinVariableShadowing { name } = self;
+        let Self { name } = self;
         format!("Variable `{name}` is shadowing a Python builtin")
     }
 }

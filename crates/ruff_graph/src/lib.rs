@@ -40,7 +40,7 @@ impl ModuleImports {
             Collector::new(module_path.as_deref(), string_imports).collect(parsed.syntax());
 
         // Resolve the imports.
-        let mut resolved_imports = ModuleImports::default();
+        let mut resolved_imports = Self::default();
         for import in imports {
             for resolved in Resolver::new(db).resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
@@ -98,7 +98,7 @@ impl ImportMap {
     ///
     /// Assumes that the input is a collection of unique file paths and their imports.
     pub fn dependencies(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
-        let mut map = ImportMap::default();
+        let mut map = Self::default();
         for (path, imports) in imports {
             map.0.insert(path, imports);
         }
@@ -109,7 +109,7 @@ impl ImportMap {
     ///
     /// Assumes that the input is a collection of unique file paths and their imports.
     pub fn dependents(imports: impl IntoIterator<Item = (SystemPathBuf, ModuleImports)>) -> Self {
-        let mut reverse = ImportMap::default();
+        let mut reverse = Self::default();
         for (path, imports) in imports {
             for import in imports.0 {
                 reverse.0.entry(import).or_default().insert(path.clone());

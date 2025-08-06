@@ -1,17 +1,14 @@
 use ruff_text_size::Ranged;
 
 use crate::visitor::source_order::SourceOrderVisitor;
-use crate::{
-    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternArguments,
-    PatternKeyword,
-};
+use crate::{self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase};
 
 impl ast::ElifElseClause {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ElifElseClause {
+        let Self {
             range: _,
             node_index: _,
             test,
@@ -29,7 +26,7 @@ impl ast::ExprDict {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprDict {
+        let Self {
             items,
             range: _,
             node_index: _,
@@ -49,7 +46,7 @@ impl ast::ExprBoolOp {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprBoolOp {
+        let Self {
             op,
             values,
             range: _,
@@ -75,7 +72,7 @@ impl ast::ExprCompare {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprCompare {
+        let Self {
             left,
             ops,
             comparators,
@@ -108,7 +105,7 @@ impl ast::InterpolatedElement {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::InterpolatedElement {
+        let Self {
             expression,
             format_spec,
             ..
@@ -128,7 +125,7 @@ impl ast::InterpolatedStringLiteralElement {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::InterpolatedStringLiteralElement {
+        let Self {
             range: _,
             node_index: _,
             value: _,
@@ -141,7 +138,7 @@ impl ast::ExprFString {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFString {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -165,7 +162,7 @@ impl ast::ExprTString {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprTString {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -182,7 +179,7 @@ impl ast::ExprStringLiteral {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprStringLiteral {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -199,7 +196,7 @@ impl ast::ExprBytesLiteral {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExprBytesLiteral {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -216,7 +213,7 @@ impl ast::ExceptHandlerExceptHandler {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ExceptHandlerExceptHandler {
+        let Self {
             range: _,
             node_index: _,
             type_,
@@ -240,7 +237,7 @@ impl ast::PatternMatchValue {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchValue {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -254,7 +251,7 @@ impl ast::PatternMatchSingleton {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchSingleton {
+        let Self {
             value,
             range: _,
             node_index: _,
@@ -268,7 +265,7 @@ impl ast::PatternMatchSequence {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchSequence {
+        let Self {
             patterns,
             range: _,
             node_index: _,
@@ -284,7 +281,7 @@ impl ast::PatternMatchMapping {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchMapping {
+        let Self {
             keys,
             patterns,
             rest,
@@ -316,7 +313,7 @@ impl ast::PatternMatchClass {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchClass {
+        let Self {
             cls,
             arguments: parameters,
             range: _,
@@ -332,7 +329,7 @@ impl ast::PatternMatchStar {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchStar {
+        let Self {
             range: _,
             node_index: _,
             name,
@@ -349,7 +346,7 @@ impl ast::PatternMatchAs {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchAs {
+        let Self {
             pattern,
             range: _,
             node_index: _,
@@ -370,7 +367,7 @@ impl ast::PatternMatchOr {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchOr {
+        let Self {
             patterns,
             range: _,
             node_index: _,
@@ -386,7 +383,7 @@ impl ast::PatternArguments {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let PatternArguments {
+        let Self {
             range: _,
             node_index: _,
             patterns,
@@ -408,7 +405,7 @@ impl ast::PatternKeyword {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let PatternKeyword {
+        let Self {
             range: _,
             node_index: _,
             attr,
@@ -425,7 +422,7 @@ impl ast::Comprehension {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Comprehension {
+        let Self {
             range: _,
             node_index: _,
             target,
@@ -477,7 +474,7 @@ impl ast::Parameter {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Parameter {
+        let Self {
             range: _,
             node_index: _,
             name,
@@ -496,7 +493,7 @@ impl ast::ParameterWithDefault {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::ParameterWithDefault {
+        let Self {
             range: _,
             node_index: _,
             parameter,
@@ -514,7 +511,7 @@ impl ast::Keyword {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Keyword {
+        let Self {
             range: _,
             node_index: _,
             arg,
@@ -533,7 +530,7 @@ impl Alias {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Alias {
+        let Self {
             range: _,
             node_index: _,
             name,
@@ -552,7 +549,7 @@ impl ast::WithItem {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::WithItem {
+        let Self {
             range: _,
             node_index: _,
             context_expr,
@@ -572,7 +569,7 @@ impl ast::MatchCase {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::MatchCase {
+        let Self {
             range: _,
             node_index: _,
             pattern,
@@ -593,7 +590,7 @@ impl ast::Decorator {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Decorator {
+        let Self {
             range: _,
             node_index: _,
             expression,
@@ -608,7 +605,7 @@ impl ast::TypeParams {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParams {
+        let Self {
             range: _,
             node_index: _,
             type_params,
@@ -625,7 +622,7 @@ impl ast::TypeParamTypeVar {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParamTypeVar {
+        let Self {
             bound,
             default,
             name,
@@ -649,7 +646,7 @@ impl ast::TypeParamTypeVarTuple {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParamTypeVarTuple {
+        let Self {
             range: _,
             node_index: _,
             name,
@@ -668,7 +665,7 @@ impl ast::TypeParamParamSpec {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::TypeParamParamSpec {
+        let Self {
             range: _,
             node_index: _,
             name,
@@ -686,7 +683,7 @@ impl ast::FString {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::FString {
+        let Self {
             elements,
             range: _,
             node_index: _,
@@ -704,7 +701,7 @@ impl ast::TString {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::TString {
+        let Self {
             elements,
             range: _,
             node_index: _,
@@ -723,7 +720,7 @@ impl ast::StringLiteral {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::StringLiteral {
+        let Self {
             range: _,
             node_index: _,
             value: _,
@@ -738,7 +735,7 @@ impl ast::BytesLiteral {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::BytesLiteral {
+        let Self {
             range: _,
             node_index: _,
             value: _,
@@ -753,7 +750,7 @@ impl ast::Identifier {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::Identifier {
+        let Self {
             range: _,
             node_index: _,
             id: _,
@@ -761,7 +758,7 @@ impl ast::Identifier {
     }
 }
 
-impl<'a> AnyNodeRef<'a> {
+impl AnyNodeRef<'_> {
     /// Compares two any node refs by their pointers (referential equality).
     pub fn ptr_eq(self, other: AnyNodeRef) -> bool {
         self.as_ptr().eq(&other.as_ptr()) && self.kind() == other.kind()
@@ -778,7 +775,7 @@ impl<'a> AnyNodeRef<'a> {
     }
 
     /// The last child of the last branch, if the node has multiple branches.
-    pub fn last_child_in_body(&self) -> Option<AnyNodeRef<'a>> {
+    pub fn last_child_in_body(&self) -> Option<Self> {
         let body =
             match self {
                 AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })

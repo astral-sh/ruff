@@ -84,23 +84,23 @@ enum Entries {
 impl Entries {
     fn position(self) -> Option<TextSize> {
         match self {
-            Entries::None => None,
-            Entries::One(position) | Entries::MoreThanOne(position) => Some(position),
+            Self::None => None,
+            Self::One(position) | Self::MoreThanOne(position) => Some(position),
         }
     }
 
     const fn is_one_or_more(self) -> bool {
-        !matches!(self, Entries::None)
+        !matches!(self, Self::None)
     }
 
     const fn is_more_than_one(self) -> bool {
-        matches!(self, Entries::MoreThanOne(_))
+        matches!(self, Self::MoreThanOne(_))
     }
 
     const fn next(self, end_position: TextSize) -> Self {
         match self {
-            Entries::None => Entries::One(end_position),
-            Entries::One(_) | Entries::MoreThanOne(_) => Entries::MoreThanOne(end_position),
+            Self::None => Self::One(end_position),
+            Self::One(_) | Self::MoreThanOne(_) => Self::MoreThanOne(end_position),
         }
     }
 }

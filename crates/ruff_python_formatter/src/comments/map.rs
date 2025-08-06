@@ -398,7 +398,7 @@ struct InOrderEntry {
 
 impl InOrderEntry {
     fn leading(range: Range<usize>) -> Self {
-        InOrderEntry {
+        Self {
             leading_start: PartIndex::from_len(range.start),
             dangling_start: PartIndex::from_len(range.end),
             trailing_start: None,
@@ -409,7 +409,7 @@ impl InOrderEntry {
 
     fn dangling(range: Range<usize>) -> Self {
         let start = PartIndex::from_len(range.start);
-        InOrderEntry {
+        Self {
             leading_start: start,
             dangling_start: start,
             trailing_start: Some(PartIndex::from_len(range.end)),
@@ -420,7 +420,7 @@ impl InOrderEntry {
 
     fn trailing(range: Range<usize>) -> Self {
         let start = PartIndex::from_len(range.start);
-        InOrderEntry {
+        Self {
             leading_start: start,
             dangling_start: start,
             trailing_start: Some(start),
@@ -553,8 +553,8 @@ impl PartIndex {
         *self = self.incremented();
     }
 
-    fn incremented(self) -> PartIndex {
-        PartIndex(NonZeroU32::new(self.0.get() + 1).unwrap())
+    fn incremented(self) -> Self {
+        Self(NonZeroU32::new(self.0.get() + 1).unwrap())
     }
 }
 

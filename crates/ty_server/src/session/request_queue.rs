@@ -151,7 +151,7 @@ impl RequestCancellationToken {
     }
 
     fn clone(this: &Self) -> Self {
-        RequestCancellationToken(this.0.clone())
+        Self(this.0.clone())
     }
 }
 

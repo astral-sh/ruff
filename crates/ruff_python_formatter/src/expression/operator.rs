@@ -6,7 +6,7 @@ use ruff_python_ast::Operator;
 pub struct FormatOperator;
 
 impl<'ast> AsFormat<PyFormatContext<'ast>> for Operator {
-    type Format<'a> = FormatRefWithRule<'a, Operator, FormatOperator, PyFormatContext<'ast>>;
+    type Format<'a> = FormatRefWithRule<'a, Self, FormatOperator, PyFormatContext<'ast>>;
 
     fn format(&self) -> Self::Format<'_> {
         FormatRefWithRule::new(self, FormatOperator)
@@ -14,7 +14,7 @@ impl<'ast> AsFormat<PyFormatContext<'ast>> for Operator {
 }
 
 impl<'ast> IntoFormat<PyFormatContext<'ast>> for Operator {
-    type Format = FormatOwnedWithRule<Operator, FormatOperator, PyFormatContext<'ast>>;
+    type Format = FormatOwnedWithRule<Self, FormatOperator, PyFormatContext<'ast>>;
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatOperator)

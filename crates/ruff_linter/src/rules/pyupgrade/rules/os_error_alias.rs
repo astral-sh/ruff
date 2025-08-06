@@ -46,7 +46,7 @@ impl AlwaysFixableViolation for OSErrorAlias {
     }
 
     fn fix_title(&self) -> String {
-        let OSErrorAlias { name } = self;
+        let Self { name } = self;
         match name {
             None => "Replace with builtin `OSError`".to_string(),
             Some(name) => format!("Replace `{name}` with builtin `OSError`"),

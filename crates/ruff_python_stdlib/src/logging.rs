@@ -12,13 +12,13 @@ pub enum LoggingLevel {
 impl LoggingLevel {
     pub fn from_attribute(level: &str) -> Option<Self> {
         match level {
-            "debug" => Some(LoggingLevel::Debug),
-            "critical" => Some(LoggingLevel::Critical),
-            "error" => Some(LoggingLevel::Error),
-            "exception" => Some(LoggingLevel::Exception),
-            "info" => Some(LoggingLevel::Info),
-            "warn" => Some(LoggingLevel::Warn),
-            "warning" => Some(LoggingLevel::Warning),
+            "debug" => Some(Self::Debug),
+            "critical" => Some(Self::Critical),
+            "error" => Some(Self::Error),
+            "exception" => Some(Self::Exception),
+            "info" => Some(Self::Info),
+            "warn" => Some(Self::Warn),
+            "warning" => Some(Self::Warning),
             _ => None,
         }
     }

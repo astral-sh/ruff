@@ -50,7 +50,7 @@ impl Violation for MissingBlankLineAfterSummary {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingBlankLineAfterSummary { num_lines } = self;
+        let Self { num_lines } = self;
         if *num_lines == 0 {
             "1 blank line required between summary line and description".to_string()
         } else {

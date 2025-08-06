@@ -18,7 +18,7 @@ pub enum Terminal {
 
 impl Terminal {
     /// Returns the [`Terminal`] behavior of the function, if it can be determined.
-    pub fn from_function(function: &ast::StmtFunctionDef) -> Terminal {
+    pub fn from_function(function: &ast::StmtFunctionDef) -> Self {
         Self::from_body(&function.body)
     }
 
@@ -36,8 +36,8 @@ impl Terminal {
     }
 
     /// Returns the [`Terminal`] behavior of the body, if it can be determined.
-    fn from_body(stmts: &[Stmt]) -> Terminal {
-        let mut terminal = Terminal::None;
+    fn from_body(stmts: &[Stmt]) -> Self {
+        let mut terminal = Self::None;
 
         for stmt in stmts {
             match stmt {
@@ -58,7 +58,7 @@ impl Terminal {
                     elif_else_clauses,
                     ..
                 }) => {
-                    let branch_terminal = Terminal::branches(
+                    let branch_terminal = Self::branches(
                         std::iter::once(Self::from_body(body)).chain(
                             elif_else_clauses
                                 .iter()
@@ -74,11 +74,11 @@ impl Terminal {
                     } else if branch_terminal.has_any_return() {
                         // Otherwise, if any branch returns, we know this can't be a
                         // non-returning function.
-                        terminal = terminal.and_then(Terminal::ConditionalReturn);
+                        terminal = terminal.and_then(Self::ConditionalReturn);
                     }
                 }
                 Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                    let branch_terminal = terminal.and_then(Terminal::branches(
+                    let branch_terminal = terminal.and_then(Self::branches(
                         cases.iter().map(|case| Self::from_body(&case.body)),
                     ));
 
@@ -91,7 +91,7 @@ impl Terminal {
                         // Otherwise, if any branch returns, we know this can't be a
                         // non-returning function.
                         if branch_terminal.has_any_return() {
-                            terminal = terminal.and_then(Terminal::ConditionalReturn);
+                            terminal = terminal.and_then(Self::ConditionalReturn);
                         }
                     }
                 }
@@ -108,14 +108,14 @@ impl Terminal {
                     // handlers exist for a reason.
                     let body_terminal = Self::from_body(body);
                     if body_terminal.has_any_return() {
-                        terminal = terminal.and_then(Terminal::ConditionalReturn);
+                        terminal = terminal.and_then(Self::ConditionalReturn);
                     }
 
                     // If the `finally` block returns, the `try` block must also return. (Similarly,
                     // if the `finally` block raises, the `try` block must also raise.)
                     terminal = terminal.and_then(Self::from_body(finalbody));
 
-                    let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
+                    let branch_terminal = Self::branches(handlers.iter().map(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
@@ -127,30 +127,30 @@ impl Terminal {
                         // If there's no `else`, we may fall through, so only mark that this can't
                         // be a non-returning function if any of the branches return.
                         if branch_terminal.has_any_return() {
-                            terminal = terminal.and_then(Terminal::ConditionalReturn);
+                            terminal = terminal.and_then(Self::ConditionalReturn);
                         }
                     } else {
                         // If there's an `else`, we won't fall through. If all the handlers and
                         // the `else` block return,, the `try` block also returns.
                         terminal =
-                            terminal.and_then(branch_terminal.branch(Terminal::from_body(orelse)));
+                            terminal.and_then(branch_terminal.branch(Self::from_body(orelse)));
                     }
                 }
                 Stmt::With(ast::StmtWith { body, .. }) => {
                     terminal = terminal.and_then(Self::from_body(body));
                 }
                 Stmt::Return(_) => {
-                    terminal = terminal.and_then(Terminal::RaiseOrReturn);
+                    terminal = terminal.and_then(Self::RaiseOrReturn);
                 }
                 Stmt::Raise(_) => {
-                    terminal = terminal.and_then(Terminal::Raise);
+                    terminal = terminal.and_then(Self::Raise);
                 }
                 _ => {}
             }
         }
 
         match terminal {
-            Terminal::None => Terminal::Implicit,
+            Self::None => Self::Implicit,
             _ => terminal,
         }
     }
@@ -238,8 +238,8 @@ impl Terminal {
     }
 
     /// Combine a series of [`Terminal`] operators.
-    fn branches(iter: impl Iterator<Item = Terminal>) -> Terminal {
-        iter.fold(Terminal::None, Terminal::branch)
+    fn branches(iter: impl Iterator<Item = Self>) -> Self {
+        iter.fold(Self::None, Self::branch)
     }
 }
 

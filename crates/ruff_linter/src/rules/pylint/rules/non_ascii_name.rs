@@ -106,18 +106,18 @@ enum Kind {
 impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Kind::Annotation => f.write_str("Annotation"),
-            Kind::Argument => f.write_str("Argument"),
-            Kind::NamedExprAssignment => f.write_str("Variable"),
-            Kind::Assignment => f.write_str("Variable"),
-            Kind::TypeParam => f.write_str("Type parameter"),
-            Kind::LoopVar => f.write_str("Variable"),
-            Kind::WithItemVar => f.write_str("Variable"),
-            Kind::Global => f.write_str("Global"),
-            Kind::Nonlocal => f.write_str("Nonlocal"),
-            Kind::ClassDefinition => f.write_str("Class"),
-            Kind::FunctionDefinition => f.write_str("Function"),
-            Kind::BoundException => f.write_str("Exception"),
+            Self::Annotation => f.write_str("Annotation"),
+            Self::Argument => f.write_str("Argument"),
+            Self::NamedExprAssignment => f.write_str("Variable"),
+            Self::Assignment => f.write_str("Variable"),
+            Self::TypeParam => f.write_str("Type parameter"),
+            Self::LoopVar => f.write_str("Variable"),
+            Self::WithItemVar => f.write_str("Variable"),
+            Self::Global => f.write_str("Global"),
+            Self::Nonlocal => f.write_str("Nonlocal"),
+            Self::ClassDefinition => f.write_str("Class"),
+            Self::FunctionDefinition => f.write_str("Function"),
+            Self::BoundException => f.write_str("Exception"),
         }
     }
 }

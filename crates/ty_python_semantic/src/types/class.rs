@@ -161,12 +161,12 @@ pub(crate) enum CodeGeneratorKind {
 
 impl CodeGeneratorKind {
     pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
-        if CodeGeneratorKind::DataclassLike.matches(db, class) {
-            Some(CodeGeneratorKind::DataclassLike)
-        } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
-            Some(CodeGeneratorKind::NamedTuple)
-        } else if CodeGeneratorKind::TypedDict.matches(db, class) {
-            Some(CodeGeneratorKind::TypedDict)
+        if Self::DataclassLike.matches(db, class) {
+            Some(Self::DataclassLike)
+        } else if Self::NamedTuple.matches(db, class) {
+            Some(Self::NamedTuple)
+        } else if Self::TypedDict.matches(db, class) {
+            Some(Self::TypedDict)
         } else {
             None
         }
@@ -265,7 +265,7 @@ impl<'db> GenericAlias<'db> {
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(alias: GenericAlias<'db>) -> Type<'db> {
+    fn from(alias: GenericAlias<'db>) -> Self {
         Type::GenericAlias(alias)
     }
 }
@@ -437,7 +437,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Self) -> bool {
         self.has_relation_to(db, other, TypeRelation::Subtyping)
     }
 
@@ -479,7 +479,7 @@ impl<'db> ClassType<'db> {
         })
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         if self == other {
             return true;
         }
@@ -1060,13 +1060,13 @@ impl<'db> ClassType<'db> {
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
-    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
+    fn from(generic: GenericAlias<'db>) -> Self {
         ClassType::Generic(generic)
     }
 }
 
 impl<'db> From<ClassType<'db>> for Type<'db> {
-    fn from(class: ClassType<'db>) -> Type<'db> {
+    fn from(class: ClassType<'db>) -> Self {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
             ClassType::Generic(generic) => generic.into(),
@@ -2859,7 +2859,7 @@ impl<'db> ClassLiteral<'db> {
 }
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
-    fn from(class: ClassLiteral<'db>) -> Type<'db> {
+    fn from(class: ClassLiteral<'db>) -> Self {
         Type::ClassLiteral(class)
     }
 }
@@ -2876,7 +2876,7 @@ pub(super) enum InheritanceCycle {
 
 impl InheritanceCycle {
     pub(super) const fn is_participant(self) -> bool {
-        matches!(self, InheritanceCycle::Participant)
+        matches!(self, Self::Participant)
     }
 }
 
@@ -3223,154 +3223,154 @@ impl KnownClass {
     /// if it is an "actual" enum, not `enum.Enum` itself or a similar custom enum class.
     pub(crate) const fn is_enum_subclass_with_members(self) -> bool {
         match self {
-            KnownClass::Bool
-            | KnownClass::Object
-            | KnownClass::Bytes
-            | KnownClass::Bytearray
-            | KnownClass::Type
-            | KnownClass::Int
-            | KnownClass::Float
-            | KnownClass::Complex
-            | KnownClass::Str
-            | KnownClass::List
-            | KnownClass::Tuple
-            | KnownClass::Set
-            | KnownClass::FrozenSet
-            | KnownClass::Dict
-            | KnownClass::Slice
-            | KnownClass::Property
-            | KnownClass::BaseException
-            | KnownClass::Exception
-            | KnownClass::BaseExceptionGroup
-            | KnownClass::ExceptionGroup
-            | KnownClass::Staticmethod
-            | KnownClass::Classmethod
-            | KnownClass::Awaitable
-            | KnownClass::Generator
-            | KnownClass::Deprecated
-            | KnownClass::Super
-            | KnownClass::Enum
-            | KnownClass::EnumType
-            | KnownClass::Auto
-            | KnownClass::Member
-            | KnownClass::Nonmember
-            | KnownClass::ABCMeta
-            | KnownClass::GenericAlias
-            | KnownClass::ModuleType
-            | KnownClass::FunctionType
-            | KnownClass::MethodType
-            | KnownClass::MethodWrapperType
-            | KnownClass::WrapperDescriptorType
-            | KnownClass::UnionType
-            | KnownClass::GeneratorType
-            | KnownClass::AsyncGeneratorType
-            | KnownClass::CoroutineType
-            | KnownClass::NoneType
-            | KnownClass::Any
-            | KnownClass::StdlibAlias
-            | KnownClass::SpecialForm
-            | KnownClass::TypeVar
-            | KnownClass::ParamSpec
-            | KnownClass::ParamSpecArgs
-            | KnownClass::ParamSpecKwargs
-            | KnownClass::TypeVarTuple
-            | KnownClass::TypeAliasType
-            | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
-            | KnownClass::NewType
-            | KnownClass::SupportsIndex
-            | KnownClass::Iterable
-            | KnownClass::Iterator
-            | KnownClass::ChainMap
-            | KnownClass::Counter
-            | KnownClass::DefaultDict
-            | KnownClass::Deque
-            | KnownClass::OrderedDict
-            | KnownClass::VersionInfo
-            | KnownClass::EllipsisType
-            | KnownClass::NotImplementedType
-            | KnownClass::Field
-            | KnownClass::KwOnly
-            | KnownClass::InitVar
-            | KnownClass::NamedTupleFallback
-            | KnownClass::TypedDictFallback => false,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::BaseException
+            | Self::Exception
+            | Self::BaseExceptionGroup
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
+            | Self::Deprecated
+            | Self::Super
+            | Self::Enum
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::ABCMeta
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::NoneType
+            | Self::Any
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NamedTuple
+            | Self::NewType
+            | Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::Field
+            | Self::KwOnly
+            | Self::InitVar
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => false,
         }
     }
 
     /// Return `true` if this class is a (true) subclass of `typing.TypedDict`.
     pub(crate) const fn is_typed_dict_subclass(self) -> bool {
         match self {
-            KnownClass::Bool
-            | KnownClass::Object
-            | KnownClass::Bytes
-            | KnownClass::Bytearray
-            | KnownClass::Type
-            | KnownClass::Int
-            | KnownClass::Float
-            | KnownClass::Complex
-            | KnownClass::Str
-            | KnownClass::List
-            | KnownClass::Tuple
-            | KnownClass::Set
-            | KnownClass::FrozenSet
-            | KnownClass::Dict
-            | KnownClass::Slice
-            | KnownClass::Property
-            | KnownClass::BaseException
-            | KnownClass::Exception
-            | KnownClass::BaseExceptionGroup
-            | KnownClass::ExceptionGroup
-            | KnownClass::Staticmethod
-            | KnownClass::Classmethod
-            | KnownClass::Awaitable
-            | KnownClass::Generator
-            | KnownClass::Deprecated
-            | KnownClass::Super
-            | KnownClass::Enum
-            | KnownClass::EnumType
-            | KnownClass::Auto
-            | KnownClass::Member
-            | KnownClass::Nonmember
-            | KnownClass::ABCMeta
-            | KnownClass::GenericAlias
-            | KnownClass::ModuleType
-            | KnownClass::FunctionType
-            | KnownClass::MethodType
-            | KnownClass::MethodWrapperType
-            | KnownClass::WrapperDescriptorType
-            | KnownClass::UnionType
-            | KnownClass::GeneratorType
-            | KnownClass::AsyncGeneratorType
-            | KnownClass::CoroutineType
-            | KnownClass::NoneType
-            | KnownClass::Any
-            | KnownClass::StdlibAlias
-            | KnownClass::SpecialForm
-            | KnownClass::TypeVar
-            | KnownClass::ParamSpec
-            | KnownClass::ParamSpecArgs
-            | KnownClass::ParamSpecKwargs
-            | KnownClass::TypeVarTuple
-            | KnownClass::TypeAliasType
-            | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
-            | KnownClass::NewType
-            | KnownClass::SupportsIndex
-            | KnownClass::Iterable
-            | KnownClass::Iterator
-            | KnownClass::ChainMap
-            | KnownClass::Counter
-            | KnownClass::DefaultDict
-            | KnownClass::Deque
-            | KnownClass::OrderedDict
-            | KnownClass::VersionInfo
-            | KnownClass::EllipsisType
-            | KnownClass::NotImplementedType
-            | KnownClass::Field
-            | KnownClass::KwOnly
-            | KnownClass::InitVar
-            | KnownClass::NamedTupleFallback
-            | KnownClass::TypedDictFallback => false,
+            Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Property
+            | Self::BaseException
+            | Self::Exception
+            | Self::BaseExceptionGroup
+            | Self::ExceptionGroup
+            | Self::Staticmethod
+            | Self::Classmethod
+            | Self::Awaitable
+            | Self::Generator
+            | Self::Deprecated
+            | Self::Super
+            | Self::Enum
+            | Self::EnumType
+            | Self::Auto
+            | Self::Member
+            | Self::Nonmember
+            | Self::ABCMeta
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
+            | Self::CoroutineType
+            | Self::NoneType
+            | Self::Any
+            | Self::StdlibAlias
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NamedTuple
+            | Self::NewType
+            | Self::SupportsIndex
+            | Self::Iterable
+            | Self::Iterator
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::Field
+            | Self::KwOnly
+            | Self::InitVar
+            | Self::NamedTupleFallback
+            | Self::TypedDictFallback => false,
         }
     }
 
@@ -4162,7 +4162,7 @@ impl KnownClass {
         let module = context.module();
 
         match self {
-            KnownClass::Super => {
+            Self::Super => {
                 // Handle the case where `super()` is called with no arguments.
                 // In this case, we need to infer the two arguments:
                 //   1. The nearest enclosing class
@@ -4228,7 +4228,7 @@ impl KnownClass {
                     _ => {}
                 }
             }
-            KnownClass::Deprecated => {
+            Self::Deprecated => {
                 // Parsing something of the form:
                 //
                 // @deprecated("message")
@@ -4254,7 +4254,7 @@ impl KnownClass {
                     DeprecatedInstance::new(db, message.into_string_literal()),
                 )));
             }
-            KnownClass::TypeVar => {
+            Self::TypeVar => {
                 let assigned_to = index
                     .try_expression(ast::ExprRef::from(call_expression))
                     .and_then(|expr| expr.assigned_to(db));
@@ -4404,7 +4404,7 @@ impl KnownClass {
                 )));
             }
 
-            KnownClass::TypeAliasType => {
+            Self::TypeAliasType => {
                 let assigned_to = index
                     .try_expression(ast::ExprRef::from(call_expression))
                     .and_then(|expr| expr.assigned_to(db));

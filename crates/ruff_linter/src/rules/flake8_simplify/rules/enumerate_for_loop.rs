@@ -43,7 +43,7 @@ pub(crate) struct EnumerateForLoop {
 impl Violation for EnumerateForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EnumerateForLoop { index } = self;
+        let Self { index } = self;
         format!("Use `enumerate()` for index variable `{index}` in `for` loop")
     }
 }

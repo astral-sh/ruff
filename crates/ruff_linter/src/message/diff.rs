@@ -25,7 +25,7 @@ pub(super) struct Diff<'a> {
 }
 
 impl<'a> Diff<'a> {
-    pub(crate) fn from_message(message: &'a Diagnostic) -> Option<Diff<'a>> {
+    pub(crate) fn from_message(message: &'a Diagnostic) -> Option<Self> {
         message.fix().map(|fix| Diff {
             source_code: message.expect_ruff_source_file(),
             fix,
@@ -152,15 +152,15 @@ impl LineStyle {
 impl From<ChangeTag> for LineStyle {
     fn from(value: ChangeTag) -> Self {
         match value {
-            ChangeTag::Equal => LineStyle {
+            ChangeTag::Equal => Self {
                 fgcolor: None,
                 style: Some(Styles::Dimmed),
             },
-            ChangeTag::Delete => LineStyle {
+            ChangeTag::Delete => Self {
                 fgcolor: Some(Color::Red),
                 style: None,
             },
-            ChangeTag::Insert => LineStyle {
+            ChangeTag::Insert => Self {
                 fgcolor: Some(Color::Green),
                 style: None,
             },

@@ -48,7 +48,7 @@ pub(crate) struct MixedCaseVariableInClassScope {
 impl Violation for MixedCaseVariableInClassScope {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MixedCaseVariableInClassScope { name } = self;
+        let Self { name } = self;
         format!("Variable `{name}` in class scope should not be mixedCase")
     }
 }

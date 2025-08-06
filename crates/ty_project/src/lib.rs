@@ -181,7 +181,7 @@ impl Project {
         db.files()
             .try_add_root(db, metadata.root(), FileRootKind::Project);
 
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
+        let project = Self::builder(Box::new(metadata), Box::new(settings), diagnostics)
             .durability(Durability::MEDIUM)
             .open_fileset_durability(Durability::LOW)
             .file_set_durability(Durability::LOW)

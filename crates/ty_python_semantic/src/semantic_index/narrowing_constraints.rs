@@ -66,8 +66,8 @@ impl ScopedNarrowingConstraintPredicate {
 }
 
 impl From<ScopedPredicateId> for ScopedNarrowingConstraintPredicate {
-    fn from(predicate: ScopedPredicateId) -> ScopedNarrowingConstraintPredicate {
-        ScopedNarrowingConstraintPredicate(predicate)
+    fn from(predicate: ScopedPredicateId) -> Self {
+        Self(predicate)
     }
 }
 

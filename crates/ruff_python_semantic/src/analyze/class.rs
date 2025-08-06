@@ -313,7 +313,7 @@ pub enum IsMetaclass {
 
 impl IsMetaclass {
     pub const fn is_yes(self) -> bool {
-        matches!(self, IsMetaclass::Yes)
+        matches!(self, Self::Yes)
     }
 }
 

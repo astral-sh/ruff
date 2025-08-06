@@ -101,7 +101,7 @@ pub(crate) struct BadQuotesMultilineString {
 impl AlwaysFixableViolation for BadQuotesMultilineString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BadQuotesMultilineString { preferred_quote } = self;
+        let Self { preferred_quote } = self;
         match preferred_quote {
             Quote::Double => "Single quote multiline found but double quotes preferred".to_string(),
             Quote::Single => "Double quote multiline found but single quotes preferred".to_string(),
@@ -109,7 +109,7 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
     }
 
     fn fix_title(&self) -> String {
-        let BadQuotesMultilineString { preferred_quote } = self;
+        let Self { preferred_quote } = self;
         match preferred_quote {
             Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
             Quote::Single => "Replace double multiline quotes with single quotes".to_string(),

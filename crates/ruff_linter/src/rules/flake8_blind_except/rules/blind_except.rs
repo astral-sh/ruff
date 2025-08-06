@@ -70,7 +70,7 @@ pub(crate) struct BlindExcept {
 impl Violation for BlindExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlindExcept { name } = self;
+        let Self { name } = self;
         format!("Do not catch blind exception: `{name}`")
     }
 }

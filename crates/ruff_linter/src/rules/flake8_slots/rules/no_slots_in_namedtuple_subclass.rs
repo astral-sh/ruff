@@ -52,7 +52,7 @@ pub(crate) struct NoSlotsInNamedtupleSubclass(NamedTupleKind);
 impl Violation for NoSlotsInNamedtupleSubclass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoSlotsInNamedtupleSubclass(namedtuple_kind) = self;
+        let Self(namedtuple_kind) = self;
         format!("Subclasses of {namedtuple_kind} should define `__slots__`")
     }
 }

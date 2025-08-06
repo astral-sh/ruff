@@ -36,7 +36,7 @@ pub(crate) struct AssertRaisesException {
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertRaisesException { exception } = self;
+        let Self { exception } = self;
         format!("Do not assert blind exception: `{exception}`")
     }
 }
@@ -50,8 +50,8 @@ enum ExceptionKind {
 impl fmt::Display for ExceptionKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ExceptionKind::BaseException => fmt.write_str("BaseException"),
-            ExceptionKind::Exception => fmt.write_str("Exception"),
+            Self::BaseException => fmt.write_str("BaseException"),
+            Self::Exception => fmt.write_str("Exception"),
         }
     }
 }

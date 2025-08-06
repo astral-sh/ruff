@@ -101,9 +101,9 @@ pub enum PreviewMode {
 impl From<bool> for PreviewMode {
     fn from(version: bool) -> Self {
         if version {
-            PreviewMode::Enabled
+            Self::Enabled
         } else {
-            PreviewMode::Disabled
+            Self::Disabled
         }
     }
 }
@@ -145,11 +145,7 @@ impl Display for UnsafeFixes {
 
 impl From<bool> for UnsafeFixes {
     fn from(value: bool) -> Self {
-        if value {
-            UnsafeFixes::Enabled
-        } else {
-            UnsafeFixes::Disabled
-        }
+        if value { Self::Enabled } else { Self::Disabled }
     }
 }
 
@@ -202,10 +198,10 @@ pub enum FilePattern {
 impl FilePattern {
     pub fn add_to(self, builder: &mut GlobSetBuilder) -> Result<()> {
         match self {
-            FilePattern::Builtin(pattern) => {
+            Self::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
             }
-            FilePattern::User(pattern, absolute) => {
+            Self::User(pattern, absolute) => {
                 // Add the absolute path.
                 builder.add(Glob::new(&absolute.to_string_lossy())?);
 
@@ -272,7 +268,7 @@ impl FilePatternSet {
 
         let set = builder.build()?;
 
-        Ok(FilePatternSet {
+        Ok(Self {
             set,
             cache_key: hasher.finish(),
             _set_internals,

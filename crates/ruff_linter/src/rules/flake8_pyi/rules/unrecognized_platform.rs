@@ -91,7 +91,7 @@ pub(crate) struct UnrecognizedPlatformName {
 impl Violation for UnrecognizedPlatformName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnrecognizedPlatformName { platform } = self;
+        let Self { platform } = self;
         format!("Unrecognized platform `{platform}`")
     }
 }

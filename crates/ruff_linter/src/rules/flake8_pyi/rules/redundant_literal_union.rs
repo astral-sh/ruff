@@ -45,7 +45,7 @@ pub(crate) struct RedundantLiteralUnion {
 impl Violation for RedundantLiteralUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedundantLiteralUnion {
+        let Self {
             literal,
             builtin_type,
         } = self;

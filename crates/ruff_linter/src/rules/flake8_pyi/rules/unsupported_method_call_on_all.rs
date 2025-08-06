@@ -48,7 +48,7 @@ pub(crate) struct UnsupportedMethodCallOnAll {
 impl Violation for UnsupportedMethodCallOnAll {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnsupportedMethodCallOnAll { name } = self;
+        let Self { name } = self;
         format!(
             "Calling `.{name}()` on `__all__` may not be supported by all type checkers (use `+=` instead)"
         )

@@ -40,7 +40,7 @@ pub(crate) struct ImplicitNamespacePackage {
 impl Violation for ImplicitNamespacePackage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImplicitNamespacePackage { filename, parent } = self;
+        let Self { filename, parent } = self;
         match parent {
             None => {
                 format!(

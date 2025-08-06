@@ -16,7 +16,7 @@ pub(crate) enum ExpectedParams {
 }
 
 impl ExpectedParams {
-    fn from_method(name: &str, is_staticmethod: bool) -> Option<ExpectedParams> {
+    fn from_method(name: &str, is_staticmethod: bool) -> Option<Self> {
         let expected_params = match name {
             "__del__" | "__repr__" | "__str__" | "__bytes__" | "__hash__" | "__bool__"
             | "__dir__" | "__len__" | "__length_hint__" | "__iter__" | "__reversed__"
@@ -24,7 +24,7 @@ impl ExpectedParams {
             | "__float__" | "__index__" | "__trunc__" | "__floor__" | "__ceil__" | "__enter__"
             | "__aenter__" | "__getnewargs_ex__" | "__getnewargs__" | "__getstate__"
             | "__reduce__" | "__copy__" | "__await__" | "__aiter__" | "__anext__"
-            | "__fspath__" | "__subclasses__" | "__next__" => Some(ExpectedParams::Fixed(0)),
+            | "__fspath__" | "__subclasses__" | "__next__" => Some(Self::Fixed(0)),
             "__format__" | "__lt__" | "__le__" | "__eq__" | "__ne__" | "__gt__" | "__ge__"
             | "__getattr__" | "__getattribute__" | "__delattr__" | "__delete__"
             | "__instancecheck__" | "__subclasscheck__" | "__getitem__" | "__missing__"
@@ -37,15 +37,13 @@ impl ExpectedParams {
             | "__imod__" | "__ilshift__" | "__irshift__" | "__iand__" | "__ixor__" | "__ior__"
             | "__ipow__" | "__setstate__" | "__reduce_ex__" | "__deepcopy__" | "__matmul__"
             | "__rmatmul__" | "__imatmul__" | "__buffer__" | "__class_getitem__"
-            | "__mro_entries__" | "__release_buffer__" | "__subclasshook__" => {
-                Some(ExpectedParams::Fixed(1))
-            }
+            | "__mro_entries__" | "__release_buffer__" | "__subclasshook__" => Some(Self::Fixed(1)),
             "__setattr__" | "__get__" | "__set__" | "__setitem__" | "__set_name__" => {
-                Some(ExpectedParams::Fixed(2))
+                Some(Self::Fixed(2))
             }
-            "__exit__" | "__aexit__" => Some(ExpectedParams::Fixed(3)),
-            "__round__" => Some(ExpectedParams::Range(0, 1)),
-            "__pow__" => Some(ExpectedParams::Range(1, 2)),
+            "__exit__" | "__aexit__" => Some(Self::Fixed(3)),
+            "__round__" => Some(Self::Range(0, 1)),
+            "__pow__" => Some(Self::Range(1, 2)),
             _ => None,
         }?;
 
@@ -53,19 +51,19 @@ impl ExpectedParams {
             expected_params
         } else {
             match expected_params {
-                ExpectedParams::Fixed(n) => ExpectedParams::Fixed(n + 1),
-                ExpectedParams::Range(min, max) => ExpectedParams::Range(min + 1, max + 1),
+                Self::Fixed(n) => Self::Fixed(n + 1),
+                Self::Range(min, max) => Self::Range(min + 1, max + 1),
             }
         })
     }
 
     fn message(&self) -> String {
         match self {
-            ExpectedParams::Fixed(n) if *n == 1 => "1 parameter".to_string(),
-            ExpectedParams::Fixed(n) => {
+            Self::Fixed(n) if *n == 1 => "1 parameter".to_string(),
+            Self::Fixed(n) => {
                 format!("{} parameters", *n)
             }
-            ExpectedParams::Range(min, max) => {
+            Self::Range(min, max) => {
                 format!("between {} and {} parameters", *min, *max)
             }
         }

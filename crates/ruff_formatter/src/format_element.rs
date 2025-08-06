@@ -70,7 +70,7 @@ pub enum FormatElement {
 
 impl FormatElement {
     pub fn tag_kind(&self) -> Option<TagKind> {
-        if let FormatElement::Tag(tag) = self {
+        if let Self::Tag(tag) = self {
             Some(tag.kind())
         } else {
             None
@@ -81,25 +81,25 @@ impl FormatElement {
 impl std::fmt::Debug for FormatElement {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FormatElement::Space => write!(fmt, "Space"),
-            FormatElement::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
-            FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
-            FormatElement::Token { text } => fmt.debug_tuple("Token").field(text).finish(),
-            FormatElement::Text { text, .. } => fmt.debug_tuple("DynamicText").field(text).finish(),
-            FormatElement::SourceCodeSlice { slice, text_width } => fmt
+            Self::Space => write!(fmt, "Space"),
+            Self::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
+            Self::ExpandParent => write!(fmt, "ExpandParent"),
+            Self::Token { text } => fmt.debug_tuple("Token").field(text).finish(),
+            Self::Text { text, .. } => fmt.debug_tuple("DynamicText").field(text).finish(),
+            Self::SourceCodeSlice { slice, text_width } => fmt
                 .debug_tuple("Text")
                 .field(slice)
                 .field(text_width)
                 .finish(),
-            FormatElement::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
-            FormatElement::BestFitting { variants, mode } => fmt
+            Self::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
+            Self::BestFitting { variants, mode } => fmt
                 .debug_struct("BestFitting")
                 .field("variants", variants)
                 .field("mode", &mode)
                 .finish(),
-            FormatElement::Interned(interned) => fmt.debug_list().entries(&**interned).finish(),
-            FormatElement::Tag(tag) => fmt.debug_tuple("Tag").field(tag).finish(),
-            FormatElement::SourcePosition(position) => {
+            Self::Interned(interned) => fmt.debug_list().entries(&**interned).finish(),
+            Self::Tag(tag) => fmt.debug_tuple("Tag").field(tag).finish(),
+            Self::SourcePosition(position) => {
                 fmt.debug_tuple("SourcePosition").field(position).finish()
             }
         }
@@ -120,7 +120,7 @@ pub enum LineMode {
 
 impl LineMode {
     pub const fn is_hard(&self) -> bool {
-        matches!(self, LineMode::Hard)
+        matches!(self, Self::Hard)
     }
 }
 
@@ -134,19 +134,19 @@ pub enum PrintMode {
 
 impl PrintMode {
     pub const fn is_flat(&self) -> bool {
-        matches!(self, PrintMode::Flat)
+        matches!(self, Self::Flat)
     }
 
     pub const fn is_expanded(&self) -> bool {
-        matches!(self, PrintMode::Expanded)
+        matches!(self, Self::Expanded)
     }
 }
 
 impl From<GroupMode> for PrintMode {
     fn from(value: GroupMode) -> Self {
         match value {
-            GroupMode::Flat => PrintMode::Flat,
-            GroupMode::Expand | GroupMode::Propagated => PrintMode::Expanded,
+            GroupMode::Flat => Self::Flat,
+            GroupMode::Expand | GroupMode::Propagated => Self::Expanded,
         }
     }
 }
@@ -161,7 +161,7 @@ impl Interned {
 }
 
 impl PartialEq for Interned {
-    fn eq(&self, other: &Interned) -> bool {
+    fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
@@ -226,13 +226,13 @@ pub fn normalize_newlines<const N: usize>(text: &str, terminators: [char; N]) ->
 impl FormatElement {
     /// Returns `true` if self is a [`FormatElement::Tag`]
     pub const fn is_tag(&self) -> bool {
-        matches!(self, FormatElement::Tag(_))
+        matches!(self, Self::Tag(_))
     }
 
     /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_start`] is `true`.
     pub const fn is_start_tag(&self) -> bool {
         match self {
-            FormatElement::Tag(tag) => tag.is_start(),
+            Self::Tag(tag) => tag.is_start(),
             _ => false,
         }
     }
@@ -240,7 +240,7 @@ impl FormatElement {
     /// Returns `true` if self is a [`FormatElement::Tag`] and [`Tag::is_end`] is `true`.
     pub const fn is_end_tag(&self) -> bool {
         match self {
-            FormatElement::Tag(tag) => tag.is_end(),
+            Self::Tag(tag) => tag.is_end(),
             _ => false,
         }
     }
@@ -248,44 +248,42 @@ impl FormatElement {
     pub const fn is_text(&self) -> bool {
         matches!(
             self,
-            FormatElement::SourceCodeSlice { .. }
-                | FormatElement::Text { .. }
-                | FormatElement::Token { .. }
+            Self::SourceCodeSlice { .. } | Self::Text { .. } | Self::Token { .. }
         )
     }
 
     pub const fn is_space(&self) -> bool {
-        matches!(self, FormatElement::Space)
+        matches!(self, Self::Space)
     }
 }
 
 impl FormatElements for FormatElement {
     fn will_break(&self) -> bool {
         match self {
-            FormatElement::ExpandParent => true,
-            FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
-            FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
-            FormatElement::Text { text_width, .. } => text_width.is_multiline(),
-            FormatElement::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
-            FormatElement::Interned(interned) => interned.will_break(),
+            Self::ExpandParent => true,
+            Self::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
+            Self::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
+            Self::Text { text_width, .. } => text_width.is_multiline(),
+            Self::SourceCodeSlice { text_width, .. } => text_width.is_multiline(),
+            Self::Interned(interned) => interned.will_break(),
             // Traverse into the most flat version because the content is guaranteed to expand when even
             // the most flat version contains some content that forces a break.
-            FormatElement::BestFitting {
+            Self::BestFitting {
                 variants: best_fitting,
                 ..
             } => best_fitting.most_flat().will_break(),
-            FormatElement::LineSuffixBoundary
-            | FormatElement::Space
-            | FormatElement::Tag(_)
-            | FormatElement::Token { .. }
-            | FormatElement::SourcePosition(_) => false,
+            Self::LineSuffixBoundary
+            | Self::Space
+            | Self::Tag(_)
+            | Self::Token { .. }
+            | Self::SourcePosition(_) => false,
         }
     }
 
     fn has_label(&self, label_id: LabelId) -> bool {
         match self {
-            FormatElement::Tag(Tag::StartLabelled(actual)) => *actual == label_id,
-            FormatElement::Interned(interned) => interned.deref().has_label(label_id),
+            Self::Tag(Tag::StartLabelled(actual)) => *actual == label_id,
+            Self::Interned(interned) => interned.deref().has_label(label_id),
             _ => false,
         }
     }
@@ -296,7 +294,7 @@ impl FormatElements for FormatElement {
 
     fn end_tag(&self, kind: TagKind) -> Option<&Tag> {
         match self {
-            FormatElement::Tag(tag) if tag.kind() == kind && tag.is_end() => Some(tag),
+            Self::Tag(tag) if tag.kind() == kind && tag.is_end() => Some(tag),
             _ => None,
         }
     }
@@ -495,7 +493,7 @@ pub struct Width(NonZeroU32);
 
 impl Width {
     pub(crate) const fn new(width: u32) -> Self {
-        Width(NonZeroU32::MIN.saturating_add(width))
+        Self(NonZeroU32::MIN.saturating_add(width))
     }
 
     pub const fn value(self) -> u32 {
@@ -512,13 +510,13 @@ pub enum TextWidth {
 }
 
 impl TextWidth {
-    pub fn from_text(text: &str, indent_width: IndentWidth) -> TextWidth {
+    pub fn from_text(text: &str, indent_width: IndentWidth) -> Self {
         let mut width = 0u32;
 
         for c in text.chars() {
             let char_width = match c {
                 '\t' => indent_width.value(),
-                '\n' => return TextWidth::Multiline,
+                '\n' => return Self::Multiline,
                 #[expect(clippy::cast_possible_truncation)]
                 c => c.width().unwrap_or(0) as u32,
             };
@@ -530,13 +528,13 @@ impl TextWidth {
 
     pub const fn width(self) -> Option<Width> {
         match self {
-            TextWidth::Width(width) => Some(width),
-            TextWidth::Multiline => None,
+            Self::Width(width) => Some(width),
+            Self::Multiline => None,
         }
     }
 
     pub(crate) const fn is_multiline(self) -> bool {
-        matches!(self, TextWidth::Multiline)
+        matches!(self, Self::Multiline)
     }
 }
 

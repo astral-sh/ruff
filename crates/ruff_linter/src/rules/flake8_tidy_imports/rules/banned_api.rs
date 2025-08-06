@@ -33,7 +33,7 @@ pub(crate) struct BannedApi {
 impl Violation for BannedApi {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BannedApi { name, message } = self;
+        let Self { name, message } = self;
         format!("`{name}` is banned: {message}")
     }
 }

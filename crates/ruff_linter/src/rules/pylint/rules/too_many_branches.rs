@@ -153,7 +153,7 @@ pub(crate) struct TooManyBranches {
 impl Violation for TooManyBranches {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyBranches {
+        let Self {
             branches,
             max_branches,
         } = self;

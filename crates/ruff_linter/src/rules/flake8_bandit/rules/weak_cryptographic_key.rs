@@ -40,7 +40,7 @@ pub(crate) struct WeakCryptographicKey {
 impl Violation for WeakCryptographicKey {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let WeakCryptographicKey { cryptographic_key } = self;
+        let Self { cryptographic_key } = self;
         let minimum_key_size = cryptographic_key.minimum_key_size();
         format!(
             "{cryptographic_key} key sizes below {minimum_key_size} bits are considered breakable"
@@ -87,9 +87,9 @@ impl CryptographicKey {
 impl Display for CryptographicKey {
     fn fmt(&self, fmt: &mut Formatter) -> std::fmt::Result {
         match self {
-            CryptographicKey::Dsa { .. } => fmt.write_str("DSA"),
-            CryptographicKey::Ec { .. } => fmt.write_str("EC"),
-            CryptographicKey::Rsa { .. } => fmt.write_str("RSA"),
+            Self::Dsa { .. } => fmt.write_str("DSA"),
+            Self::Ec { .. } => fmt.write_str("EC"),
+            Self::Rsa { .. } => fmt.write_str("RSA"),
         }
     }
 }

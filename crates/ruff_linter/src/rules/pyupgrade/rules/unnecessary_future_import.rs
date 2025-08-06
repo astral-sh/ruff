@@ -49,7 +49,7 @@ pub(crate) struct UnnecessaryFutureImport {
 impl AlwaysFixableViolation for UnnecessaryFutureImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryFutureImport { names } = self;
+        let Self { names } = self;
         if names.len() == 1 {
             let import = &names[0];
             format!("Unnecessary `__future__` import `{import}` for target Python version")

@@ -46,7 +46,7 @@ pub(crate) struct StaticJoinToFString {
 impl AlwaysFixableViolation for StaticJoinToFString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let StaticJoinToFString { expression } = self;
+        let Self { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Consider `{expression}` instead of string join")
         } else {
@@ -55,7 +55,7 @@ impl AlwaysFixableViolation for StaticJoinToFString {
     }
 
     fn fix_title(&self) -> String {
-        let StaticJoinToFString { expression } = self;
+        let Self { expression } = self;
         if let Some(expression) = expression.full_display() {
             format!("Replace with `{expression}`")
         } else {

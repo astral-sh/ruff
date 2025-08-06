@@ -103,8 +103,8 @@ impl BufferSnapshot {
     /// If self is not a [`BufferSnapshot::Position`]
     pub fn unwrap_position(&self) -> usize {
         match self {
-            BufferSnapshot::Position(index) => *index,
-            BufferSnapshot::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
+            Self::Position(index) => *index,
+            Self::Any(_) => panic!("Tried to unwrap Any snapshot as a position."),
         }
     }
 
@@ -115,10 +115,10 @@ impl BufferSnapshot {
     /// If `self` is not a [`BufferSnapshot::Any`].
     pub fn unwrap_any<T: 'static>(self) -> T {
         match self {
-            BufferSnapshot::Position(_) => {
+            Self::Position(_) => {
                 panic!("Tried to unwrap Position snapshot as Any snapshot.")
             }
-            BufferSnapshot::Any(value) => match value.downcast::<T>() {
+            Self::Any(value) => match value.downcast::<T>() {
                 Ok(snapshot) => *snapshot,
                 Err(err) => {
                     panic!(
@@ -542,7 +542,7 @@ impl RemoveSoftLineBreaksState {
                         } else {
                             // Found the end tag of the initial `if_group_breaks`. Skip this element but retain
                             // the elements coming after
-                            *self = RemoveSoftLineBreaksState::Default;
+                            *self = Self::Default;
                         }
                     }
                     _ => {}

@@ -230,7 +230,7 @@ pub enum TraversalSignal {
 
 impl TraversalSignal {
     pub const fn is_traverse(self) -> bool {
-        matches!(self, TraversalSignal::Traverse)
+        matches!(self, Self::Traverse)
     }
 }
 

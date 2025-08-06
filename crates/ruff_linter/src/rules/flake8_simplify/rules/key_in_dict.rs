@@ -45,7 +45,7 @@ pub(crate) struct InDictKeys {
 impl AlwaysFixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InDictKeys { operator } = self;
+        let Self { operator } = self;
         format!("Use `key {operator} dict` instead of `key {operator} dict.keys()`")
     }
 

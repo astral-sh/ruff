@@ -16,7 +16,7 @@ impl SystemPath {
         let path = path.as_ref();
         // SAFETY: FsPath is marked as #[repr(transparent)] so the conversion from a
         // *const Utf8Path to a *const FsPath is valid.
-        unsafe { &*(path as *const Utf8Path as *const SystemPath) }
+        unsafe { &*(path as *const Utf8Path as *const Self) }
     }
 
     /// Takes any path, and when possible, converts Windows UNC paths to regular paths.
@@ -40,9 +40,9 @@ impl SystemPath {
     ///
     /// To check if a path remained as UNC, use `path.as_os_str().as_encoded_bytes().starts_with(b"\\\\")`.
     #[inline]
-    pub fn simplified(&self) -> &SystemPath {
+    pub fn simplified(&self) -> &Self {
         // SAFETY: simplified only trims the path, that means the returned path must be a valid UTF-8 path.
-        SystemPath::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
+        Self::from_std_path(dunce::simplified(self.as_std_path())).unwrap()
     }
 
     /// Returns `true` if the `SystemPath` is absolute, i.e., if it is independent of
@@ -118,7 +118,7 @@ impl SystemPath {
     /// ```
     #[inline]
     #[must_use]
-    pub fn starts_with(&self, base: impl AsRef<SystemPath>) -> bool {
+    pub fn starts_with(&self, base: impl AsRef<Self>) -> bool {
         self.0.starts_with(base.as_ref())
     }
 
@@ -142,7 +142,7 @@ impl SystemPath {
     /// ```
     #[inline]
     #[must_use]
-    pub fn ends_with(&self, child: impl AsRef<SystemPath>) -> bool {
+    pub fn ends_with(&self, child: impl AsRef<Self>) -> bool {
         self.0.ends_with(child.as_ref())
     }
 
@@ -165,8 +165,8 @@ impl SystemPath {
     /// ```
     #[inline]
     #[must_use]
-    pub fn parent(&self) -> Option<&SystemPath> {
-        self.0.parent().map(SystemPath::new)
+    pub fn parent(&self) -> Option<&Self> {
+        self.0.parent().map(Self::new)
     }
 
     /// Produces an iterator over `SystemPath` and its ancestors.
@@ -198,8 +198,8 @@ impl SystemPath {
     ///
     /// [`parent`]: SystemPath::parent
     #[inline]
-    pub fn ancestors(&self) -> impl Iterator<Item = &SystemPath> {
-        self.0.ancestors().map(SystemPath::new)
+    pub fn ancestors(&self) -> impl Iterator<Item = &Self> {
+        self.0.ancestors().map(Self::new)
     }
 
     /// Produces an iterator over the [`camino::Utf8Component`]s of the path.
@@ -322,9 +322,9 @@ impl SystemPath {
     #[inline]
     pub fn strip_prefix(
         &self,
-        base: impl AsRef<SystemPath>,
-    ) -> std::result::Result<&SystemPath, StripPrefixError> {
-        self.0.strip_prefix(base.as_ref()).map(SystemPath::new)
+        base: impl AsRef<Self>,
+    ) -> std::result::Result<&Self, StripPrefixError> {
+        self.0.strip_prefix(base.as_ref()).map(Self::new)
     }
 
     /// Creates an owned [`SystemPathBuf`] with `path` adjoined to `self`.
@@ -340,7 +340,7 @@ impl SystemPath {
     /// ```
     #[inline]
     #[must_use]
-    pub fn join(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+    pub fn join(&self, path: impl AsRef<Self>) -> SystemPathBuf {
         SystemPathBuf::from_utf8_path_buf(self.0.join(&path.as_ref().0))
     }
 
@@ -389,8 +389,8 @@ impl SystemPath {
         &self.0
     }
 
-    pub fn from_std_path(path: &Path) -> Option<&SystemPath> {
-        Some(SystemPath::new(Utf8Path::from_path(path)?))
+    pub fn from_std_path(path: &Path) -> Option<&Self> {
+        Some(Self::new(Utf8Path::from_path(path)?))
     }
 
     /// Makes a path absolute and normalizes it without accessing the file system.
@@ -444,7 +444,7 @@ impl SystemPath {
     /// # #[cfg(not(windows))]
     /// # fn main() {}
     /// ```
-    pub fn absolute(path: impl AsRef<SystemPath>, cwd: impl AsRef<SystemPath>) -> SystemPathBuf {
+    pub fn absolute(path: impl AsRef<Self>, cwd: impl AsRef<Self>) -> SystemPathBuf {
         fn absolute(path: &SystemPath, cwd: &SystemPath) -> SystemPathBuf {
             let path = &path.0;
 
@@ -586,13 +586,13 @@ impl Borrow<SystemPath> for SystemPathBuf {
 
 impl From<&str> for SystemPathBuf {
     fn from(value: &str) -> Self {
-        SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+        Self::from_utf8_path_buf(Utf8PathBuf::from(value))
     }
 }
 
 impl From<String> for SystemPathBuf {
     fn from(value: String) -> Self {
-        SystemPathBuf::from_utf8_path_buf(Utf8PathBuf::from(value))
+        Self::from_utf8_path_buf(Utf8PathBuf::from(value))
     }
 }
 
@@ -609,9 +609,9 @@ impl AsRef<SystemPath> for SystemPathBuf {
     }
 }
 
-impl AsRef<SystemPath> for SystemPath {
+impl AsRef<Self> for SystemPath {
     #[inline]
-    fn as_ref(&self) -> &SystemPath {
+    fn as_ref(&self) -> &Self {
         self
     }
 }
@@ -669,7 +669,7 @@ impl Deref for SystemPathBuf {
 
 impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
     fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
-        let mut buf = SystemPathBuf::new();
+        let mut buf = Self::new();
         buf.extend(iter);
         buf
     }
@@ -726,10 +726,10 @@ impl ruff_cache::CacheKey for SystemPathBuf {
 pub struct SystemVirtualPath(str);
 
 impl SystemVirtualPath {
-    pub fn new(path: &str) -> &SystemVirtualPath {
+    pub fn new(path: &str) -> &Self {
         // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
         // *const str to a *const SystemVirtualPath is valid.
-        unsafe { &*(path as *const str as *const SystemVirtualPath) }
+        unsafe { &*(path as *const str as *const Self) }
     }
 
     /// Converts the path to an owned [`SystemVirtualPathBuf`].
@@ -774,7 +774,7 @@ impl SystemVirtualPathBuf {
 
 impl From<String> for SystemVirtualPathBuf {
     fn from(value: String) -> Self {
-        SystemVirtualPathBuf(value)
+        Self(value)
     }
 }
 
@@ -785,9 +785,9 @@ impl AsRef<SystemVirtualPath> for SystemVirtualPathBuf {
     }
 }
 
-impl AsRef<SystemVirtualPath> for SystemVirtualPath {
+impl AsRef<Self> for SystemVirtualPath {
     #[inline]
-    fn as_ref(&self) -> &SystemVirtualPath {
+    fn as_ref(&self) -> &Self {
         self
     }
 }

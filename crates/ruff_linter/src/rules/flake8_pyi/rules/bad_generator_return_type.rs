@@ -69,7 +69,7 @@ impl Violation for GeneratorReturnFromIterMethod {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let GeneratorReturnFromIterMethod {
+        let Self {
             return_type,
             method,
         } = self;
@@ -77,7 +77,7 @@ impl Violation for GeneratorReturnFromIterMethod {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let GeneratorReturnFromIterMethod {
+        let Self {
             return_type,
             method,
         } = self;
@@ -295,9 +295,9 @@ enum Module {
 impl std::fmt::Display for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Module::Typing => write!(f, "typing"),
-            Module::TypingExtensions => write!(f, "typing_extensions"),
-            Module::CollectionsAbc => write!(f, "collections.abc"),
+            Self::Typing => write!(f, "typing"),
+            Self::TypingExtensions => write!(f, "typing_extensions"),
+            Self::CollectionsAbc => write!(f, "collections.abc"),
         }
     }
 }
@@ -311,8 +311,8 @@ enum Method {
 impl std::fmt::Display for Method {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Method::Iter => write!(f, "__iter__"),
-            Method::AIter => write!(f, "__aiter__"),
+            Self::Iter => write!(f, "__iter__"),
+            Self::AIter => write!(f, "__aiter__"),
         }
     }
 }
@@ -326,8 +326,8 @@ enum Generator {
 impl std::fmt::Display for Generator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Generator::Generator => write!(f, "Generator"),
-            Generator::AsyncGenerator => write!(f, "AsyncGenerator"),
+            Self::Generator => write!(f, "Generator"),
+            Self::AsyncGenerator => write!(f, "AsyncGenerator"),
         }
     }
 }
@@ -335,8 +335,8 @@ impl std::fmt::Display for Generator {
 impl Generator {
     fn to_iter(self) -> Iterator {
         match self {
-            Generator::Generator => Iterator::Iterator,
-            Generator::AsyncGenerator => Iterator::AsyncIterator,
+            Self::Generator => Iterator::Iterator,
+            Self::AsyncGenerator => Iterator::AsyncIterator,
         }
     }
 }
@@ -350,8 +350,8 @@ enum Iterator {
 impl std::fmt::Display for Iterator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Iterator::Iterator => write!(f, "Iterator"),
-            Iterator::AsyncIterator => write!(f, "AsyncIterator"),
+            Self::Iterator => write!(f, "Iterator"),
+            Self::AsyncIterator => write!(f, "AsyncIterator"),
         }
     }
 }

@@ -52,7 +52,7 @@ pub(crate) struct TooManyArguments {
 impl Violation for TooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyArguments { c_args, max_args } = self;
+        let Self { c_args, max_args } = self;
         format!("Too many arguments in function definition ({c_args} > {max_args})")
     }
 }

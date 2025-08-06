@@ -53,7 +53,7 @@ pub(crate) struct MagicValueComparison {
 impl Violation for MagicValueComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MagicValueComparison { value } = self;
+        let Self { value } = self;
         format!(
             "Magic value used in comparison, consider replacing `{value}` with a constant variable"
         )

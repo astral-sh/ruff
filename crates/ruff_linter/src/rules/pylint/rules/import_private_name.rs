@@ -58,7 +58,7 @@ pub(crate) struct ImportPrivateName {
 impl Violation for ImportPrivateName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportPrivateName { name, module } = self;
+        let Self { name, module } = self;
         match module {
             Some(module) => {
                 format!("Private name import `{name}` from external module `{module}`")

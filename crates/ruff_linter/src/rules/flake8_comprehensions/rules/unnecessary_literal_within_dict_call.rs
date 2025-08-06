@@ -42,7 +42,7 @@ pub(crate) struct UnnecessaryLiteralWithinDictCall {
 impl AlwaysFixableViolation for UnnecessaryLiteralWithinDictCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryLiteralWithinDictCall { kind } = self;
+        let Self { kind } = self;
         format!("Unnecessary dict {kind} passed to `dict()` (remove the outer call to `dict()`)")
     }
 

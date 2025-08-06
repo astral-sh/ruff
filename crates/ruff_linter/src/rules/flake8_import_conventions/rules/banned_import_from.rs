@@ -40,7 +40,7 @@ pub(crate) struct BannedImportFrom {
 impl Violation for BannedImportFrom {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BannedImportFrom { name } = self;
+        let Self { name } = self;
         format!("Members of `{name}` should not be imported explicitly")
     }
 }

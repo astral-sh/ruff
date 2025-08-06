@@ -37,7 +37,7 @@ pub(crate) struct UnreachableCode {
 impl Violation for UnreachableCode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnreachableCode { name } = self;
+        let Self { name } = self;
         format!("Unreachable code in `{name}`")
     }
 }

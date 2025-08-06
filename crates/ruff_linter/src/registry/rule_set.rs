@@ -52,13 +52,13 @@ impl RuleSet {
 
     #[inline]
     pub const fn from_rules(rules: &[Rule]) -> Self {
-        let mut set = RuleSet::empty();
+        let mut set = Self::empty();
 
         let mut i = 0;
 
         // Uses a while because for loops are not allowed in const functions.
         while i < rules.len() {
-            set = set.union(&RuleSet::from_rule(rules[i]));
+            set = set.union(&Self::from_rule(rules[i]));
             i += 1;
         }
 
@@ -206,7 +206,7 @@ impl RuleSet {
     /// ```
     pub fn insert(&mut self, rule: Rule) {
         let set = std::mem::take(self);
-        *self = set.union(&RuleSet::from_rule(rule));
+        *self = set.union(&Self::from_rule(rule));
     }
 
     #[inline]
@@ -232,7 +232,7 @@ impl RuleSet {
     /// ```
     pub fn remove(&mut self, rule: Rule) {
         let set = std::mem::take(self);
-        *self = set.subtract(&RuleSet::from_rule(rule));
+        *self = set.subtract(&Self::from_rule(rule));
     }
 
     /// Returns `true` if `rule` is in this set.
@@ -313,7 +313,7 @@ impl Display for RuleSet {
 
 impl FromIterator<Rule> for RuleSet {
     fn from_iter<T: IntoIterator<Item = Rule>>(iter: T) -> Self {
-        let mut set = RuleSet::empty();
+        let mut set = Self::empty();
 
         for rule in iter {
             set.insert(rule);
@@ -326,7 +326,7 @@ impl FromIterator<Rule> for RuleSet {
 impl Extend<Rule> for RuleSet {
     fn extend<T: IntoIterator<Item = Rule>>(&mut self, iter: T) {
         let set = std::mem::take(self);
-        *self = set.union(&RuleSet::from_iter(iter));
+        *self = set.union(&Self::from_iter(iter));
     }
 }
 

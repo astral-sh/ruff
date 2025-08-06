@@ -46,7 +46,7 @@ pub(crate) struct NoSelfUse {
 impl Violation for NoSelfUse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoSelfUse { method_name } = self;
+        let Self { method_name } = self;
         format!("Method `{method_name}` could be a function, class method, or static method")
     }
 }

@@ -38,7 +38,7 @@ pub(crate) struct InvalidTodoTag {
 impl Violation for InvalidTodoTag {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidTodoTag { tag } = self;
+        let Self { tag } = self;
         format!("Invalid TODO tag: `{tag}`")
     }
 }
@@ -192,12 +192,12 @@ pub(crate) struct InvalidTodoCapitalization {
 impl AlwaysFixableViolation for InvalidTodoCapitalization {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidTodoCapitalization { tag } = self;
+        let Self { tag } = self;
         format!("Invalid TODO capitalization: `{tag}` should be `TODO`")
     }
 
     fn fix_title(&self) -> String {
-        let InvalidTodoCapitalization { tag } = self;
+        let Self { tag } = self;
         format!("Replace `{tag}` with `TODO`")
     }
 }

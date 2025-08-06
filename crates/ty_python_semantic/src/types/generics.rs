@@ -250,7 +250,7 @@ impl<'db> GenericContext<'db> {
         )
     }
 
-    pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
+    pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: Self) -> bool {
         self.variables(db).is_subset(other.variables(db))
     }
 
@@ -440,7 +440,7 @@ impl<'db> Specialization<'db> {
     /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
-    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Self) -> Self {
         self.apply_type_mapping(db, &TypeMapping::Specialization(other))
     }
 
@@ -464,7 +464,7 @@ impl<'db> Specialization<'db> {
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
-        other: Option<Specialization<'db>>,
+        other: Option<Self>,
     ) -> Self {
         if let Some(other) = other {
             self.apply_specialization(db, other)
@@ -593,7 +593,7 @@ impl<'db> Specialization<'db> {
         true
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return false;
