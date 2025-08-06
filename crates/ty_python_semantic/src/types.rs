@@ -8310,6 +8310,25 @@ impl<'db> ModuleLiteralType<'db> {
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
+    fn try_module_getattr(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        // For module literals, we want to try calling the module's own __getattr__ function
+        // if it exists. First, we need to look up the __getattr__ function in the module's scope.
+        if let Some(file) = self.module(db).file(db) {
+            let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
+            if let Place::Type(getattr_type, _) = getattr_symbol.place {
+                // If we found a __getattr__ function, try to call it with the name argument
+                if let Ok(outcome) = getattr_type.try_call(
+                    db,
+                    &CallArguments::positional([Type::string_literal(db, name)]),
+                ) {
+                    return Place::bound(outcome.return_type(db)).into();
+                }
+            }
+        }
+
+        Place::Unbound.into()
+    }
+
     fn static_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // `__dict__` is a very special member that is never overridden by module globals;
         // we should always look it up directly as an attribute on `types.ModuleType`,
@@ -8335,10 +8354,21 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        self.module(db)
+        let result = self
+            .module(db)
             .file(db)
             .map(|file| imported_symbol(db, file, name, None))
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        // If the normal lookup failed, try to call the module's __getattr__ function
+        if result.place.is_unbound() {
+            let getattr_result = self.try_module_getattr(db, name);
+            if !getattr_result.place.is_unbound() {
+                return getattr_result;
+            }
+        }
+
+        result
     }
 }
 
