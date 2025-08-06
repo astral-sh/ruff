@@ -47,8 +47,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_legacy_typevar,
+    walk_generic_context, walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
@@ -5403,16 +5403,26 @@ impl<'db> Type<'db> {
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
                     let class_definition = class.definition(db);
-                    Ok(Type::TypeVar(TypeVarInstance::new(
+                    let typevar = TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        legacy_typevar_binding_context,
+                        None,
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
                         TypeVarKind::Implicit,
-                    )))
+                    );
+                    let typevar = bind_legacy_typevar(
+                        db,
+                        &module,
+                        index,
+                        scope_id.file_scope_id(db),
+                        legacy_typevar_binding_context,
+                        typevar,
+                    )
+                    .unwrap_or(typevar);
+                    Ok(Type::TypeVar(typevar))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),

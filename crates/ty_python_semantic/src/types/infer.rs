@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, enclosing_generic_contexts};
+use crate::types::generics::{GenericContext, bind_legacy_typevar};
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -6427,7 +6427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
         resolved
-            .map_type(|ty| {
+            .map_type(|ty| match ty {
                 // If the expression resolves to a legacy typevar, we will have the TypeVarInstance
                 // that was created when the typevar was created, which will not have an associated
                 // binding context. If this expression appears inside of a generic context that
@@ -6438,40 +6438,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If the legacy typevar is still unbound after that search, and we are in a
                 // context that binds unbound legacy typevars (i.e., the signature of a generic
                 // function), bind it with that context.
-                let find_legacy_typevar_binding = |typevar: TypeVarInstance<'db>| {
-                    enclosing_generic_contexts(
+                Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => bind_legacy_typevar(
+                    self.db(),
+                    self.context.module(),
+                    self.index,
+                    self.scope().file_scope_id(self.db()),
+                    self.legacy_typevar_binding_context,
+                    typevar,
+                )
+                .map(Type::TypeVar)
+                .unwrap_or(ty),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                    if typevar.is_legacy(self.db()) =>
+                {
+                    bind_legacy_typevar(
                         self.db(),
                         self.context.module(),
                         self.index,
                         self.scope().file_scope_id(self.db()),
+                        self.legacy_typevar_binding_context,
+                        typevar,
                     )
-                    .find_map(|enclosing_context| {
-                        enclosing_context.binds_legacy_typevar(self.db(), typevar)
-                    })
-                    .or_else(|| {
-                        self.legacy_typevar_binding_context
-                            .map(|legacy_typevar_binding_context| {
-                                typevar
-                                    .with_binding_context(self.db(), legacy_typevar_binding_context)
-                            })
-                    })
-                };
-
-                match ty {
-                    Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => {
-                        find_legacy_typevar_binding(typevar)
-                            .map(Type::TypeVar)
-                            .unwrap_or(ty)
-                    }
-                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                        if typevar.is_legacy(self.db()) =>
-                    {
-                        find_legacy_typevar_binding(typevar)
-                            .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
-                            .unwrap_or(ty)
-                    }
-                    _ => ty,
+                    .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
+                    .unwrap_or(ty)
                 }
+                _ => ty,
             })
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.

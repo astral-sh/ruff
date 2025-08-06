@@ -24,9 +24,16 @@ class Shape:
 
     def nested_func(self: Self) -> Self:
         def inner() -> Self:
-            reveal_type(self)  # revealed: Self@inner
+            reveal_type(self)  # revealed: Self@nested_func
             return self
         return inner()
+
+    def nested_func_without_enclosing_binding(self):
+        def inner(x: Self):
+            # TODO: revealed: Self@nested_func_without_enclosing_binding
+            # (The outer method binds an implicit `Self`)
+            reveal_type(x)  # revealed: Self@inner
+        inner(self)
 
     def implicit_self(self) -> Self:
         # TODO: first argument in a method should be considered as "typing.Self"
