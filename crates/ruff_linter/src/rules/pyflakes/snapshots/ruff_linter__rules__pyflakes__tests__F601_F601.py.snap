@@ -1,91 +1,99 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F601.py:3:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+ --> F601.py:3:5
   |
 1 | x = {
 2 |     "a": 1,
 3 |     "a": 2,
-  |     ^^^ F601
+  |     ^^^
 4 |     "b": 3,
 5 |     ("a", "b"): 3,
   |
-  = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:6:5: F601 Dictionary key literal `("a", "b")` repeated
+F601 Dictionary key literal `("a", "b")` repeated
+ --> F601.py:6:5
   |
 4 |     "b": 3,
 5 |     ("a", "b"): 3,
 6 |     ("a", "b"): 4,
-  |     ^^^^^^^^^^ F601
+  |     ^^^^^^^^^^
 7 |     1.0: 2,
 8 |     1: 0,
   |
-  = help: Remove repeated key literal `("a", "b")`
+help: Remove repeated key literal `("a", "b")`
 
-F601.py:8:5: F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+  --> F601.py:8:5
    |
  6 |     ("a", "b"): 4,
  7 |     1.0: 2,
  8 |     1: 0,
-   |     ^ F601
+   |     ^
  9 |     1: 3,
 10 |     b"123": 1,
    |
-   = help: Remove repeated key literal `1`
+help: Remove repeated key literal `1`
 
-F601.py:9:5: F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+  --> F601.py:9:5
    |
  7 |     1.0: 2,
  8 |     1: 0,
  9 |     1: 3,
-   |     ^ F601
+   |     ^
 10 |     b"123": 1,
 11 |     b"123": 4,
    |
-   = help: Remove repeated key literal `1`
+help: Remove repeated key literal `1`
 
-F601.py:11:5: F601 Dictionary key literal `b"123"` repeated
+F601 Dictionary key literal `b"123"` repeated
+  --> F601.py:11:5
    |
  9 |     1: 3,
 10 |     b"123": 1,
 11 |     b"123": 4,
-   |     ^^^^^^ F601
+   |     ^^^^^^
 12 | }
    |
-   = help: Remove repeated key literal `b"123"`
+help: Remove repeated key literal `b"123"`
 
-F601.py:16:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:16:5
    |
 14 | x = {
 15 |     "a": 1,
 16 |     "a": 2,
-   |     ^^^ F601
+   |     ^^^
 17 |     "a": 3,
 18 |     "a": 3,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:17:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:17:5
    |
 15 |     "a": 1,
 16 |     "a": 2,
 17 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 18 |     "a": 3,
 19 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:18:5
    |
 16 |     "a": 2,
 17 |     "a": 3,
 18 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 19 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 15 15 |     "a": 1,
@@ -96,38 +104,41 @@ F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
 20 19 | 
 21 20 | x = {
 
-F601.py:23:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:23:5
    |
 21 | x = {
 22 |     "a": 1,
 23 |     "a": 2,
-   |     ^^^ F601
+   |     ^^^
 24 |     "a": 3,
 25 |     "a": 3,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:24:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:24:5
    |
 22 |     "a": 1,
 23 |     "a": 2,
 24 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 25 |     "a": 3,
 26 |     "a": 4,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:25:5
    |
 23 |     "a": 2,
 24 |     "a": 3,
 25 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 26 |     "a": 4,
 27 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 22 22 |     "a": 1,
@@ -138,26 +149,28 @@ F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
 27 26 | }
 28 27 | 
 
-F601.py:26:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:26:5
    |
 24 |     "a": 3,
 25 |     "a": 3,
 26 |     "a": 4,
-   |     ^^^ F601
+   |     ^^^
 27 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:31:5
    |
 29 | x = {
 30 |     "a": 1,
 31 |     "a": 1,
-   |     ^^^ F601
+   |     ^^^
 32 |     "a": 2,
 33 |     "a": 3,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 28 28 | 
@@ -168,70 +181,76 @@ F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
 33 32 |     "a": 3,
 34 33 |     "a": 4,
 
-F601.py:32:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:32:5
    |
 30 |     "a": 1,
 31 |     "a": 1,
 32 |     "a": 2,
-   |     ^^^ F601
+   |     ^^^
 33 |     "a": 3,
 34 |     "a": 4,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:33:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:33:5
    |
 31 |     "a": 1,
 32 |     "a": 2,
 33 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 34 |     "a": 4,
 35 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:34:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:34:5
    |
 32 |     "a": 2,
 33 |     "a": 3,
 34 |     "a": 4,
-   |     ^^^ F601
+   |     ^^^
 35 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:41:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:41:5
    |
 39 |     "a": 1,
 40 |     a: 1,
 41 |     "a": 2,
-   |     ^^^ F601
+   |     ^^^
 42 |     a: 2,
 43 |     "a": 3,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:43:5: F601 Dictionary key literal `"a"` repeated
+F601 Dictionary key literal `"a"` repeated
+  --> F601.py:43:5
    |
 41 |     "a": 2,
 42 |     a: 2,
 43 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 44 |     a: 3,
 45 |     "a": 3,
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
-F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:45:5
    |
 43 |     "a": 3,
 44 |     a: 3,
 45 |     "a": 3,
-   |     ^^^ F601
+   |     ^^^
 46 |     a: 4,
 47 | }
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 42 42 |     a: 2,
@@ -242,15 +261,16 @@ F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
 47 46 | }
 48 47 | 
 
-F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:49:14
    |
 47 | }
 48 |
 49 | x = {"a": 1, "a": 1}
-   |              ^^^ F601
+   |              ^^^
 50 | x = {"a": 1, "b": 2, "a": 1}
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 46 46 |     a: 4,
@@ -262,15 +282,16 @@ F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
 51 51 | 
 52 52 | x = {
 
-F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
+F601 [*] Dictionary key literal `"a"` repeated
+  --> F601.py:50:22
    |
 49 | x = {"a": 1, "a": 1}
 50 | x = {"a": 1, "b": 2, "a": 1}
-   |                      ^^^ F601
+   |                      ^^^
 51 |
 52 | x = {
    |
-   = help: Remove repeated key literal `"a"`
+help: Remove repeated key literal `"a"`
 
 ℹ Unsafe fix
 47 47 | }
@@ -282,25 +303,27 @@ F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
 52 52 | x = {
 53 53 |     ('a', 'b'): 'asdf',
 
-F601.py:54:5: F601 Dictionary key literal `('a', 'b')` repeated
+F601 Dictionary key literal `('a', 'b')` repeated
+  --> F601.py:54:5
    |
 52 | x = {
 53 |     ('a', 'b'): 'asdf',
 54 |     ('a', 'b'): 'qwer',
-   |     ^^^^^^^^^^ F601
+   |     ^^^^^^^^^^
 55 | }
    |
-   = help: Remove repeated key literal `('a', 'b')`
+help: Remove repeated key literal `('a', 'b')`
 
-F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
+F601 [*] Dictionary key literal `"x"` repeated
+  --> F601.py:58:19
    |
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
 58 | t={"x":"test123", "x":("test123")}
-   |                   ^^^ F601
+   |                   ^^^
 59 |
 60 | t={"x":("test123"), "x":"test123"}
    |
-   = help: Remove repeated key literal `"x"`
+help: Remove repeated key literal `"x"`
 
 ℹ Unsafe fix
 55 55 | }
@@ -312,16 +335,17 @@ F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
 60 60 | t={"x":("test123"), "x":"test123"}
 61 61 | 
 
-F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
+F601 [*] Dictionary key literal `"x"` repeated
+  --> F601.py:60:21
    |
 58 | t={"x":"test123", "x":("test123")}
 59 |
 60 | t={"x":("test123"), "x":"test123"}
-   |                     ^^^ F601
+   |                     ^^^
 61 |
 62 | # Regression test for: https://github.com/astral-sh/ruff/issues/12772
    |
-   = help: Remove repeated key literal `"x"`
+help: Remove repeated key literal `"x"`
 
 ℹ Unsafe fix
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/4897
@@ -333,45 +357,49 @@ F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
 62 62 | # Regression test for: https://github.com/astral-sh/ruff/issues/12772
 63 63 | x = {
 
-F601.py:65:5: F601 Dictionary key literal `1` repeated
+F601 Dictionary key literal `1` repeated
+  --> F601.py:65:5
    |
 63 | x = {
 64 |     1: "abc",
 65 |     1: "def",
-   |     ^ F601
+   |     ^
 66 |     True: "ghi",
 67 |     0: "foo",
    |
-   = help: Remove repeated key literal `1`
+help: Remove repeated key literal `1`
 
-F601.py:66:5: F601 Dictionary key literal `True` repeated (`True` hashes to the same value as `1`)
+F601 Dictionary key literal `True` repeated (`True` hashes to the same value as `1`)
+  --> F601.py:66:5
    |
 64 |     1: "abc",
 65 |     1: "def",
 66 |     True: "ghi",
-   |     ^^^^ F601
+   |     ^^^^
 67 |     0: "foo",
 68 |     0: "bar",
    |
-   = help: Remove repeated key literal `True`
+help: Remove repeated key literal `True`
 
-F601.py:68:5: F601 Dictionary key literal `0` repeated
+F601 Dictionary key literal `0` repeated
+  --> F601.py:68:5
    |
 66 |     True: "ghi",
 67 |     0: "foo",
 68 |     0: "bar",
-   |     ^ F601
+   |     ^
 69 |     False: "baz",
 70 | }
    |
-   = help: Remove repeated key literal `0`
+help: Remove repeated key literal `0`
 
-F601.py:69:5: F601 Dictionary key literal `False` repeated (`False` hashes to the same value as `0`)
+F601 Dictionary key literal `False` repeated (`False` hashes to the same value as `0`)
+  --> F601.py:69:5
    |
 67 |     0: "foo",
 68 |     0: "bar",
 69 |     False: "baz",
-   |     ^^^^^ F601
+   |     ^^^^^
 70 | }
    |
-   = help: Remove repeated key literal `False`
+help: Remove repeated key literal `False`
