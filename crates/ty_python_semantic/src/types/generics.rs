@@ -114,11 +114,14 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
+        binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
         let variables: FxOrderSet<_> = type_params_node
             .iter()
-            .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
+            .filter_map(|type_param| {
+                Self::variable_from_type_param(db, index, binding_context, type_param)
+            })
             .collect();
         Self::new(db, variables)
     }
@@ -126,6 +129,7 @@ impl<'db> GenericContext<'db> {
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
+        binding_context: Definition<'db>,
         type_param_node: &ast::TypeParam,
     ) -> Option<TypeVarInstance<'db>> {
         match type_param_node {
@@ -136,7 +140,7 @@ impl<'db> GenericContext<'db> {
                 else {
                     return None;
                 };
-                Some(typevar)
+                Some(typevar.with_binding_context(db, binding_context))
             }
             // TODO: Support these!
             ast::TypeParam::ParamSpec(_) => None,
