@@ -45,7 +45,7 @@ pub fn resolve_real_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Op
 }
 
 /// Which files should be visible when doing a module query
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
 pub(crate) enum ModuleResolveMode {
     StubsAllowed,
     StubsNotAllowed,
@@ -157,7 +157,7 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading
     /// ty's configuration settings. These shouldn't ever change unless the
@@ -554,7 +554,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,

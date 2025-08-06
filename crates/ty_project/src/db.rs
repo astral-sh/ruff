@@ -128,18 +128,51 @@ impl ProjectDatabase {
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
         let memory_usage = <dyn salsa::Database>::memory_usage(self);
-        let mut ingredients = memory_usage.structs;
-        let mut memos = memory_usage.queries.into_iter().collect::<Vec<_>>();
+        let mut ingredients = memory_usage
+            .structs
+            .into_iter()
+            .filter(|ingredient| ingredient.count() > 0)
+            .collect::<Vec<_>>();
+        let mut memos = memory_usage
+            .queries
+            .into_iter()
+            .filter(|(_, memos)| memos.count() > 0)
+            .collect::<Vec<_>>();
 
-        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
-        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+        ingredients.sort_by_key(|ingredient| {
+            let heap_size = ingredient.heap_size_of_fields().unwrap_or_else(|| {
+                // Salsa currently does not expose a way to track the heap size of interned
+                // query arguments.
+                if ingredient.debug_name().contains("interned_arguments") {
+                    0
+                } else {
+                    panic!(
+                        "expected `heap_size` to be provided by Salsa struct `{}`",
+                        ingredient.debug_name()
+                    )
+                }
+            });
+
+            cmp::Reverse(ingredient.size_of_fields() + heap_size)
+        });
+
+        memos.sort_by_key(|(_, memo)| {
+            let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
+                panic!(
+                    "expected `heap_size` to be provided by Salsa query `{}`",
+                    memo.debug_name()
+                )
+            });
+
+            cmp::Reverse(memo.size_of_fields() + heap_size)
+        });
 
         let mut total_fields = 0;
         let mut total_metadata = 0;
         for ingredient in &ingredients {
-            total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
             total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
+            total_metadata += ingredient.size_of_metadata();
         }
 
         let mut total_memo_fields = 0;
@@ -171,7 +204,7 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
     /// Checks the open files in the project.
@@ -281,12 +314,15 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA STRUCTS=======")?;
 
                 for ingredient in ingredients {
+                    let size_of_fields =
+                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(
                         f,
                         "{:<50} metadata={:<8} fields={:<8} count={}",
                         format!("`{}`", ingredient.debug_name()),
                         format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         ingredient.count()
                     )?;
                 }
@@ -294,13 +330,16 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA QUERIES=======")?;
 
                 for (query_fn, memo) in memos {
+                    let size_of_fields =
+                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
                         "    metadata={:<8} fields={:<8} count={}",
                         format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         memo.count()
                     )?;
                 }

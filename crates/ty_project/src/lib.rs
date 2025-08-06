@@ -55,7 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
@@ -636,7 +636,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize)]
 pub struct IOErrorDiagnostic {
     file: Option<File>,
     error: IOErrorKind,
@@ -652,7 +652,7 @@ impl IOErrorDiagnostic {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 enum IOErrorKind {
     #[error(transparent)]
     Walk(#[from] walk::WalkError),

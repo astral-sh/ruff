@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 /// The target platform to assume when resolving types.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize, ruff_macros::RustDoc),

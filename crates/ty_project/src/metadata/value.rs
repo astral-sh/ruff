@@ -16,7 +16,7 @@ use std::sync::Arc;
 use toml::Spanned;
 use ty_combine::Combine;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, get_size2::GetSize)]
 pub enum ValueSource {
     /// Value loaded from a project's configuration file.
     ///
@@ -84,7 +84,7 @@ impl Drop for ValueSourceGuard {
 ///
 /// This ensures that two resolved configurations are identical even if the position of a value has changed
 /// or if the values were loaded from different sources.
-#[derive(Clone, serde::Serialize)]
+#[derive(Clone, serde::Serialize, get_size2::GetSize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
@@ -325,6 +325,7 @@ where
     Ord,
     Hash,
     Combine,
+    get_size2::GetSize,
 )]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -394,6 +395,7 @@ impl fmt::Display for RelativePathBuf {
     Ord,
     Hash,
     Combine,
+    get_size2::GetSize,
 )]
 #[serde(transparent)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

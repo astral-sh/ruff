@@ -117,7 +117,7 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ClassPatternKind {
     Irrefutable,
     Refutable,
@@ -130,7 +130,7 @@ impl ClassPatternKind {
 }
 
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
@@ -140,7 +140,7 @@ pub(crate) enum PatternPredicateKind<'db> {
     Unsupported,
 }
 
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct PatternPredicate<'db> {
     pub(crate) file: File,
 
@@ -206,7 +206,7 @@ impl<'db> PatternPredicate<'db> {
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
 ///
 /// [Truthiness]: [crate::types::Truthiness]
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct StarImportPlaceholderPredicate<'db> {
     pub(crate) importing_file: File,
 
