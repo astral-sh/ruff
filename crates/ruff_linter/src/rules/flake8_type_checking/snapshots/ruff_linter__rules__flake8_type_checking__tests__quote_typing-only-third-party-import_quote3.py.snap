@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-quote3.py:4:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+ --> quote3.py:4:44
   |
 2 |     from typing import Literal, Union
 3 |
 4 |     from django.contrib.auth.models import AbstractBaseUser
-  |                                            ^^^^^^^^^^^^^^^^ TC002
+  |                                            ^^^^^^^^^^^^^^^^
 5 |
 6 |     def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -28,16 +29,17 @@ quote3.py:4:44: TC002 [*] Move third-party import `django.contrib.auth.models.Ab
 8  11 | 
 9  12 | 
 
-quote3.py:13:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+  --> quote3.py:13:44
    |
 11 |     from typing import Callable, Literal
 12 |
 13 |     from django.contrib.auth.models import AbstractBaseUser
-   |                                            ^^^^^^^^^^^^^^^^ TC002
+   |                                            ^^^^^^^^^^^^^^^^
 14 |
 15 |     def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -59,16 +61,17 @@ quote3.py:13:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 17 20 | 
 18 21 | 
 
-quote3.py:22:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+  --> quote3.py:22:44
    |
 20 |     from typing import Annotated, Callable, Literal
 21 |
 22 |     from django.contrib.auth.models import AbstractBaseUser
-   |                                            ^^^^^^^^^^^^^^^^ TC002
+   |                                            ^^^^^^^^^^^^^^^^
 23 |
 24 |     def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], b…
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -90,16 +93,17 @@ quote3.py:22:44: TC002 [*] Move third-party import `django.contrib.auth.models.A
 26 29 | 
 27 30 | 
 
-quote3.py:31:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+  --> quote3.py:31:37
    |
 29 |     from typing import literal
 30 |
 31 |     from django.contrib.auth import models
-   |                                     ^^^^^^ TC002
+   |                                     ^^^^^^
 32 |
 33 |     def test_attribute(arg: models.AbstractBaseUser["int"]):
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -121,16 +125,17 @@ quote3.py:31:37: TC002 [*] Move third-party import `django.contrib.auth.models` 
 35 38 | 
 36 39 | 
 
-quote3.py:40:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+  --> quote3.py:40:37
    |
 38 |     from typing import Literal
 39 |
 40 |     from django.contrib.auth import models
-   |                                     ^^^^^^ TC002
+   |                                     ^^^^^^
 41 |
 42 |     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -152,16 +157,17 @@ quote3.py:40:37: TC002 [*] Move third-party import `django.contrib.auth.models` 
 44 47 | 
 45 48 | 
 
-quote3.py:59:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+  --> quote3.py:59:29
    |
 57 | def f():
 58 |     from typing import Literal
 59 |     from third_party import Type
-   |                             ^^^^ TC002
+   |                             ^^^^
 60 |
 61 |     def test_string_contains_opposite_quote(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
@@ -183,16 +189,17 @@ quote3.py:59:29: TC002 [*] Move third-party import `third_party.Type` into a typ
 63 66 | 
 64 67 | 
 
-quote3.py:67:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+  --> quote3.py:67:29
    |
 65 | def f():
 66 |     from typing import Literal
 67 |     from third_party import Type
-   |                             ^^^^ TC002
+   |                             ^^^^
 68 |
 69 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
