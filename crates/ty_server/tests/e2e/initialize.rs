@@ -392,8 +392,13 @@ fn unknown_initialization_options() -> Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default()
-                .with_unknown([("foo".to_string(), Value::String("bar".to_string()))].into()),
+            ClientOptions::default().with_unknown(
+                [
+                    ("foo".to_string(), Value::Null),
+                    ("bar".to_string(), Value::Null),
+                ]
+                .into(),
+            ),
         )
         .build()?
         .wait_until_workspaces_are_initialized()?;
@@ -403,7 +408,7 @@ fn unknown_initialization_options() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options during initialization: {\n  /"foo/": /"bar/"\n}"
+      "message": "Received unknown options during initialization: 'bar', 'foo'. Refer to the logs for more details"
     }
     "#);
 
@@ -419,8 +424,13 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
         .with_workspace(
             workspace_root,
             Some(
-                ClientOptions::default()
-                    .with_unknown([("foo".to_string(), Value::String("bar".to_string()))].into()),
+                ClientOptions::default().with_unknown(
+                    [
+                        ("foo".to_string(), Value::Null),
+                        ("bar".to_string(), Value::Null),
+                    ]
+                    .into(),
+                ),
             ),
         )?
         .build()?
@@ -431,7 +441,7 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  /"foo/": /"bar/"\n}"
+      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: 'bar', 'foo'. Refer to the logs for more details."
     }
     "#);
 
