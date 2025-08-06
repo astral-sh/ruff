@@ -2050,10 +2050,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 safe_mutable_classes.iter().any(|safe_mutable_class| {
                     value_ty.is_equivalent_to(db, *safe_mutable_class)
-                        || !value_ty
+                        || value_ty
                             .generic_origin(db)
                             .zip(safe_mutable_class.generic_origin(db))
-                            .is_none_or(|(l, r)| l != r)
+                            .is_some_and(|(l, r)| l == r)
                 })
             };
 
