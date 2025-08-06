@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+ --> UP040.pyi:6:1
   |
 4 | # UP040
 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
 6 | x: typing.TypeAlias = int
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | x: TypeAlias = int
   |
-  = help: Use the `type` keyword
+help: Use the `type` keyword
 
 ℹ Safe fix
 3 3 | 
@@ -21,14 +22,15 @@ UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 8 8 | 
 9 9 | 
 
-UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+ --> UP040.pyi:7:1
   |
 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
 6 | x: typing.TypeAlias = int
 7 | x: TypeAlias = int
-  | ^^^^^^^^^^^^^^^^^^ UP040
+  | ^^^^^^^^^^^^^^^^^^
   |
-  = help: Use the `type` keyword
+help: Use the `type` keyword
 
 ℹ Safe fix
 4 4 | # UP040
@@ -40,18 +42,19 @@ UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 9 9 | 
 10 10 | # comments in the value are preserved
 
-UP040.pyi:11:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+  --> UP040.pyi:11:1
    |
 10 |   # comments in the value are preserved
 11 | / x: TypeAlias = tuple[
 12 | |     int,  # preserved
 13 | |     float,
 14 | | ]
-   | |_^ UP040
+   | |_^
 15 |
 16 |   T: TypeAlias = ( # comment0
    |
-   = help: Use the `type` keyword
+help: Use the `type` keyword
 
 ℹ Safe fix
 8  8  | 
@@ -63,7 +66,8 @@ UP040.pyi:11:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of 
 13 13 |     float,
 14 14 | ]
 
-UP040.pyi:16:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
+UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
+  --> UP040.pyi:16:1
    |
 14 |   ]
 15 |
@@ -76,9 +80,9 @@ UP040.pyi:16:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of 
 22 | |     str  # comment6
 23 | |     # comment7
 24 | | ) # comment8
-   | |_^ UP040
+   | |_^
    |
-   = help: Use the `type` keyword
+help: Use the `type` keyword
 
 ℹ Safe fix
 13 13 |     float,
