@@ -5268,12 +5268,13 @@ impl<'db> Type<'db> {
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
     ///
-    /// The `scope_id` argument must always be a scope from the file we are currently inferring, so
+    /// The `scope_id` and `legacy_typevar_binding_context` arguments must always come from the file we are currently inferring, so
     /// as to avoid cross-module AST dependency.
     pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
+        legacy_typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -5406,7 +5407,7 @@ impl<'db> Type<'db> {
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(class_definition),
+                        legacy_typevar_binding_context,
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
@@ -5481,7 +5482,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id) {
+                    match element.in_type_expression(db, scope_id, legacy_typevar_binding_context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -6648,7 +6649,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         if module_member_with_same_name
-            .in_type_expression(db, scope)
+            .in_type_expression(db, scope, None)
             .is_err()
         {
             return;
