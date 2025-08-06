@@ -289,6 +289,12 @@ impl<'db> TupleType<'db> {
     pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
         self.tuple(db).truthiness()
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.tuple(db)
+            .all_elements()
+            .any(|ty| ty.has_divergent_type(db))
+    }
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.

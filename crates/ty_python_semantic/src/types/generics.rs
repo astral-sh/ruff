@@ -633,6 +633,13 @@ impl<'db> Specialization<'db> {
             ty.find_legacy_typevars(db, typevars);
         }
     }
+
+    pub(crate) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.types(db).iter().any(|ty| ty.has_divergent_type(db))
+            || self
+                .tuple_inner(db)
+                .is_some_and(|tuple| tuple.has_divergent_type(db))
+    }
 }
 
 /// A mapping between type variables and types.

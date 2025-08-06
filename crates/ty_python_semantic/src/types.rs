@@ -54,7 +54,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name,
 };
-use crate::types::infer::infer_unpack_types;
+use crate::types::infer::{divergence_safe_todo, infer_unpack_types};
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -4742,8 +4742,10 @@ impl<'db> Type<'db> {
         match self {
             Type::Tuple(tuple_type) => return Ok(Cow::Borrowed(tuple_type.tuple(db))),
             Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                return Ok(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                    "*tuple[] annotations"
+                return Ok(Cow::Owned(TupleSpec::homogeneous(divergence_safe_todo(
+                    db,
+                    "*tuple[] annotations",
+                    [self],
                 ))));
             }
             Type::StringLiteral(string_literal_ty) => {
@@ -5177,7 +5179,11 @@ impl<'db> Type<'db> {
                     typevar.kind(db),
                 )))
             }
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            Type::Intersection(_) => Some(divergence_safe_todo(
+                db,
+                "Type::Intersection.to_instance",
+                [*self],
+            )),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
@@ -5561,10 +5567,10 @@ impl<'db> Type<'db> {
                         .unwrap_or(SubclassOfInner::unknown()),
                 ),
             },
-
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(*dynamic)),
             // TODO intersections
+            // TODO divergence safety
             Type::Intersection(_) => SubclassOfType::from(
                 db,
                 SubclassOfInner::try_from_type(db, todo_type!("Intersection meta-type"))
@@ -6056,30 +6062,10 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.has_divergent_type(db))
             }
-            Type::Tuple(tuple) => tuple
-                .tuple(db)
-                .all_elements()
-                .any(|ty| ty.has_divergent_type(db)),
-            Type::GenericAlias(alias) => alias
-                .specialization(db)
-                .types(db)
-                .iter()
-                .any(|ty| ty.has_divergent_type(db)),
-            Type::NominalInstance(instance) => match instance.class {
-                ClassType::Generic(alias) => alias
-                    .specialization(db)
-                    .types(db)
-                    .iter()
-                    .any(|ty| ty.has_divergent_type(db)),
-                ClassType::NonGeneric(_) => false,
-            },
-            Type::Callable(callable) => callable.signatures(db).iter().any(|sig| {
-                sig.parameters().iter().any(|param| {
-                    param
-                        .annotated_type()
-                        .is_some_and(|ty| ty.has_divergent_type(db))
-                }) || sig.return_ty.iter().any(|ty| ty.has_divergent_type(db))
-            }),
+            Type::Tuple(tuple) => tuple.has_divergent_type(db),
+            Type::GenericAlias(alias) => alias.specialization(db).has_divergent_type(db),
+            Type::NominalInstance(instance) => instance.class.has_divergent_type(db),
+            Type::Callable(callable) => callable.has_divergent_type(db),
             Type::ProtocolInstance(protocol) => protocol.has_divergent_type(db),
             Type::PropertyInstance(property) => {
                 property
@@ -6093,7 +6079,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(DynamicType::Divergent) => true,
                 SubclassOfInner::Dynamic(_) => false,
-                SubclassOfInner::Class(class) => class.metaclass(db).has_divergent_type(db),
+                SubclassOfInner::Class(class) => class.has_divergent_type(db),
             },
             Type::Never
             | Type::AlwaysTruthy
@@ -8148,6 +8134,10 @@ impl<'db> CallableType<'db> {
             && self
                 .signatures(db)
                 .is_equivalent_to(db, other.signatures(db))
+    }
+
+    fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        self.signatures(db).has_divergent_type(db)
     }
 }
 
