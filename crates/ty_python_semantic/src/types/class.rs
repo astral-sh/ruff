@@ -1027,10 +1027,7 @@ impl<'db> ClassType<'db> {
                 None
             };
 
-        match (
-            dunder_new_function.and_then(|ty| ty.into_callable(db)),
-            synthesized_dunder_init_callable.and_then(|ty| ty.into_callable(db)),
-        ) {
+        match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
                 UnionType::from_elements(
                     db,
@@ -1050,7 +1047,11 @@ impl<'db> ClassType<'db> {
                     .place;
 
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                    Type::Callable(new_function.into_callable_type(db))
+                    Type::Callable(
+                        new_function
+                            .into_bound_method_type(db, self_ty)
+                            .into_callable_type(db),
+                    )
                 } else {
                     // Fallback if no `object.__new__` is found.
                     CallableType::single(
