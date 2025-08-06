@@ -365,3 +365,33 @@ def g(x: T) -> T | None:
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
+
+## Opaque decorators don't affect typevar binding
+
+Inside the body of a generic function, we should be able to see that the typevars bound by that
+function are in fact bound by that function. This requires being able to see the enclosing
+function's _undecorated_ type and signature, especially in the case where a gradually typed
+decorator "hides" the function type from outside callers.
+
+```py
+from typing import cast, Any, Callable, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
+
+def opaque_decorator(f: Any) -> Any:
+    return f
+
+def transparent_decorator(f: F) -> F:
+    return f
+
+@opaque_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+
+@transparent_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+```

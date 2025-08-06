@@ -38,6 +38,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
+use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -46,8 +47,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, walk_generic_context,
-    walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_legacy_typevar,
+    walk_generic_context, walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
@@ -61,7 +62,7 @@ use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signat
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -669,10 +670,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(_))
     }
 
-    pub(crate) const fn is_typed_dict(&self) -> bool {
-        matches!(self, Type::TypedDict(..))
-    }
-
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
     /// most general form of the type that is fully static.
     #[must_use]
@@ -832,6 +829,17 @@ impl<'db> Type<'db> {
     pub fn expect_enum_literal(self) -> EnumLiteralType<'db> {
         self.into_enum_literal()
             .expect("Expected a Type::EnumLiteral variant")
+    }
+
+    pub(crate) const fn is_typed_dict(&self) -> bool {
+        matches!(self, Type::TypedDict(..))
+    }
+
+    pub(crate) fn into_typed_dict(self) -> Option<TypedDictType<'db>> {
+        match self {
+            Type::TypedDict(typed_dict) => Some(typed_dict),
+            _ => None,
+        }
     }
 
     /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
@@ -2626,7 +2634,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    #[salsa::tracked(heap_size=get_size2::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     #[allow(unused_variables)]
     // If we choose name `_unit`, the macro will generate code that uses `_unit`, causing clippy to fail.
     fn lookup_dunder_new(self, db: &'db dyn Db, unit: ()) -> Option<PlaceAndQualifiers<'db>> {
@@ -2647,7 +2655,7 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(cycle_fn=class_lookup_cycle_recover, cycle_initial=class_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
@@ -2810,7 +2818,7 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(heap_size=get_size2::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
@@ -3103,7 +3111,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,
@@ -5260,12 +5268,13 @@ impl<'db> Type<'db> {
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
     ///
-    /// The `scope_id` argument must always be a scope from the file we are currently inferring, so
+    /// The `scope_id` and `legacy_typevar_binding_context` arguments must always come from the file we are currently inferring, so
     /// as to avoid cross-module AST dependency.
     pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
+        legacy_typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -5289,15 +5298,15 @@ impl<'db> Type<'db> {
                         ],
                     ),
                     _ if class.is_typed_dict(db) => {
-                        Type::TypedDict(TypedDictType::new(db, ClassType::NonGeneric(*class)))
+                        TypedDictType::from(db, ClassType::NonGeneric(*class))
                     }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::TypedDict(
-                TypedDictType::new(db, ClassType::from(*alias)),
-            )),
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
+                Ok(TypedDictType::from(db, ClassType::from(*alias)))
+            }
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -5394,19 +5403,34 @@ impl<'db> Type<'db> {
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
                     let class_definition = class.definition(db);
-                    Ok(Type::TypeVar(TypeVarInstance::new(
+                    let typevar = TypeVarInstance::new(
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(class_definition),
+                        None,
                         Some(TypeVarBoundOrConstraints::UpperBound(instance)),
                         TypeVarVariance::Invariant,
                         None,
-                        TypeVarKind::Legacy,
-                    )))
+                        TypeVarKind::Implicit,
+                    );
+                    let typevar = bind_legacy_typevar(
+                        db,
+                        &module,
+                        index,
+                        scope_id.file_scope_id(db),
+                        legacy_typevar_binding_context,
+                        typevar,
+                    )
+                    .unwrap_or(typevar);
+                    Ok(Type::TypeVar(typevar))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
-                SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
+                SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::TypedDict
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
 
                 SpecialFormType::Literal
                 | SpecialFormType::Union
@@ -5473,7 +5497,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id) {
+                    match element.in_type_expression(db, scope_id, legacy_typevar_binding_context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -5644,6 +5668,7 @@ impl<'db> Type<'db> {
             return KnownClass::Dict
                 .to_specialized_class_type(db, [KnownClass::Str.to_instance(db), Type::object(db)])
                 .map(Type::from)
+                // Guard against user-customized typesheds with a broken `dict` class
                 .unwrap_or_else(Type::unknown);
         }
 
@@ -5669,7 +5694,7 @@ impl<'db> Type<'db> {
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(heap_size=get_size2::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub fn apply_specialization(
         self,
         db: &'db dyn Db,
@@ -5820,7 +5845,7 @@ impl<'db> Type<'db> {
     ) {
         match self {
             Type::TypeVar(typevar) => {
-                if typevar.is_legacy(db) {
+                if typevar.is_legacy(db) || typevar.is_implicit(db) {
                     typevars.insert(typevar);
                 }
             }
@@ -6551,6 +6576,8 @@ enum InvalidTypeExpression<'db> {
     Deprecated,
     /// Same for `dataclasses.Field`
     Field,
+    /// Same for `typing.TypedDict`
+    TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6598,6 +6625,11 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::Field => {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
                     }
+                    InvalidTypeExpression::TypedDict => {
+                        f.write_str(
+                            "The special form `typing.TypedDict` is not allowed in type expressions. \
+                            Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
+                    }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
@@ -6639,7 +6671,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         if module_member_with_same_name
-            .in_type_expression(db, scope)
+            .in_type_expression(db, scope, None)
             .is_err()
         {
             return;
@@ -6694,11 +6726,16 @@ impl<'db> FieldInstance<'db> {
     }
 }
 
-/// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
+/// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
+/// or an implicit typevar like `Self` was used.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum TypeVarKind {
+    /// `T = TypeVar("T")`
     Legacy,
+    /// `def foo[T](x: T) -> T: ...`
     Pep695,
+    /// `typing.Self`
+    Implicit,
 }
 
 /// Data regarding a single type variable.
@@ -6801,6 +6838,10 @@ impl<'db> TypeVarInstance<'db> {
 
     pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Legacy)
+    }
+
+    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), TypeVarKind::Implicit)
     }
 
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
@@ -8359,7 +8400,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
     }
 
-    #[salsa::tracked(heap_size=get_size2::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
@@ -8991,6 +9032,15 @@ pub struct TypedDictType<'db> {
 impl get_size2::GetSize for TypedDictType<'_> {}
 
 impl<'db> TypedDictType<'db> {
+    pub(crate) fn from(db: &'db dyn Db, defining_class: ClassType<'db>) -> Type<'db> {
+        Type::TypedDict(Self::new(db, defining_class))
+    }
+
+    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
+        let (class_literal, specialization) = self.defining_class(db).class_literal(db);
+        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    }
+
     pub(crate) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,

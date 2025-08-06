@@ -1,4 +1,3 @@
-use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
@@ -9,6 +8,7 @@ use super::{
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
 };
+use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::NodeWithScopeKind;
@@ -23,9 +23,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, KnownInstanceType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -54,9 +54,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashSet, FxHasher};
-
-type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
+use rustc_hash::FxHashSet;
 
 fn explicit_bases_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -1102,11 +1100,11 @@ impl MethodDecorator {
     }
 }
 
-/// Metadata regarding a dataclass field/attribute.
+/// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DataclassField<'db> {
+pub(crate) struct Field<'db> {
     /// The declared type of the field
-    pub(crate) field_ty: Type<'db>,
+    pub(crate) declared_ty: Type<'db>,
 
     /// The type of the default value for this field
     pub(crate) default_ty: Option<Type<'db>>,
@@ -1199,7 +1197,7 @@ impl<'db> ClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
-    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let parsed = parsed_module(db, scope.file(db)).load(db);
@@ -1309,7 +1307,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the class's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(returns(deref), cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::explicit_bases_query: {}", self.name(db));
 
@@ -1399,7 +1397,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
-    #[salsa::tracked(returns(deref), heap_size=get_size2::heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("ClassLiteral::decorators: {}", self.name(db));
 
@@ -1448,7 +1446,7 @@ impl<'db> ClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -1492,7 +1490,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=is_typed_dict_cycle_recover,
         cycle_initial=is_typed_dict_cycle_initial,
-        heap_size=get_size2::heap_size
+        heap_size=ruff_memory_usage::heap_size
     )]
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
@@ -1544,7 +1542,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=try_metaclass_cycle_recover,
         cycle_initial=try_metaclass_cycle_initial,
-        heap_size=get_size2::heap_size,
+        heap_size=ruff_memory_usage::heap_size,
     )]
     pub(super) fn try_metaclass(
         self,
@@ -1863,8 +1861,8 @@ impl<'db> ClassLiteral<'db> {
             let mut kw_only_field_seen = false;
             for (
                 field_name,
-                DataclassField {
-                    mut field_ty,
+                Field {
+                    declared_ty: mut field_ty,
                     mut default_ty,
                     init_only: _,
                     init,
@@ -2029,31 +2027,54 @@ impl<'db> ClassLiteral<'db> {
                 None
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("value"))),
-                    ]),
-                    Some(Type::none(db)),
-                );
+                let fields = self.fields(db, specialization, field_policy);
 
-                Some(CallableType::function_like(db, signature))
+                // Add (key type, value type) overloads for all TypedDict items ("fields"):
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(Type::none(db)),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                    ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                let fields = self.fields(db, specialization, field_policy);
 
-                Some(CallableType::function_like(db, signature))
+                // Add (key -> value type) overloads for all TypedDict items ("fields"):
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                        ]),
+                        Some(field.declared_ty),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
                 // TODO: synthesize a set of overloads with precise types
@@ -2148,7 +2169,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxOrderMap<Name, DataclassField<'db>> {
+    ) -> FxOrderMap<Name, Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -2195,7 +2216,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> FxOrderMap<Name, DataclassField<'db>> {
+    ) -> FxOrderMap<Name, Field<'db>> {
         let mut attributes = FxOrderMap::default();
 
         let class_body_scope = self.body_scope(db);
@@ -2247,8 +2268,8 @@ impl<'db> ClassLiteral<'db> {
 
                     attributes.insert(
                         symbol.name().clone(),
-                        DataclassField {
-                            field_ty: attr_ty.apply_optional_specialization(db, specialization),
+                        Field {
+                            declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                             default_ty,
                             init_only: attr.is_init_var(),
                             init,
@@ -2312,7 +2333,9 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
                 ClassBase::TypedDict => {
-                    return Place::bound(todo_type!("Support for `TypedDict`")).into();
+                    return KnownClass::TypedDictFallback
+                        .to_instance(db)
+                        .instance_member(db, name);
                 }
             }
         }
@@ -2785,7 +2808,7 @@ impl<'db> ClassLiteral<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=get_size2::heap_size)]
+    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///

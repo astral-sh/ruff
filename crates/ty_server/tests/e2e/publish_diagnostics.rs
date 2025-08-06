@@ -1,7 +1,6 @@
 use anyhow::Result;
 use lsp_types::notification::PublishDiagnostics;
 use ruff_db::system::SystemPath;
-use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
@@ -15,7 +14,7 @@ def foo() -> str:
 ";
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_root, ClientOptions::default())?
+        .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(false)
         .build()?

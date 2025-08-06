@@ -16,6 +16,7 @@ license.workspace = true
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
+ty_combine = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["zstd"] }
 ty_server = { workspace = true }
