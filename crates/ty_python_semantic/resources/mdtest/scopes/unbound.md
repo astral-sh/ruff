@@ -34,7 +34,7 @@ class C:
     if coinflip():
         x = 1
 
-    # error: [possibly-unresolved-reference]
+    # Possibly unbound variables in enclosing scopes are considered bound.
     y = x
 
 reveal_type(C.y)  # revealed: Unknown | Literal[1, "abc"]
