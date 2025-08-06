@@ -1,4 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
-EXE002_1.py:1:1: EXE002 The file is executable but no shebang is present
+EXE002 The file is executable but no shebang is present
+--> EXE002_1.py:1:1

@@ -21,16 +21,17 @@ invalid-syntax: Expected a statement
 4 | "a" """b
   |
 
-ISC_syntax_error.py:3:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error.py:3:1
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
 3 | "a" "b" "c
-  | ^^^^^^^ ISC001
+  | ^^^^^^^
 4 | "a" """b
 5 | c""" "d
   |
-  = help: Combine string literals
+help: Combine string literals
 
 invalid-syntax: missing closing quote in string literal
  --> ISC_syntax_error.py:3:9
@@ -54,17 +55,18 @@ invalid-syntax: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:4:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error.py:4:1
   |
 2 |   "a" "b
 3 |   "a" "b" "c
 4 | / "a" """b
 5 | | c""" "d
-  | |____^ ISC001
+  | |____^
 6 |
 7 |   # For f-strings, the `FStringRanges` won't contain the range for
   |
-  = help: Combine string literals
+help: Combine string literals
 
 invalid-syntax: missing closing quote in string literal
  --> ISC_syntax_error.py:5:6
@@ -110,16 +112,17 @@ invalid-syntax: Expected FStringEnd, found newline
 11 | f"a" f"""b
    |
 
-ISC_syntax_error.py:10:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC_syntax_error.py:10:1
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
 10 | f"a" f"b" f"c
-   | ^^^^^^^^^ ISC001
+   | ^^^^^^^^^
 11 | f"a" f"""b
 12 | c""" f"d {e
    |
-   = help: Combine string literals
+help: Combine string literals
 
 invalid-syntax: f-string: unterminated string
   --> ISC_syntax_error.py:10:13
@@ -143,17 +146,18 @@ invalid-syntax: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:11:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC_syntax_error.py:11:1
    |
  9 |   f"a" f"b
 10 |   f"a" f"b" f"c
 11 | / f"a" f"""b
 12 | | c""" f"d {e
-   | |____^ ISC001
+   | |____^
 13 |
 14 |   (
    |
-   = help: Combine string literals
+help: Combine string literals
 
 invalid-syntax: missing closing quote in string literal
   --> ISC_syntax_error.py:16:5

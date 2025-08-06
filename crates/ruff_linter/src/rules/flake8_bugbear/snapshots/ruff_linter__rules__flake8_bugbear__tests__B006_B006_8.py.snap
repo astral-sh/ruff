@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
-snapshot_kind: text
 ---
-B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_8.py:1:19
   |
 1 | def foo(a: list = []):
-  |                   ^^ B006
+  |                   ^^
 2 |     raise NotImplementedError("")
   |
-  = help: Replace with `None`; initialize within function
+help: Replace with `None`; initialize within function
 
 ℹ Unsafe fix
 1   |-def foo(a: list = []):
@@ -17,14 +17,15 @@ B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument default
 3 3 | 
 4 4 | 
 
-B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for argument defaults
+ --> B006_8.py:5:19
   |
 5 | def bar(a: dict = {}):
-  |                   ^^ B006
+  |                   ^^
 6 |     """ This one also has a docstring"""
 7 |     raise NotImplementedError("and has some text in here")
   |
-  = help: Replace with `None`; initialize within function
+help: Replace with `None`; initialize within function
 
 ℹ Unsafe fix
 2 2 |     raise NotImplementedError("")
@@ -36,14 +37,15 @@ B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument default
 7 7 |     raise NotImplementedError("and has some text in here")
 8 8 | 
 
-B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_8.py:10:19
    |
 10 | def baz(a: list = []):
-   |                   ^^ B006
+   |                   ^^
 11 |     """This one raises a different exception"""
 12 |     raise IndexError()
    |
-   = help: Replace with `None`; initialize within function
+help: Replace with `None`; initialize within function
 
 ℹ Unsafe fix
 7  7  |     raise NotImplementedError("and has some text in here")
@@ -58,13 +60,14 @@ B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaul
 13 15 | 
 14 16 | 
 
-B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_8.py:15:19
    |
 15 | def qux(a: list = []):
-   |                   ^^ B006
+   |                   ^^
 16 |     raise NotImplementedError
    |
-   = help: Replace with `None`; initialize within function
+help: Replace with `None`; initialize within function
 
 ℹ Unsafe fix
 12 12 |     raise IndexError()
@@ -76,13 +79,14 @@ B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaul
 17 17 | 
 18 18 | 
 
-B006_8.py:19:20: B006 [*] Do not use mutable data structures for argument defaults
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_8.py:19:20
    |
 19 | def quux(a: list = []):
-   |                    ^^ B006
+   |                    ^^
 20 |     raise NotImplemented
    |
-   = help: Replace with `None`; initialize within function
+help: Replace with `None`; initialize within function
 
 ℹ Unsafe fix
 16 16 |     raise NotImplementedError
