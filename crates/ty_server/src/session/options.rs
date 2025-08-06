@@ -1,10 +1,11 @@
 use lsp_types::Url;
 use ruff_db::system::SystemPathBuf;
+use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use ty_project::combine::Combine;
+use ty_combine::Combine;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -75,7 +76,7 @@ impl InitializationOptions {
 ///    all workspaces managed by the language server.
 /// 2. Workspace options contains options that are specific to a workspace. They are applied to the
 ///    workspace these options are associated with.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientOptions {
     #[serde(flatten)]
@@ -99,18 +100,11 @@ impl ClientOptions {
     }
 }
 
-impl Combine for ClientOptions {
-    fn combine_with(&mut self, other: Self) {
-        self.global.combine_with(other.global);
-        self.workspace.combine_with(other.workspace);
-    }
-}
-
 /// Options that are global to the language server.
 ///
 /// These are the dynamic options that are applied to all workspaces managed by the language
 /// server.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GlobalOptions {
     /// Diagnostic mode for the language server.
@@ -125,16 +119,10 @@ impl GlobalOptions {
     }
 }
 
-impl Combine for GlobalOptions {
-    fn combine_with(&mut self, other: Self) {
-        self.diagnostic_mode.combine_with(other.diagnostic_mode);
-    }
-}
-
 /// Options that are specific to a workspace.
 ///
 /// These are the dynamic options that are applied to a specific workspace.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WorkspaceOptions {
     /// Whether to disable language services like code completions, hover, etc.
@@ -195,14 +183,6 @@ impl WorkspaceOptions {
             disable_language_services: self.disable_language_services.unwrap_or_default(),
             overrides,
         }
-    }
-}
-
-impl Combine for WorkspaceOptions {
-    fn combine_with(&mut self, other: Self) {
-        self.disable_language_services
-            .combine_with(other.disable_language_services);
-        self.python_extension.combine_with(other.python_extension);
     }
 }
 

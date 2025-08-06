@@ -4207,11 +4207,22 @@ dependencies = [
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
+ "ty_combine",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
  "ty_static",
  "wild",
+]
+
+[[package]]
+name = "ty_combine"
+version = "0.0.0"
+dependencies = [
+ "ordermap",
+ "ruff_db",
+ "ruff_python_ast",
+ "ty_python_semantic",
 ]
 
 [[package]]
@@ -4266,6 +4277,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml 0.9.4",
  "tracing",
+ "ty_combine",
  "ty_python_semantic",
  "ty_vendored",
 ]
@@ -4336,6 +4348,7 @@ dependencies = [
  "lsp-types",
  "regex",
  "ruff_db",
+ "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_source_file",
@@ -4349,6 +4362,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
+ "ty_combine",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",

@@ -28,8 +28,6 @@ use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection}
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
-pub mod combine;
-
 mod db;
 mod files;
 mod glob;
