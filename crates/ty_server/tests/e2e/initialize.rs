@@ -1,6 +1,7 @@
 use anyhow::Result;
-use lsp_types::{Position, request::RegisterCapability};
+use lsp_types::{Position, notification::ShowMessage, request::RegisterCapability};
 use ruff_db::system::SystemPath;
+use serde_json::Value;
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
@@ -379,6 +380,60 @@ def bar() -> str:
         hover_bar.is_some(),
         "Expected hover information for workspace B, got: {hover_bar:?}"
     );
+
+    Ok(())
+}
+
+/// Tests that the server sends a warning notification if user provided unknown options during
+/// initialization.
+#[test]
+fn unknown_initialization_options() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_unknown([("foo".to_string(), Value::String("bar".to_string()))].into()),
+        )
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let show_message_params = server.await_notification::<ShowMessage>()?;
+
+    insta::assert_json_snapshot!(show_message_params, @r#"
+    {
+      "type": 2,
+      "message": "Received unknown options during initialization: {\n  /"foo/": /"bar/"\n}"
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Tests that the server sends a warning notification if user provided unknown options in the
+/// workspace configuration.
+#[test]
+fn unknown_options_in_workspace_configuration() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(
+                ClientOptions::default()
+                    .with_unknown([("foo".to_string(), Value::String("bar".to_string()))].into()),
+            ),
+        )?
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let show_message_params = server.await_notification::<ShowMessage>()?;
+
+    insta::assert_json_snapshot!(show_message_params, @r#"
+    {
+      "type": 2,
+      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  /"foo/": /"bar/"\n}"
+    }
+    "#);
 
     Ok(())
 }
