@@ -244,8 +244,7 @@ class D(TypedDict):
 
 td = D(x=1, label="a")
 td["x"] = 0
-# TODO: should be Literal[0]
-reveal_type(td["x"])  # revealed: int
+reveal_type(td["x"])  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does["not"]["exist"] = 0

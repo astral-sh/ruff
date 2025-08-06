@@ -121,7 +121,7 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -2035,24 +2035,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // pyright. TODO: Other standard library classes may also be considered safe. Also,
             // subclasses of these safe classes that do not override `__getitem__/__setitem__`
             // may be considered safe.
-            let safe_mutable_classes = [
-                KnownClass::List.to_instance(db),
-                KnownClass::Dict.to_instance(db),
-                KnownClass::Bytearray.to_instance(db),
-                KnownClass::DefaultDict.to_instance(db),
-                SpecialFormType::ChainMap.instance_fallback(db),
-                SpecialFormType::Counter.instance_fallback(db),
-                SpecialFormType::Deque.instance_fallback(db),
-                SpecialFormType::OrderedDict.instance_fallback(db),
-                SpecialFormType::TypedDict.instance_fallback(db),
-            ];
-            if safe_mutable_classes.iter().all(|safe_mutable_class| {
-                !value_ty.is_equivalent_to(db, *safe_mutable_class)
-                    && value_ty
-                        .generic_origin(db)
-                        .zip(safe_mutable_class.generic_origin(db))
-                        .is_none_or(|(l, r)| l != r)
-            }) {
+            let is_safe_mutable_class = || {
+                let safe_mutable_classes = [
+                    KnownClass::List.to_instance(db),
+                    KnownClass::Dict.to_instance(db),
+                    KnownClass::Bytearray.to_instance(db),
+                    KnownClass::DefaultDict.to_instance(db),
+                    SpecialFormType::ChainMap.instance_fallback(db),
+                    SpecialFormType::Counter.instance_fallback(db),
+                    SpecialFormType::Deque.instance_fallback(db),
+                    SpecialFormType::OrderedDict.instance_fallback(db),
+                    SpecialFormType::TypedDict.instance_fallback(db),
+                ];
+
+                safe_mutable_classes.iter().any(|safe_mutable_class| {
+                    value_ty.is_equivalent_to(db, *safe_mutable_class)
+                        || !value_ty
+                            .generic_origin(db)
+                            .zip(safe_mutable_class.generic_origin(db))
+                            .is_none_or(|(l, r)| l != r)
+                })
+            };
+
+            if !value_ty.is_typed_dict() && !is_safe_mutable_class() {
                 bound_ty = declared_ty;
             }
         }
