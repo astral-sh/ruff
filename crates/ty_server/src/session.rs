@@ -477,7 +477,7 @@ impl Session {
                         Refer to the logs for more details.",
                         unknown_options
                             .keys()
-                            .map(|key| key.to_string())
+                            .map(String::as_str)
                             .collect::<Vec<_>>()
                             .join("', '")
                     ));

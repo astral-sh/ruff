@@ -118,7 +118,7 @@ impl Server {
                     Refer to the logs for more details",
                     unknown_options
                         .keys()
-                        .map(|key| key.as_str())
+                        .map(String::as_str)
                         .collect::<Vec<_>>()
                         .join("', '")
                 ));
