@@ -572,27 +572,27 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
-        match &*self.0 {
-            SearchPathInner::Extra(path)
-            | SearchPathInner::FirstParty(path)
-            | SearchPathInner::StandardLibraryCustom(path)
-            | SearchPathInner::SitePackages(path)
-            | SearchPathInner::Editable(path) => Some(path),
-            SearchPathInner::StandardLibraryVendored(_) => None,
+    pub(super) fn as_path(&self) -> SystemOrVendoredPathRef<'_> {
+        match *self.0 {
+            SearchPathInner::Extra(ref path)
+            | SearchPathInner::FirstParty(ref path)
+            | SearchPathInner::StandardLibraryCustom(ref path)
+            | SearchPathInner::SitePackages(ref path)
+            | SearchPathInner::Editable(ref path) => SystemOrVendoredPathRef::System(path),
+            SearchPathInner::StandardLibraryVendored(ref path) => {
+                SystemOrVendoredPathRef::Vendored(path)
+            }
         }
     }
 
     #[must_use]
+    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+        self.as_path().as_system_path()
+    }
+
+    #[must_use]
     pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
-        match &*self.0 {
-            SearchPathInner::StandardLibraryVendored(path) => Some(path),
-            SearchPathInner::Extra(_)
-            | SearchPathInner::FirstParty(_)
-            | SearchPathInner::StandardLibraryCustom(_)
-            | SearchPathInner::SitePackages(_)
-            | SearchPathInner::Editable(_) => None,
-        }
+        self.as_path().as_vendored_path()
     }
 }
 
@@ -686,6 +686,20 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         match self {
             Self::System(system) => system.parent().map(Self::System),
             Self::Vendored(vendored) => vendored.parent().map(Self::Vendored),
+        }
+    }
+
+    fn as_system_path(&self) -> Option<&'db SystemPath> {
+        match self {
+            SystemOrVendoredPathRef::System(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    fn as_vendored_path(&self) -> Option<&'db VendoredPath> {
+        match self {
+            SystemOrVendoredPathRef::Vendored(path) => Some(path),
+            _ => None,
         }
     }
 }
