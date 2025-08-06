@@ -269,9 +269,11 @@ There are a few exceptions to these rules:
     `src` paths) are resolved relative to the _current_ working directory.
 1. If no config file is found in the directory hierarchy, Ruff searches for a user-specific
     configuration file at `${config_dir}/ruff/pyproject.toml`, with `${config_dir}` being
-    determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy). If such a file exists, it is used
-    and all relative paths are again resolved relative to the _current working directory_;
-    if no config file is found at all, Ruff uses its built-in default settings.
+    determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy).
+    If such a file exists, it is used and all relative paths are again resolved relative to the
+    _current working directory_;
+    if no configuration file is found at all, Ruff uses its built-in default settings.
+
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ hierarchical configuration context.
 
