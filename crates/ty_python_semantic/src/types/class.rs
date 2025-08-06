@@ -2316,7 +2316,9 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
                 ClassBase::TypedDict => {
-                    return Place::bound(todo_type!("Support for `TypedDict`")).into();
+                    return KnownClass::TypedDictFallback
+                        .to_class_literal(db)
+                        .instance_member(db, name);
                 }
             }
         }

@@ -5414,7 +5414,12 @@ impl<'db> Type<'db> {
                     )))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
-                SpecialFormType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
+                SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::TypedDict
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
 
                 SpecialFormType::Literal
                 | SpecialFormType::Union
@@ -6560,6 +6565,8 @@ enum InvalidTypeExpression<'db> {
     Deprecated,
     /// Same for `dataclasses.Field`
     Field,
+    /// Same for `typing.TypedDict`
+    TypedDict,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6606,6 +6613,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     }
                     InvalidTypeExpression::Field => {
                         f.write_str("`dataclasses.Field` is not allowed in type expressions")
+                    }
+                    InvalidTypeExpression::TypedDict => {
+                        f.write_str("`typing.TypedDict` is not allowed in type expressions")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,

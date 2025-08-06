@@ -375,6 +375,16 @@ reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for `TypedDict
 msg.content
 ```
 
+## Error cases
+
+### `typing.TypedDict` is not allowed in type expressions
+
+```py
+from typing import TypedDict
+
+x: TypedDict = {"name": "Alice"}  # error: [invalid-type-form] "`typing.TypedDict` is not allowed in type expressions"
+```
+
 ## Diagnostics
 
 <!-- snapshot-diagnostics -->
