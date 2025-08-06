@@ -354,3 +354,43 @@ ISC.py:186:5: ISC003 [*] Explicitly concatenated string should be implicitly con
 187 187 | 		# leading comment
 188 188 |     "end"
 189 189 | )
+
+ISC.py:192:9: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+191 |   _ = "Line1\n" + (
+192 | /         "Line2\n"
+193 | |         + "Line3"
+    | |_________________^ ISC003
+194 |   )
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+190 190 | 
+191 191 | _ = "Line1\n" + (
+192 192 |         "Line2\n"
+193     |-        + "Line3"
+    193 |+         "Line3"
+194 194 | )
+195 195 | 
+196 196 | _ = "Line1\n" + (
+
+ISC.py:197:9: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+    |
+196 |   _ = "Line1\n" + (
+197 | /         "start"
+198 | |         + " middle "
+    | |____________________^ ISC003
+199 |           + " end"
+200 |   ) + "\nLine5"
+    |
+    = help: Remove redundant '+' operator to implicitly concatenate
+
+ℹ Safe fix
+195 195 | 
+196 196 | _ = "Line1\n" + (
+197 197 |         "start"
+198     |-        + " middle "
+    198 |+         " middle "
+199 199 |         + " end"
+200 200 | ) + "\nLine5"

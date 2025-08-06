@@ -1,11 +1,11 @@
-use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::AlwaysFixableViolation;
 use crate::checkers::ast::Checker;
+use crate::AlwaysFixableViolation;
 use crate::{Edit, Fix};
 
 /// ## What it does
@@ -47,6 +47,35 @@ impl AlwaysFixableViolation for ExplicitStringConcatenation {
 }
 
 /// ISC003
+/// ISC003
+
+/// ISC003
+
+fn is_inside_brackets(checker: &Checker, expr_range: TextRange) -> bool {
+    let locator = checker.locator();
+
+    // Get the current statement that contains this expression
+    if let Some(stmt) = checker.semantic().current_statements().next() {
+        let stmt_source = locator.slice(stmt.range());
+        let expr_start_in_stmt = expr_range.start() - stmt.start();
+        let expr_end_in_stmt = expr_range.end() - stmt.start();
+
+        // Look for brackets within the statement
+        let before_expr = &stmt_source[..expr_start_in_stmt.to_usize()];
+        let after_expr = &stmt_source[expr_end_in_stmt.to_usize()..];
+
+        // Check for parentheses or curly braces
+        let has_opening_bracket =
+            before_expr.rfind('(').is_some() || before_expr.rfind('{').is_some();
+        let has_closing_bracket = after_expr.find(')').is_some() || after_expr.find('}').is_some();
+
+        has_opening_bracket && has_closing_bracket
+    } else {
+        false
+    }
+}
+
+/// ISC003
 pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
     // If the user sets `allow-multiline` to `false`, then we should allow explicitly concatenated
     // strings that span multiple lines even if this rule is enabled. Otherwise, there's no way
@@ -80,9 +109,12 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     .locator()
                     .contains_line_break(TextRange::new(left.end(), right.start()))
             {
-                checker
-                    .report_diagnostic(ExplicitStringConcatenation, expr.range())
-                    .set_fix(generate_fix(checker, bin_op));
+                // Only report violations for expressions that are inside brackets
+                if is_inside_brackets(checker, expr.range()) {
+                    let mut diagnostic =
+                        checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
+                    diagnostic.set_fix(generate_fix(checker, bin_op));
+                }
             }
         }
     }
