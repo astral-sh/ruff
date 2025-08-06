@@ -6,7 +6,7 @@ use std::path;
 use camino::{Utf8Components, Utf8Path, Utf8PathBuf};
 
 #[repr(transparent)]
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, PartialOrd, Hash, Ord)]
 pub struct VendoredPath(Utf8Path);
 
 impl VendoredPath {

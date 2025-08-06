@@ -232,7 +232,7 @@ pub struct NamespacePackage<'db> {
     name: ModuleName,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Hash, Ord, get_size2::GetSize)]
 pub enum ModuleKind {
     /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
@@ -251,7 +251,18 @@ impl ModuleKind {
 }
 
 /// Enumeration of various core stdlib modules in which important types are located
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Hash,
+    Ord,
+    strum_macros::EnumString,
+    get_size2::GetSize,
+)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {

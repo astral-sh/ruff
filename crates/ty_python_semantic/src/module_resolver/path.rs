@@ -657,7 +657,7 @@ impl fmt::Display for SearchPath {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub(super) enum SystemOrVendoredPathRef<'db> {
     System(&'db SystemPath),
     Vendored(&'db VendoredPath),
