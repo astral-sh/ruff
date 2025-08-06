@@ -233,7 +233,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::TypeVar(_, _) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
                 Type::Intersection(intersection) => {
                     intersection.iter_positive(db).find_map(|ty| imp(db, ty))?

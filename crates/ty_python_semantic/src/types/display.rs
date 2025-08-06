@@ -208,7 +208,7 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => {
+            Type::TypeVar(typevar, _) => {
                 f.write_str(typevar.name(self.db))?;
                 if let Some(binding_context) = typevar
                     .binding_context(self.db)

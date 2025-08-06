@@ -322,9 +322,9 @@ impl<'db> Signature<'db> {
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
     ) -> Self {
-        let parameters =
+        let mut parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
-        let return_ty = function_node.returns.as_ref().map(|returns| {
+        let mut return_ty = function_node.returns.as_ref().map(|returns| {
             let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
 
             if function_node.is_async && !is_generator {
@@ -340,6 +340,12 @@ impl<'db> Signature<'db> {
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!
         }
+
+        // Mark any of the typevars bound by this function as inferrable.
+        parameters =
+            parameters.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferrable(definition));
+        return_ty = return_ty
+            .map(|ty| ty.apply_type_mapping(db, &TypeMapping::MarkTypeVarsInferrable(definition)));
 
         Self {
             generic_context: generic_context.or(legacy_generic_context),

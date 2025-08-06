@@ -600,7 +600,7 @@ pub enum Type<'db> {
     Tuple(TupleType<'db>),
     /// An instance of a typevar in a generic class or function. When the generic class or function
     /// is specialized, we will replace this typevar with its specialization.
-    TypeVar(TypeVarInstance<'db>),
+    TypeVar(TypeVarInstance<'db>, Inferrable),
     /// A bound super object like `super()` or `super(A, A())`
     /// This type doesn't handle an unbound super object like `super(A)`; for that we just use
     /// a `Type::NominalInstance` of `builtins.super`.
@@ -699,16 +699,19 @@ impl<'db> Type<'db> {
                 // existential type representing "all lists, containing any type." We currently
                 // represent this by replacing `Any` in invariant position with an unresolved type
                 // variable.
-                TypeVarVariance::Invariant => Type::TypeVar(TypeVarInstance::new(
-                    db,
-                    Name::new_static("T_all"),
-                    None,
-                    None,
-                    None,
-                    variance,
-                    None,
-                    TypeVarKind::Pep695,
-                )),
+                TypeVarVariance::Invariant => Type::TypeVar(
+                    TypeVarInstance::new(
+                        db,
+                        Name::new_static("T_all"),
+                        None,
+                        None,
+                        None,
+                        variance,
+                        None,
+                        TypeVarKind::Pep695,
+                    ),
+                    Inferrable::Inferrable,
+                ),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
                 TypeVarVariance::Bivariant => unreachable!(),
@@ -779,7 +782,9 @@ impl<'db> Type<'db> {
                 )
                 .build(),
             Type::Tuple(tuple_type) => Type::tuple(tuple_type.materialize(db, variance)),
-            Type::TypeVar(type_var) => Type::TypeVar(type_var.materialize(db, variance)),
+            Type::TypeVar(type_var, inferrable) => {
+                Type::TypeVar(type_var.materialize(db, variance), *inferrable)
+            }
             Type::TypeIs(type_is) => {
                 type_is.with_type(db, type_is.return_type(db).materialize(db, variance))
             }
@@ -1082,9 +1087,9 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => visitor.visit(self, |v| {
                 Type::SubclassOf(subclass_of.normalized_impl(db, v))
             }),
-            Type::TypeVar(typevar) => {
-                visitor.visit(self, |v| Type::TypeVar(typevar.normalized_impl(db, v)))
-            }
+            Type::TypeVar(typevar, inferrable) => visitor.visit(self, |v| {
+                Type::TypeVar(typevar.normalized_impl(db, v), inferrable)
+            }),
             Type::KnownInstance(known_instance) => visitor.visit(self, |v| {
                 Type::KnownInstance(known_instance.normalized_impl(db, v))
             }),
@@ -1163,7 +1168,7 @@ impl<'db> Type<'db> {
             | Type::Intersection(_)
             | Type::Callable(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
+            | Type::TypeVar(_,_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => false,
@@ -1241,7 +1246,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::Intersection(_)
-            | Type::TypeVar(_)
+            | Type::TypeVar(_, _)
             | Type::BoundSuper(_) => None,
         }
     }
@@ -1337,13 +1342,17 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
-            (Type::TypeVar(_), Type::Union(union)) if union.elements(db).contains(&self) => true,
-            (Type::Intersection(intersection), Type::TypeVar(_))
+            (Type::TypeVar(_, Inferrable::NotInferrable), Type::Union(union))
+                if union.elements(db).contains(&self) =>
+            {
+                true
+            }
+            (Type::Intersection(intersection), Type::TypeVar(_, Inferrable::NotInferrable))
                 if intersection.positive(db).contains(&target) =>
             {
                 true
             }
-            (Type::Intersection(intersection), Type::TypeVar(_))
+            (Type::Intersection(intersection), Type::TypeVar(_, Inferrable::NotInferrable))
                 if intersection.negative(db).contains(&target) =>
             {
                 false
@@ -1354,16 +1363,17 @@ impl<'db> Type<'db> {
             //
             // Note that this is not handled by the early return at the beginning of this method,
             // since subtyping between a TypeVar and an arbitrary other type cannot be guaranteed to be reflexive.
-            (Type::TypeVar(lhs_typevar), Type::TypeVar(rhs_typevar))
-                if lhs_typevar == rhs_typevar =>
-            {
-                true
-            }
+            (
+                Type::TypeVar(lhs_typevar, Inferrable::NotInferrable),
+                Type::TypeVar(rhs_typevar, Inferrable::NotInferrable),
+            ) if lhs_typevar == rhs_typevar => true,
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
+            (Type::TypeVar(typevar, Inferrable::NotInferrable), _)
+                if typevar.bound_or_constraints(db).is_some() =>
+            {
                 match typevar.bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -1379,7 +1389,7 @@ impl<'db> Type<'db> {
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::TypeVar(typevar))
+            (_, Type::TypeVar(typevar, Inferrable::NotInferrable))
                 if typevar.constraints(db).is_some_and(|constraints| {
                     constraints
                         .iter()
@@ -1428,7 +1438,11 @@ impl<'db> Type<'db> {
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(_)) => false,
+            (_, Type::TypeVar(_, Inferrable::NotInferrable)) => false,
+
+            // TODO: Infer specializations here
+            (Type::TypeVar(_, Inferrable::Inferrable), _)
+            | (_, Type::TypeVar(_, Inferrable::Inferrable)) => false,
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -1679,7 +1693,7 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
-            (Type::NominalInstance(_) | Type::TypeVar(_), _) => false,
+            (Type::NominalInstance(_) | Type::TypeVar(_, Inferrable::NotInferrable), _) => false,
         }
     }
 
@@ -1802,14 +1816,14 @@ impl<'db> Type<'db> {
             // be specialized to the same type. (This is an important difference between typevars
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
             // constraints, which are handled below.
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar))
+            (Type::TypeVar(self_typevar, Inferrable::NotInferrable), Type::TypeVar(other_typevar, Inferrable::NotInferrable))
                 if self_typevar == other_typevar =>
             {
                 false
             }
 
-            (tvar @ Type::TypeVar(_), Type::Intersection(intersection))
-            | (Type::Intersection(intersection), tvar @ Type::TypeVar(_))
+            (tvar @ Type::TypeVar(_, Inferrable::NotInferrable), Type::Intersection(intersection))
+            | (Type::Intersection(intersection), tvar @ Type::TypeVar(_, Inferrable::NotInferrable))
                 if intersection.negative(db).contains(&tvar) =>
             {
                 true
@@ -1819,7 +1833,7 @@ impl<'db> Type<'db> {
             // specialized to any type. A bounded typevar is not disjoint from its bound, and is
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
-            (Type::TypeVar(typevar), other) | (other, Type::TypeVar(typevar)) => {
+            (Type::TypeVar(typevar, Inferrable::NotInferrable), other) | (other, Type::TypeVar(typevar, Inferrable::NotInferrable)) => {
                 match typevar.bound_or_constraints(db) {
                     None => false,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -1831,6 +1845,10 @@ impl<'db> Type<'db> {
                         .all(|constraint| constraint.is_disjoint_from_impl(db, other, visitor)),
                 }
             }
+
+            // TODO: Infer specializations here
+            (Type::TypeVar(_, Inferrable::Inferrable), _)
+            | (_, Type::TypeVar(_, Inferrable::Inferrable)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -2331,14 +2349,18 @@ impl<'db> Type<'db> {
             // the bound is a final singleton class, since it can still be specialized to `Never`.
             // A constrained typevar is a singleton if all of its constraints are singletons. (Note
             // that you cannot specialize a constrained typevar to a subtype of a constraint.)
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| constraint.is_singleton(db)),
-            },
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => {
+                match typevar.bound_or_constraints(db) {
+                    None => false,
+                    Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_singleton(db)),
+                }
+            }
+
+            Type::TypeVar(_, Inferrable::Inferrable) => false,
 
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
@@ -2466,14 +2488,18 @@ impl<'db> Type<'db> {
             // `Never`. A constrained typevar is single-valued if all of its constraints are
             // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
             // of a constraint.)
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| constraint.is_single_valued(db)),
-            },
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => {
+                match typevar.bound_or_constraints(db) {
+                    None => false,
+                    Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_single_valued(db)),
+                }
+            }
+
+            Type::TypeVar(_, Inferrable::Inferrable) => false,
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -2625,7 +2651,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
+            | Type::TypeVar(_, _)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
@@ -2735,16 +2761,21 @@ impl<'db> Type<'db> {
                 KnownClass::Object.to_instance(db).instance_member(db, name)
             }
 
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Object.to_instance(db).instance_member(db, name),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.instance_member(db, name)
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => {
+                match typevar.bound_or_constraints(db) {
+                    None => KnownClass::Object.to_instance(db).instance_member(db, name),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.instance_member(db, name)
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .map_with_boundness_and_qualifiers(db, |constraint| {
+                            constraint.instance_member(db, name)
+                        }),
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .map_with_boundness_and_qualifiers(db, |constraint| {
-                        constraint.instance_member(db, name)
-                    }),
-            },
+            }
+
+            // TODO: Consider inferring constraints under which the instance member exists.
+            Type::TypeVar(_, Inferrable::Inferrable) => Place::Unbound.into(),
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
             Type::BooleanLiteral(_) | Type::TypeIs(_) => {
@@ -3606,15 +3637,18 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => Truthiness::Ambiguous,
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.try_bool_impl(db, allow_short_circuit)?
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => {
+                match typevar.bound_or_constraints(db) {
+                    None => Truthiness::Ambiguous,
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.try_bool_impl(db, allow_short_circuit)?
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        try_union(constraints)?
+                    }
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    try_union(constraints)?
-                }
-            },
+            }
+            Type::TypeVar(_, Inferrable::Inferrable) => Truthiness::Ambiguous,
 
             Type::NominalInstance(instance) => match instance.class.known(db) {
                 Some(known_class) => known_class.bool(),
@@ -3710,7 +3744,9 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => match typevar
+                .bound_or_constraints(db)
+            {
                 None => CallableBinding::not_callable(self).into(),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Bindings::from_union(
@@ -3718,6 +3754,9 @@ impl<'db> Type<'db> {
                     constraints.elements(db).iter().map(|ty| ty.bindings(db)),
                 ),
             },
+
+            // TODO: Infer constraints under which the typevar _is_ callable
+            Type::TypeVar(_, Inferrable::Inferrable) => CallableBinding::not_callable(self).into(),
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
@@ -5210,7 +5249,7 @@ impl<'db> Type<'db> {
             // If there is no bound or constraints on a typevar `T`, `T: object` implicitly, which
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
-            Type::TypeVar(typevar) => {
+            Type::TypeVar(typevar, inferrable) => {
                 let bound_or_constraints = match typevar.bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
                         TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
@@ -5221,16 +5260,19 @@ impl<'db> Type<'db> {
                         )
                     }
                 };
-                Some(Type::TypeVar(TypeVarInstance::new(
-                    db,
-                    Name::new(format!("{}'instance", typevar.name(db))),
-                    None,
-                    None,
-                    Some(bound_or_constraints),
-                    typevar.variance(db),
-                    None,
-                    typevar.kind(db),
-                )))
+                Some(Type::TypeVar(
+                    TypeVarInstance::new(
+                        db,
+                        Name::new(format!("{}'instance", typevar.name(db))),
+                        None,
+                        None,
+                        Some(bound_or_constraints),
+                        typevar.variance(db),
+                        None,
+                        typevar.kind(db),
+                    ),
+                    *inferrable,
+                ))
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
@@ -5320,7 +5362,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
+            | Type::TypeVar(_, _)
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -5342,7 +5384,9 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
-                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::TypeVar(typevar) => {
+                    Ok(Type::TypeVar(*typevar, Inferrable::NotInferrable))
+                }
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
@@ -5422,7 +5466,7 @@ impl<'db> Type<'db> {
                         typevar,
                     )
                     .unwrap_or(typevar);
-                    Ok(Type::TypeVar(typevar))
+                    Ok(Type::TypeVar(typevar, Inferrable::NotInferrable))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
@@ -5621,15 +5665,18 @@ impl<'db> Type<'db> {
             Type::Tuple(tuple) => tuple
                 .to_subclass_of(db)
                 .unwrap_or_else(SubclassOfType::subclass_of_unknown),
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Type.to_instance(db),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    // TODO: If we add a proper `OneOf` connector, we should use that here instead
-                    // of union. (Using a union here doesn't break anything, but it is imprecise.)
-                    constraints.map(db, |constraint| constraint.to_meta_type(db))
+            Type::TypeVar(typevar, Inferrable::NotInferrable) => {
+                match typevar.bound_or_constraints(db) {
+                    None => KnownClass::Type.to_instance(db),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        // TODO: If we add a proper `OneOf` connector, we should use that here instead
+                        // of union. (Using a union here doesn't break anything, but it is imprecise.)
+                        constraints.map(db, |constraint| constraint.to_meta_type(db))
+                    }
                 }
-            },
+            }
+            Type::TypeVar(_, Inferrable::Inferrable) => KnownClass::Type.to_instance(db),
 
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(*alias).metaclass(db),
@@ -5709,7 +5756,7 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
         match self {
-            Type::TypeVar(typevar) => match type_mapping {
+            Type::TypeVar(typevar, inferrable) => match type_mapping {
                 TypeMapping::Specialization(specialization) => {
                     specialization.get(db, typevar).unwrap_or(self)
                 }
@@ -5718,7 +5765,14 @@ impl<'db> Type<'db> {
                 }
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
+                    Type::TypeVar(typevar.with_binding_context(db, *binding_context), inferrable)
+                }
+                TypeMapping::MarkTypeVarsInferrable(binding_context) => {
+                    if typevar.binding_context(db) == Some(*binding_context) {
+                        Type::TypeVar(typevar, Inferrable::Inferrable)
+                    } else {
+                        self
+                    }
                 }
             }
 
@@ -5812,7 +5866,8 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
-                TypeMapping::BindLegacyTypevars(_) => self,
+                TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::MarkTypeVarsInferrable(_) => self,
                 TypeMapping::PromoteLiterals => self.literal_fallback_instance(db)
                     .expect("literal type should have fallback instance type"),
             }
@@ -5844,7 +5899,7 @@ impl<'db> Type<'db> {
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
         match self {
-            Type::TypeVar(typevar) => {
+            Type::TypeVar(typevar, _) => {
                 if typevar.is_legacy(db) || typevar.is_implicit(db) {
                     typevars.insert(typevar);
                 }
@@ -6044,7 +6099,7 @@ impl<'db> Type<'db> {
             | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
+            Self::TypeVar(var,_) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
@@ -6169,6 +6224,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(Definition<'db>),
+    /// Marks the typevars that are bound by a generic class or function as inferrable.
+    MarkTypeVarsInferrable(Definition<'db>),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6183,7 +6240,9 @@ fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeMapping::PartialSpecialization(specialization) => {
             walk_partial_specialization(db, specialization, visitor);
         }
-        TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) => {}
+        TypeMapping::PromoteLiterals
+        | TypeMapping::BindLegacyTypevars(_)
+        | TypeMapping::MarkTypeVarsInferrable(_) => {}
     }
 }
 
@@ -6200,6 +6259,9 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
             }
+            TypeMapping::MarkTypeVarsInferrable(binding_context) => {
+                TypeMapping::MarkTypeVarsInferrable(*binding_context)
+            }
         }
     }
 
@@ -6214,6 +6276,9 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PromoteLiterals => TypeMapping::PromoteLiterals,
             TypeMapping::BindLegacyTypevars(binding_context) => {
                 TypeMapping::BindLegacyTypevars(*binding_context)
+            }
+            TypeMapping::MarkTypeVarsInferrable(binding_context) => {
+                TypeMapping::MarkTypeVarsInferrable(*binding_context)
             }
         }
     }
@@ -6274,7 +6339,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             walk_generic_context(db, context, visitor);
         }
         KnownInstanceType::TypeVar(typevar) => {
-            visitor.visit_type_var_type(db, typevar);
+            visitor.visit_type_var_type(db, typevar, Inferrable::NotInferrable);
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
             visitor.visit_type_alias_type(db, type_alias);
@@ -6736,6 +6801,27 @@ pub enum TypeVarKind {
     Pep695,
     /// `typing.Self`
     Implicit,
+}
+
+/// Whether a typevar is inferrable in the current context.
+///
+/// Inside the generic class or function that binds it, a typevar stands for a specific type; we
+/// just don't know what it is yet. In this case, the typevar is _not inferrable_. When checking
+/// e.g. assignability, we must verify that the property holds for all possible specializations of
+/// the typevar.
+///
+/// Outside of that generic class or function, the typevar is _inferrable_. Assignability checks
+/// only have to hold for _some_ specialization, and we infer the constraints under which the check
+/// holds.
+///
+/// (In [[POPL2015][]] and related papers, inferrable typevars are sometimes called _polymorphic_,
+/// and non-inferrable ones _monomorphic_.)
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
+pub enum Inferrable {
+    Inferrable,
+    NotInferrable,
 }
 
 /// Data regarding a single type variable.

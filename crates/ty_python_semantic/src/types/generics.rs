@@ -14,8 +14,9 @@ use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarVariance, UnionType, binding_type, declaration_type,
+    Inferrable, KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
+    declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -114,7 +115,7 @@ pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?S
     visitor: &mut V,
 ) {
     for typevar in context.variables(db) {
-        visitor.visit_type_var_type(db, *typevar);
+        visitor.visit_type_var_type(db, *typevar, Inferrable::Inferrable);
     }
 }
 
@@ -264,7 +265,7 @@ impl<'db> GenericContext<'db> {
         let types = self
             .variables(db)
             .iter()
-            .map(|typevar| Type::TypeVar(*typevar))
+            .map(|typevar| Type::TypeVar(*typevar, Inferrable::Inferrable))
             .collect();
         self.specialize(db, types)
     }
@@ -280,7 +281,7 @@ impl<'db> GenericContext<'db> {
             db,
             self.variables(db)
                 .iter()
-                .map(|typevar| Type::TypeVar(*typevar)),
+                .map(|typevar| Type::TypeVar(*typevar, Inferrable::Inferrable)),
         )
     }
 
@@ -768,6 +769,10 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if formal == actual {
+            return Ok(());
+        }
+
         // If the actual type is a subtype of the formal type, then return without adding any new
         // type mappings. (Note that if the formal type contains any typevars, this check will
         // fail, since no non-typevar types are assignable to a typevar. Also note that we are
@@ -792,7 +797,8 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
+            (Type::TypeVar(typevar, Inferrable::Inferrable), ty) |
+             (ty, Type::TypeVar(typevar, Inferrable::Inferrable)) => {
                 match typevar.bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty.is_assignable_to(self.db, bound) {
@@ -889,7 +895,7 @@ impl<'db> SpecializationBuilder<'db> {
                 // already handled above the case where the actual is assignable to a _non-typevar_
                 // union element.)
                 let mut typevars = formal.iter(self.db).filter_map(|ty| match ty {
-                    Type::TypeVar(typevar) => Some(*typevar),
+                    Type::TypeVar(typevar, Inferrable::Inferrable) => Some(*typevar),
                     _ => None,
                 });
                 let typevar = typevars.next();

@@ -117,9 +117,9 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    Inferrable, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter,
+    ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
     TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
@@ -6450,16 +6450,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If the legacy typevar is still unbound after that search, and we are in a
                 // context that binds unbound legacy typevars (i.e., the signature of a generic
                 // function), bind it with that context.
-                Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => bind_legacy_typevar(
-                    self.db(),
-                    self.context.module(),
-                    self.index,
-                    self.scope().file_scope_id(self.db()),
-                    self.legacy_typevar_binding_context,
-                    typevar,
-                )
-                .map(Type::TypeVar)
-                .unwrap_or(ty),
+                Type::TypeVar(typevar, Inferrable::NotInferrable)
+                    if typevar.is_legacy(self.db()) =>
+                {
+                    bind_legacy_typevar(
+                        self.db(),
+                        self.context.module(),
+                        self.index,
+                        self.scope().file_scope_id(self.db()),
+                        self.legacy_typevar_binding_context,
+                        typevar,
+                    )
+                    .map(|typevar| Type::TypeVar(typevar, Inferrable::NotInferrable))
+                    .unwrap_or(ty)
+                }
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
                     if typevar.is_legacy(self.db()) =>
                 {
@@ -7175,7 +7179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_)
+                | Type::TypeVar(_, _)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
             ) => {
@@ -7501,7 +7505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_)
+                | Type::TypeVar(_, _)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
@@ -7531,7 +7535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
-                | Type::TypeVar(_)
+                | Type::TypeVar(_, _)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
                 op,

@@ -1,7 +1,7 @@
 use crate::{
     Db, FxIndexSet,
     types::{
-        BoundMethodType, BoundSuperType, CallableType, GenericAlias, IntersectionType,
+        BoundMethodType, BoundSuperType, CallableType, GenericAlias, Inferrable, IntersectionType,
         KnownInstanceType, MethodWrapperKind, NominalInstanceType, PropertyInstanceType,
         ProtocolInstanceType, SubclassOfType, Type, TypeAliasType, TypeIsType, TypeVarInstance,
         TypedDictType, UnionType,
@@ -77,7 +77,12 @@ pub(crate) trait TypeVisitor<'db> {
         walk_nominal_instance_type(db, nominal, self);
     }
 
-    fn visit_type_var_type(&mut self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) {
+    fn visit_type_var_type(
+        &mut self,
+        db: &'db dyn Db,
+        type_var: TypeVarInstance<'db>,
+        _inferrable: Inferrable,
+    ) {
         walk_type_var_type(db, type_var, self);
     }
 
@@ -131,7 +136,7 @@ enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
-    TypeVar(TypeVarInstance<'db>),
+    TypeVar(TypeVarInstance<'db>, Inferrable),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
 }
@@ -194,7 +199,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::TypeVar(type_var) => TypeKind::NonAtomic(NonAtomicType::TypeVar(type_var)),
+            Type::TypeVar(type_var, inferrable) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeVar(type_var, inferrable))
+            }
             Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
@@ -231,7 +238,9 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::TypeVar(type_var) => visitor.visit_type_var_type(db, type_var),
+        NonAtomicType::TypeVar(type_var, inferrable) => {
+            visitor.visit_type_var_type(db, type_var, inferrable);
+        }
         NonAtomicType::ProtocolInstance(protocol) => {
             visitor.visit_protocol_instance_type(db, protocol);
         }

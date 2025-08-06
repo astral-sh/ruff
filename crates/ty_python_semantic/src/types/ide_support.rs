@@ -149,7 +149,7 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
-            | Type::TypeVar(_)
+            | Type::TypeVar(_, _)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {

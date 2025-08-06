@@ -144,9 +144,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
-        (Type::TypeVar(_), _) => Ordering::Less,
-        (_, Type::TypeVar(_)) => Ordering::Greater,
+        (Type::TypeVar(left, left_inferrable), Type::TypeVar(right, right_inferrable)) => left
+            .cmp(right)
+            .then_with(|| left_inferrable.cmp(right_inferrable)),
+        (Type::TypeVar(_, _), _) => Ordering::Less,
+        (_, Type::TypeVar(_, _)) => Ordering::Greater,
 
         (Type::AlwaysTruthy, _) => Ordering::Less,
         (_, Type::AlwaysTruthy) => Ordering::Greater,
