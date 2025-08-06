@@ -12,3 +12,9 @@ pub fn heap_size<T: GetSize>(value: &T) -> usize {
         .get_heap_size_with_tracker(&mut *TRACKER.lock().unwrap())
         .0
 }
+
+/// Returns `0`, ignoring the memory usage of the value.
+// TODO: Remove this and add `GetSize` support for `OrderSet`.
+pub fn ignore<T>(_value: &T) -> usize {
+    0
+}

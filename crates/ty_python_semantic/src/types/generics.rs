@@ -101,7 +101,7 @@ pub(crate) fn bind_legacy_typevar<'db>(
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::ignore)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
@@ -411,7 +411,7 @@ impl std::fmt::Display for LegacyGenericBase {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
@@ -421,6 +421,9 @@ pub struct Specialization<'db> {
     /// elements, above what the class's (single) typevar can represent.
     tuple_inner: Option<TupleType<'db>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Specialization<'_> {}
 
 pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -673,7 +676,7 @@ impl<'db> Specialization<'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: Cow<'a, [Type<'db>]>,
