@@ -519,6 +519,9 @@ struct DefinitionInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// For function definitions, the undecorated type of the function.
+    undecorated_type: Option<Type<'db>>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -609,6 +612,10 @@ impl<'db> DefinitionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.is_cycle_callback().then_some(Type::Never)
+    }
+
+    pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
+        self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
 }
 
@@ -823,6 +830,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
+    /// For function definitions, the undecorated type of the function.
+    undecorated_type: Option<Type<'db>>,
+
     /// The fallback type for missing expressions/bindings/declarations.
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
@@ -858,6 +868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations: VecMap::default(),
             legacy_typevar_binding_context: None,
             deferred: VecSet::default(),
+            undecorated_type: None,
             cycle_fallback: false,
         }
     }
@@ -2662,6 +2673,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_literal,
             type_mappings,
         ));
+        self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
@@ -9121,6 +9133,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_fallback,
 
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
+
             // builder only state
             legacy_typevar_binding_context: _,
             deferred_state: _,
@@ -9180,6 +9195,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             declarations,
             deferred,
             cycle_fallback,
+            undecorated_type,
 
             // builder only state
             legacy_typevar_binding_context: _,
@@ -9193,14 +9209,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!diagnostics.is_empty() || cycle_fallback || !deferred.is_empty()).then(|| {
-                Box::new(DefinitionInferenceExtra {
-                    cycle_fallback,
-                    deferred: deferred.into_boxed_slice(),
-                    diagnostics,
-                })
-            });
+        let extra = (!diagnostics.is_empty()
+            || cycle_fallback
+            || undecorated_type.is_some()
+            || !deferred.is_empty())
+        .then(|| {
+            Box::new(DefinitionInferenceExtra {
+                cycle_fallback,
+                deferred: deferred.into_boxed_slice(),
+                diagnostics,
+                undecorated_type,
+            })
+        });
 
         if bindings.len() > 20 {
             tracing::debug!(
@@ -9243,6 +9263,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
+
+            // Ignored; only relevant to definition regions
+            undecorated_type: _,
 
             // Builder only state
             legacy_typevar_binding_context: _,

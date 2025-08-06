@@ -9,6 +9,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
+use crate::types::infer::infer_definition_types;
 use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -35,7 +36,9 @@ fn enclosing_generic_contexts<'db>(
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
-                binding_type(db, index.expect_single_definition(function.node(module)))
+                infer_definition_types(db, index.expect_single_definition(function.node(module)))
+                    .undecorated_type()
+                    .expect("function should have undecorated type")
                     .into_function_literal()?
                     .signature(db)
                     .iter()
