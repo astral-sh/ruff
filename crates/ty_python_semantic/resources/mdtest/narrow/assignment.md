@@ -75,7 +75,7 @@ class _:
 
     if cond():
         a = A()
-    reveal_type(a.x)  # revealed: int | None
+    reveal_type(a.x)  # revealed: int | None | Unknown
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
