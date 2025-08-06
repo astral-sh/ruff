@@ -21,14 +21,15 @@ invalid-syntax: Expected ')', found newline
 15 |     def method():
    |
 
-E30_syntax_error.py:18:1: E305 Expected 2 blank lines after class or function definition, found (1)
+E305 Expected 2 blank lines after class or function definition, found (1)
+  --> E30_syntax_error.py:18:1
    |
 16 |         pass
 17 |
 18 | foo = Foo(
-   | ^^^ E305
+   | ^^^
    |
-   = help: Add missing blank line(s)
+help: Add missing blank line(s)
 
 invalid-syntax: Expected ')', found newline
   --> E30_syntax_error.py:18:11

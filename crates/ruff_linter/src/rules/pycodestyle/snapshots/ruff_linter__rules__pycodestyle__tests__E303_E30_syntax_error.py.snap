@@ -11,14 +11,15 @@ invalid-syntax: Expected ']', found '('
 5 |     pass
   |
 
-E30_syntax_error.py:12:1: E303 Too many blank lines (3)
+E303 Too many blank lines (3)
+  --> E30_syntax_error.py:12:1
    |
 12 | class Foo:
-   | ^^^^^ E303
+   | ^^^^^
 13 |     def __init__(
 14 |         pass
    |
-   = help: Remove extraneous blank line(s)
+help: Remove extraneous blank line(s)
 
 invalid-syntax: Expected ')', found newline
   --> E30_syntax_error.py:13:18

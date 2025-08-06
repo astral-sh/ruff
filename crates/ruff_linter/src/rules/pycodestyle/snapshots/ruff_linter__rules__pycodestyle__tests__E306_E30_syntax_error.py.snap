@@ -39,12 +39,13 @@ invalid-syntax: Expected ')', found newline
 23 |         pass
    |
 
-E30_syntax_error.py:24:5: E306 Expected 1 blank line before a nested definition, found 0
+E306 Expected 1 blank line before a nested definition, found 0
+  --> E30_syntax_error.py:24:5
    |
 22 |     def nested1():
 23 |         pass
 24 |     def nested2():
-   |     ^^^ E306
+   |     ^^^
 25 |         pass
    |
-   = help: Add missing blank line
+help: Add missing blank line

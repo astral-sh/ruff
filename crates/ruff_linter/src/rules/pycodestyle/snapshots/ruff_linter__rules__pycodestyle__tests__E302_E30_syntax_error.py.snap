@@ -11,15 +11,16 @@ invalid-syntax: Expected ']', found '('
 5 |     pass
   |
 
-E30_syntax_error.py:7:1: E302 Expected 2 blank lines, found 1
+E302 Expected 2 blank lines, found 1
+ --> E30_syntax_error.py:7:1
   |
 5 |     pass
 6 |
 7 | def bar():
-  | ^^^ E302
+  | ^^^
 8 |     pass
   |
-  = help: Add missing blank line(s)
+help: Add missing blank line(s)
 
 invalid-syntax: Expected ')', found newline
   --> E30_syntax_error.py:13:18

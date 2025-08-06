@@ -12,12 +12,13 @@ invalid-syntax: Expected an indented block after `if` statement
 11 | print()
    |
 
-E11.py:12:1: E113 Unexpected indentation
+E113 Unexpected indentation
+  --> E11.py:12:1
    |
 10 | #: E113
 11 | print()
 12 |     print()
-   | ^^^^ E113
+   | ^^^^
 13 | #: E114 E116
 14 | mimetype = 'application/x-directory'
    |

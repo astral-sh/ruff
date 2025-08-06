@@ -21,15 +21,16 @@ invalid-syntax: Expected ')', found newline
 15 |     def method():
    |
 
-E30_syntax_error.py:15:5: E301 Expected 1 blank line, found 0
+E301 Expected 1 blank line, found 0
+  --> E30_syntax_error.py:15:5
    |
 13 |     def __init__(
 14 |         pass
 15 |     def method():
-   |     ^^^ E301
+   |     ^^^
 16 |         pass
    |
-   = help: Add missing blank line
+help: Add missing blank line
 
 invalid-syntax: Expected ')', found newline
   --> E30_syntax_error.py:18:11
