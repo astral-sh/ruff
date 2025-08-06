@@ -1,45 +1,6 @@
-use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex};
-
 use crate::lint::{LintRegistry, RuleSelection};
-use crate::semantic_index::scope::FileScopeId;
 use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
-use rustc_hash::FxHasher;
-
-/// A stack of the currently inferred function scopes.
-/// Used to monitor type inference for recursive functions to ensure they do not diverge.
-/// This call stack is currently only used to infer functions with unspecified return types ​​and does not faithfully represent the actual call stack.
-#[derive(Debug, Default, Clone)]
-pub struct CallStack(Arc<Mutex<Vec<(File, FileScopeId)>>>);
-
-impl CallStack {
-    pub fn new() -> Self {
-        CallStack(Arc::new(Mutex::new(Vec::new())))
-    }
-
-    pub fn push(&self, file: File, scope: FileScopeId) {
-        self.0.lock().unwrap().push((file, scope));
-    }
-
-    pub fn pop(&self) -> Option<(File, FileScopeId)> {
-        self.0.lock().unwrap().pop()
-    }
-
-    pub fn contains(&self, file: File, scope: FileScopeId) -> bool {
-        self.0
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|(f, s)| f == &file && s == &scope)
-    }
-
-    pub fn hash_value(&self) -> u64 {
-        let mut hasher = FxHasher::default();
-        self.0.lock().unwrap().hash(&mut hasher);
-        hasher.finish()
-    }
-}
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
@@ -51,8 +12,6 @@ pub trait Db: SourceDb {
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
-
-    fn call_stack(&self) -> &CallStack;
 }
 
 #[cfg(test)]
@@ -65,7 +24,7 @@ pub(crate) mod tests {
         default_lint_registry,
     };
 
-    use super::{CallStack, Db};
+    use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
     use ruff_db::Db as SourceDb;
@@ -87,7 +46,6 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         events: Events,
         rule_selection: Arc<RuleSelection>,
-        call_stack: CallStack,
     }
 
     impl TestDb {
@@ -107,7 +65,6 @@ pub(crate) mod tests {
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
-                call_stack: CallStack::default(),
             }
         }
 
@@ -168,10 +125,6 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             default_lint_registry()
-        }
-
-        fn call_stack(&self) -> &CallStack {
-            &self.call_stack
         }
     }
 

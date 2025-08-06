@@ -9,9 +9,8 @@ use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    CallStack, Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
-    default_lint_registry,
+    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -27,7 +26,6 @@ pub struct ModuleDb {
     files: Files,
     system: OsSystem,
     rule_selection: Arc<RuleSelection>,
-    call_stack: CallStack,
 }
 
 impl ModuleDb {
@@ -99,10 +97,6 @@ impl Db for ModuleDb {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
-    }
-
-    fn call_stack(&self) -> &CallStack {
-        &self.call_stack
     }
 }
 

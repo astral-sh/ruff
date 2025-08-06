@@ -54,7 +54,7 @@ pub use crate::types::ide_support::{
     definitions_for_attribute, definitions_for_imported_symbol, definitions_for_keyword_argument,
     definitions_for_name,
 };
-use crate::types::infer::{infer_scope_types_with_call_stack, infer_unpack_types};
+use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
@@ -7801,13 +7801,7 @@ impl<'db> BoundMethodType<'db> {
             .literal(db)
             .last_definition(db)
             .body_scope(db);
-        if db
-            .call_stack()
-            .contains(scope.file(db), scope.file_scope_id(db))
-        {
-            return Type::unknown();
-        }
-        let inference = infer_scope_types_with_call_stack(db, scope, db.call_stack().hash_value());
+        let inference = infer_scope_types(db, scope);
         inference.infer_return_type(db, Some(self))
     }
 

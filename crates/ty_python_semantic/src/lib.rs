@@ -4,7 +4,7 @@ use rustc_hash::FxHasher;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
-pub use db::{CallStack, Db};
+pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{
     Module, SearchPathValidationError, SearchPaths, resolve_module, resolve_real_module,

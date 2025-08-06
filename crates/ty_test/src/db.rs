@@ -12,7 +12,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{CallStack, Db as SemanticDb, Program, default_lint_registry};
+use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
 #[salsa::db]
 #[derive(Clone)]
@@ -22,7 +22,6 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
-    call_stack: CallStack,
 }
 
 impl Db {
@@ -39,7 +38,6 @@ impl Db {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: Arc::new(rule_selection),
-            call_stack: CallStack::default(),
         }
     }
 
@@ -89,10 +87,6 @@ impl SemanticDb for Db {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
-    }
-
-    fn call_stack(&self) -> &CallStack {
-        &self.call_stack
     }
 }
 
