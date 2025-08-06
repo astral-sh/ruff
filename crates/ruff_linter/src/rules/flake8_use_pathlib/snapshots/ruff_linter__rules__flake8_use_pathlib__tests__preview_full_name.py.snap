@@ -785,7 +785,7 @@ full_name.py:123:1: PTH103 [*] `os.makedirs()` should be replaced by `Path.mkdir
 121 122 | os.makedirs("name", 0o777, exist_ok=False)
 122 123 | 
 123     |-os.makedirs("name", 0o777, False)
-    124 |+pathlib.Path("name").mkdir(mode=0o777, exist_ok=False, parents=True)
+    124 |+pathlib.Path("name").mkdir(0o777, True, False)
 124 125 | 
 125 126 | os.makedirs(name="name", mode=0o777, exist_ok=False)
 126 127 | 

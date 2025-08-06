@@ -113,7 +113,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
 
         let mkdir_args = if call.arguments.args.len() == 3 && call.arguments.keywords.is_empty() {
             format!(
-                "mode={}, exist_ok={}, parents=True",
+                "{}, True, {}",
                 checker.locator().slice(call.arguments.args[1].range()),
                 checker.locator().slice(call.arguments.args[2].range()),
             )
