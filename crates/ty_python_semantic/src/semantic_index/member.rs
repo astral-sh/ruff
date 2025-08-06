@@ -150,9 +150,9 @@ impl get_size2::GetSize for MemberFlags {}
 /// Uses a compact representation where the entire expression is stored as a single path.
 /// For example, `foo.bar[0]["baz"]` is stored as:
 /// - path: `foobar0baz`
-/// - segments: metadata describing each segment's type and length (stored as relative offset)
+/// - segments: stores where each segment starts and its kind (attribute, int subscript, string subscript)
 ///
-/// The symbol name length is computed by subtracting all segment lengths from the total path length.
+/// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct MemberExpr {
     /// The entire path as a single Name
@@ -507,7 +507,7 @@ enum Segments {
 }
 
 static_assertions::assert_eq_size!(SmallSegments, u64);
-static_assertions::assert_eq_size!(Segments, [usize; 2]);
+static_assertions::assert_eq_size!(Segments, [u64; 2]);
 
 impl Segments {
     fn from_vec(segments: SmallVec<[SegmentInfo; 8]>) -> Self {
@@ -706,7 +706,10 @@ impl SmallSegments {
         Some(Self(packed))
     }
 
-    #[allow(clippy::cast_possible_truncation)] // Safe: INLINE_COUNT_MASK ensures value is at most 7
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "INLINE_COUNT_MASK ensures value is at most 7"
+    )]
     const fn len(self) -> usize {
         // Add 1 because we store count minus 1
         ((self.0 & INLINE_COUNT_MASK) + 1) as usize
@@ -720,7 +723,8 @@ impl SmallSegments {
         }
     }
 
-    /// Returns a new `SmallSegments` with the last segment removed, or None if only one segment remains
+    /// Returns the parent member expression, e.g. `x.b` from `x.b.c`, or `None` if the parent is
+    /// the `symbol` itself (e, g. parent of `x.a` is just `x`).
     const fn parent(self) -> Option<Self> {
         let len = self.len();
         if len <= 1 {
