@@ -31,12 +31,14 @@ fn enclosing_generic_contexts<'db>(
         .ancestor_scopes(scope)
         .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
             NodeWithScopeKind::Class(class) => {
-                binding_type(db, index.expect_single_definition(class.node(module)))
+                let definition = index.expect_single_definition(class.node(module));
+                binding_type(db, definition)
                     .into_class_literal()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {
-                infer_definition_types(db, index.expect_single_definition(function.node(module)))
+                let definition = index.expect_single_definition(function.node(module));
+                infer_definition_types(db, definition)
                     .undecorated_type()
                     .expect("function should have undecorated type")
                     .into_function_literal()?
@@ -50,33 +52,33 @@ fn enclosing_generic_contexts<'db>(
         })
 }
 
-/// Binds an unbound legacy typevar.
+/// Binds an unbound typevar.
 ///
-/// When a legacy typevar is first created, we will have a [`TypeVarInstance`] which does not have
-/// an associated binding context. When the typevar is used in a generic class or function, we
-/// "bind" it, adding the [`Definition`] of the generic class or function as its "binding context".
+/// When a typevar is first created, we will have a [`TypeVarInstance`] which does not have an
+/// associated binding context. When the typevar is used in a generic class or function, we "bind"
+/// it, adding the [`Definition`] of the generic class or function as its "binding context".
 ///
-/// When an expression resolves to a legacy typevar, our inferred type will refer to the unbound
+/// When an expression resolves to a typevar, our inferred type will refer to the unbound
 /// [`TypeVarInstance`] from when the typevar was first created. This function walks the scopes
 /// that enclosing the expression, looking for the innermost binding context that binds the
 /// typevar.
 ///
 /// If no enclosing scope has already bound the typevar, we might be in a syntactic position that
-/// is about to bind it (indicated by a non-`None` `legacy_typevar_binding_context`), in which case
-/// we bind the typevar with that new binding context.
-pub(crate) fn bind_legacy_typevar<'db>(
+/// is about to bind it (indicated by a non-`None` `typevar_binding_context`), in which case we
+/// bind the typevar with that new binding context.
+pub(crate) fn bind_typevar<'db>(
     db: &'db dyn Db,
     module: &ParsedModuleRef,
     index: &SemanticIndex<'db>,
     containing_scope: FileScopeId,
-    legacy_typevar_binding_context: Option<Definition<'db>>,
+    typevar_binding_context: Option<Definition<'db>>,
     typevar: TypeVarInstance<'db>,
 ) -> Option<TypeVarInstance<'db>> {
     enclosing_generic_contexts(db, module, index, containing_scope)
-        .find_map(|enclosing_context| enclosing_context.binds_legacy_typevar(db, typevar))
+        .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
-            legacy_typevar_binding_context.map(|legacy_typevar_binding_context| {
-                typevar.with_binding_context(db, legacy_typevar_binding_context)
+            typevar_binding_context.map(|typevar_binding_context| {
+                typevar.with_binding_context(db, typevar_binding_context)
             })
         })
 }
@@ -271,19 +273,15 @@ impl<'db> GenericContext<'db> {
         self.variables(db).is_subset(other.variables(db))
     }
 
-    pub(crate) fn binds_legacy_typevar(
+    pub(crate) fn binds_typevar(
         self,
         db: &'db dyn Db,
         typevar: TypeVarInstance<'db>,
     ) -> Option<TypeVarInstance<'db>> {
-        assert!(typevar.is_legacy(db) || typevar.is_implicit(db));
         let typevar_def = typevar.definition(db);
         self.variables(db)
             .iter()
-            .find(|self_typevar| {
-                (self_typevar.is_legacy(db) || self_typevar.is_implicit(db))
-                    && self_typevar.definition(db) == typevar_def
-            })
+            .find(|self_typevar| self_typevar.definition(db) == typevar_def)
             .copied()
     }
 

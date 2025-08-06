@@ -47,8 +47,8 @@ use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    GenericContext, PartialSpecialization, Specialization, bind_legacy_typevar,
-    walk_generic_context, walk_partial_specialization, walk_specialization,
+    GenericContext, PartialSpecialization, Specialization, bind_typevar, walk_generic_context,
+    walk_partial_specialization, walk_specialization,
 };
 pub use crate::types::ide_support::{
     CallSignatureDetails, Member, all_members, call_signature_details, definition_kind_for_name,
@@ -5269,13 +5269,13 @@ impl<'db> Type<'db> {
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
     ///
-    /// The `scope_id` and `legacy_typevar_binding_context` arguments must always come from the file we are currently inferring, so
+    /// The `scope_id` and `typevar_binding_context` arguments must always come from the file we are currently inferring, so
     /// as to avoid cross-module AST dependency.
     pub(crate) fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
-        legacy_typevar_binding_context: Option<Definition<'db>>,
+        typevar_binding_context: Option<Definition<'db>>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -5343,7 +5343,20 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
-                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
+                KnownInstanceType::TypeVar(typevar) => {
+                    let module = parsed_module(db, scope_id.file(db)).load(db);
+                    let index = semantic_index(db, scope_id.file(db));
+                    let typevar = bind_typevar(
+                        db,
+                        &module,
+                        index,
+                        scope_id.file_scope_id(db),
+                        typevar_binding_context,
+                        *typevar,
+                    )
+                    .unwrap_or(*typevar);
+                    Ok(Type::TypeVar(typevar))
+                }
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
                     fallback_type: Type::unknown(),
@@ -5414,12 +5427,12 @@ impl<'db> Type<'db> {
                         None,
                         TypeVarKind::Implicit,
                     );
-                    let typevar = bind_legacy_typevar(
+                    let typevar = bind_typevar(
                         db,
                         &module,
                         index,
                         scope_id.file_scope_id(db),
-                        legacy_typevar_binding_context,
+                        typevar_binding_context,
                         typevar,
                     )
                     .unwrap_or(typevar);
@@ -5498,7 +5511,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id, legacy_typevar_binding_context) {
+                    match element.in_type_expression(db, scope_id, typevar_binding_context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,

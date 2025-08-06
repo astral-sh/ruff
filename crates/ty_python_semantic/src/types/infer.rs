@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_legacy_typevar};
+use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -816,8 +816,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
     called_functions: FxHashSet<FunctionType<'db>>,
 
-    /// Whether we are in a context that binds unbound legacy typevars.
-    legacy_typevar_binding_context: Option<Definition<'db>>,
+    /// Whether we are in a context that binds unbound typevars.
+    typevar_binding_context: Option<Definition<'db>>,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -866,7 +866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
-            legacy_typevar_binding_context: None,
+            typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_fallback: false,
@@ -1024,13 +1024,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node(self.module())),
             NodeWithScopeKind::Class(class) => self.infer_class_body(class.node(self.module())),
             NodeWithScopeKind::ClassTypeParameters(class) => {
-                self.infer_class_type_params(class.node(self.module()));
+                self.infer_class_type_params(class.node(self.module()), scope);
             }
             NodeWithScopeKind::FunctionTypeParameters(function) => {
-                self.infer_function_type_params(function.node(self.module()));
+                self.infer_function_type_params(function.node(self.module()), scope);
             }
             NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
-                self.infer_type_alias_type_params(type_alias.node(self.module()));
+                self.infer_type_alias_type_params(type_alias.node(self.module()), scope);
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
                 self.infer_type_alias(type_alias.node(self.module()));
@@ -2236,18 +2236,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(&module.body);
     }
 
-    fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
+    fn infer_class_type_params(&mut self, class: &ast::StmtClassDef, scope: ScopeId) {
         let type_params = class
             .type_params
             .as_deref()
             .expect("class type params scope without type params");
 
+        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
+        // scope should have a child containing the appropriate definition. Find that scope and use
+        // its definition as the binding context.
+        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
+        let binding_context = child_scopes
+            .filter_map(|(_, binding_scope)| match binding_scope.node() {
+                NodeWithScopeKind::Class(class) => {
+                    Some(DefinitionNodeKey::from(class.node(self.context.module())))
+                }
+                _ => None,
+            })
+            .map(|key| self.index.expect_single_definition(key))
+            .next();
+
+        let previous_typevar_binding_context =
+            std::mem::replace(&mut self.typevar_binding_context, binding_context);
+
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            // Note: We do not install a new `legacy_typevar_binding_context`; since this class has
-            // PEP 695 typevars, it should not also bind any legacy typevars via inheriting from
-            // `typing.Generic` or `typing.Protocol`.
             let mut call_arguments =
                 CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value);
@@ -2257,36 +2271,69 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
         }
+
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
         self.infer_body(&class.body);
     }
 
-    fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
+    fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef, scope: ScopeId) {
         let type_params = function
             .type_params
             .as_deref()
             .expect("function type params scope without type params");
 
-        // Note: We do not install a new `legacy_typevar_binding_context`; since this function has
-        // PEP 695 typevars, it should not also bind any legacy typevars by referencing them in its
-        // parameter or return type annotations.
+        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
+        // scope should have a child containing the appropriate definition. Find that scope and use
+        // its definition as the binding context.
+        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
+        let binding_context = child_scopes
+            .filter_map(|(_, binding_scope)| match binding_scope.node() {
+                NodeWithScopeKind::Function(function) => Some(DefinitionNodeKey::from(
+                    function.node(self.context.module()),
+                )),
+                _ => None,
+            })
+            .map(|key| self.index.expect_single_definition(key))
+            .next();
+
+        let previous_typevar_binding_context =
+            std::mem::replace(&mut self.typevar_binding_context, binding_context);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::None,
         );
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
+    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias, scope: ScopeId) {
         let type_params = type_alias
             .type_params
             .as_ref()
             .expect("type alias type params scope without type params");
 
+        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
+        // scope should have a child containing the appropriate definition. Find that scope and use
+        // its definition as the binding context.
+        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
+        let binding_context = child_scopes
+            .filter_map(|(_, binding_scope)| match binding_scope.node() {
+                NodeWithScopeKind::TypeAlias(alias) => {
+                    Some(DefinitionNodeKey::from(alias.node(self.context.module())))
+                }
+                _ => None,
+            })
+            .map(|key| self.index.expect_single_definition(key))
+            .next();
+
+        let previous_typevar_binding_context =
+            std::mem::replace(&mut self.typevar_binding_context, binding_context);
         self.infer_type_parameters(type_params);
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
@@ -2634,14 +2681,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if self.defer_annotations() {
                 self.deferred.insert(definition);
             } else {
-                let previous_legacy_typevar_binding_context =
-                    self.legacy_typevar_binding_context.replace(definition);
+                let previous_typevar_binding_context =
+                    self.typevar_binding_context.replace(definition);
                 self.infer_return_type_annotation(
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
                 self.infer_parameters(parameters);
-                self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
 
@@ -3054,12 +3101,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
                 self.deferred.insert(definition);
             } else {
-                let previous_legacy_typevar_binding_context =
-                    self.legacy_typevar_binding_context.replace(definition);
+                let previous_typevar_binding_context =
+                    self.typevar_binding_context.replace(definition);
                 for base in class_node.bases() {
                     self.infer_expression(base);
                 }
-                self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
     }
@@ -3069,23 +3116,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
-        let previous_legacy_typevar_binding_context =
-            self.legacy_typevar_binding_context.replace(definition);
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
         self.infer_parameters(function.parameters.as_ref());
-        self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
-        let previous_legacy_typevar_binding_context =
-            self.legacy_typevar_binding_context.replace(definition);
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         for base in class.bases() {
             self.infer_expression(base);
         }
-        self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_type_alias_definition(
@@ -3394,27 +3439,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default,
         } = node;
 
-        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
-        // scope should have a child containing the class, function, or type alias definition. Find
-        // that scope and use its definition as the binding context.
-        let typevar_scope = definition.file_scope(self.db());
-        let child_scopes = self.index.child_scopes(typevar_scope);
-        let binding_context = child_scopes
-            .filter_map(|(_, binding_scope)| match binding_scope.node() {
-                NodeWithScopeKind::Class(class) => {
-                    Some(DefinitionNodeKey::from(class.node(self.context.module())))
-                }
-                NodeWithScopeKind::Function(function) => Some(DefinitionNodeKey::from(
-                    function.node(self.context.module()),
-                )),
-                NodeWithScopeKind::TypeAlias(alias) => {
-                    Some(DefinitionNodeKey::from(alias.node(self.context.module())))
-                }
-                _ => None,
-            })
-            .map(|key| self.index.expect_single_definition(key))
-            .next();
-
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
@@ -3459,7 +3483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             &name.id,
             Some(definition),
-            binding_context,
+            None,
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
@@ -6439,43 +6463,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
         resolved
-            .map_type(|ty| match ty {
-                // If the expression resolves to a legacy typevar, we will have the TypeVarInstance
-                // that was created when the typevar was created, which will not have an associated
-                // binding context. If this expression appears inside of a generic context that
-                // binds that typevar, we need to update the TypeVarInstance to include that
-                // binding context. To do that, we walk the enclosing scopes, looking for the
-                // nearest generic context that binds the typevar.
-                //
-                // If the legacy typevar is still unbound after that search, and we are in a
-                // context that binds unbound legacy typevars (i.e., the signature of a generic
-                // function), bind it with that context.
-                Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => bind_legacy_typevar(
-                    self.db(),
-                    self.context.module(),
-                    self.index,
-                    self.scope().file_scope_id(self.db()),
-                    self.legacy_typevar_binding_context,
-                    typevar,
-                )
-                .map(Type::TypeVar)
-                .unwrap_or(ty),
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                    if typevar.is_legacy(self.db()) =>
-                {
-                    bind_legacy_typevar(
-                        self.db(),
-                        self.context.module(),
-                        self.index,
-                        self.scope().file_scope_id(self.db()),
-                        self.legacy_typevar_binding_context,
-                        typevar,
-                    )
-                    .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
-                    .unwrap_or(ty)
-                }
-                _ => ty,
-            })
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
@@ -9137,7 +9124,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
 
             // builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9198,7 +9185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type,
 
             // builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9268,7 +9255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
 
             // Builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9377,7 +9364,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .in_type_expression(
                                 self.db(),
                                 self.scope(),
-                                self.legacy_typevar_binding_context,
+                                self.typevar_binding_context,
                             )
                             .unwrap_or_else(|error| {
                                 error.into_fallback_type(
@@ -9597,11 +9584,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.legacy_typevar_binding_context,
-                    )
+                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -9618,11 +9601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.legacy_typevar_binding_context,
-                    )
+                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -10311,7 +10290,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .in_type_expression(
                                 self.db(),
                                 self.scope(),
-                                self.legacy_typevar_binding_context,
+                                self.typevar_binding_context,
                             )
                             .unwrap_or(Type::unknown())
                     }
