@@ -44,3 +44,8 @@ def f():
     def g():
         nonlocal x
         x = 2
+
+# OK
+class A:
+    def method(self):
+        nonlocal __class__

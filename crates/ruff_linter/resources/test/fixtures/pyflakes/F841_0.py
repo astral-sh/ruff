@@ -151,3 +151,26 @@ def f():
         pass
     except Exception as _:
         pass
+
+# OK
+class A:
+    def set_class(self, cls):
+        __class__ = cls
+
+# OK
+class A:
+    class B:
+        def set_class(self, cls):
+            __class__ = cls
+# OK
+class A:
+    __class__ = 1
+
+
+# OK
+class A:
+    def foo():
+        class B:
+            print(__class__)
+            def set_class(self, cls):
+                __class__ = cls
