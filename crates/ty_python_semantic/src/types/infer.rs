@@ -62,7 +62,7 @@ use super::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{ClassBase, NominalInstanceType, add_inferred_python_version_hint_to_diagnostic};
+use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
@@ -1375,7 +1375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     };
 
-                    if !instance.class.is_known(self.db(), KnownClass::KwOnly) {
+                    if !instance.class().is_known(self.db(), KnownClass::KwOnly) {
                         continue;
                     }
 
@@ -1772,7 +1772,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::NominalInstance(instance)
                 if matches!(
-                    instance.class.known(self.db()),
+                    instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -3969,7 +3969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Super instances do not allow attribute assignment
-            Type::NominalInstance(instance) if instance.class.is_known(db, KnownClass::Super) => {
+            Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -4629,7 +4629,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Handle various singletons.
         if let Type::NominalInstance(instance) = declared.inner_type() {
-            if instance.class.is_known(self.db(), KnownClass::SpecialForm) {
+            if instance
+                .class()
+                .is_known(self.db(), KnownClass::SpecialForm)
+            {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(special_form) = SpecialFormType::try_from_file_and_name(
                         self.db(),
@@ -8211,11 +8214,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (
-                Type::NominalInstance(NominalInstanceType { class: class1, .. }),
-                Type::NominalInstance(NominalInstanceType { class: class2, .. }),
-            ) => class1
+                Type::NominalInstance(nominal1),
+                Type::NominalInstance(nominal2),
+            ) => nominal1.class()
                 .tuple_spec(self.db())
-                .and_then(|lhs_tuple| Some((lhs_tuple, class2.tuple_spec(self.db())?)))
+                .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.class().tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
                         |op| self.infer_tuple_rich_comparison(&lhs_tuple, op, &rhs_tuple, range);
@@ -8676,10 +8679,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-                Type::IntLiteral(i64_int),
-            ) => class
+            (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => nominal
+                .class()
                 .tuple_spec(db)
                 .and_then(|tuple| Some((tuple, i32::try_from(i64_int).ok()?)))
                 .map(|(tuple, i32_int)| {
@@ -8698,16 +8699,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (
-                Type::NominalInstance(NominalInstanceType {
-                    class: maybe_tuple, ..
-                }),
-                Type::NominalInstance(NominalInstanceType {
-                    class: maybe_slice, ..
-                }),
-            ) => maybe_tuple
+                Type::NominalInstance(maybe_tuple_nominal),
+                Type::NominalInstance(maybe_slice_nominal),
+            ) => maybe_tuple_nominal
+                .class()
                 .tuple_spec(db)
                 .as_deref()
-                .and_then(|tuple_spec| Some((tuple_spec, maybe_slice.slice_literal(db)?)))
+                .and_then(|tuple_spec| {
+                    Some((tuple_spec, maybe_slice_nominal.class().slice_literal(db)?))
+                })
                 .map(|(tuple, SliceLiteral { start, stop, step })| match tuple {
                     TupleSpec::Fixed(tuple) => {
                         if let Ok(new_elements) = tuple.py_slice(db, start, stop, step) {
@@ -8744,10 +8744,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (
-                Type::StringLiteral(literal_ty),
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-            ) => class
+            (Type::StringLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
+                .class()
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -8784,10 +8782,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (
-                Type::BytesLiteral(literal_ty),
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-            ) => class
+            (Type::BytesLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
+                .class()
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -8811,15 +8807,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ))
             }
 
-            (
-                Type::NominalInstance(NominalInstanceType { class, .. }),
-                Type::BooleanLiteral(bool),
-            ) if class.tuple_spec(db).is_some() => Some(self.infer_subscript_expression_types(
-                subscript,
-                value_ty,
-                Type::IntLiteral(i64::from(bool)),
-                expr_context,
-            )),
+            (Type::NominalInstance(nominal), Type::BooleanLiteral(bool))
+                if nominal.class().tuple_spec(db).is_some() =>
+            {
+                Some(self.infer_subscript_expression_types(
+                    subscript,
+                    value_ty,
+                    Type::IntLiteral(i64::from(bool)),
+                    expr_context,
+                ))
+            }
 
             (Type::SpecialForm(SpecialFormType::Protocol), typevars) => Some(
                 self.legacy_generic_class_context(
@@ -9047,9 +9044,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .map(|typevar| match typevar {
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
-                Type::NominalInstance(NominalInstanceType { class, .. })
+                Type::NominalInstance(nominal)
                     if matches!(
-                        class.known(self.db()),
+                        nominal.class().known(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
                     ) =>
                 {
@@ -9092,7 +9089,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
             Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
             Some(ty @ Type::NominalInstance(instance))
-                if instance.class.is_known(self.db(), KnownClass::NoneType) =>
+                if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(ty)
             }
@@ -10974,8 +10971,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::Dynamic(DynamicType::TodoPEP695ParamSpec) => {
                         return Some(Parameters::todo());
                     }
-                    Type::NominalInstance(NominalInstanceType { class, .. })
-                        if class.is_known(self.db(), KnownClass::ParamSpec) =>
+                    Type::NominalInstance(nominal)
+                        if nominal.class().is_known(self.db(), KnownClass::ParamSpec) =>
                     {
                         return Some(Parameters::todo());
                     }

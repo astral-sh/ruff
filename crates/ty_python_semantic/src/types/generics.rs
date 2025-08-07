@@ -10,7 +10,7 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
-use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
+use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
@@ -870,12 +870,16 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (
-                Type::NominalInstance(NominalInstanceType { class: class1, .. }),
-                Type::NominalInstance(NominalInstanceType { class: class2, .. })
-            ) if class1.tuple_spec(self.db).is_some() => {
-                if let (Some(formal_tuple), Some(actual_tuple)) = (class1.tuple_spec(self.db), class2.tuple_spec(self.db)) {
-                    let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
+            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2))
+                if nominal1.class().tuple_spec(self.db).is_some() =>
+            {
+                if let (Some(formal_tuple), Some(actual_tuple)) = (
+                    nominal1.class().tuple_spec(self.db),
+                    nominal2.class().tuple_spec(self.db),
+                ) {
+                    let Some(most_precise_length) =
+                        formal_tuple.len().most_precise(actual_tuple.len())
+                    else {
                         return Ok(());
                     };
                     let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
@@ -892,40 +896,42 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (
-                Type::NominalInstance(NominalInstanceType {
-                    class: ClassType::Generic(formal_alias),
-                    ..
-                })
-                // TODO: This will only handle classes that explicit implement a generic protocol
-                // by listing it as a base class. To handle classes that implicitly implement a
-                // generic protocol, we will need to check the types of the protocol members to be
-                // able to infer the specialization of the protocol that the class implements.
-                | Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(ClassType::Generic(formal_alias)),
-                    ..
-                }),
-                Type::NominalInstance(NominalInstanceType {
-                    class: actual_class,
-                    ..
-                }),
-            ) => {
-                let formal_origin = formal_alias.origin(self.db);
-                for base in actual_class.iter_mro(self.db) {
-                    let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
-                        continue;
-                    };
-                    if formal_origin != base_alias.origin(self.db) {
-                        continue;
+            (formal, Type::NominalInstance(actual_nominal)) => {
+                // Extract formal_alias if this is a generic class
+                let formal_alias = match formal {
+                    Type::NominalInstance(formal_nominal) => {
+                        formal_nominal.class().into_generic_alias()
                     }
-                    let formal_specialization = formal_alias.specialization(self.db).types(self.db);
-                    let base_specialization = base_alias.specialization(self.db).types(self.db);
-                    for (formal_ty, base_ty) in
-                        formal_specialization.iter().zip(base_specialization)
-                    {
-                        self.infer(*formal_ty, *base_ty)?;
+                    // TODO: This will only handle classes that explicit implement a generic protocol
+                    // by listing it as a base class. To handle classes that implicitly implement a
+                    // generic protocol, we will need to check the types of the protocol members to be
+                    // able to infer the specialization of the protocol that the class implements.
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(ClassType::Generic(alias)),
+                        ..
+                    }) => Some(alias),
+                    _ => None,
+                };
+
+                if let Some(formal_alias) = formal_alias {
+                    let formal_origin = formal_alias.origin(self.db);
+                    for base in actual_nominal.class().iter_mro(self.db) {
+                        let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                            continue;
+                        };
+                        if formal_origin != base_alias.origin(self.db) {
+                            continue;
+                        }
+                        let formal_specialization =
+                            formal_alias.specialization(self.db).types(self.db);
+                        let base_specialization = base_alias.specialization(self.db).types(self.db);
+                        for (formal_ty, base_ty) in
+                            formal_specialization.iter().zip(base_specialization)
+                        {
+                            self.infer(*formal_ty, *base_ty)?;
+                        }
+                        return Ok(());
                     }
-                    return Ok(());
                 }
             }
 

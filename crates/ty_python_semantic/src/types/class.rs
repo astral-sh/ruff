@@ -24,9 +24,9 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, KnownInstanceType, NominalInstanceType, StringLiteralType, TypeAliasType,
-    TypeMapping, TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, declaration_type, infer_definition_types, todo_type,
+    DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -311,6 +311,13 @@ pub enum ClassType<'db> {
 impl<'db> ClassType<'db> {
     pub(super) const fn is_not_generic(self) -> bool {
         matches!(self, Self::NonGeneric(_))
+    }
+
+    pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
+        match self {
+            Self::NonGeneric(_) => None,
+            Self::Generic(generic) => Some(generic),
+        }
     }
 
     pub(super) fn normalized_impl(
@@ -1958,7 +1965,7 @@ impl<'db> ClassLiteral<'db> {
 
                 if field_ty
                     .into_nominal_instance()
-                    .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
+                    .is_some_and(|instance| instance.class().is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
@@ -4740,7 +4747,7 @@ impl<'db> ClassType<'db> {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
             Type::NominalInstance(instance)
-                if instance.class.is_known(db, KnownClass::NoneType) =>
+                if instance.class().is_known(db, KnownClass::NoneType) =>
             {
                 Some(None)
             }
@@ -4821,7 +4828,8 @@ impl SlotsKind {
 
         match slots_ty {
             // __slots__ = ("a", "b")
-            Type::NominalInstance(NominalInstanceType { class, .. }) => match class
+            Type::NominalInstance(nominal) => match nominal
+                .class()
                 .tuple_spec(db)
                 .and_then(|spec| spec.len().into_fixed_length())
             {

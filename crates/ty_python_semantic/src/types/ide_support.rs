@@ -94,7 +94,7 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class.class_literal(db);
+                let (class_literal, _specialization) = instance.class().class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
             }
 
@@ -207,7 +207,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class.known(db),
+                                    instance.class().known(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple

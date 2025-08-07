@@ -11,9 +11,8 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, NominalInstanceType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
-    infer_expression_types,
+    ClassLiteral, ClassType, IntersectionBuilder, KnownClass, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -226,16 +225,14 @@ impl ClassInfoConstraintFunction {
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
 
-            Type::NominalInstance(NominalInstanceType { class, .. }) => {
-                class.tuple_spec(db).and_then(|tuple| {
-                    UnionType::try_from_elements(
-                        db,
-                        tuple
-                            .all_elements()
-                            .map(|element| self.generate_constraint(db, *element)),
-                    )
-                })
-            }
+            Type::NominalInstance(nominal) => nominal.class().tuple_spec(db).and_then(|tuple| {
+                UnionType::try_from_elements(
+                    db,
+                    tuple
+                        .all_elements()
+                        .map(|element| self.generate_constraint(db, *element)),
+                )
+            }),
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -560,7 +557,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class.is_known(db, KnownClass::Bool) =>
+                        if instance.class().is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -571,11 +568,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class.class_literal(db).0).is_some() =>
+                        if enum_metadata(db, instance.class().class_literal(db).0).is_some() =>
                     {
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class.class_literal(db).0, None)
+                            enum_member_literals(db, instance.class().class_literal(db).0, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -602,7 +599,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class.is_known(self.db, KnownClass::Bool) =>
+                if instance.class().is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))

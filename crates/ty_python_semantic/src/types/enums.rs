@@ -131,13 +131,13 @@ pub(crate) fn enum_metadata<'db>(
                         }
                         // enum.nonmember
                         Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Nonmember) =>
+                            if instance.class().is_known(db, KnownClass::Nonmember) =>
                         {
                             return None;
                         }
                         // enum.member
                         Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Member) =>
+                            if instance.class().is_known(db, KnownClass::Member) =>
                         {
                             ty.member(db, "value")
                                 .place
@@ -146,7 +146,7 @@ pub(crate) fn enum_metadata<'db>(
                         }
                         // enum.auto
                         Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Auto) =>
+                            if instance.class().is_known(db, KnownClass::Auto) =>
                         {
                             auto_counter += 1;
                             Type::IntLiteral(auto_counter)
@@ -203,7 +203,7 @@ pub(crate) fn enum_metadata<'db>(
                 Ok(PlaceAndQualifiers {
                     place: Place::Type(Type::NominalInstance(instance), _),
                     ..
-                }) if instance.class.is_known(db, KnownClass::Member) => {
+                }) if instance.class().is_known(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {
