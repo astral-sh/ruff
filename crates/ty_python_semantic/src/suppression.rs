@@ -402,7 +402,7 @@ impl Suppressions {
             })
     }
 
-    fn iter(&self) -> SuppressionsIter {
+    fn iter(&self) -> SuppressionsIter<'_> {
         self.file.iter().chain(&self.line)
     }
 }

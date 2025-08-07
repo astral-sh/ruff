@@ -286,7 +286,7 @@ impl Display for MessageCodeFrame<'_> {
 /// modify the annotation ranges by inserting 3-byte Unicode replacements
 /// because `annotate-snippets` will account for their actual width when
 /// rendering and displaying the column to the user.
-fn replace_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
+fn replace_unprintable(source: &str, annotation_range: TextRange) -> SourceCode<'_> {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;

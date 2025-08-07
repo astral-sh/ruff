@@ -2,8 +2,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeQualifiers,
+    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers,
     class_base::ClassBase,
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
@@ -250,11 +250,13 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-        self.specialization(db).find_legacy_typevars(db, typevars);
+        self.specialization(db)
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -395,11 +397,12 @@ impl<'db> ClassType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
-            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
+            Self::Generic(generic) => generic.find_legacy_typevars(db, binding_context, typevars),
         }
     }
 
@@ -591,7 +594,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
-    /// or those marked as ClassVars are considered.
+    /// or those marked as `ClassVars` are considered.
     ///
     /// You must provide the `inherited_generic_context` that we should use for the `__new__` or
     /// `__init__` member. This is inherited from the containing class -­but importantly, from the
@@ -1045,7 +1048,11 @@ impl<'db> ClassType<'db> {
                     .place;
 
                 if let Place::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                    new_function.into_bound_method_type(db, self_ty)
+                    Type::Callable(
+                        new_function
+                            .into_bound_method_type(db, self_ty)
+                            .into_callable_type(db),
+                    )
                 } else {
                     // Fallback if no `object.__new__` is found.
                     CallableType::single(
@@ -1143,7 +1150,8 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
+#[expect(clippy::ref_option)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn pep695_generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
@@ -1196,11 +1204,13 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let parsed = parsed_module(db, scope.file(db)).load(db);
+        let file = scope.file(db);
+        let parsed = parsed_module(db, file).load(db);
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            let index = semantic_index(db, file);
+            let definition = index.expect_single_definition(class_def_node);
+            GenericContext::from_type_params(db, index, definition, type_params)
         })
     }
 
@@ -1315,21 +1325,7 @@ impl<'db> ClassLiteral<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(
-                |base_node| match definition_expression_type(db, class_definition, base_node) {
-                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(generic_context)) => {
-                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
-                            generic_context.with_binding_context(db, class_definition),
-                        ))
-                    }
-                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context,
-                    )) => Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context.with_binding_context(db, class_definition),
-                    )),
-                    ty => ty,
-                },
-            )
+            .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
     }
 
@@ -1775,7 +1771,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
-    /// or those marked as ClassVars are considered.
+    /// or those marked as `ClassVars` are considered.
     ///
     /// Returns [`Place::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassLiteral::class_member`] if you require a method that will
@@ -2023,18 +2019,30 @@ impl<'db> ClassLiteral<'db> {
                 None
             }
             (CodeGeneratorKind::TypedDict, "__setitem__") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("value"))),
-                    ]),
-                    Some(Type::none(db)),
-                );
+                let fields = self.fields(db, specialization, field_policy);
 
-                Some(CallableType::function_like(db, signature))
+                // Add (key type, value type) overloads for all TypedDict items ("fields"):
+                let overloads = fields.iter().map(|(name, field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("self")))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_only(Some(Name::new_static("key")))
+                                .with_annotated_type(key_type),
+                            Parameter::positional_only(Some(Name::new_static("value")))
+                                .with_annotated_type(field.declared_ty),
+                        ]),
+                        Some(Type::none(db)),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
                 let fields = self.fields(db, specialization, field_policy);
@@ -3599,7 +3607,7 @@ impl KnownClass {
     /// representing all possible instances of the class.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_instance(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
@@ -3661,7 +3669,7 @@ impl KnownClass {
     fn try_to_class_literal_without_logging(
         self,
         db: &dyn Db,
-    ) -> Result<ClassLiteral, KnownClassLookupError> {
+    ) -> Result<ClassLiteral<'_>, KnownClassLookupError<'_>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
             Place::Type(Type::ClassLiteral(class_literal), Boundness::Bound) => Ok(class_literal),
@@ -3678,7 +3686,7 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral> {
+    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral<'_>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
@@ -3713,7 +3721,7 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
         self.try_to_class_literal(db)
             .map(Type::ClassLiteral)
             .unwrap_or_else(Type::unknown)
@@ -3723,7 +3731,7 @@ impl KnownClass {
     /// representing that class and all possible subclasses of the class.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| SubclassOfType::from(db, class))
@@ -4399,15 +4407,11 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                // A freshly created legacy TypeVar does not have a binding context until it is
-                // used in a base class list, function parameter list, or type alias.
-                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
-                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,

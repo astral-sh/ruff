@@ -36,7 +36,7 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file)
     }
 
-    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
+    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
         resolve_module(self.db, module_name)
     }
 
@@ -233,7 +233,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_, _) => CompletionKind::TypeParameter,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
                 Type::Intersection(intersection) => {
                     intersection.iter_positive(db).find_map(|ty| imp(db, ty))?

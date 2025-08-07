@@ -69,7 +69,8 @@ Assignments to keys are also validated:
 ```py
 # TODO: this should be an error
 alice["name"] = None
-# TODO: this should be an error
+
+# error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 bob["name"] = None
 ```
 
@@ -78,7 +79,8 @@ Assignments to non-existing keys are disallowed:
 ```py
 # TODO: this should be an error
 alice["extra"] = True
-# TODO: this should be an error
+
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 bob["extra"] = True
 ```
 
@@ -138,6 +140,8 @@ reveal_type(alice["name"])  # revealed: Unknown
 
 ## Key-based access
 
+### Reading
+
 ```py
 from typing import TypedDict, Final, Literal, Any
 
@@ -167,6 +171,57 @@ def _(person: Person, literal_key: Literal["age"], union_of_keys: Literal["age",
 
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
+```
+
+### Writing
+
+```py
+from typing_extensions import TypedDict, Final, Literal, LiteralString, Any
+
+class Person(TypedDict):
+    name: str
+    surname: str
+    age: int | None
+
+NAME_FINAL: Final = "name"
+AGE_FINAL: Final[Literal["age"]] = "age"
+
+def _(person: Person):
+    person["name"] = "Alice"
+    person["age"] = 30
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "naem" - did you mean "name"?"
+    person["naem"] = "Alice"
+
+def _(person: Person):
+    person[NAME_FINAL] = "Alice"
+    person[AGE_FINAL] = 30
+
+def _(person: Person, literal_key: Literal["age"]):
+    person[literal_key] = 22
+
+def _(person: Person, union_of_keys: Literal["name", "surname"]):
+    person[union_of_keys] = "unknown"
+
+    # error: [invalid-assignment] "Cannot assign value of type `Literal[1]` to key of type `Literal["name", "surname"]` on TypedDict `Person`"
+    person[union_of_keys] = 1
+
+def _(person: Person, union_of_keys: Literal["name", "age"], unknown_value: Any):
+    person[union_of_keys] = unknown_value
+
+    # error: [invalid-assignment] "Cannot assign value of type `None` to key of type `Literal["name", "age"]` on TypedDict `Person`"
+    person[union_of_keys] = None
+
+def _(person: Person, str_key: str, literalstr_key: LiteralString):
+    # error: [invalid-key] "Cannot access `Person` with a key of type `str`. Only string literals are allowed as keys on TypedDicts."
+    person[str_key] = None
+
+    # error: [invalid-key] "Cannot access `Person` with a key of type `LiteralString`. Only string literals are allowed as keys on TypedDicts."
+    person[literalstr_key] = None
+
+def _(person: Person, unknown_key: Any):
+    # No error here:
+    person[unknown_key] = "Eve"
 ```
 
 ## Methods on `TypedDict`
@@ -409,6 +464,15 @@ def access_invalid_key(person: Person):
 
 def access_with_str_key(person: Person, str_key: str):
     person[str_key]  # error: [invalid-key]
+
+def write_to_key_with_wrong_type(person: Person):
+    person["age"] = "42"  # error: [invalid-assignment]
+
+def write_to_non_existing_key(person: Person):
+    person["naem"] = "Alice"  # error: [invalid-key]
+
+def write_to_non_literal_string_key(person: Person, str_key: str):
+    person[str_key] = "Alice"  # error: [invalid-key]
 ```
 
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

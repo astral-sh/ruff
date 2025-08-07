@@ -18,7 +18,7 @@ impl<'a> NodeRefEqualityKey<'a> {
     }
 
     /// Returns the underlying node.
-    pub(super) fn node(&self) -> AnyNodeRef {
+    pub(super) fn node(&self) -> AnyNodeRef<'_> {
         self.node
     }
 }

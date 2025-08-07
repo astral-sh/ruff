@@ -7,20 +7,20 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
-    WrapperDescriptorKind,
+    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType, WrapperDescriptorKind,
 };
-use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
-    pub fn display(&self, db: &'db dyn Db) -> DisplayType {
+    pub fn display(&self, db: &'db dyn Db) -> DisplayType<'_> {
         DisplayType { ty: self, db }
     }
     fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
@@ -216,11 +216,9 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar, _) => {
-                f.write_str(typevar.name(self.db))?;
-                if let Some(binding_context) = typevar
-                    .binding_context(self.db)
-                    .and_then(|def| def.name(self.db))
+            Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar) => {
+                f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+                if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
                 {
                     write!(f, "@{binding_context}")?;
                 }
@@ -421,6 +419,84 @@ impl Display for DisplayGenericAlias<'_> {
     }
 }
 
+impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayTypeVarInstance<'db> {
+        DisplayTypeVarInstance { typevar: self, db }
+    }
+}
+
+pub(crate) struct DisplayTypeVarInstance<'db> {
+    typevar: TypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.typevar.name(self.db))?;
+        match self.typevar.bound_or_constraints(self.db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                write!(f, ": {}", bound.display(self.db))?;
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                f.write_str(": (")?;
+                for (idx, constraint) in constraints.iter(self.db).enumerate() {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    constraint.display(self.db).fmt(f)?;
+                }
+                f.write_char(')')?;
+            }
+            None => {}
+        }
+        if let Some(default_type) = self.typevar.default_ty(self.db) {
+            write!(f, " = {}", default_type.display(self.db))?;
+        }
+        Ok(())
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayBoundTypeVarInstance<'db> {
+        DisplayBoundTypeVarInstance {
+            bound_typevar: self,
+            db,
+        }
+    }
+}
+
+pub(crate) struct DisplayBoundTypeVarInstance<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayBoundTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let typevar = self.bound_typevar.typevar(self.db);
+        f.write_str(typevar.name(self.db))?;
+        match typevar.bound_or_constraints(self.db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                write!(f, ": {}", bound.display(self.db))?;
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                f.write_str(": (")?;
+                for (idx, constraint) in constraints.iter(self.db).enumerate() {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    constraint.display(self.db).fmt(f)?;
+                }
+                f.write_char(')')?;
+            }
+            None => {}
+        }
+        if let Some(default_type) = self.bound_typevar.default_ty(self.db) {
+            write!(f, " = {}", default_type.display(self.db))?;
+        }
+        Ok(())
+    }
+}
+
 impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         DisplayGenericContext {
@@ -460,7 +536,7 @@ impl Display for DisplayGenericContext<'_> {
 
         let non_implicit_variables: Vec<_> = variables
             .iter()
-            .filter(|var| !var.is_self(self.db))
+            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_self(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {
@@ -468,30 +544,11 @@ impl Display for DisplayGenericContext<'_> {
         }
 
         f.write_char('[')?;
-        for (idx, var) in non_implicit_variables.iter().enumerate() {
+        for (idx, bound_typevar) in non_implicit_variables.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            f.write_str(var.name(self.db))?;
-            match var.bound_or_constraints(self.db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    write!(f, ": {}", bound.display(self.db))?;
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    f.write_str(": (")?;
-                    for (idx, constraint) in constraints.iter(self.db).enumerate() {
-                        if idx > 0 {
-                            f.write_str(", ")?;
-                        }
-                        constraint.display(self.db).fmt(f)?;
-                    }
-                    f.write_char(')')?;
-                }
-                None => {}
-            }
-            if let Some(default_type) = var.default_ty(self.db) {
-                write!(f, " = {}", default_type.display(self.db))?;
-            }
+            bound_typevar.display(self.db).fmt(f)?;
         }
         f.write_char(']')
     }
@@ -505,7 +562,6 @@ impl<'db> Specialization<'db> {
         tuple_specialization: TupleSpecialization,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
             tuple_specialization,
@@ -514,7 +570,6 @@ impl<'db> Specialization<'db> {
 }
 
 pub struct DisplaySpecialization<'db> {
-    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
@@ -523,7 +578,7 @@ pub struct DisplaySpecialization<'db> {
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
-        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+        for (idx, ty) in self.types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
@@ -988,23 +1043,23 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
 }
 
 pub(crate) trait TypeArrayDisplay<'db> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray;
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db>;
 }
 
 impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }

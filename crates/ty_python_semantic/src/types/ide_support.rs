@@ -20,7 +20,7 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
+pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -149,7 +149,8 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
-            | Type::TypeVar(_, _)
+            | Type::NonInferableTypeVar(_)
+            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
@@ -309,12 +310,12 @@ impl<'db> AllMembers<'db> {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
-                    let result = ty.member(db, name.as_str());
+                    let result = ty.member(db, name);
                     let Some(ty) = result.place.ignore_possibly_unbound() else {
                         continue;
                     };
                     self.members.insert(Member {
-                        name: name.clone(),
+                        name: Name::new(name),
                         ty,
                     });
                 }
@@ -517,7 +518,12 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(db, *definition, Some(name_str));
+        let resolved = resolve_definition(
+            db,
+            *definition,
+            Some(name_str),
+            ImportAliasResolution::ResolveAliases,
+        );
         resolved_definitions.extend(resolved);
     }
 
@@ -528,7 +534,14 @@ pub fn definitions_for_name<'db>(
         };
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
-            .flat_map(|def| resolve_definition(db, def, Some(name_str)))
+            .flat_map(|def| {
+                resolve_definition(
+                    db,
+                    def,
+                    Some(name_str),
+                    ImportAliasResolution::ResolveAliases,
+                )
+            })
             .collect()
     } else {
         resolved_definitions
@@ -577,7 +590,12 @@ pub fn definitions_for_attribute<'db>(
             if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
-                    resolved.extend(resolve_definition(db, def, Some(name_str)));
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(name_str),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
                 }
             }
             continue;
@@ -613,7 +631,12 @@ pub fn definitions_for_attribute<'db>(
                 // Check declarations first
                 for decl in use_def.all_reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
@@ -621,7 +644,12 @@ pub fn definitions_for_attribute<'db>(
                 // If no declarations found, check bindings
                 for binding in use_def.all_reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
@@ -640,7 +668,12 @@ pub fn definitions_for_attribute<'db>(
                     // Check declarations first
                     for decl in use_def.all_reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
@@ -648,7 +681,12 @@ pub fn definitions_for_attribute<'db>(
                     // If no declarations found, check bindings
                     for binding in use_def.all_reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
@@ -715,11 +753,15 @@ pub fn definitions_for_keyword_argument<'db>(
 /// Find the definitions for a symbol imported via `from x import y as z` statement.
 /// This function handles the case where the cursor is on the original symbol name `y`.
 /// Returns the same definitions as would be found for the alias `z`.
+/// The `alias_resolution` parameter controls whether symbols imported with local import
+/// aliases (like "x" in "from a import b as x") are resolved to their targets or kept
+/// as aliases.
 pub fn definitions_for_imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     import_node: &ast::StmtImportFrom,
     symbol_name: &str,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
@@ -728,6 +770,7 @@ pub fn definitions_for_imported_symbol<'db>(
         import_node,
         symbol_name,
         &mut visited,
+        alias_resolution,
     )
 }
 
@@ -821,6 +864,15 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
+    /// Controls whether local import aliases should be resolved to their targets or returned as-is.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ImportAliasResolution {
+        /// Resolve import aliases to their original definitions
+        ResolveAliases,
+        /// Keep import aliases as-is, don't resolve to original definitions
+        PreserveAliases,
+    }
+
     use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -865,9 +917,16 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         let mut visited = FxHashSet::default();
-        let resolved = resolve_definition_recursive(db, definition, &mut visited, symbol_name);
+        let resolved = resolve_definition_recursive(
+            db,
+            definition,
+            &mut visited,
+            symbol_name,
+            alias_resolution,
+        );
 
         // If resolution failed, return the original definition as fallback
         if resolved.is_empty() {
@@ -883,6 +942,7 @@ mod resolve_definition {
         definition: Definition<'db>,
         visited: &mut FxHashSet<Definition<'db>>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         // Prevent infinite recursion if there are circular imports
         if visited.contains(&definition) {
@@ -928,7 +988,14 @@ mod resolve_definition {
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
-                resolve_from_import_definitions(db, file, import_node, &alias.name, visited)
+                resolve_from_import_definitions(
+                    db,
+                    file,
+                    import_node,
+                    &alias.name,
+                    visited,
+                    alias_resolution,
+                )
             }
 
             // For star imports, try to resolve to the specific symbol being accessed
@@ -939,7 +1006,14 @@ mod resolve_definition {
 
                 // If we have a symbol name, use the helper to resolve it in the target module
                 if let Some(symbol_name) = symbol_name {
-                    resolve_from_import_definitions(db, file, import_node, symbol_name, visited)
+                    resolve_from_import_definitions(
+                        db,
+                        file,
+                        import_node,
+                        symbol_name,
+                        visited,
+                        alias_resolution,
+                    )
                 } else {
                     // No symbol context provided, can't resolve star import
                     Vec::new()
@@ -958,7 +1032,21 @@ mod resolve_definition {
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
+        if alias_resolution == ImportAliasResolution::PreserveAliases {
+            for alias in &import_node.names {
+                if let Some(asname) = &alias.asname {
+                    if asname.as_str() == symbol_name {
+                        return vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                            file,
+                            asname.range,
+                        ))];
+                    }
+                }
+            }
+        }
+
         // Resolve the target module file
         let module_file = {
             // Resolve the module being imported from (handles both relative and absolute imports)
@@ -987,7 +1075,13 @@ mod resolve_definition {
         } else {
             let mut resolved_definitions = Vec::new();
             for def in definitions_in_module {
-                let resolved = resolve_definition_recursive(db, def, visited, Some(symbol_name));
+                let resolved = resolve_definition_recursive(
+                    db,
+                    def,
+                    visited,
+                    Some(symbol_name),
+                    alias_resolution,
+                );
                 resolved_definitions.extend(resolved);
             }
             resolved_definitions

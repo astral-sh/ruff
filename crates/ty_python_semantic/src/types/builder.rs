@@ -973,11 +973,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let Type::TypeVar(typevar, _) = ty else {
+            let (Type::NonInferableTypeVar(bound_typevar) | Type::TypeVar(bound_typevar)) = ty
+            else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.bound_or_constraints(db)
+                bound_typevar.typevar(db).bound_or_constraints(db)
             else {
                 continue;
             };

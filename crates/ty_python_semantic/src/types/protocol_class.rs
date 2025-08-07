@@ -10,10 +10,11 @@ use crate::semantic_index::place_table;
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
-    semantic_index::use_def_map,
+    semantic_index::{definition::Definition, use_def_map},
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, KnownFunction,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        TypeTransformer,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
     },
@@ -210,10 +211,11 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for data in self.inner(db).values() {
-            data.find_legacy_typevars(db, typevars);
+            data.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -271,9 +273,11 @@ impl<'db> ProtocolMemberData<'db> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        self.kind.find_legacy_typevars(db, typevars);
+        self.kind
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -358,12 +362,19 @@ impl<'db> ProtocolMemberKind<'db> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
-            ProtocolMemberKind::Method(callable) => callable.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Property(property) => property.find_legacy_typevars(db, typevars),
-            ProtocolMemberKind::Other(ty) => ty.find_legacy_typevars(db, typevars),
+            ProtocolMemberKind::Method(callable) => {
+                callable.find_legacy_typevars(db, binding_context, typevars);
+            }
+            ProtocolMemberKind::Property(property) => {
+                property.find_legacy_typevars(db, binding_context, typevars);
+            }
+            ProtocolMemberKind::Other(ty) => {
+                ty.find_legacy_typevars(db, binding_context, typevars);
+            }
         }
     }
 

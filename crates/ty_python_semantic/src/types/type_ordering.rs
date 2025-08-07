@@ -144,11 +144,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::TypeVar(left, left_inferable), Type::TypeVar(right, right_inferable)) => left
-            .cmp(right)
-            .then_with(|| left_inferable.cmp(right_inferable)),
-        (Type::TypeVar(_, _), _) => Ordering::Less,
-        (_, Type::TypeVar(_, _)) => Ordering::Greater,
+        (Type::NonInferableTypeVar(left), Type::NonInferableTypeVar(right)) => left.cmp(right),
+        (Type::NonInferableTypeVar(_), _) => Ordering::Less,
+        (_, Type::NonInferableTypeVar(_)) => Ordering::Greater,
+
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        (Type::TypeVar(_), _) => Ordering::Less,
+        (_, Type::TypeVar(_)) => Ordering::Greater,
 
         (Type::AlwaysTruthy, _) => Ordering::Less,
         (_, Type::AlwaysTruthy) => Ordering::Greater,

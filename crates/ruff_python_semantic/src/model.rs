@@ -2100,7 +2100,7 @@ impl<'a> SemanticModel<'a> {
     /// This method searches all scopes created by a function definition, comparing the
     /// [`TextRange`] of the provided `function_def` with the the range of the function
     /// associated with the scope.
-    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope> {
+    pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {
             let Some(function) = scope.kind.as_function() else {
                 return false;

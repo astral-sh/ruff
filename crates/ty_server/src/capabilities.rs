@@ -1,4 +1,15 @@
-use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind, WorkDoneProgressOptions};
+use lsp_types::{
+    ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
+    DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
+    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
+    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+};
+
+use crate::PositionEncoding;
+use crate::session::GlobalSettings;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -21,6 +32,7 @@ bitflags::bitflags! {
         const FILE_WATCHER_SUPPORT = 1 << 12;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
         const WORKSPACE_CONFIGURATION = 1 << 14;
+        const RENAME_DYNAMIC_REGISTRATION = 1 << 15;
     }
 }
 
@@ -98,6 +110,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for rename capabilities.
+    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
+        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -236,6 +253,13 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
+        }
+
         if client_capabilities
             .window
             .as_ref()
@@ -246,6 +270,90 @@ impl ResolvedClientCapabilities {
         }
 
         flags
+    }
+}
+
+/// Creates the server capabilities based on the resolved client capabilities and resolved global
+/// settings from the initialization options.
+pub(crate) fn server_capabilities(
+    position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: &GlobalSettings,
+) -> ServerCapabilities {
+    let diagnostic_provider =
+        if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
+            // If the client supports dynamic registration, we will register the diagnostic
+            // capabilities dynamically based on the `ty.diagnosticMode` setting.
+            None
+        } else {
+            // Otherwise, we always advertise support for workspace diagnostics.
+            Some(DiagnosticServerCapabilities::Options(
+                server_diagnostic_options(true),
+            ))
+        };
+
+    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
+        // If the client supports dynamic registration, we will register the rename capabilities
+        // dynamically based on the `ty.experimental.rename` setting.
+        None
+    } else {
+        // Otherwise, we check whether user has enabled rename support via the resolved settings
+        // from initialization options.
+        global_settings
+            .is_rename_enabled()
+            .then(|| OneOf::Right(server_rename_options()))
+    };
+
+    ServerCapabilities {
+        position_encoding: Some(position_encoding.into()),
+        diagnostic_provider,
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::INCREMENTAL),
+                ..Default::default()
+            },
+        )),
+        type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        declaration_provider: Some(DeclarationCapability::Simple(true)),
+        references_provider: Some(OneOf::Left(true)),
+        rename_provider,
+        document_highlight_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        signature_help_provider: Some(SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+            retrigger_characters: Some(vec![")".to_string()]),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
+        }),
+        inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
+            InlayHintOptions::default(),
+        ))),
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+                legend: SemanticTokensLegend {
+                    token_types: ty_ide::SemanticTokenType::all()
+                        .iter()
+                        .map(|token_type| token_type.as_lsp_concept().into())
+                        .collect(),
+                    token_modifiers: ty_ide::SemanticTokenModifier::all_names()
+                        .iter()
+                        .map(|&s| s.into())
+                        .collect(),
+                },
+                range: Some(true),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+            },
+        )),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(vec!['.'.to_string()]),
+            ..Default::default()
+        }),
+        selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+        document_symbol_provider: Some(OneOf::Left(true)),
+        workspace_symbol_provider: Some(OneOf::Left(true)),
+        ..Default::default()
     }
 }
 
@@ -260,5 +368,12 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
             // diagnostic mode.
             work_done_progress: Some(workspace_diagnostics),
         },
+    }
+}
+
+pub(crate) fn server_rename_options() -> RenameOptions {
+    RenameOptions {
+        prepare_provider: Some(true),
+        work_done_progress_options: WorkDoneProgressOptions::default(),
     }
 }
