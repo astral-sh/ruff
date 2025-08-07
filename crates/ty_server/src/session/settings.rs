@@ -1,5 +1,6 @@
 use super::options::DiagnosticMode;
 
+use ty_ide::InlayHintSettings;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 
 /// Resolved client settings that are shared across all workspaces.
@@ -33,6 +34,7 @@ pub(crate) struct ExperimentalSettings {
 #[derive(Clone, Default, Debug)]
 pub(crate) struct WorkspaceSettings {
     pub(super) disable_language_services: bool,
+    pub(super) inlay_hints: InlayHintSettings,
     pub(super) overrides: Option<ProjectOptionsOverrides>,
 }
 
@@ -43,5 +45,9 @@ impl WorkspaceSettings {
 
     pub(crate) fn project_options_overrides(&self) -> Option<&ProjectOptionsOverrides> {
         self.overrides.as_ref()
+    }
+
+    pub(crate) fn inlay_hints(&self) -> &InlayHintSettings {
+        &self.inlay_hints
     }
 }
