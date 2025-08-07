@@ -83,9 +83,12 @@ impl<'db> ClassBase<'db> {
                     let fields = subclass.own_fields(db, None);
                     Self::try_from_type(
                         db,
-                        TupleType::from_elements(db, fields.values().map(|field| field.field_ty))?
-                            .to_class_type(db)?
-                            .into(),
+                        TupleType::from_elements(
+                            db,
+                            fields.values().map(|field| field.declared_ty),
+                        )?
+                        .to_class_type(db)
+                        .into(),
                         subclass,
                     )
                 } else {
