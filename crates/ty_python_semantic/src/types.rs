@@ -5770,8 +5770,14 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, bound_typevar).unwrap_or(self)
                 }
+                TypeMapping::BindSelf(self_type) => {
+                    if bound_typevar.typevar(db).is_self(db) {
+                        *self_type
+                    } else {
+                        self
+                    }
+                }
                 TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf(_) |
                 TypeMapping::MarkTypeVarsInferable(_) => self,
             }
 
@@ -5796,21 +5802,14 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
-                TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
-                TypeMapping::PromoteLiterals |
-                TypeMapping::MarkTypeVarsInferable(_)
-                => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
                     Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
                 }
-                TypeMapping::BindSelf(self_type) => {
-                    if typevar.is_self(db) {
-                        *self_type
-                    } else {
-                        self
-                    }
-                }
+                TypeMapping::Specialization(_) |
+                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::PromoteLiterals |
+                TypeMapping::BindSelf(_) |
+                TypeMapping::MarkTypeVarsInferable(_) => self,
             }
 
             Type::FunctionLiteral(function) => {
