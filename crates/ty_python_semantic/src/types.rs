@@ -6954,7 +6954,7 @@ fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn default_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn default_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let binding_context = self.binding_context(db);
         self.typevar(db)
             .default_ty(db)
