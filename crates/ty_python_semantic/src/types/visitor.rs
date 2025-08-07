@@ -242,7 +242,7 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
         NonAtomicType::TypeVar(bound_typevar) => {
-            visitor.visit_bound_type_var_type(db, bound_typevar)
+            visitor.visit_bound_type_var_type(db, bound_typevar);
         }
         NonAtomicType::ProtocolInstance(protocol) => {
             visitor.visit_protocol_instance_type(db, protocol);

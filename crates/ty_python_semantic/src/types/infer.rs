@@ -11511,11 +11511,12 @@ mod tests {
         .unwrap();
 
         let check_typevar = |var: &'static str,
+                             display: &'static str,
                              upper_bound: Option<&'static str>,
                              constraints: Option<&[&'static str]>,
                              default: Option<&'static str>| {
             let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-            assert_eq!(var_ty.display(&db).to_string(), "typing.TypeVar");
+            assert_eq!(var_ty.display(&db).to_string(), display);
 
             let expected_name_ty = format!(r#"Literal["{var}"]"#);
             let name_ty = var_ty.member(&db, "__name__").place.expect_type();
@@ -11549,14 +11550,26 @@ mod tests {
             );
         };
 
-        check_typevar("T", None, None, None);
-        check_typevar("U", Some("A"), None, None);
-        check_typevar("V", None, Some(&["A", "B"]), None);
-        check_typevar("W", None, None, Some("A"));
-        check_typevar("X", Some("A"), None, Some("A1"));
+        check_typevar("T", "typing.TypeVar[T]", None, None, None);
+        check_typevar("U", "typing.TypeVar[U: A]", Some("A"), None, None);
+        check_typevar(
+            "V",
+            "typing.TypeVar[V: (A, B)]",
+            None,
+            Some(&["A", "B"]),
+            None,
+        );
+        check_typevar("W", "typing.TypeVar[W = A]", None, None, Some("A"));
+        check_typevar(
+            "X",
+            "typing.TypeVar[X: A = A1]",
+            Some("A"),
+            None,
+            Some("A1"),
+        );
 
         // a typevar with less than two constraints is treated as unconstrained
-        check_typevar("Y", None, None, None);
+        check_typevar("Y", "typing.TypeVar[Y]", None, None, None);
     }
 
     /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing

@@ -5756,7 +5756,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(bound_typevar.with_binding_context(db, *binding_context))
+                    Type::TypeVar(typevar.with_binding_context(*binding_context))
                 }
             }
 
@@ -5884,10 +5884,11 @@ impl<'db> Type<'db> {
     ) {
         match self {
             Type::TypeVar(bound_typevar) => {
-                if (bound_typevar.is_legacy(db) || bound_typevar.is_implicit(db))
-                    && binding_context.is_none_or(|binding_context| {
-                        bound_typevar.binding_context(db) == Some(binding_context)
-                    })
+                if matches!(
+                    bound_typevar.typevar.kind(db),
+                    TypeVarKind::Legacy | TypeVarKind::Implicit
+                ) && binding_context
+                    .is_none_or(|binding_context| bound_typevar.binding_context == binding_context)
                 {
                     typevars.insert(bound_typevar);
                 }
@@ -6095,7 +6096,7 @@ impl<'db> Type<'db> {
             | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db)?)),
+            Self::TypeVar(BoundTypeVarInstance{typevar,..}) => Some(TypeDefinition::TypeVar(typevar.definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
@@ -6410,7 +6411,9 @@ impl<'db> KnownInstanceType<'db> {
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
-                    KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+                    KnownInstanceType::TypeVar(typevar) => {
+                        write!(f, "typing.TypeVar[{}]", typevar.display(self.db))
+                    }
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
                         f.write_str("dataclasses.Field[")?;
@@ -6875,10 +6878,6 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), TypeVarKind::Legacy)
-    }
-
     pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), TypeVarKind::Implicit)
     }
@@ -6947,7 +6946,7 @@ fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     bound_typevar: BoundTypeVarInstance<'db>,
     visitor: &mut V,
 ) {
-    visitor.visit_type_var_type(db, bound_typevar.typevar, visitor);
+    visitor.visit_type_var_type(db, bound_typevar.typevar);
 }
 
 impl<'db> BoundTypeVarInstance<'db> {

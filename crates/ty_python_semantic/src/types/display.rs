@@ -15,8 +15,8 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
-    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType,
-    WrapperDescriptorKind,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType, WrapperDescriptorKind,
 };
 
 impl<'db> Type<'db> {
@@ -413,6 +413,83 @@ impl Display for DisplayGenericAlias<'_> {
     }
 }
 
+impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayTypeVarInstance<'db> {
+        DisplayTypeVarInstance { typevar: self, db }
+    }
+}
+
+pub(crate) struct DisplayTypeVarInstance<'db> {
+    typevar: TypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.typevar.name(self.db))?;
+        match self.typevar.bound_or_constraints(self.db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                write!(f, ": {}", bound.display(self.db))?;
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                f.write_str(": (")?;
+                for (idx, constraint) in constraints.iter(self.db).enumerate() {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    constraint.display(self.db).fmt(f)?;
+                }
+                f.write_char(')')?;
+            }
+            None => {}
+        }
+        if let Some(default_type) = self.typevar.default_ty(self.db) {
+            write!(f, " = {}", default_type.display(self.db))?;
+        }
+        Ok(())
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayBoundTypeVarInstance<'db> {
+        DisplayBoundTypeVarInstance {
+            bound_typevar: self,
+            db,
+        }
+    }
+}
+
+pub(crate) struct DisplayBoundTypeVarInstance<'db> {
+    bound_typevar: BoundTypeVarInstance<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayBoundTypeVarInstance<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(self.bound_typevar.typevar.name(self.db))?;
+        match self.bound_typevar.typevar.bound_or_constraints(self.db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                write!(f, ": {}", bound.display(self.db))?;
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                f.write_str(": (")?;
+                for (idx, constraint) in constraints.iter(self.db).enumerate() {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    constraint.display(self.db).fmt(f)?;
+                }
+                f.write_char(')')?;
+            }
+            None => {}
+        }
+        if let Some(default_type) = self.bound_typevar.default_ty(self.db) {
+            write!(f, " = {}", default_type.display(self.db))?;
+        }
+        Ok(())
+    }
+}
+
 impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         DisplayGenericContext {
@@ -464,26 +541,7 @@ impl Display for DisplayGenericContext<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            f.write_str(bound_typevar.typevar.name(self.db))?;
-            match bound_typevar.typevar.bound_or_constraints(self.db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    write!(f, ": {}", bound.display(self.db))?;
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    f.write_str(": (")?;
-                    for (idx, constraint) in constraints.iter(self.db).enumerate() {
-                        if idx > 0 {
-                            f.write_str(", ")?;
-                        }
-                        constraint.display(self.db).fmt(f)?;
-                    }
-                    f.write_char(')')?;
-                }
-                None => {}
-            }
-            if let Some(default_type) = bound_typevar.default_ty(self.db) {
-                write!(f, " = {}", default_type.display(self.db))?;
-            }
+            bound_typevar.display(self.db).fmt(f)?;
         }
         f.write_char(']')
     }

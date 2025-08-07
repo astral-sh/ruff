@@ -21,6 +21,7 @@ static_assert(is_subtype_of(Never, Never))
 static_assert(not is_subtype_of(int, Never))
 
 T = TypeVar("T", bound=Never)
+
 def _(t: T):
     static_assert(is_subtype_of(T, Never))
 ```
