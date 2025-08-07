@@ -36,7 +36,7 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file)
     }
 
-    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
+    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
         resolve_module(self.db, module_name)
     }
 

@@ -99,7 +99,7 @@ pub(crate) struct Codes<'a> {
 
 impl Codes<'_> {
     /// Returns an iterator over the [`Code`]s in the `noqa` directive.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Code> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Code<'_>> {
         self.codes.iter()
     }
 
@@ -306,7 +306,7 @@ impl<'a> FileNoqaDirectives<'a> {
         Self(lines)
     }
 
-    pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[FileNoqaDirectiveLine<'_>] {
         &self.0
     }
 
@@ -1106,7 +1106,10 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub(crate) fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine> {
+    pub(crate) fn find_line_with_directive(
+        &self,
+        offset: TextSize,
+    ) -> Option<&NoqaDirectiveLine<'_>> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 
@@ -1139,7 +1142,7 @@ impl<'a> NoqaDirectives<'a> {
             .ok()
     }
 
-    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine] {
+    pub(crate) fn lines(&self) -> &[NoqaDirectiveLine<'_>] {
         &self.inner
     }
 

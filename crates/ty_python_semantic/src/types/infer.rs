@@ -9631,7 +9631,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         expression: &ast::Expr,
         message: std::fmt::Arguments,
-    ) -> Option<LintDiagnosticGuard> {
+    ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
             .report_lint(&INVALID_TYPE_FORM, expression)
             .map(|builder| {
@@ -11231,7 +11231,7 @@ impl StringPartsCollector {
         self.expression = true;
     }
 
-    fn string_type(self, db: &dyn Db) -> Type {
+    fn string_type(self, db: &dyn Db) -> Type<'_> {
         if self.expression {
             KnownClass::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {

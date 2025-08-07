@@ -611,7 +611,7 @@ Checks for exception handlers that catch non-exception classes.
 
 **Why is this bad?**
 
-Catching classes that do not inherit from `BaseException` will raise a TypeError at runtime.
+Catching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.
 
 **Example**
 

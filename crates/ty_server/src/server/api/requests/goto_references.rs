@@ -20,7 +20,7 @@ impl RequestHandler for ReferencesRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for ReferencesRequestHandler {
-    fn document_url(params: &ReferenceParams) -> Cow<Url> {
+    fn document_url(params: &ReferenceParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 

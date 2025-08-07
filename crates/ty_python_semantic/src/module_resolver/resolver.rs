@@ -153,7 +153,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     }
 }
 
-pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
+pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator<'_> {
     Program::get(db).search_paths(db).iter(db)
 }
 

@@ -162,12 +162,12 @@ impl PlaceTable {
     }
 
     /// Iterator over all symbols in this scope.
-    pub(crate) fn symbols(&self) -> std::slice::Iter<Symbol> {
+    pub(crate) fn symbols(&self) -> std::slice::Iter<'_, Symbol> {
         self.symbols.iter()
     }
 
     /// Iterator over all members in this scope.
-    pub(crate) fn members(&self) -> std::slice::Iter<Member> {
+    pub(crate) fn members(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()
     }
 
@@ -220,7 +220,7 @@ impl PlaceTable {
     /// ## Panics
     /// If the place ID is not found in the table.
     #[track_caller]
-    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
+    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
             ScopedPlaceId::Symbol(symbol) => self.symbol(symbol).into(),
             ScopedPlaceId::Member(member) => self.member(member).into(),
@@ -275,7 +275,7 @@ impl PlaceTableBuilder {
     }
 
     #[track_caller]
-    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef {
+    pub(crate) fn place(&self, place_id: impl Into<ScopedPlaceId>) -> PlaceExprRef<'_> {
         match place_id.into() {
             ScopedPlaceId::Symbol(id) => PlaceExprRef::Symbol(self.symbols.symbol(id)),
             ScopedPlaceId::Member(id) => PlaceExprRef::Member(self.member.member(id)),
@@ -289,7 +289,7 @@ impl PlaceTableBuilder {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = PlaceExprRef<'_>> {
         self.symbols
             .iter()
             .map(Into::into)

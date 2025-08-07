@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn start_of_file() -> Result<()> {
-        fn insert(contents: &str) -> Result<Insertion> {
+        fn insert(contents: &str) -> Result<Insertion<'_>> {
             let parsed = parse_module(contents)?;
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
@@ -450,7 +450,7 @@ x = 1
 
     #[test]
     fn start_of_block() {
-        fn insert(contents: &str, offset: TextSize) -> Insertion {
+        fn insert(contents: &str, offset: TextSize) -> Insertion<'_> {
             let parsed = parse_module(contents).unwrap();
             let locator = Locator::new(contents);
             let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
