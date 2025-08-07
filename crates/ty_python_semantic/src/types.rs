@@ -5776,6 +5776,12 @@ impl<'db> Type<'db> {
             }
 
             Type::NonInferableTypeVar(bound_typevar) => match type_mapping {
+                TypeMapping::Specialization(specialization) => {
+                    specialization.get(db, bound_typevar).unwrap_or(self)
+                }
+                TypeMapping::PartialSpecialization(partial) => {
+                    partial.get(db, bound_typevar).unwrap_or(self)
+                }
                 TypeMapping::MarkTypeVarsInferable(binding_context) => {
                     if bound_typevar.binding_context(db) == *binding_context {
                         Type::TypeVar(bound_typevar)
@@ -5783,8 +5789,6 @@ impl<'db> Type<'db> {
                         self
                     }
                 }
-                TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf(_)
