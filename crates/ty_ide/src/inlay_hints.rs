@@ -189,13 +189,11 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 for (arg_index, arg_or_keyword) in
                     call.arguments.arguments_source_order().enumerate()
                 {
-                    if matches!(arg_or_keyword, ArgOrKeyword::Arg(_)) {
-                        if let Some(name) = details.argument_names.get(&arg_index) {
-                            self.add_function_argument_name(
-                                arg_or_keyword.range().start(),
-                                name.to_string(),
-                            );
-                        }
+                    if let Some(name) = details.argument_names.get(&arg_index) {
+                        self.add_function_argument_name(
+                            arg_or_keyword.range().start(),
+                            name.to_string(),
+                        );
                     }
                     self.visit_expr(arg_or_keyword.value());
                 }
