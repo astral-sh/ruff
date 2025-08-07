@@ -7988,14 +7988,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
-        match (left, right) {
+        let comparison_result = match (left, right) {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
                 for element in union.elements(self.db()) {
                     builder =
                         builder.add(self.infer_binary_type_comparison(*element, op, other, range)?);
                 }
-                Ok(builder.build())
+                Some(Ok(builder.build()))
             }
             (other, Type::Union(union)) => {
                 let mut builder = UnionBuilder::new(self.db());
@@ -8003,27 +8003,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     builder =
                         builder.add(self.infer_binary_type_comparison(other, op, *element, range)?);
                 }
-                Ok(builder.build())
+                Some(Ok(builder.build()))
             }
 
-            (Type::Intersection(intersection), right) => self
-                .infer_binary_intersection_type_comparison(
+            (Type::Intersection(intersection), right) => {
+                Some(self.infer_binary_intersection_type_comparison(
                     intersection,
                     op,
                     right,
                     IntersectionOn::Left,
                     range,
-                ),
-            (left, Type::Intersection(intersection)) => self
-                .infer_binary_intersection_type_comparison(
+                ))
+            }
+            (left, Type::Intersection(intersection)) => {
+                Some(self.infer_binary_intersection_type_comparison(
                     intersection,
                     op,
                     left,
                     IntersectionOn::Right,
                     range,
-                ),
+                ))
+            }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m)) => match op {
+            (Type::IntLiteral(n), Type::IntLiteral(m)) => Some(match op {
                 ast::CmpOp::Eq => Ok(Type::BooleanLiteral(n == m)),
                 ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(n != m)),
                 ast::CmpOp::Lt => Ok(Type::BooleanLiteral(n < m)),
@@ -8052,45 +8054,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     left_ty: left,
                     right_ty: right,
                 }),
-            },
-            (Type::IntLiteral(_), Type::NominalInstance(_)) => self.infer_binary_type_comparison(
-                KnownClass::Int.to_instance(self.db()),
-                op,
-                right,
-                range,
-            ),
-            (Type::NominalInstance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
-                left,
-                op,
-                KnownClass::Int.to_instance(self.db()),
-                range,
-            ),
+            }),
+            (Type::IntLiteral(_), Type::NominalInstance(_)) => {
+                Some(self.infer_binary_type_comparison(
+                    KnownClass::Int.to_instance(self.db()),
+                    op,
+                    right,
+                    range,
+                ))
+            }
+            (Type::NominalInstance(_), Type::IntLiteral(_)) => {
+                Some(self.infer_binary_type_comparison(
+                    left,
+                    op,
+                    KnownClass::Int.to_instance(self.db()),
+                    range,
+                ))
+            }
 
             // Booleans are coded as integers (False = 0, True = 1)
-            (Type::IntLiteral(n), Type::BooleanLiteral(b)) => self.infer_binary_type_comparison(
-                Type::IntLiteral(n),
-                op,
-                Type::IntLiteral(i64::from(b)),
-                range,
-            ),
-            (Type::BooleanLiteral(b), Type::IntLiteral(m)) => self.infer_binary_type_comparison(
-                Type::IntLiteral(i64::from(b)),
-                op,
-                Type::IntLiteral(m),
-                range,
-            ),
-            (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => self
-                .infer_binary_type_comparison(
+            (Type::IntLiteral(n), Type::BooleanLiteral(b)) => {
+                Some(self.infer_binary_type_comparison(
+                    Type::IntLiteral(n),
+                    op,
+                    Type::IntLiteral(i64::from(b)),
+                    range,
+                ))
+            }
+            (Type::BooleanLiteral(b), Type::IntLiteral(m)) => {
+                Some(self.infer_binary_type_comparison(
+                    Type::IntLiteral(i64::from(b)),
+                    op,
+                    Type::IntLiteral(m),
+                    range,
+                ))
+            }
+            (Type::BooleanLiteral(a), Type::BooleanLiteral(b)) => {
+                Some(self.infer_binary_type_comparison(
                     Type::IntLiteral(i64::from(a)),
                     op,
                     Type::IntLiteral(i64::from(b)),
                     range,
-                ),
+                ))
+            }
 
             (Type::StringLiteral(salsa_s1), Type::StringLiteral(salsa_s2)) => {
                 let s1 = salsa_s1.value(self.db());
                 let s2 = salsa_s2.value(self.db());
-                match op {
+                let result = match op {
                     ast::CmpOp::Eq => Ok(Type::BooleanLiteral(s1 == s2)),
                     ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(s1 != s2)),
                     ast::CmpOp::Lt => Ok(Type::BooleanLiteral(s1 < s2)),
@@ -8113,38 +8124,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Ok(Type::BooleanLiteral(true))
                         }
                     }
-                }
+                };
+                Some(result)
             }
-            (Type::StringLiteral(_), _) => self.infer_binary_type_comparison(
+            (Type::StringLiteral(_), _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
                 op,
                 right,
                 range,
-            ),
-            (_, Type::StringLiteral(_)) => self.infer_binary_type_comparison(
+            )),
+            (_, Type::StringLiteral(_)) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Str.to_instance(self.db()),
                 range,
-            ),
+            )),
 
-            (Type::LiteralString, _) => self.infer_binary_type_comparison(
+            (Type::LiteralString, _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Str.to_instance(self.db()),
                 op,
                 right,
                 range,
-            ),
-            (_, Type::LiteralString) => self.infer_binary_type_comparison(
+            )),
+            (_, Type::LiteralString) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Str.to_instance(self.db()),
                 range,
-            ),
+            )),
 
             (Type::BytesLiteral(salsa_b1), Type::BytesLiteral(salsa_b2)) => {
                 let b1 = salsa_b1.value(self.db());
                 let b2 = salsa_b2.value(self.db());
-                match op {
+                let result = match op {
                     ast::CmpOp::Eq => Ok(Type::BooleanLiteral(b1 == b2)),
                     ast::CmpOp::NotEq => Ok(Type::BooleanLiteral(b1 != b2)),
                     ast::CmpOp::Lt => Ok(Type::BooleanLiteral(b1 < b2)),
@@ -8171,42 +8183,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Ok(Type::BooleanLiteral(true))
                         }
                     }
-                }
+                };
+                Some(result)
             }
-            (Type::BytesLiteral(_), _) => self.infer_binary_type_comparison(
+            (Type::BytesLiteral(_), _) => Some(self.infer_binary_type_comparison(
                 KnownClass::Bytes.to_instance(self.db()),
                 op,
                 right,
                 range,
-            ),
-            (_, Type::BytesLiteral(_)) => self.infer_binary_type_comparison(
+            )),
+            (_, Type::BytesLiteral(_)) => Some(self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
-            ),
+            )),
 
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Ok(Type::BooleanLiteral(literal_1 == literal_2))
+                Some(Ok(Type::BooleanLiteral(literal_1 == literal_2)))
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Ok(Type::BooleanLiteral(literal_1 != literal_2))
+                Some(Ok(Type::BooleanLiteral(literal_1 != literal_2)))
             }
 
-            _ => {
-                // Special-casing for comparisons between tuple instance types
-                if let (Some(lhs_tuple), Some(rhs_tuple)) = (
-                    left.tuple_instance_spec(self.db()),
-                    right.tuple_instance_spec(self.db()),
-                ) {
+            (
+                Type::NominalInstance(NominalInstanceType { class: class1, .. }),
+                Type::NominalInstance(NominalInstanceType { class: class2, .. }),
+            ) => class1
+                .tuple_spec(self.db())
+                .and_then(|lhs_tuple| Some((lhs_tuple, class2.tuple_spec(self.db())?)))
+                .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
                         |op| self.infer_tuple_rich_comparison(&lhs_tuple, op, &rhs_tuple, range);
 
-                    return match op {
+                    match op {
                         ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
                         ast::CmpOp::NotEq => tuple_rich_comparison(RichCompareOperator::Ne),
                         ast::CmpOp::Lt => tuple_rich_comparison(RichCompareOperator::Lt),
@@ -8264,49 +8278,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 },
                             })
                         }
-                    };
+                    }
                 }
+            ),
 
-                // Final generalized fallback: lookup the rich comparison `__dunder__` methods
-                let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
-                let membership_test_comparison = |op, range: TextRange| {
-                    self.infer_membership_test_comparison(left, right, op, range)
-                };
-                match op {
-                    ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-                    ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-                    ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-                    ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-                    ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-                    ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-                    ast::CmpOp::In => {
-                        membership_test_comparison(MembershipTestCompareOperator::In, range)
-                    }
-                    ast::CmpOp::NotIn => {
-                        membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-                    }
-                    ast::CmpOp::Is => {
-                        if left.is_disjoint_from(self.db(), right) {
-                            Ok(Type::BooleanLiteral(false))
-                        } else if left.is_singleton(self.db())
-                            && left.is_equivalent_to(self.db(), right)
-                        {
-                            Ok(Type::BooleanLiteral(true))
-                        } else {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        }
-                    }
-                    ast::CmpOp::IsNot => {
-                        if left.is_disjoint_from(self.db(), right) {
-                            Ok(Type::BooleanLiteral(true))
-                        } else if left.is_singleton(self.db())
-                            && left.is_equivalent_to(self.db(), right)
-                        {
-                            Ok(Type::BooleanLiteral(false))
-                        } else {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        }
-                    }
+            _ => None,
+        };
+
+        if let Some(result) = comparison_result {
+            return result;
+        }
+
+        // Final generalized fallback: lookup the rich comparison `__dunder__` methods
+        let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
+        let membership_test_comparison =
+            |op, range: TextRange| self.infer_membership_test_comparison(left, right, op, range);
+        match op {
+            ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
+            ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
+            ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
+            ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
+            ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
+            ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
+            ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In, range),
+            ast::CmpOp::NotIn => {
+                membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
+            }
+            ast::CmpOp::Is => {
+                if left.is_disjoint_from(self.db(), right) {
+                    Ok(Type::BooleanLiteral(false))
+                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
+                    Ok(Type::BooleanLiteral(true))
+                } else {
+                    Ok(KnownClass::Bool.to_instance(self.db()))
+                }
+            }
+            ast::CmpOp::IsNot => {
+                if left.is_disjoint_from(self.db(), right) {
+                    Ok(Type::BooleanLiteral(true))
+                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
+                    Ok(Type::BooleanLiteral(false))
+                } else {
+                    Ok(KnownClass::Bool.to_instance(self.db()))
                 }
             }
         }
