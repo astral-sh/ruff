@@ -176,29 +176,18 @@ pub(crate) fn non_pep604_annotation(
                         }
 
                         // Unwrap all nested Optional[...] and wrap once as `X | None`.
-                        fn unwrap_all_optionals<'a>(
-                            mut expr: &'a Expr,
-                            checker: &Checker,
-                        ) -> &'a Expr {
-                            loop {
-                                match expr {
-                                    Expr::Subscript(ast::ExprSubscript {
-                                        value, slice, ..
-                                    }) => {
-                                        if let Some(Pep604Operator::Optional) =
-                                            to_pep604_operator(value, slice, checker.semantic())
-                                        {
-                                            expr = slice;
-                                            continue;
-                                        }
-                                        break expr;
-                                    }
-                                    _ => break expr,
-                                }
+                        let mut inner = slice;
+                        while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
+                            if let Some(Pep604Operator::Optional) =
+                                to_pep604_operator(value, slice, checker.semantic())
+                            {
+                                inner = slice;
+                            } else {
+                                break;
                             }
                         }
 
-                        let inner = unwrap_all_optionals(slice, checker);
+                        let inner = inner;
                         let flattened_slice = pep_604_optional(inner);
 
                         diagnostic.set_fix(Fix::applicable_edit(
