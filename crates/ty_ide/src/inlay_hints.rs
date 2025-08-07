@@ -76,6 +76,14 @@ pub struct InlayHintSettings {
     /// x": Literal[1]" = 1
     /// ```
     pub variable_types: bool,
+    /// Whether to show function argument names.
+    ///
+    /// For example, this would enable / disable hints like the ones quoted below:
+    /// ```python
+    /// def foo(x: int): pass
+    /// foo("x="1)
+    /// ```
+    pub function_argument_names: bool,
 }
 
 struct InlayHintVisitor<'a, 'db> {
@@ -100,6 +108,9 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     }
 
     fn add_type_hint(&mut self, position: TextSize, ty: Type<'db>) {
+        if !self.settings.variable_types {
+            return;
+        }
         self.hints.push(InlayHint {
             position,
             content: InlayHintContent::Type(ty),
@@ -107,6 +118,9 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     }
 
     fn add_function_argument_name(&mut self, position: TextSize, name: String) {
+        if !self.settings.function_argument_names {
+            return;
+        }
         self.hints.push(InlayHint {
             position,
             content: InlayHintContent::FunctionArgumentName(name),
@@ -132,10 +146,6 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
         match stmt {
             Stmt::Assign(assign) => {
-                if !self.settings.variable_types {
-                    return;
-                }
-
                 self.in_assignment = true;
                 for target in &assign.targets {
                     self.visit_expr(target);
@@ -278,6 +288,7 @@ mod tests {
         fn inlay_hints(&self) -> String {
             self.inlay_hints_with_settings(&InlayHintSettings {
                 variable_types: true,
+                function_argument_names: true,
             })
         }
 
@@ -344,6 +355,21 @@ mod tests {
         x[: Literal[1]] = 1
         y = 2
         ");
+    }
+
+    #[test]
+    fn test_disabled_variable_types() {
+        let test = inlay_hint_test("x = 1");
+
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: false,
+                ..Default::default()
+            }),
+            @r"
+        x = 1
+        "
+        );
     }
 
     #[test]
@@ -580,22 +606,6 @@ mod tests {
     }
 
     #[test]
-    fn test_function_call_out_of_range() {
-        let test = inlay_hint_test(
-            "
-            def foo(x: int): pass
-            <START>foo(1)<END>
-            bar(2)",
-        );
-
-        assert_snapshot!(test.inlay_hints(), @r"
-        def foo(x: int): pass
-        foo([x=]1)
-        bar(2)
-        ");
-    }
-
-    #[test]
     fn test_function_call_with_union_type() {
         let test = inlay_hint_test(
             "
@@ -820,16 +830,37 @@ mod tests {
     }
 
     #[test]
-    fn disabled_variable_types() {
-        let test = inlay_hint_test("x = 1");
-
-        assert_snapshot!(
-            test.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: false,
-            }),
-            @r"
-        x = 1
-        "
+    fn test_disabled_function_argument_names() {
+        let test = inlay_hint_test(
+            "
+        def foo(x: int): pass
+        foo(1)",
         );
+
+        assert_snapshot!(test.inlay_hints_with_settings(&InlayHintSettings {
+            function_argument_names: false,
+            ..Default::default()
+        }), @r"
+        def foo(x: int): pass
+        foo(1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_out_of_range() {
+        let test = inlay_hint_test(
+            "
+            <START>def foo(x: int): pass
+            def bar(y: int): pass
+            foo(1)<END>
+            bar(2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: int): pass
+        def bar(y: int): pass
+        foo([x=]1)
+        bar(2)
+        ");
     }
 }

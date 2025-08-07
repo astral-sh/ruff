@@ -438,6 +438,7 @@ impl Workspace {
             // TODO: Provide a way to configure this
             &InlayHintSettings {
                 variable_types: true,
+                function_argument_names: true,
             },
         );
 
