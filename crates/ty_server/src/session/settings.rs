@@ -6,12 +6,24 @@ use ty_project::metadata::options::ProjectOptionsOverrides;
 #[derive(Clone, Default, Debug, PartialEq)]
 pub(crate) struct GlobalSettings {
     pub(super) diagnostic_mode: DiagnosticMode,
+    pub(super) experimental: ExperimentalSettings,
+}
+
+impl GlobalSettings {
+    pub(crate) fn is_rename_enabled(&self) -> bool {
+        self.experimental.rename
+    }
 }
 
 impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
     }
+}
+
+#[derive(Clone, Default, Debug, PartialEq)]
+pub(crate) struct ExperimentalSettings {
+    pub(super) rename: bool,
 }
 
 /// Resolved client settings for a specific workspace.

@@ -9,6 +9,7 @@ use lsp_types::{
 };
 
 use crate::PositionEncoding;
+use crate::session::GlobalSettings;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -31,6 +32,7 @@ bitflags::bitflags! {
         const FILE_WATCHER_SUPPORT = 1 << 12;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
         const WORKSPACE_CONFIGURATION = 1 << 14;
+        const RENAME_DYNAMIC_REGISTRATION = 1 << 15;
     }
 }
 
@@ -108,6 +110,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for rename capabilities.
+    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
+        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -246,6 +253,13 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
+        }
+
         if client_capabilities
             .window
             .as_ref()
@@ -259,9 +273,12 @@ impl ResolvedClientCapabilities {
     }
 }
 
+/// Creates the server capabilities based on the resolved client capabilities and resolved global
+/// settings from the initialization options.
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: &GlobalSettings,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -274,6 +291,18 @@ pub(crate) fn server_capabilities(
                 server_diagnostic_options(true),
             ))
         };
+
+    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
+        // If the client supports dynamic registration, we will register the rename capabilities
+        // dynamically based on the `ty.experimental.rename` setting.
+        None
+    } else {
+        // Otherwise, we check whether user has enabled rename support via the resolved settings
+        // from initialization options.
+        global_settings
+            .is_rename_enabled()
+            .then(|| OneOf::Right(server_rename_options()))
+    };
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
@@ -289,10 +318,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
-        rename_provider: Some(OneOf::Right(RenameOptions {
-            prepare_provider: Some(true),
-            work_done_progress_options: WorkDoneProgressOptions::default(),
-        })),
+        rename_provider,
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
@@ -342,5 +368,12 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
             // diagnostic mode.
             work_done_progress: Some(workspace_diagnostics),
         },
+    }
+}
+
+pub(crate) fn server_rename_options() -> RenameOptions {
+    RenameOptions {
+        prepare_provider: Some(true),
+        work_done_progress_options: WorkDoneProgressOptions::default(),
     }
 }

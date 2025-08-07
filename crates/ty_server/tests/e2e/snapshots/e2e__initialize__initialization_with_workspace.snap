@@ -31,9 +31,6 @@ expression: initialization_result
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
     "workspaceSymbolProvider": true,
-    "renameProvider": {
-      "prepareProvider": true
-    },
     "declarationProvider": true,
     "semanticTokensProvider": {
       "legend": {

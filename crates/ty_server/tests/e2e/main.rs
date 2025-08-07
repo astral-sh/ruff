@@ -868,7 +868,7 @@ impl TestServerBuilder {
     pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .diagnostic = if enabled {
             Some(DiagnosticClientCapabilities::default())
         } else {
@@ -881,9 +881,20 @@ impl TestServerBuilder {
     pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .diagnostic
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable dynamic registration of rename capability
+    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .rename
+            .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self
     }
@@ -892,7 +903,7 @@ impl TestServerBuilder {
     pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .configuration = Some(enabled);
         self
     }
@@ -902,7 +913,7 @@ impl TestServerBuilder {
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .did_change_watched_files = if enabled {
             Some(DidChangeWatchedFilesClientCapabilities::default())
         } else {
