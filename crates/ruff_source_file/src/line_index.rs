@@ -72,13 +72,13 @@ impl LineIndex {
     /// The `column` number is the nth-character of the line, except for the first line
     /// where it doesn't include the UTF-8 BOM marker at the start of the file.
     ///
-    /// ### BOM handling
+    /// ## BOM handling
     ///
     /// For files starting with a UTF-8 BOM marker, the byte offsets
     /// in the range `0...3` are all mapped to line 0 and column 0.
     /// Because of this, the conversion isn't losless.
     ///
-    /// ## Examples
+    /// ### Examples
     ///
     /// ```
     /// # use ruff_text_size::TextSize;
@@ -105,6 +105,27 @@ impl LineIndex {
     /// assert_eq!(
     ///     index.line_column(TextSize::from(16), &source),
     ///     LineColumn { line: OneIndexed::from_zero_indexed(1), column: OneIndexed::from_zero_indexed(4) }
+    /// );
+    /// ```
+    ///
+    /// ## EOF handling
+    ///
+    /// For offsets exactly at the end of a file ending in a line terminator
+    /// (`\r` or `\n`), the offset is mapped to the last column of the preceding
+    /// line rather than the start of another line.
+    ///
+    /// ### Example
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextLen, TextSize};
+    /// # use ruff_source_file::{LineIndex, OneIndexed, LineColumn};
+    /// let source = "eof\n";
+    /// let index = LineIndex::from_source_text(&source);
+    ///
+    /// // New line at EOF maps to the same line
+    /// assert_eq!(
+    ///     index.line_column(source.text_len(), &source),
+    ///     LineColumn { line: OneIndexed::from_zero_indexed(0), column: OneIndexed::from_zero_indexed(3) }
     /// );
     /// ```
     ///
