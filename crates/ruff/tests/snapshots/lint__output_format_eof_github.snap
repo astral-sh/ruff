@@ -1,0 +1,22 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - github
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=2,col=1,endLine=5,endColumn=1::input.py:2:1: invalid-syntax: missing closing quote in string literal
+::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=5,col=1,endLine=5,endColumn=1::input.py:5:1: invalid-syntax: unexpected EOF while parsing
+
+----- stderr -----

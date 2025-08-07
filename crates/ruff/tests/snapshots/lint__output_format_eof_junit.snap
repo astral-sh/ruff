@@ -1,0 +1,31 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - junit
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="ruff" tests="2" failures="2" errors="0">
+    <testsuite name="[TMP]/input.py" tests="2" disabled="0" errors="0" failures="2" package="org.ruff">
+        <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="2" column="1">
+            <failure message="missing closing quote in string literal">line 2, col 1, missing closing quote in string literal</failure>
+        </testcase>
+        <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="5" column="1">
+            <failure message="unexpected EOF while parsing">line 5, col 1, unexpected EOF while parsing</failure>
+        </testcase>
+    </testsuite>
+</testsuites>
+
+----- stderr -----

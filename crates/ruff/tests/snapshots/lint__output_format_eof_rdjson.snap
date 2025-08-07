@@ -1,0 +1,66 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - rdjson
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "diagnostics": [
+    {
+      "code": {
+        "value": "invalid-syntax"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 5
+          },
+          "start": {
+            "column": 1,
+            "line": 2
+          }
+        }
+      },
+      "message": "missing closing quote in string literal"
+    },
+    {
+      "code": {
+        "value": "invalid-syntax"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 5
+          },
+          "start": {
+            "column": 1,
+            "line": 5
+          }
+        }
+      },
+      "message": "unexpected EOF while parsing"
+    }
+  ],
+  "severity": "WARNING",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}
+----- stderr -----

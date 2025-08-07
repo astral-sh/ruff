@@ -1,0 +1,59 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - gitlab
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "check_name": "syntax-error",
+    "description": "missing closing quote in string literal",
+    "fingerprint": "e558cec859bb66e8",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "column": 1,
+          "line": 2
+        },
+        "end": {
+          "column": 1,
+          "line": 5
+        }
+      }
+    },
+    "severity": "major"
+  },
+  {
+    "check_name": "syntax-error",
+    "description": "unexpected EOF while parsing",
+    "fingerprint": "2aefec8d57710ec4",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "column": 1,
+          "line": 5
+        },
+        "end": {
+          "column": 1,
+          "line": 5
+        }
+      }
+    },
+    "severity": "major"
+  }
+]
+----- stderr -----

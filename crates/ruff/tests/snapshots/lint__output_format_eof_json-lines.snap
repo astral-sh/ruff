@@ -1,0 +1,22 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - json-lines
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":5},"filename":"[TMP]/input.py","fix":null,"location":{"column":1,"row":2},"message":"missing closing quote in string literal","noqa_row":null,"url":null}
+{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":5},"filename":"[TMP]/input.py","fix":null,"location":{"column":1,"row":5},"message":"unexpected EOF while parsing","noqa_row":null,"url":null}
+
+----- stderr -----

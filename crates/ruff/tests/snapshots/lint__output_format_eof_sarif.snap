@@ -1,0 +1,81 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - sarif
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[TMP]/input.py"
+                },
+                "region": {
+                  "endColumn": 1,
+                  "endLine": 5,
+                  "startColumn": 1,
+                  "startLine": 2
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "missing closing quote in string literal"
+          },
+          "ruleId": "invalid-syntax"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "[TMP]/input.py"
+                },
+                "region": {
+                  "endColumn": 1,
+                  "endLine": 5,
+                  "startColumn": 1,
+                  "startLine": 5
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "unexpected EOF while parsing"
+          },
+          "ruleId": "invalid-syntax"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ruff",
+          "name": "ruff",
+          "rules": [],
+          "version": "[VERSION]"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
+----- stderr -----

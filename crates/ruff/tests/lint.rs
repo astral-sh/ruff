@@ -5801,3 +5801,65 @@ fn future_annotations_preview_warning() {
     ",
     );
 }
+
+/// Test that our end-of-file handling is the same for all output formats.
+///
+/// There are only four lines in the input (with a trailing newline), but we used to report the
+/// `unexpected EOF` syntax error as being at line 5, column 1. We should now report line 4, column
+/// 2 in all output formats.
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format_eof(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+(
+'''unterminated string
+'x'
+)
+";
+
+    let tempdir = TempDir::new()?;
+    let input = tempdir.path().join("input.py");
+    fs::write(&input, CONTENT)?;
+
+    let snapshot = format!("output_format_eof_{output_format}");
+
+    let project_dir = dunce::canonicalize(tempdir.path())?;
+
+    insta::with_settings!({
+        filters => vec![
+            (tempdir_filter(&project_dir).as_str(), "[TMP]/"),
+            (tempdir_filter(&tempdir).as_str(), "[TMP]/"),
+            (r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#),
+            (ruff_linter::VERSION, "[VERSION]"),
+        ]
+    }, {
+        assert_cmd_snapshot!(
+            snapshot,
+            Command::new(get_cargo_bin(BIN_NAME))
+                .args([
+                    "check",
+                    "--no-cache",
+                    "--output-format",
+                    output_format,
+                    "--select",
+                    "F401,F821",
+                    "--target-version",
+                    "py39",
+                    "input.py",
+                ])
+                .current_dir(&tempdir),
+        );
+    });
+
+    Ok(())
+}

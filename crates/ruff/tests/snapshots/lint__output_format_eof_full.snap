@@ -1,0 +1,37 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - full
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+input.py:2:1: invalid-syntax: missing closing quote in string literal
+  |
+1 |   (
+2 | / '''unterminated string
+3 | | 'x'
+4 | | )
+  | |__^
+  |
+
+input.py:5:1: invalid-syntax: unexpected EOF while parsing
+  |
+3 | 'x'
+4 | )
+  |  ^
+  |
+
+Found 2 errors.
+
+----- stderr -----

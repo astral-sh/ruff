@@ -1,0 +1,22 @@
+---
+source: crates/ruff/tests/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - pylint
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+input.py:2: [invalid-syntax] missing closing quote in string literal
+input.py:5: [invalid-syntax] unexpected EOF while parsing
+
+----- stderr -----
