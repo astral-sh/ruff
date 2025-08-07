@@ -528,9 +528,9 @@ def _(args: IntStarStrInt) -> None:
     # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)
 
+    # TODO: we should emit a diagnostic here
     takes_at_least_zero(*args)
 
-    # TODO: false positive
     takes_at_least_one(*args)  # error: [invalid-argument-type]
 
     # TODO: should only have one diagnostic here
