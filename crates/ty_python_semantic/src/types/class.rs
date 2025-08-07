@@ -4721,13 +4721,13 @@ impl<'db> ClassType<'db> {
     /// The specialization must be one in which the typevars are solved as being statically known
     /// integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self else {
+        let (class, Some(specialization)) = self.class_literal(db) else {
             return None;
         };
-        if !alias.origin(db).is_known(db, KnownClass::Slice) {
+        if !class.is_known(db, KnownClass::Slice) {
             return None;
         }
-        let [start, stop, step] = alias.specialization(db).types(db) else {
+        let [start, stop, step] = specialization.types(db) else {
             return None;
         };
 
