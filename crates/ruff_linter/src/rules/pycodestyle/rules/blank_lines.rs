@@ -1052,8 +1052,16 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         }
 
         if line.preceding_blank_lines == 0
-            // Only apply to nested functions.
-            && matches!(state.fn_status, Status::Inside(_))
+            // Apply to nested definitions: either within a function body, or deeper-than-immediate inside a class
+            && (
+                matches!(state.fn_status, Status::Inside(_))
+                || if let Status::Inside(class_indent) = state.class_status {
+                    line.indent_length
+                        > class_indent + self.context.settings().tab_size.as_usize()
+                } else {
+                    false
+                }
+            )
             && line.kind.is_class_function_or_decorator()
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Decorator)

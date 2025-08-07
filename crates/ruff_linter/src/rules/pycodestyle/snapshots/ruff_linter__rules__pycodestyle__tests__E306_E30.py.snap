@@ -239,3 +239,23 @@ E30.py:983:9: E306 [*] Expected 1 blank line before a nested definition, found 0
 983 984 |         def callback():
 984 985 |             loop.remove_reader(self._fd)
 985 986 |         loop.add_reader(self._fd, callback)
+
+E30.py:993:9: E306 [*] Expected 1 blank line before a nested definition, found 0
+    |
+991 |     if True:
+992 |         print("conditional")
+993 |         def test():
+    |         ^^^ E306
+994 |             pass
+995 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+990 990 | class Foo:
+991 991 |     if True:
+992 992 |         print("conditional")
+    993 |+
+993 994 |         def test():
+994 995 |             pass
+995 996 | # end

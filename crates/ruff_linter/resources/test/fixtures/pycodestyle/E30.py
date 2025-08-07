@@ -984,3 +984,12 @@ class foo:
             loop.remove_reader(self._fd)
         loop.add_reader(self._fd, callback)
 # end
+
+
+# E301
+class Foo:
+    if True:
+        print("conditional")
+        def test():
+            pass
+# end
