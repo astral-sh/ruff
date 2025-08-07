@@ -28,7 +28,6 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use crate::util::get_size::untracked_arc_size;
 
 pub mod ast_ids;
 mod builder;

@@ -702,7 +702,6 @@ impl SmallSegments {
             prev_offset = segment.offset();
         }
 
-        // Check if we can fit in inline storage
         Some(Self(packed))
     }
 
