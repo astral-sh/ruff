@@ -2,7 +2,7 @@ use crate::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
@@ -57,9 +57,6 @@ pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'
     let ast = parsed_module(db, file).load(db);
 
     visitor.visit_body(ast.suite());
-
-    // Sort hints by position to ensure correct insertion order
-    visitor.hints.sort_by_key(|hint| hint.position);
 
     visitor.hints
 }
@@ -151,20 +148,24 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                if let Some(details) =
-                    inlay_hint_function_argument_details(self.db, &self.model, call)
-                {
-                    for (position, name) in details.argument_names {
-                        self.add_function_argument_name(position, name);
-                    }
-                }
-                for arg in &call.arguments.args {
-                    self.visit_expr(arg);
-                }
-                for kw in &call.arguments.keywords {
-                    self.visit_expr(&kw.value);
-                }
+                let details = inlay_hint_function_argument_details(self.db, &self.model, call)
+                    .unwrap_or_default();
+
                 self.visit_expr(&call.func);
+
+                for (arg_index, arg_or_keyword) in
+                    call.arguments.arguments_source_order().enumerate()
+                {
+                    if matches!(arg_or_keyword, ArgOrKeyword::Arg(_)) {
+                        if let Some(name) = details.argument_names.get(&arg_index) {
+                            self.add_function_argument_name(
+                                arg_or_keyword.range().start(),
+                                name.to_string(),
+                            );
+                        }
+                    }
+                    self.visit_expr(arg_or_keyword.value());
+                }
             }
             _ => {
                 source_order::walk_expr(self, expr);
@@ -630,9 +631,9 @@ mod tests {
             def inner(y: str) -> str:
                 return y.upper()
 
-            def process(a: int, b: str): pass
+            def process(a: int, b: str, c: bool): pass
 
-            process(outer(5), inner(inner('test')))",
+            process(outer(5), inner(inner('test')), True)",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
@@ -642,9 +643,9 @@ mod tests {
         def inner(y: str) -> str:
             return y.upper()
 
-        def process(a: int, b: str): pass
+        def process(a: int, b: str, c: bool): pass
 
-        process([a=]outer([x=]5), [b=]inner([y=]inner([y=]'test')))
+        process([a=]outer([x=]5), [b=]inner([y=]inner([y=]'test')), [c=]True)
         ");
     }
 

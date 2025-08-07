@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use crate::place::{
     Place, builtins_module_scope, imported_symbol, place_from_bindings, place_from_declarations,
@@ -15,9 +16,9 @@ use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstan
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_python_ast::{self as ast};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
 pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
@@ -844,8 +845,9 @@ pub fn find_active_signature_from_details(
     Some(best_index)
 }
 
+#[derive(Default)]
 pub struct InlayHintFunctionArgumentDetails {
-    pub argument_names: Vec<(TextSize, String)>,
+    pub argument_names: HashMap<usize, String>,
 }
 
 pub fn inlay_hint_function_argument_details<'db>(
@@ -861,13 +863,16 @@ pub fn inlay_hint_function_argument_details<'db>(
 
     let active_signature_index = find_active_signature_from_details(&signature_details)?;
 
-    let signature = signature_details.get(active_signature_index)?;
+    let call_signature_details = signature_details.get(active_signature_index)?;
 
-    let parameters = signature.signature.parameters();
-    let mut argument_names = Vec::new();
+    let parameters = call_signature_details.signature.parameters();
+    let mut argument_names = HashMap::new();
 
-    for (arg_index, arg_expr) in call_expr.arguments.args.iter().enumerate() {
-        let Some(arg_mapping) = signature.argument_to_parameter_mapping.get(arg_index) else {
+    for arg_index in 0..call_expr.arguments.args.len() {
+        let Some(arg_mapping) = call_signature_details
+            .argument_to_parameter_mapping
+            .get(arg_index)
+        else {
             continue;
         };
 
@@ -888,7 +893,7 @@ pub fn inlay_hint_function_argument_details<'db>(
             let Some(name) = param.name() else {
                 continue;
             };
-            argument_names.push((arg_expr.range().start(), name.to_string()));
+            argument_names.insert(arg_index, name.to_string());
         }
     }
 
