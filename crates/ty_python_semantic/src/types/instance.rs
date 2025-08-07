@@ -26,7 +26,7 @@ impl<'db> Type<'db> {
         } else if class_literal.is_typed_dict(db) {
             TypedDictType::from(db, class)
         } else {
-            Self::NominalInstance(NominalInstanceType::from_class(class))
+            Self::NominalInstance(NominalInstanceType { class })
         }
     }
 
@@ -36,12 +36,7 @@ impl<'db> Type<'db> {
         };
         tuple
             .to_class_type(db)
-            .map(|class| {
-                Type::NominalInstance(NominalInstanceType {
-                    class,
-                    _phantom: PhantomData,
-                })
-            })
+            .map(|class| Type::NominalInstance(NominalInstanceType { class }))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -84,11 +79,7 @@ impl<'db> Type<'db> {
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct NominalInstanceType<'db> {
-    pub(super) class: ClassType<'db>,
-
-    // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
-    // is through the `Type::instance` constructor function.
-    _phantom: PhantomData<()>,
+    class: ClassType<'db>,
 }
 
 pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -96,17 +87,12 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &mut V,
 ) {
-    visitor.visit_type(db, nominal.class.into());
+    visitor.visit_type(db, nominal.class().into());
 }
 
 impl<'db> NominalInstanceType<'db> {
-    // Keep this method private, so that the only way of constructing `NominalInstanceType`
-    // instances is through the `Type::instance` constructor function.
-    fn from_class(class: ClassType<'db>) -> Self {
-        Self {
-            class,
-            _phantom: PhantomData,
-        }
+    pub(super) fn class(&self) -> ClassType<'db> {
+        self.class
     }
 
     pub(super) fn normalized_impl(
@@ -114,11 +100,15 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &mut TypeTransformer<'db>,
     ) -> Self {
-        Self::from_class(self.class.normalized_impl(db, visitor))
+        Self {
+            class: self.class.normalized_impl(db, visitor),
+        }
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self::from_class(self.class.materialize(db, variance))
+        Self {
+            class: self.class.materialize(db, variance),
+        }
     }
 
     pub(super) fn has_relation_to(
@@ -176,7 +166,9 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        Self::from_class(self.class.apply_type_mapping(db, type_mapping))
+        Self {
+            class: self.class.apply_type_mapping(db, type_mapping),
+        }
     }
 
     pub(super) fn find_legacy_typevars(

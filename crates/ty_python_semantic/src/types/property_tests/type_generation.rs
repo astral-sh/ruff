@@ -153,7 +153,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class.class_literal(db).0))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class().class_literal(db).0))
                 );
                 ty
             }

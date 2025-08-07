@@ -87,7 +87,7 @@ impl<'db> ClassBase<'db> {
             }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class.is_known(db, KnownClass::GenericAlias) =>
+                if instance.class().is_known(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }

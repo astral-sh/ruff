@@ -214,7 +214,7 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     match ty {
         Type::NominalInstance(instance) => {
-            if instance.class.is_known(db, KnownClass::Bool) {
+            if instance.class().is_known(db, KnownClass::Bool) {
                 return Some(vec![
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
@@ -222,7 +222,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
-            if let Some(spec) = instance.class.tuple_spec(db) {
+            if let Some(spec) = instance.class().tuple_spec(db) {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
                         let expanded = fixed_length_tuple
@@ -249,7 +249,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            let class_literal = instance.class.class_literal(db).0;
+            let class_literal = instance.class().class_literal(db).0;
 
             if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
                 return Some(enum_members.collect());
