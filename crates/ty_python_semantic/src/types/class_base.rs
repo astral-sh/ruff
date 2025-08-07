@@ -155,6 +155,7 @@ impl<'db> ClassBase<'db> {
             | Type::LiteralString
             | Type::Tuple(_)
             | Type::ModuleLiteral(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)

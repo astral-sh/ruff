@@ -149,6 +149,7 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
@@ -868,7 +869,7 @@ mod resolve_definition {
     pub enum ImportAliasResolution {
         /// Resolve import aliases to their original definitions
         ResolveAliases,
-        /// Keep import aliases as-is, don't resolve to original definitions  
+        /// Keep import aliases as-is, don't resolve to original definitions
         PreserveAliases,
     }
 

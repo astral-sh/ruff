@@ -749,6 +749,10 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if formal == actual {
+            return Ok(());
+        }
+
         // If the actual type is a subtype of the formal type, then return without adding any new
         // type mappings. (Note that if the formal type contains any typevars, this check will
         // fail, since no non-typevar types are assignable to a typevar. Also note that we are

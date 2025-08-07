@@ -4037,6 +4037,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
+            | Type::NonInferableTypeVar(..)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -7242,6 +7243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7568,6 +7570,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7598,6 +7601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::EnumLiteral(_)
                 | Type::Tuple(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -10636,7 +10640,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut signature_iter = callable_binding.into_iter().map(|binding| {
                     if argument_type.is_bound_method() {
-                        binding.signature.bind_self()
+                        binding.signature.bind_self(self.db(), Some(argument_type))
                     } else {
                         binding.signature.clone()
                     }

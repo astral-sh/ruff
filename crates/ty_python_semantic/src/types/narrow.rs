@@ -222,7 +222,7 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(bound_typevar) => match bound_typevar
+            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
                 .typevar(db)
                 .bound_or_constraints(db)?
             {
@@ -258,6 +258,7 @@ impl ClassInfoConstraintFunction {
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,
