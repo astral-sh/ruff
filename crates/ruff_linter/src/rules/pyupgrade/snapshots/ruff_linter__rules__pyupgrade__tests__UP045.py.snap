@@ -168,6 +168,7 @@ UP045.py:76:18: UP045 [*] Use `X | None` for type annotations
 76 | nested_optional: Optional[Optional[str]] = None
    |                  ^^^^^^^^^^^^^^^^^^^^^^^ UP045
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
    = help: Convert to `X | None`
 
@@ -178,6 +179,7 @@ UP045.py:76:18: UP045 [*] Use `X | None` for type annotations
 76    |-nested_optional: Optional[Optional[str]] = None
    76 |+nested_optional: str | None = None
 77 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
 
 UP045.py:76:27: UP045 Use `X | None` for type annotations
    |
@@ -186,6 +188,7 @@ UP045.py:76:27: UP045 Use `X | None` for type annotations
 76 | nested_optional: Optional[Optional[str]] = None
    |                           ^^^^^^^^^^^^^ UP045
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
    = help: Convert to `X | None`
 
@@ -195,6 +198,7 @@ UP045.py:77:25: UP045 [*] Use `X | None` for type annotations
 76 | nested_optional: Optional[Optional[str]] = None
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
    |
    = help: Convert to `X | None`
 
@@ -204,6 +208,7 @@ UP045.py:77:25: UP045 [*] Use `X | None` for type annotations
 76 76 | nested_optional: Optional[Optional[str]] = None
 77    |-nested_optional_typing: typing.Optional[Optional[int]] = None
    77 |+nested_optional_typing: int | None = None
+78 78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
 
 UP045.py:77:41: UP045 Use `X | None` for type annotations
    |
@@ -211,5 +216,40 @@ UP045.py:77:41: UP045 Use `X | None` for type annotations
 76 | nested_optional: Optional[Optional[str]] = None
 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
    |                                         ^^^^^^^^^^^^^ UP045
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
+   |
+   = help: Convert to `X | None`
+
+UP045.py:78:25: UP045 [*] Use `X | None` for type annotations
+   |
+76 | nested_optional: Optional[Optional[str]] = None
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP045
+   |
+   = help: Convert to `X | None`
+
+ℹ Safe fix
+75 75 | # Nested Optional types should be flattened
+76 76 | nested_optional: Optional[Optional[str]] = None
+77 77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78    |-triple_nested_optional: Optional[Optional[Optional[str]]] = None
+   78 |+triple_nested_optional: str | None = None
+
+UP045.py:78:34: UP045 Use `X | None` for type annotations
+   |
+76 | nested_optional: Optional[Optional[str]] = None
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^ UP045
+   |
+   = help: Convert to `X | None`
+
+UP045.py:78:43: UP045 Use `X | None` for type annotations
+   |
+76 | nested_optional: Optional[Optional[str]] = None
+77 | nested_optional_typing: typing.Optional[Optional[int]] = None
+78 | triple_nested_optional: Optional[Optional[Optional[str]]] = None
+   |                                           ^^^^^^^^^^^^^ UP045
    |
    = help: Convert to `X | None`

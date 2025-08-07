@@ -1,0 +1,29 @@
+---
+source: crates/ruff/tests/integration_test.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--isolated"
+    - "-"
+    - "--select"
+    - UP045
+    - "--diff"
+    - "--target-version"
+    - py312
+  stdin: "from typing import Optional\nnested_optional: Optional[Optional[Optional[str]]] = None"
+---
+success: false
+exit_code: 1
+----- stdout -----
+@@ -1,2 +1,2 @@
+ from typing import Optional
+-nested_optional: Optional[Optional[Optional[str]]] = None
+\ No newline at end of file
++nested_optional: str | None = None
+\ No newline at end of file
+
+
+----- stderr -----
+Would fix 1 error.

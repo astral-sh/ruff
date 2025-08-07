@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::helpers::{flatten_optional, pep_604_optional, pep_604_union};
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_text_size::Ranged;
@@ -175,22 +175,31 @@ pub(crate) fn non_pep604_annotation(
                             return;
                         }
 
-                        let flattened_slice = if let Expr::Subscript(ast::ExprSubscript {
-                            value: slice_value,
-                            slice: slice_slice,
-                            ..
-                        }) = slice
-                        {
-                            if let Some(Pep604Operator::Optional) =
-                                to_pep604_operator(slice_value, slice_slice, checker.semantic())
-                            {
-                                flatten_optional(slice_slice)
-                            } else {
-                                pep_604_optional(slice)
+                        // Unwrap all nested Optional[...] and wrap once as `X | None`.
+                        fn unwrap_all_optionals<'a>(
+                            mut expr: &'a Expr,
+                            checker: &Checker,
+                        ) -> &'a Expr {
+                            loop {
+                                match expr {
+                                    Expr::Subscript(ast::ExprSubscript {
+                                        value, slice, ..
+                                    }) => {
+                                        if let Some(Pep604Operator::Optional) =
+                                            to_pep604_operator(value, slice, checker.semantic())
+                                        {
+                                            expr = slice;
+                                            continue;
+                                        }
+                                        break expr;
+                                    }
+                                    _ => break expr,
+                                }
                             }
-                        } else {
-                            pep_604_optional(slice)
-                        };
+                        }
+
+                        let inner = unwrap_all_optionals(slice, checker);
+                        let flattened_slice = pep_604_optional(inner);
 
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
