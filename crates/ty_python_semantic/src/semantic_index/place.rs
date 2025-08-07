@@ -269,7 +269,6 @@ impl PlaceTable {
         self.members.place_id_by_instance_attribute_name(name)
     }
 
-    // TODO: Use this in `infer_place_load`.
     pub(crate) fn nested_scopes_with_bindings(&self, symbol_id: ScopedSymbolId) -> &[FileScopeId] {
         if let Some(scopes) = self.symbols.nested_scopes_with_bindings.get(&symbol_id) {
             scopes
