@@ -156,7 +156,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
         Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("full") => {
+            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
+        }
         Ok(other) => {
             tracing::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
