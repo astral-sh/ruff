@@ -1,14 +1,15 @@
 use lsp_types::{
     ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
     DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, SelectionRangeProviderCapability,
-    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
+    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
 use crate::PositionEncoding;
+use crate::session::GlobalSettings;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -272,9 +273,12 @@ impl ResolvedClientCapabilities {
     }
 }
 
+/// Creates the server capabilities based on the resolved client capabilities and resolved global
+/// settings from the initialization options.
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
+    global_settings: &GlobalSettings,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -287,6 +291,18 @@ pub(crate) fn server_capabilities(
                 server_diagnostic_options(true),
             ))
         };
+
+    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
+        // If the client supports dynamic registration, we will register the rename capabilities
+        // dynamically based on the `ty.experimental.rename` setting.
+        None
+    } else {
+        // Otherwise, we check whether user has enabled rename support via the resolved settings
+        // from initialization options.
+        global_settings
+            .is_rename_enabled()
+            .then(|| OneOf::Right(server_rename_options()))
+    };
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
@@ -302,6 +318,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
+        rename_provider,
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
@@ -351,5 +368,12 @@ pub(crate) fn server_diagnostic_options(workspace_diagnostics: bool) -> Diagnost
             // diagnostic mode.
             work_done_progress: Some(workspace_diagnostics),
         },
+    }
+}
+
+pub(crate) fn server_rename_options() -> RenameOptions {
+    RenameOptions {
+        prepare_provider: Some(true),
+        work_done_progress_options: WorkDoneProgressOptions::default(),
     }
 }

@@ -10,14 +10,12 @@ use lsp_types::request::{
 };
 use lsp_types::{
     DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
-    RenameOptions, TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
-    WorkDoneProgressOptions,
+    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
 use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use settings::GlobalSettings;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
@@ -30,8 +28,10 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::WorkspaceSettings;
-use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -587,6 +587,8 @@ impl Session {
         }
     }
 
+    // TODO: Merge the following two methods as `register_capability` and `unregister_capability`
+
     /// Sends a registration notification to the client to enable / disable workspace diagnostics
     /// as per the `ty.diagnosticMode` global setting.
     ///
@@ -697,13 +699,7 @@ impl Session {
         let registration = Registration {
             id: RENAME_REGISTRATION_ID.into(),
             method: Rename::METHOD.into(),
-            register_options: Some(
-                serde_json::to_value(RenameOptions {
-                    prepare_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions::default(),
-                })
-                .unwrap(),
-            ),
+            register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
         };
 
         client.send_request::<RegisterCapability>(

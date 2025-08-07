@@ -130,7 +130,7 @@ pub(crate) struct GlobalOptions {
     diagnostic_mode: Option<DiagnosticMode>,
 
     /// Experimental features that the server provides on an opt-in basis.
-    experimental: Option<Experimental>,
+    pub(crate) experimental: Option<Experimental>,
 }
 
 impl GlobalOptions {
@@ -259,7 +259,7 @@ impl Combine for DiagnosticMode {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Experimental {
     /// Whether to enable the experimental symbol rename feature.
-    rename: Option<bool>,
+    pub(crate) rename: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

@@ -437,7 +437,7 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
 /// Tests that the server sends a registration request for the rename capability if the client
 /// setting is set to true and dynamic registration is enabled.
 #[test]
-fn register_rename_capability_when_true() -> Result<()> {
+fn register_rename_capability_when_enabled() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
@@ -467,10 +467,33 @@ fn register_rename_capability_when_true() -> Result<()> {
     Ok(())
 }
 
+/// Tests that rename capability is statically registered during initialization if the client
+/// doesn't support dynamic registration, but the server is configured to support it.
+#[test]
+fn rename_available_without_dynamic_registration() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+
+    let server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(ClientOptions::default().with_experimental_rename(true))
+        .enable_rename_dynamic_registration(false)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let initialization_result = server.initialization_result().unwrap();
+    insta::assert_json_snapshot!(initialization_result.capabilities.rename_provider, @r#"
+    {
+      "prepareProvider": true
+    }
+    "#);
+
+    Ok(())
+}
+
 /// Tests that the server does not send a registration request for the rename capability if the
 /// client setting is set to false and dynamic registration is enabled.
 #[test]
-fn not_register_rename_capability_when_false() -> Result<()> {
+fn not_register_rename_capability_when_disabled() -> Result<()> {
     let workspace_root = SystemPath::new("foo");
 
     TestServerBuilder::new()?
