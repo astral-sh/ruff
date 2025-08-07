@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use ruff_diagnostics::Applicability;
-    use ruff_text_size::TextRange;
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::diagnostic::{
         Annotation, DiagnosticFormat, Severity,
@@ -398,6 +398,34 @@ print()
           | ----- print statement
           |
         help: Remove `print` statement
+        ");
+    }
+
+    /// Carriage return (`\r`) is a valid line-ending in Python, so we should normalize this to a
+    /// line feed (`\n`) for rendering. Otherwise we report a single long line for this case.
+    #[test]
+    fn normalize_carriage_return() {
+        let mut env = TestEnvironment::new();
+        env.add(
+            "example.py",
+            "# Keep parenthesis around preserved CR\rint(-\r    1)\rint(+\r    1)",
+        );
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::at(TextSize::new(39), TextSize::new(0)));
+        let annotation = Annotation::primary(span);
+        diagnostic.annotate(annotation);
+
+        insta::assert_snapshot!(env.render(&diagnostic), @"
+      error[test-diagnostic]: main diagnostic message
+       --> example.py:1:40
+        |
+      1 | # Keep parenthesis around preserved CR\rint(-\r    1)\rint(+
+        |                                       ^
+        |
         ");
     }
 }
