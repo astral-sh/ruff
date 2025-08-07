@@ -84,7 +84,6 @@ use crate::semantic_index::place::{PlaceExpr, PlaceExprRef};
 use crate::semantic_index::scope::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
@@ -1855,10 +1854,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We don't need to consider free variables that aren't explicitly declared `global` or
             // `nonlocal`, because we're in the middle of handling a binding, and bound variables
             // can't refer to an enclosing scope without those keywords.
-            if symbol.is_global() || symbol.is_nonlocal() {
+            if !symbol.is_local() {
                 let symbol_id = place_id.expect_symbol();
-                if let Some((enclosing_scope_id, enclosing_scope_symbol_id)) =
-                    place_table.definition_in_enclosing_scope(symbol_id)
+                if let Some((enclosing_scope_symbol_id, enclosing_scope_id)) =
+                    self.index.resolve_symbol(symbol_id, file_scope_id)
                 {
                     enclosing_use_def = self.index.use_def_map(enclosing_scope_id);
                     declarations = enclosing_use_def
@@ -1875,8 +1874,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         place_and_quals
                     } else if let PlaceExprRef::Symbol(symbol) = place {
                         let symbol_id = place_id.expect_symbol();
-
-                        if self.skip_non_global_scopes(file_scope_id, symbol_id)
+                        // Footgun: `place` and `symbol` were probably constructed with all-zero
+                        // flags. We need to read the place table to get correct flags.
+                        let symbol_with_flags = place_table.symbol(symbol_id);
+                        if symbol_with_flags.is_global()
                             || self.scope.file_scope_id(self.db()).is_global()
                         {
                             let module_type_declarations =
@@ -2028,19 +2029,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         self.bindings.insert(binding, bound_ty);
-    }
-
-    /// Returns `true` if `symbol_id` should be looked up in the global scope, skipping intervening
-    /// local scopes.
-    fn skip_non_global_scopes(
-        &self,
-        file_scope_id: FileScopeId,
-        symbol_id: ScopedSymbolId,
-    ) -> bool {
-        !file_scope_id.is_global()
-            && self
-                .index
-                .symbol_is_global_in_scope(symbol_id, file_scope_id)
     }
 
     fn add_declaration(
@@ -6554,12 +6542,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
                     // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
                     // flags. We need to read the place table to get correct flags.
-                    symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
+                    let symbol_with_flags = place_table.symbol(symbol_id);
+                    symbol_resolves_locally = symbol_with_flags.is_local();
                     // If we try to access a variable in a class before it has been defined, the
                     // lookup will fall back to global. See the comment on `Symbol::is_local`.
                     let fallback_to_global =
                         scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
-                    if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
+                    if symbol_with_flags.is_global() || fallback_to_global {
                         return global_symbol(self.db(), self.file(), symbol.name()).map_type(
                             |ty| {
                                 self.narrow_place_with_applicable_constraints(

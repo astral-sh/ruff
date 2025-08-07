@@ -305,22 +305,6 @@ impl<'db> SemanticIndex<'db> {
         self.scope_ids_by_scope.iter().copied()
     }
 
-    pub(crate) fn symbol_is_global_in_scope(
-        &self,
-        symbol: ScopedSymbolId,
-        scope: FileScopeId,
-    ) -> bool {
-        self.place_table(scope).symbol(symbol).is_global()
-    }
-
-    pub(crate) fn symbol_is_nonlocal_in_scope(
-        &self,
-        symbol: ScopedSymbolId,
-        scope: FileScopeId,
-    ) -> bool {
-        self.place_table(scope).symbol(symbol).is_nonlocal()
-    }
-
     /// Returns the id of the parent scope.
     pub(crate) fn parent_scope_id(&self, scope_id: FileScopeId) -> Option<FileScopeId> {
         let scope = self.scope(scope_id);
@@ -533,6 +517,54 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
+    }
+
+    // Find the scope that defines a given name. If `Symbol::is_local` is true, then the current
+    // scope is the defining scope, and this function just returns its arguments. But if
+    // `Symbol::is_local` is false, then some enclosing scope might be the defining scope. This
+    // function returns `None` if no defining scope is found, which could mean a built-in like
+    // `print` or `int`, or a `NameError`, or a more obscure case like a direct insertion into
+    // `globals()`.
+    //
+    // XXX: This has the same limitation documented on `Symbol::is_local`, related to the global
+    // fallback corner case in class bodies.
+    pub(crate) fn resolve_symbol(
+        &self,
+        symbol_id: ScopedSymbolId,
+        scope_id: FileScopeId,
+    ) -> Option<(ScopedSymbolId, FileScopeId)> {
+        let name = self.place_tables[scope_id].symbol(symbol_id).name();
+        // Note that the first element of `ancestor_scopes` is the current scope.
+        for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(scope_id) {
+            // Skip class bodies (other than the current scope, if it's a class body), which can't
+            // resolve free variables from nested scopes.
+            if ancestor_scope.kind().is_class() && ancestor_scope_id != scope_id {
+                continue;
+            }
+            let place_table = &self.place_tables[ancestor_scope_id];
+            let Some(ancestor_symbol_id) = place_table.symbol_id(name) else {
+                // There's no symbol by this name in this scope.
+                continue;
+            };
+            let symbol = place_table.symbol(ancestor_symbol_id);
+            // If the symbol is bound or declared here, and not marked `nonlocal` or `global`, then
+            // it resolves here.
+            if symbol.is_local() {
+                return Some((ancestor_symbol_id, ancestor_scope_id));
+            }
+            // If the symbol is explicitly `global` here, then it resolves to the global/module
+            // scope. It's a semantic syntax error if a `nonlocal` variable resolves to a global,
+            // but we don't enforce that here (see `SemanticIndexBuilder::pop_scope`).
+            if symbol.is_global() {
+                let global_symbol_id = self.place_tables[FileScopeId::global()]
+                    .symbol_id(symbol.name())
+                    .expect("we created a global place when we visited the `global` statement");
+                return Some((global_symbol_id, FileScopeId::global()));
+            }
+            // Otherwise, keep walking.
+        }
+        // We ran out of ancestor scopes without finding this name.
+        None
     }
 }
 
