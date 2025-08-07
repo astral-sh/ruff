@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.12.8
+
+### Preview features
+
+- \[`flake8-use-pathlib`\] Expand `PTH201` to check all `PurePath` subclasses ([#19440](https://github.com/astral-sh/ruff/pull/19440))
+
+### Bug fixes
+
+- \[`flake8-blind-except`\] Change `BLE001` to correctly parse exception tuples ([#19747](https://github.com/astral-sh/ruff/pull/19747))
+- \[`flake8-errmsg`\] Exclude `typing.cast` from `EM101` ([#19656](https://github.com/astral-sh/ruff/pull/19656))
+- \[`flake8-simplify`\] Fix raw string handling in `SIM905` for embedded quotes ([#19591](https://github.com/astral-sh/ruff/pull/19591))
+- \[`flake8_import_conventions`\] Avoid false positives for NFKC-normalized `__debug__` import aliases in ICN001 ([#19411](https://github.com/astral-sh/ruff/pull/19411))
+- \[`isort`\] Fix syntax error after docstring ending with backslash (`I002`) ([#19505](https://github.com/astral-sh/ruff/pull/19505))
+- \[`pylint`\] Mark `PLC0207` fixes as unsafe when `*args` unpacking is present ([#19679](https://github.com/astral-sh/ruff/pull/19679))
+- \[`pyupgrade`\] Prevent infinite loop with `I002` (`UP010`, `UP035`) ([#19413](https://github.com/astral-sh/ruff/pull/19413))
+- \[`ruff`\] Parenthesize generator expressions in f-strings (`RUF010`) ([#19434](https://github.com/astral-sh/ruff/pull/19434))
+
+### Rule changes
+
+- Always expand tabs to four spaces in diagnostics ([#19618](https://github.com/astral-sh/ruff/pull/19618))
+- Don't flag `pyrefly` pragmas as unused code (`ERA001`) ([#19731](https://github.com/astral-sh/ruff/pull/19731))
+- Include column numbers in GitLab output format. ([#19708](https://github.com/astral-sh/ruff/pull/19708))
+
+### Documentation
+
+- Fix a typo in the docs ([#19706](https://github.com/astral-sh/ruff/pull/19706))
+- Fix copy and line separator colors in dark mode ([#19630](https://github.com/astral-sh/ruff/pull/19630))
+- Fix link: unused_import.rs ([#19648](https://github.com/astral-sh/ruff/pull/19648))
+- \[`refurb`\] Make example error out-of-the-box (`FURB157`) ([#19695](https://github.com/astral-sh/ruff/pull/19695))
+- \[`refurb`\] Make example error out-of-the-box (`FURB164`) ([#19673](https://github.com/astral-sh/ruff/pull/19673))
+- \[`refurb`\] Make example error out-of-the-box (`FURB180`) ([#19672](https://github.com/astral-sh/ruff/pull/19672))
+
+### Other changes
+
+- Update pre-commit's `ruff` id ([#19654](https://github.com/astral-sh/ruff/pull/19654))
+
 ## 0.12.7
 
 This is a follow-up release to 0.12.6. Because of an issue in the package metadata, 0.12.6 failed to publish fully to PyPI and has been yanked. Similarly, there is no GitHub release or Git tag for 0.12.6. The contents of the 0.12.7 release are identical to 0.12.6, except for the updated metadata.
