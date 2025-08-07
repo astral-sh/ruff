@@ -419,13 +419,16 @@ print()
         let annotation = Annotation::primary(span);
         diagnostic.annotate(annotation);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @"
-      error[test-diagnostic]: main diagnostic message
-       --> example.py:1:40
-        |
-      1 | # Keep parenthesis around preserved CR\rint(-\r    1)\rint(+
-        |                                       ^
-        |
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:2:1
+          |
+        1 | # Keep parenthesis around preserved CR
+        2 | int(-
+          | ^
+        3 |     1)
+        4 | int(+
+          |
         ");
     }
 }

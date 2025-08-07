@@ -1000,7 +1000,12 @@ fn replace_unprintable<'r>(
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        if let Some(printable) = unprintable_replacement(c) {
+        // normalize `\r` line endings but don't double `\r\n`
+        if c == '\r' && !matches!(source.get(index + 1..index + 2), Some("\n")) {
+            result.push_str(&source[last_end..index]);
+            result.push('\n');
+            last_end = index + 1;
+        } else if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
 
             let len = printable.text_len().to_u32();
