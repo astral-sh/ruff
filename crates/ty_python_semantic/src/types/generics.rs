@@ -870,11 +870,11 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2))
-                if nominal1.tuple_spec(self.db).is_some() =>
+            (Type::NominalInstance(formal), Type::NominalInstance(actual))
+                if formal.tuple_spec(self.db).is_some() =>
             {
                 if let (Some(formal_tuple), Some(actual_tuple)) =
-                    (nominal1.tuple_spec(self.db), nominal2.tuple_spec(self.db))
+                    (formal.tuple_spec(self.db), actual.tuple_spec(self.db))
                 {
                     let Some(most_precise_length) =
                         formal_tuple.len().most_precise(actual_tuple.len())
