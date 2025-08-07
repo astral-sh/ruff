@@ -1,11 +1,11 @@
 use lsp_types::{
     ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
     DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
-    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    InlayHintServerCapabilities, MarkupKind, OneOf, SelectionRangeProviderCapability,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
 
 use crate::PositionEncoding;
@@ -31,6 +31,7 @@ bitflags::bitflags! {
         const FILE_WATCHER_SUPPORT = 1 << 12;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 13;
         const WORKSPACE_CONFIGURATION = 1 << 14;
+        const RENAME_DYNAMIC_REGISTRATION = 1 << 15;
     }
 }
 
@@ -108,6 +109,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports dynamic registration for diagnostic capabilities.
     pub(crate) const fn supports_diagnostic_dynamic_registration(self) -> bool {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
+    }
+
+    /// Returns `true` if the client supports dynamic registration for rename capabilities.
+    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
+        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -246,6 +252,13 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
+        if text_document
+            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
+            .unwrap_or_default()
+        {
+            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
+        }
+
         if client_capabilities
             .window
             .as_ref()
@@ -289,10 +302,6 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
-        rename_provider: Some(OneOf::Right(RenameOptions {
-            prepare_provider: Some(true),
-            work_done_progress_options: WorkDoneProgressOptions::default(),
-        })),
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {

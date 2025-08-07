@@ -14,7 +14,7 @@ use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 
 use crate::logging::LogLevel;
 
-use super::settings::{GlobalSettings, WorkspaceSettings};
+use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
 
 /// Initialization options that are set once at server startup that never change.
 ///
@@ -107,6 +107,12 @@ impl ClientOptions {
     }
 
     #[must_use]
+    pub fn with_experimental_rename(mut self, enabled: bool) -> Self {
+        self.global.experimental.get_or_insert_default().rename = Some(enabled);
+        self
+    }
+
+    #[must_use]
     pub fn with_unknown(mut self, unknown: HashMap<String, Value>) -> Self {
         self.unknown = unknown;
         self
@@ -122,12 +128,23 @@ impl ClientOptions {
 pub(crate) struct GlobalOptions {
     /// Diagnostic mode for the language server.
     diagnostic_mode: Option<DiagnosticMode>,
+
+    /// Experimental features that the server provides on an opt-in basis.
+    experimental: Option<Experimental>,
 }
 
 impl GlobalOptions {
     pub(crate) fn into_settings(self) -> GlobalSettings {
+        let experimental = self
+            .experimental
+            .map(|experimental| ExperimentalSettings {
+                rename: experimental.rename.unwrap_or_default(),
+            })
+            .unwrap_or_default();
+
         GlobalSettings {
             diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
+            experimental,
         }
     }
 }
@@ -236,6 +253,13 @@ impl Combine for DiagnosticMode {
             *self = DiagnosticMode::Workspace;
         }
     }
+}
+
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Experimental {
+    /// Whether to enable the experimental symbol rename feature.
+    rename: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
