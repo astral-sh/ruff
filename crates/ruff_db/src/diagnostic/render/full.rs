@@ -431,4 +431,28 @@ print()
           |
         ");
     }
+
+    /// Without stripping the BOM, we report an error in column 2, unlike Ruff.
+    #[test]
+    fn strip_bom() {
+        let mut env = TestEnvironment::new();
+        env.add("example.py", "\u{feff}import foo");
+        env.format(DiagnosticFormat::Full);
+
+        let mut diagnostic = env.err().build();
+        let span = env
+            .path("example.py")
+            .with_range(TextRange::at(TextSize::new(3), TextSize::new(0)));
+        let annotation = Annotation::primary(span);
+        diagnostic.annotate(annotation);
+
+        insta::assert_snapshot!(env.render(&diagnostic), @r"
+        error[test-diagnostic]: main diagnostic message
+         --> example.py:1:2
+          |
+        1 | ﻿import foo
+          | ^
+          |
+        ");
+    }
 }
