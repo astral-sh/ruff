@@ -1,6 +1,5 @@
 use crate::semantic_index::member::{
-    Member, MemberExpr, MemberExprRef, MemberSegment, MemberTable, MemberTableBuilder,
-    ScopedMemberId,
+    Member, MemberExpr, MemberExprRef, MemberTable, MemberTableBuilder, ScopedMemberId,
 };
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
@@ -37,48 +36,14 @@ impl PlaceExpr {
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub(crate) fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
-        let mut current = expr.into();
-        let mut segments = smallvec::SmallVec::new_const();
+        let expr = expr.into();
 
-        loop {
-            match current {
-                ast::ExprRef::Name(name) => {
-                    if segments.is_empty() {
-                        return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
-                    }
-
-                    return Some(PlaceExpr::Member(Member::new(MemberExpr::new(
-                        name.id.clone(),
-                        segments,
-                    ))));
-                }
-                ast::ExprRef::Attribute(attribute) => {
-                    segments.push(MemberSegment::Attribute(attribute.attr.id.clone()));
-                    current = ast::ExprRef::from(&attribute.value);
-                }
-                ast::ExprRef::Subscript(subscript) => {
-                    match &*subscript.slice {
-                        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                            value: ast::Number::Int(index),
-                            ..
-                        }) => {
-                            segments.push(MemberSegment::IntSubscript(index.clone()));
-                        }
-                        ast::Expr::StringLiteral(string) => {
-                            segments.push(MemberSegment::StringSubscript(string.value.to_string()));
-                        }
-                        _ => {
-                            return None;
-                        }
-                    }
-
-                    current = ast::ExprRef::from(&subscript.value);
-                }
-                _ => {
-                    return None;
-                }
-            }
+        if let ast::ExprRef::Name(name) = expr {
+            return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
+
+        let member_expression = MemberExpr::try_from_expr(expr)?;
+        Some(Self::Member(Member::new(member_expression)))
     }
 }
 
@@ -132,7 +97,7 @@ impl<'a> PlaceExprRef<'a> {
     pub(crate) fn num_member_segments(self) -> usize {
         match self {
             PlaceExprRef::Symbol(_) => 0,
-            PlaceExprRef::Member(member) => member.expression().member_segments().len(),
+            PlaceExprRef::Member(member) => member.expression().num_segments(),
         }
     }
 }
@@ -517,24 +482,20 @@ enum ParentPlaceIterState<'a> {
 
 impl<'a> ParentPlaceIterState<'a> {
     fn parent_state(
-        expression: MemberExprRef<'a>,
+        expression: &MemberExprRef<'a>,
         symbols: &'a SymbolTable,
         members: &'a MemberTable,
     ) -> Self {
-        let segments = expression.rev_member_segments();
-        let segments = &segments[1..];
-
-        if segments.is_empty() {
-            Self::Symbol {
-                symbol_name: expression.symbol_name(),
-                symbols,
-            }
-        } else {
-            Self::Member {
-                next_member: MemberExprRef::from_raw(expression.symbol_name(), segments),
+        match expression.parent() {
+            Some(parent) => Self::Member {
+                next_member: parent,
                 symbols,
                 members,
-            }
+            },
+            None => Self::Symbol {
+                symbol_name: expression.symbol_name(),
+                symbols,
+            },
         }
     }
 }
@@ -549,9 +510,10 @@ impl<'a> ParentPlaceIter<'a> {
         symbol_table: &'a SymbolTable,
         member_table: &'a MemberTable,
     ) -> Self {
+        let expr_ref = expression.as_ref();
         ParentPlaceIter {
             state: Some(ParentPlaceIterState::parent_state(
-                expression.as_ref(),
+                &expr_ref,
                 symbol_table,
                 member_table,
             )),
@@ -578,7 +540,7 @@ impl Iterator for ParentPlaceIter<'_> {
                     next_member,
                 } => {
                     self.state = Some(ParentPlaceIterState::parent_state(
-                        next_member,
+                        &next_member,
                         symbols,
                         members,
                     ));

@@ -4,6 +4,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_semantic::ImportAliasResolution;
 
 /// Navigate to the definition of a symbol.
 ///
@@ -22,7 +23,12 @@ pub fn goto_definition(
     // Create a StubMapper to map from stub files to source files
     let stub_mapper = StubMapper::new(db);
 
-    let definition_targets = goto_target.get_definition_targets(file, db, Some(&stub_mapper))?;
+    let definition_targets = goto_target.get_definition_targets(
+        file,
+        db,
+        Some(&stub_mapper),
+        ImportAliasResolution::ResolveAliases,
+    )?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),

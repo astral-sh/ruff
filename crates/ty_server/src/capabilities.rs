@@ -1,4 +1,14 @@
-use lsp_types::{ClientCapabilities, DiagnosticOptions, MarkupKind, WorkDoneProgressOptions};
+use lsp_types::{
+    ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
+    DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
+    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
+    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
+    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+};
+
+use crate::PositionEncoding;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -246,6 +256,78 @@ impl ResolvedClientCapabilities {
         }
 
         flags
+    }
+}
+
+pub(crate) fn server_capabilities(
+    position_encoding: PositionEncoding,
+    resolved_client_capabilities: ResolvedClientCapabilities,
+) -> ServerCapabilities {
+    let diagnostic_provider =
+        if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
+            // If the client supports dynamic registration, we will register the diagnostic
+            // capabilities dynamically based on the `ty.diagnosticMode` setting.
+            None
+        } else {
+            // Otherwise, we always advertise support for workspace diagnostics.
+            Some(DiagnosticServerCapabilities::Options(
+                server_diagnostic_options(true),
+            ))
+        };
+
+    ServerCapabilities {
+        position_encoding: Some(position_encoding.into()),
+        diagnostic_provider,
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::INCREMENTAL),
+                ..Default::default()
+            },
+        )),
+        type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        declaration_provider: Some(DeclarationCapability::Simple(true)),
+        references_provider: Some(OneOf::Left(true)),
+        rename_provider: Some(OneOf::Right(RenameOptions {
+            prepare_provider: Some(true),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
+        })),
+        document_highlight_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        signature_help_provider: Some(SignatureHelpOptions {
+            trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
+            retrigger_characters: Some(vec![")".to_string()]),
+            work_done_progress_options: WorkDoneProgressOptions::default(),
+        }),
+        inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
+            InlayHintOptions::default(),
+        ))),
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                work_done_progress_options: WorkDoneProgressOptions::default(),
+                legend: SemanticTokensLegend {
+                    token_types: ty_ide::SemanticTokenType::all()
+                        .iter()
+                        .map(|token_type| token_type.as_lsp_concept().into())
+                        .collect(),
+                    token_modifiers: ty_ide::SemanticTokenModifier::all_names()
+                        .iter()
+                        .map(|&s| s.into())
+                        .collect(),
+                },
+                range: Some(true),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+            },
+        )),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(vec!['.'.to_string()]),
+            ..Default::default()
+        }),
+        selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+        document_symbol_provider: Some(OneOf::Left(true)),
+        workspace_symbol_provider: Some(OneOf::Left(true)),
+        ..Default::default()
     }
 }
 
