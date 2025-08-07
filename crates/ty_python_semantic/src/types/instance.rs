@@ -89,7 +89,11 @@ impl<'db> Type<'db> {
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-pub struct NominalInstanceType<'db>(NominalInstanceInner<'db>);
+pub struct NominalInstanceType<'db>(
+    // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
+    // is through the `Type::instance` constructor function.
+    NominalInstanceInner<'db>,
+);
 
 pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
