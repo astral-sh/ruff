@@ -700,8 +700,9 @@ impl<'db> Type<'db> {
                 // existential type representing "all lists, containing any type." We currently
                 // represent this by replacing `Any` in invariant position with an unresolved type
                 // variable.
-                TypeVarVariance::Invariant => {
-                    Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+                TypeVarVariance::Invariant => Type::TypeVar(BoundTypeVarInstance::new(
+                    db,
+                    TypeVarInstance::new(
                         db,
                         Name::new_static("T_all"),
                         None,
@@ -709,8 +710,9 @@ impl<'db> Type<'db> {
                         variance,
                         None,
                         TypeVarKind::Pep695,
-                    )))
-                }
+                    ),
+                    BindingContext::Synthetic,
+                )),
                 TypeVarVariance::Covariant => Type::object(db),
                 TypeVarVariance::Contravariant => Type::Never,
                 TypeVarVariance::Bivariant => unreachable!(),
@@ -5241,7 +5243,8 @@ impl<'db> Type<'db> {
                         )
                     }
                 };
-                Some(Type::TypeVar(
+                Some(Type::TypeVar(BoundTypeVarInstance::new(
+                    db,
                     TypeVarInstance::new(
                         db,
                         Name::new(format!("{}'instance", typevar.name(db))),
@@ -5250,9 +5253,9 @@ impl<'db> Type<'db> {
                         typevar.variance(db),
                         None,
                         typevar.kind(db),
-                    )
-                    .with_binding_context(db, bound_typevar.binding_context(db)),
-                ))
+                    ),
+                    bound_typevar.binding_context(db),
+                )))
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
@@ -5760,7 +5763,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
+                    Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context))
                 }
             }
 
@@ -5892,7 +5895,7 @@ impl<'db> Type<'db> {
                     bound_typevar.typevar(db).kind(db),
                     TypeVarKind::Legacy | TypeVarKind::Implicit
                 ) && binding_context.is_none_or(|binding_context| {
-                    bound_typevar.binding_context(db) == binding_context
+                    bound_typevar.binding_context(db) == BindingContext::Definition(binding_context)
                 }) {
                     typevars.insert(bound_typevar);
                 }
@@ -6224,7 +6227,7 @@ pub enum TypeMapping<'a, 'db> {
     PromoteLiterals,
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
-    BindLegacyTypevars(Definition<'db>),
+    BindLegacyTypevars(BindingContext<'db>),
 }
 
 fn walk_type_mapping<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -6877,7 +6880,7 @@ impl<'db> TypeVarInstance<'db> {
         db: &'db dyn Db,
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance::new(db, self, binding_context)
+        BoundTypeVarInstance::new(db, self, BindingContext::Definition(binding_context))
     }
 
     pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
@@ -6931,15 +6934,32 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
+/// Where a type variable is bound and usable.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
+pub enum BindingContext<'db> {
+    /// The definition of the generic class, function, or type alias that binds this typevar.
+    Definition(Definition<'db>),
+    /// The typevar is synthesized internally, and is not associated with a particular definition
+    /// in the source, but is still bound and eligible for specialization inference.
+    Synthetic,
+}
+
+impl<'db> BindingContext<'db> {
+    fn name(self, db: &'db dyn Db) -> Option<String> {
+        match self {
+            BindingContext::Definition(definition) => definition.name(db),
+            BindingContext::Synthetic => None,
+        }
+    }
+}
+
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
 #[salsa::interned(debug)]
 #[derive(PartialOrd, Ord)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
-
-    /// The definition of the generic class, function, or type alias that binds this typevar.
-    binding_context: Definition<'db>,
+    binding_context: BindingContext<'db>,
 }
 
 // The Salsa heap is tracked separately.

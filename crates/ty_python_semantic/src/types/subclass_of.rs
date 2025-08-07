@@ -3,8 +3,8 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -90,17 +90,21 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+                    Type::TypeVar(BoundTypeVarInstance::new(
                         db,
-                        Name::new_static("T_all"),
-                        None,
-                        Some(TypeVarBoundOrConstraints::UpperBound(
-                            KnownClass::Type.to_instance(db),
-                        )),
-                        variance,
-                        None,
-                        TypeVarKind::Pep695,
-                    )))
+                        TypeVarInstance::new(
+                            db,
+                            Name::new_static("T_all"),
+                            None,
+                            Some(TypeVarBoundOrConstraints::UpperBound(
+                                KnownClass::Type.to_instance(db),
+                            )),
+                            variance,
+                            None,
+                            TypeVarKind::Pep695,
+                        ),
+                        BindingContext::Synthetic,
+                    ))
                 }
                 TypeVarVariance::Bivariant => unreachable!(),
             },

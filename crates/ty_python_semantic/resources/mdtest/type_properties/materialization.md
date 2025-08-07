@@ -44,7 +44,7 @@ reveal_type(top_materialization(Callable[[Any], None]))  # revealed: (Never, /) 
 The invariant position is replaced with an unresolved type variable.
 
 ```py
-reveal_type(top_materialization(list[Any]))  # revealed: list[typing.TypeVar[T_all]]
+reveal_type(top_materialization(list[Any]))  # revealed: list[T_all]
 ```
 
 ### Bottom materialization
@@ -70,7 +70,7 @@ The invariant position is replaced in the same way as the top materialization, w
 type variable.
 
 ```py
-reveal_type(bottom_materialization(list[Any]))  # revealed: list[typing.TypeVar[T_all]]
+reveal_type(bottom_materialization(list[Any]))  # revealed: list[T_all]
 ```
 
 ## Fully static types
@@ -198,16 +198,14 @@ def _(callable: Callable[[tuple[Any, int], tuple[str, Unknown]], None]) -> None:
 And, similarly for an invariant position.
 
 ```py
-reveal_type(top_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[typing.TypeVar[T_all], int]]
-reveal_type(bottom_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[typing.TypeVar[T_all], int]]
+reveal_type(top_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T_all, int]]
+reveal_type(bottom_materialization(list[tuple[Any, int]]))  # revealed: list[tuple[T_all, int]]
 
-reveal_type(top_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, typing.TypeVar[T_all]]]
-reveal_type(bottom_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, typing.TypeVar[T_all]]]
+reveal_type(top_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T_all]]
+reveal_type(bottom_materialization(list[tuple[str, Unknown]]))  # revealed: list[tuple[str, T_all]]
 
-# revealed: list[tuple[typing.TypeVar[T_all], int, typing.TypeVar[T_all]]]
-reveal_type(top_materialization(list[tuple[Any, int, Unknown]]))
-# revealed: list[tuple[typing.TypeVar[T_all], int, typing.TypeVar[T_all]]]
-reveal_type(bottom_materialization(list[tuple[Any, int, Unknown]]))
+reveal_type(top_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T_all, int, T_all]]
+reveal_type(bottom_materialization(list[tuple[Any, int, Unknown]]))  # revealed: list[tuple[T_all, int, T_all]]
 ```
 
 ## Union
@@ -246,14 +244,14 @@ def _(callable: Callable[[Any | int, str | Unknown], None]) -> None:
 And, similarly for an invariant position.
 
 ```py
-reveal_type(top_materialization(list[Any | int]))  # revealed: list[typing.TypeVar[T_all] | int]
-reveal_type(bottom_materialization(list[Any | int]))  # revealed: list[typing.TypeVar[T_all] | int]
+reveal_type(top_materialization(list[Any | int]))  # revealed: list[T_all | int]
+reveal_type(bottom_materialization(list[Any | int]))  # revealed: list[T_all | int]
 
-reveal_type(top_materialization(list[str | Unknown]))  # revealed: list[str | typing.TypeVar[T_all]]
-reveal_type(bottom_materialization(list[str | Unknown]))  # revealed: list[str | typing.TypeVar[T_all]]
+reveal_type(top_materialization(list[str | Unknown]))  # revealed: list[str | T_all]
+reveal_type(bottom_materialization(list[str | Unknown]))  # revealed: list[str | T_all]
 
-reveal_type(top_materialization(list[Any | int | Unknown]))  # revealed: list[typing.TypeVar[T_all] | int]
-reveal_type(bottom_materialization(list[Any | int | Unknown]))  # revealed: list[typing.TypeVar[T_all] | int]
+reveal_type(top_materialization(list[Any | int | Unknown]))  # revealed: list[T_all | int]
+reveal_type(bottom_materialization(list[Any | int | Unknown]))  # revealed: list[T_all | int]
 ```
 
 ## Intersection
@@ -278,8 +276,8 @@ class Foo: ...
 # revealed: Foo & tuple[str]
 reveal_type(bottom_materialization(Intersection[Any | Foo, tuple[str]]))
 
-reveal_type(top_materialization(Intersection[list[Any], list[int]]))  # revealed: list[typing.TypeVar[T_all]] & list[int]
-reveal_type(bottom_materialization(Intersection[list[Any], list[int]]))  # revealed: list[typing.TypeVar[T_all]] & list[int]
+reveal_type(top_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]
+reveal_type(bottom_materialization(Intersection[list[Any], list[int]]))  # revealed: list[T_all] & list[int]
 ```
 
 ## Negation (via `Not`)
@@ -317,8 +315,9 @@ reveal_type(bottom_materialization(type[Unknown]))  # revealed: Never
 reveal_type(top_materialization(type[int | Any]))  # revealed: type
 reveal_type(bottom_materialization(type[int | Any]))  # revealed: type[int]
 
-reveal_type(top_materialization(list[type[Any]]))  # revealed: list[typing.TypeVar[T_all: type]]
-reveal_type(bottom_materialization(list[type[Any]]))  # revealed: list[typing.TypeVar[T_all: type]]
+# Here, `T` has an upper bound of `type`
+reveal_type(top_materialization(list[type[Any]]))  # revealed: list[T_all]
+reveal_type(bottom_materialization(list[type[Any]]))  # revealed: list[T_all]
 ```
 
 ## Type variables
@@ -379,8 +378,8 @@ class GenericCovariant(Generic[T_co]):
 class GenericContravariant(Generic[T_contra]):
     pass
 
-reveal_type(top_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[typing.TypeVar[T_all]]
-reveal_type(bottom_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[typing.TypeVar[T_all]]
+reveal_type(top_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T_all]
+reveal_type(bottom_materialization(GenericInvariant[Any]))  # revealed: GenericInvariant[T_all]
 
 reveal_type(top_materialization(GenericCovariant[Any]))  # revealed: GenericCovariant[object]
 reveal_type(bottom_materialization(GenericCovariant[Any]))  # revealed: GenericCovariant[Never]
@@ -396,10 +395,10 @@ from typing import Callable
 from ty_extensions import TypeOf
 
 def invariant(callable: Callable[[GenericInvariant[Any]], None]) -> None:
-    # revealed: (GenericInvariant[typing.TypeVar[T_all]], /) -> None
+    # revealed: (GenericInvariant[T_all], /) -> None
     reveal_type(top_materialization(TypeOf[callable]))
 
-    # revealed: (GenericInvariant[typing.TypeVar[T_all]], /) -> None
+    # revealed: (GenericInvariant[T_all], /) -> None
     reveal_type(bottom_materialization(TypeOf[callable]))
 
 def covariant(callable: Callable[[GenericCovariant[Any]], None]) -> None:
