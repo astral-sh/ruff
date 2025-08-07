@@ -6758,6 +6758,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
 
+                let has_root_place_been_reassigned = || {
+                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                    enclosing_place_table
+                        .parents(place_expr)
+                        .any(|enclosing_root_place_id| {
+                            enclosing_place_table
+                                .place(enclosing_root_place_id)
+                                .is_bound()
+                        })
+                };
+
                 // If the reference is in a nested eager scope, we need to look for the place at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
@@ -6799,28 +6810,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
                         EnclosingSnapshotResult::NotFound => {
-                            let enclosing_place_table =
-                                self.index.place_table(enclosing_scope_file_id);
-                            for enclosing_root_place_id in enclosing_place_table.parents(place_expr)
-                            {
-                                let enclosing_root_place =
-                                    enclosing_place_table.place(enclosing_root_place_id);
-                                if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) = place(
-                                        db,
-                                        enclosing_scope_id,
-                                        enclosing_root_place,
-                                        ConsideredDefinitions::AllReachable,
-                                    )
-                                    .place
-                                    {
-                                        return Place::Unbound.into();
-                                    }
-                                }
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
                             }
                             continue;
                         }
-                        EnclosingSnapshotResult::NoLongerInEagerContext => {}
+                        EnclosingSnapshotResult::NoLongerInEagerContext => {
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
+                            }
+                        }
                     }
                 }
 
