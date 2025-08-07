@@ -432,7 +432,7 @@ def f(x: HeterogeneousTupleSubclass):
     # TODO: should be `I2`
     reveal_type(c)  # revealed: I0 | I1 | I2
 
-    # TODO: should emit a diagnostic ([invalid-assignment] "Not enough values to unpack: Expected 4")
+    # TODO: should emit a diagnostic ([invalid-assignment] "Too many values to unpack: Expected 2")
     d, e = x
 
     reveal_type(d)  # revealed: I0 | I1 | I2
