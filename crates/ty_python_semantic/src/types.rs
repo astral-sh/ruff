@@ -8338,21 +8338,18 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        let result = self
+        let place_and_qualifiers = self
             .module(db)
             .file(db)
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default();
 
-        // If the normal lookup failed, try to call the module's __getattr__ function
-        if result.place.is_unbound() {
-            let getattr_result = self.try_module_getattr(db, name);
-            if !getattr_result.place.is_unbound() {
-                return getattr_result;
-            }
+        // If the normal lookup failed, try to call the module's `__getattr__` function
+        if place_and_qualifiers.place.is_unbound() {
+            return self.try_module_getattr(db, name);
         }
 
-        result
+        place_and_qualifiers
     }
 }
 
