@@ -3282,7 +3282,32 @@ impl<'db> Type<'db> {
                     policy,
                 );
 
-                let custom_getattr_result = || self.try_custom_getattr(db, &name, false);
+                let custom_getattr_result = || {
+                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
+                    // dynamic imports. We explicitly hide it here to prevent arbitrary attributes
+                    // from being available on modules. Same for `types.GenericAlias` - its
+                    // `__getattr__` method will delegate to `__origin__` to allow looking up
+                    // attributes on the original type. But in typeshed its return type is `Any`.
+                    // It will need a special handling, so it remember the origin type to properly
+                    // resolve the attribute.
+                    if matches!(
+                        self.into_nominal_instance()
+                            .and_then(|instance| instance.class.known(db)),
+                        Some(KnownClass::ModuleType | KnownClass::GenericAlias)
+                    ) {
+                        return Place::Unbound.into();
+                    }
+
+                    self.try_call_dunder(
+                        db,
+                        "__getattr__",
+                        CallArguments::positional([Type::string_literal(db, &name)]),
+                    )
+                    .map(|outcome| Place::bound(outcome.return_type(db)))
+                    // TODO: Handle call errors here.
+                    .unwrap_or(Place::Unbound)
+                    .into()
+                };
 
                 let custom_getattribute_result = || {
                     // Avoid cycles when looking up `__getattribute__`
@@ -4657,47 +4682,6 @@ impl<'db> Type<'db> {
             }
             Place::Unbound => Err(CallDunderError::MethodNotAvailable),
         }
-    }
-
-    /// Try to call `__getattr__` on the given type, respecting restrictions for fake typeshed methods.
-    ///
-    /// This helper function encapsulates the logic for calling `__getattr__` while preventing
-    /// the fake `__getattr__` methods on `types.ModuleType` and `types.GenericAlias` from being used.
-    fn try_custom_getattr(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        allow_module_type_getattr: bool,
-    ) -> PlaceAndQualifiers<'db> {
-        // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
-        // dynamic imports. We explicitly hide it here to prevent arbitrary attributes
-        // from being available on modules. Same for `types.GenericAlias` - its
-        // `__getattr__` method will delegate to `__origin__` to allow looking up
-        // attributes on the original type. But in typeshed its return type is `Any`.
-        // It will need a special handling, so it remember the origin type to properly
-        // resolve the attribute.
-        //
-        // However, for ModuleLiteral types with real module-level __getattr__, we should
-        // allow it to be called.
-        if !allow_module_type_getattr
-            && matches!(
-                self.into_nominal_instance()
-                    .and_then(|instance| instance.class.known(db)),
-                Some(KnownClass::ModuleType | KnownClass::GenericAlias)
-            )
-        {
-            return Place::Unbound.into();
-        }
-
-        self.try_call_dunder(
-            db,
-            "__getattr__",
-            CallArguments::positional([Type::string_literal(db, name)]),
-        )
-        .map(|outcome| Place::bound(outcome.return_type(db)))
-        // TODO: Handle call errors here.
-        .unwrap_or(Place::Unbound)
-        .into()
     }
 
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
