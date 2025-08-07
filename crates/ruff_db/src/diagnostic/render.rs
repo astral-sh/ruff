@@ -655,6 +655,22 @@ impl<'r> RenderableSnippet<'r> {
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
+        // Strip the BOM from the beginning of the snippet, if present. Doing this here saves us the
+        // trouble of updating the annotation ranges in `replace_unprintable`, and also allows us to
+        // check that the BOM is at the very beginning of the file, not just the beginning of the
+        // snippet.
+        const BOM: char = '\u{feff}';
+        let bom_len = BOM.text_len();
+        let (snippet, snippet_start) =
+            if snippet_start == TextSize::default() && snippet.starts_with(BOM) {
+                (
+                    &snippet[bom_len.to_usize()..],
+                    snippet_start + TextSize::new(bom_len.to_u32()),
+                )
+            } else {
+                (snippet, snippet_start)
+            };
+
         let annotations = anns
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))

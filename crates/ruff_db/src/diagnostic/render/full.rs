@@ -448,9 +448,9 @@ print()
 
         insta::assert_snapshot!(env.render(&diagnostic), @r"
         error[test-diagnostic]: main diagnostic message
-         --> example.py:1:2
+         --> example.py:1:1
           |
-        1 | ﻿import foo
+        1 | import foo
           | ^
           |
         ");
