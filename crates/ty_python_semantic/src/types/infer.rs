@@ -9026,18 +9026,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                    let typevar = bind_typevar(
-                        self.db(),
-                        self.module(),
-                        self.index,
-                        self.scope().file_scope_id(self.db()),
-                        self.typevar_binding_context,
-                        *typevar,
-                    )
-                    .unwrap_or(*typevar);
-                    Ok(typevar)
-                }
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
+                    self.db(),
+                    self.module(),
+                    self.index,
+                    self.scope().file_scope_id(self.db()),
+                    self.typevar_binding_context,
+                    *typevar,
+                )
+                .ok_or(GenericContextError::InvalidArgument),
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(NominalInstanceType { class, .. })
                     if matches!(

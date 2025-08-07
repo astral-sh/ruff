@@ -5346,7 +5346,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeVar(typevar) => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
-                    let typevar = bind_typevar(
+                    Ok(bind_typevar(
                         db,
                         &module,
                         index,
@@ -5354,8 +5354,8 @@ impl<'db> Type<'db> {
                         typevar_binding_context,
                         *typevar,
                     )
-                    .unwrap_or(*typevar);
-                    Ok(Type::TypeVar(typevar))
+                    .map(Type::TypeVar)
+                    .unwrap_or(*self))
                 }
                 KnownInstanceType::Deprecated(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Deprecated],
@@ -5427,7 +5427,7 @@ impl<'db> Type<'db> {
                         None,
                         TypeVarKind::Implicit,
                     );
-                    let typevar = bind_typevar(
+                    Ok(bind_typevar(
                         db,
                         &module,
                         index,
@@ -5435,8 +5435,8 @@ impl<'db> Type<'db> {
                         typevar_binding_context,
                         typevar,
                     )
-                    .unwrap_or(typevar);
-                    Ok(Type::TypeVar(typevar))
+                    .map(Type::TypeVar)
+                    .unwrap_or(*self))
                 }
                 SpecialFormType::TypeAlias => Ok(Type::Dynamic(DynamicType::TodoTypeAlias)),
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
@@ -5730,6 +5730,12 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(partial) => {
                     partial.get(db, typevar).unwrap_or(self)
                 }
+                TypeMapping::PromoteLiterals | TypeMapping::BindLegacyTypevars(_) => self,
+            }
+
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => match type_mapping {
+                TypeMapping::Specialization(_) |
+                TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
                     Type::TypeVar(typevar.with_binding_context(db, *binding_context))
