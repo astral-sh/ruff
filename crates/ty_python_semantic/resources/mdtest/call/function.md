@@ -184,13 +184,18 @@ class SingleElementTuple(tuple[int]): ...
 
 def _(args: SingleElementTuple) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
+
     takes_one(*args)
+
     takes_two(*args)  # error: [missing-argument]
     takes_two_positional_only(*args)  # error: [missing-argument]
+
     takes_two_different(*args)  # error: [missing-argument]
     takes_two_different_positional_only(*args)  # error: [missing-argument]
+
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
+
     takes_at_least_two(*args)  # error: [missing-argument]
     takes_at_least_two_positional_only(*args)  # error: [missing-argument]
 
@@ -212,15 +217,23 @@ class IntStrTuple(tuple[int, str]): ...
 
 def _(args: IntStrTuple) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
+
     takes_one(*args)  # error: [too-many-positional-arguments]
-    takes_two(*args)  # error: [invalid-argument-type]
-    takes_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
     takes_two_different(*args)
     takes_two_different_positional_only(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    takes_at_least_two(*args)  # error: [invalid-argument-type]
-    takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
 ```
 
 ### Mixed tuple argument
@@ -356,15 +369,25 @@ class IntStarStr(tuple[int, *tuple[str, ...]]): ...
 
 def _(args: IntStarStr) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
+
     takes_one(*args)
-    takes_two(*args)  # error: [invalid-argument-type]
-    takes_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
     takes_two_different(*args)
     takes_two_different_positional_only(*args)
+
     takes_at_least_zero(*args)
+
     takes_at_least_one(*args)
-    takes_at_least_two(*args)  # error: [invalid-argument-type]
-    takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
 
 class IntIntStarInt(tuple[int, int, *tuple[int, ...]]): ...
 
@@ -384,14 +407,23 @@ class IntIntStarStr(tuple[int, int, *tuple[str, ...]]): ...
 
 def _(args: IntIntStarStr) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
+
     takes_one(*args)  # error: [too-many-positional-arguments]
+
     takes_two(*args)
     takes_two_positional_only(*args)
-    takes_two_different(*args)  # error: [invalid-argument-type]
-    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
     takes_at_least_zero(*args)
+
     takes_at_least_one(*args)
+
     takes_at_least_two(*args)
+
     takes_at_least_two_positional_only(*args)
 
 class IntStarIntInt(tuple[int, *tuple[int, ...], int]): ...
@@ -412,15 +444,26 @@ class IntStarStrInt(tuple[int, *tuple[str, ...], int]): ...
 
 def _(args: IntStarStrInt) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
+
     takes_one(*args)  # error: [too-many-positional-arguments]
-    takes_two(*args)  # error: [invalid-argument-type]
-    takes_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
     takes_two_different(*args)
     takes_two_different_positional_only(*args)
+
     takes_at_least_zero(*args)
+
     takes_at_least_one(*args)
-    takes_at_least_two(*args)  # error: [invalid-argument-type]
-    takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
 ```
 
 ### String argument
