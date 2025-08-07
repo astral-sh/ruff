@@ -662,7 +662,7 @@ impl<'r> RenderableSnippet<'r> {
         const BOM: char = '\u{feff}';
         let bom_len = BOM.text_len();
         let (snippet, snippet_start) =
-            if snippet_start == TextSize::default() && snippet.starts_with(BOM) {
+            if snippet_start == TextSize::ZERO && snippet.starts_with(BOM) {
                 (
                     &snippet[bom_len.to_usize()..],
                     snippet_start + TextSize::new(bom_len.to_u32()),
