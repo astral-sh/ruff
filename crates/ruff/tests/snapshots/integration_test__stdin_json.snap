@@ -3,11 +3,12 @@ source: crates/ruff/tests/integration_test.rs
 info:
   program: ruff
   args:
-    - "-"
-    - "--isolated"
-    - "--no-cache"
+    - check
     - "--output-format"
     - json
+    - "--no-cache"
+    - "--isolated"
+    - "-"
     - "--stdin-filename"
     - F401.py
   stdin: "import os\n"
@@ -30,8 +31,8 @@ exit_code: 1
         {
           "content": "",
           "end_location": {
-            "column": 1,
-            "row": 2
+            "column": 10,
+            "row": 1
           },
           "location": {
             "column": 1,
@@ -51,4 +52,3 @@ exit_code: 1
   }
 ]
 ----- stderr -----
-
