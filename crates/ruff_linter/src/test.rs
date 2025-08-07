@@ -2,7 +2,6 @@
 //! Helper functions for the tests of rule implementations.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::fmt;
 use std::path::Path;
 
@@ -41,16 +40,30 @@ pub(crate) struct DiagnosticsDiff {
     removed: Vec<Diagnostic>,
     /// Diagnostics that were added (present in 'after' but not in 'before')
     added: Vec<Diagnostic>,
-    /// Diagnostic that are the same in both runs
-    unchanged: Vec<Diagnostic>,
+    /// Settings used before the change
+    settings_before: LinterSettings,
+    /// Settings used after the change
+    settings_after: LinterSettings,
 }
 
 impl fmt::Display for DiagnosticsDiff {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "--- Linter settings ---")?;
+        let settings_before_str = format!("{}", self.settings_before);
+        let settings_after_str = format!("{}", self.settings_after);
+        let diff = similar::TextDiff::from_lines(&settings_before_str, &settings_after_str);
+        for change in diff.iter_all_changes() {
+            match change.tag() {
+                similar::ChangeTag::Delete => write!(f, "-{change}")?,
+                similar::ChangeTag::Insert => write!(f, "+{change}")?,
+                similar::ChangeTag::Equal => (),
+            }
+        }
+        writeln!(f)?;
+
         writeln!(f, "--- Summary ---")?;
         writeln!(f, "Removed: {}", self.removed.len())?;
         writeln!(f, "Added: {}", self.added.len())?;
-        writeln!(f, "Unchanged: {}", self.unchanged.len())?;
         writeln!(f)?;
 
         if !self.removed.is_empty() {
@@ -74,42 +87,28 @@ impl fmt::Display for DiagnosticsDiff {
 }
 
 /// Compare two sets of diagnostics and return the differences
-fn diff_diagnostics(before: Vec<Diagnostic>, after: Vec<Diagnostic>) -> DiagnosticsDiff {
-    fn key(diagnostic: &Diagnostic) -> String {
-        format!(
-            "{}:{}:{}",
-            diagnostic.expect_range().start().to_usize(),
-            diagnostic.expect_range().end().to_usize(),
-            diagnostic.id()
-        )
-    }
-
-    let mut after_map: HashMap<String, Diagnostic> = after
-        .iter()
-        .map(|diagnostic| (key(diagnostic), diagnostic.clone()))
-        .collect();
-
+fn diff_diagnostics(
+    before: Vec<Diagnostic>,
+    after: Vec<Diagnostic>,
+    settings_before: &LinterSettings,
+    settings_after: &LinterSettings,
+) -> DiagnosticsDiff {
     let mut removed = Vec::new();
-    let mut unchanged = Vec::new();
+    let mut added = after;
 
-    // Iterate over original `before` vector to preserve ordering
-    for diagnostic in before {
-        if after_map.remove(&key(&diagnostic)).is_some() {
-            unchanged.push(diagnostic);
-        } else {
-            removed.push(diagnostic);
-        }
+    for old_diag in before {
+        let Some(pos) = added.iter().position(|diag| diag == &old_diag) else {
+            removed.push(old_diag);
+            continue;
+        };
+        added.remove(pos);
     }
-
-    let added: Vec<Diagnostic> = after
-        .into_iter()
-        .filter(|diagnostic| after_map.contains_key(&key(diagnostic)))
-        .collect();
 
     DiagnosticsDiff {
         removed,
         added,
-        unchanged,
+        settings_before: settings_before.clone(),
+        settings_after: settings_after.clone(),
     }
 }
 
@@ -137,10 +136,20 @@ pub(crate) fn test_path_with_settings_diff(
     settings_before: &LinterSettings,
     settings_after: &LinterSettings,
 ) -> Result<DiagnosticsDiff> {
+    assert!(
+        format!("{settings_before}") != format!("{settings_after}"),
+        "Settings must be different for differential testing"
+    );
+
     let diagnostics_before = test_path(&path, settings_before)?;
     let diagnostic_after = test_path(&path, settings_after)?;
 
-    let diff = diff_diagnostics(diagnostics_before, diagnostic_after);
+    let diff = diff_diagnostics(
+        diagnostics_before,
+        diagnostic_after,
+        settings_before,
+        settings_after,
+    );
     Ok(diff)
 }
 
@@ -544,11 +553,6 @@ def main():
             diff.added[0].id(),
             DiagnosticId::Lint(LintName::of("unused-import")),
             "Should add the unused import diagnostic"
-        );
-        assert_eq!(
-            diff.unchanged.len(),
-            0,
-            "Should have no unchanged diagnostics"
         );
 
         std::fs::remove_file(test_file)?;
