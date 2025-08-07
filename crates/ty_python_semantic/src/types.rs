@@ -1365,10 +1365,10 @@ impl<'db> Type<'db> {
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(BoundTypeVarInstance { typevar, .. }), _)
-                if typevar.bound_or_constraints(db).is_some() =>
+            (Type::TypeVar(bound_typevar), _)
+                if bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
-                match typevar.bound_or_constraints(db) {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.has_relation_to(db, target, relation)
@@ -1383,12 +1383,15 @@ impl<'db> Type<'db> {
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::TypeVar(BoundTypeVarInstance { typevar, .. }))
-                if typevar.constraints(db).is_some_and(|constraints| {
-                    constraints
-                        .iter()
-                        .all(|constraint| self.has_relation_to(db, *constraint, relation))
-                }) =>
+            (_, Type::TypeVar(bound_typevar))
+                if bound_typevar
+                    .typevar(db)
+                    .constraints(db)
+                    .is_some_and(|constraints| {
+                        constraints
+                            .iter()
+                            .all(|constraint| self.has_relation_to(db, *constraint, relation))
+                    }) =>
             {
                 true
             }
@@ -1823,9 +1826,8 @@ impl<'db> Type<'db> {
             // specialized to any type. A bounded typevar is not disjoint from its bound, and is
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
-            (Type::TypeVar(BoundTypeVarInstance{ typevar, .. }), other) |
-                (other, Type::TypeVar(BoundTypeVarInstance{ typevar, .. })) => {
-                match typevar.bound_or_constraints(db) {
+            (Type::TypeVar(bound_typevar), other) | (other, Type::TypeVar(bound_typevar)) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => false,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.is_disjoint_from_impl(db, other, visitor)
@@ -2336,8 +2338,8 @@ impl<'db> Type<'db> {
             // the bound is a final singleton class, since it can still be specialized to `Never`.
             // A constrained typevar is a singleton if all of its constraints are singletons. (Note
             // that you cannot specialize a constrained typevar to a subtype of a constraint.)
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => {
-                match typevar.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => false,
                     Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
@@ -2473,8 +2475,8 @@ impl<'db> Type<'db> {
             // `Never`. A constrained typevar is single-valued if all of its constraints are
             // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
             // of a constraint.)
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => {
-                match typevar.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => false,
                     Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
@@ -2744,8 +2746,8 @@ impl<'db> Type<'db> {
                 KnownClass::Object.to_instance(db).instance_member(db, name)
             }
 
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => {
-                match typevar.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => KnownClass::Object.to_instance(db).instance_member(db, name),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.instance_member(db, name)
@@ -3617,8 +3619,8 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => {
-                match typevar.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Truthiness::Ambiguous,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.try_bool_impl(db, allow_short_circuit)?
@@ -3723,16 +3725,18 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => match typevar
-                .bound_or_constraints(db)
-            {
-                None => CallableBinding::not_callable(self).into(),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Bindings::from_union(
-                    self,
-                    constraints.elements(db).iter().map(|ty| ty.bindings(db)),
-                ),
-            },
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    None => CallableBinding::not_callable(self).into(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.bindings(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Bindings::from_union(
+                            self,
+                            constraints.elements(db).iter().map(|ty| ty.bindings(db)),
+                        )
+                    }
+                }
+            }
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
@@ -5226,7 +5230,7 @@ impl<'db> Type<'db> {
             // has no instance type. Otherwise, synthesize a typevar with bound or constraints
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => {
-                let typevar = bound_typevar.typevar;
+                let typevar = bound_typevar.typevar(db);
                 let bound_or_constraints = match typevar.bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(upper_bound) => {
                         TypeVarBoundOrConstraints::UpperBound(upper_bound.to_instance(db)?)
@@ -5247,7 +5251,7 @@ impl<'db> Type<'db> {
                         None,
                         typevar.kind(db),
                     )
-                    .with_binding_context(bound_typevar.binding_context),
+                    .with_binding_context(db, bound_typevar.binding_context(db)),
                 ))
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
@@ -5651,8 +5655,8 @@ impl<'db> Type<'db> {
             Type::Tuple(tuple) => tuple
                 .to_subclass_of(db)
                 .unwrap_or_else(SubclassOfType::subclass_of_unknown),
-            Type::TypeVar(BoundTypeVarInstance { typevar, .. }) => {
-                match typevar.bound_or_constraints(db) {
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => KnownClass::Type.to_instance(db),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -5756,7 +5760,7 @@ impl<'db> Type<'db> {
                 TypeMapping::PartialSpecialization(_) |
                 TypeMapping::PromoteLiterals => self,
                 TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(typevar.with_binding_context(*binding_context))
+                    Type::TypeVar(typevar.with_binding_context(db, *binding_context))
                 }
             }
 
@@ -5885,11 +5889,11 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => {
                 if matches!(
-                    bound_typevar.typevar.kind(db),
+                    bound_typevar.typevar(db).kind(db),
                     TypeVarKind::Legacy | TypeVarKind::Implicit
-                ) && binding_context
-                    .is_none_or(|binding_context| bound_typevar.binding_context == binding_context)
-                {
+                ) && binding_context.is_none_or(|binding_context| {
+                    bound_typevar.binding_context(db) == binding_context
+                }) {
                     typevars.insert(bound_typevar);
                 }
             }
@@ -6096,7 +6100,7 @@ impl<'db> Type<'db> {
             | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
-            Self::TypeVar(BoundTypeVarInstance{typevar,..}) => Some(TypeDefinition::TypeVar(typevar.definition(db)?)),
+            Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
@@ -6870,12 +6874,10 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn with_binding_context(
         self,
+        db: &'db dyn Db,
         binding_context: Definition<'db>,
     ) -> BoundTypeVarInstance<'db> {
-        BoundTypeVarInstance {
-            typevar: self,
-            binding_context,
-        }
+        BoundTypeVarInstance::new(db, self, binding_context)
     }
 
     pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
@@ -6931,9 +6933,8 @@ impl<'db> TypeVarInstance<'db> {
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
-#[derive(
-    Clone, Copy, Debug, Hash, Eq, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
-)]
+#[salsa::interned(debug)]
+#[derive(PartialOrd, Ord)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
 
@@ -6941,19 +6942,23 @@ pub struct BoundTypeVarInstance<'db> {
     binding_context: Definition<'db>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
+
 fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bound_typevar: BoundTypeVarInstance<'db>,
     visitor: &mut V,
 ) {
-    visitor.visit_type_var_type(db, bound_typevar.typevar);
+    visitor.visit_type_var_type(db, bound_typevar.typevar(db));
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn default_ty(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.typevar.default_ty(db).map(|ty| {
-            ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(self.binding_context))
-        })
+        let binding_context = self.binding_context(db);
+        self.typevar(db)
+            .default_ty(db)
+            .map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context)))
     }
 
     pub(crate) fn normalized_impl(
@@ -6961,17 +6966,19 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         visitor: &mut TypeTransformer<'db>,
     ) -> Self {
-        Self {
-            typevar: self.typevar.normalized_impl(db, visitor),
-            binding_context: self.binding_context,
-        }
+        Self::new(
+            db,
+            self.typevar(db).normalized_impl(db, visitor),
+            self.binding_context(db),
+        )
     }
 
     fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
-        Self {
-            typevar: self.typevar.materialize(db, variance),
-            binding_context: self.binding_context,
-        }
+        Self::new(
+            db,
+            self.typevar(db).materialize(db, variance),
+            self.binding_context(db),
+        )
     }
 }
 

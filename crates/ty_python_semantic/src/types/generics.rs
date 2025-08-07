@@ -79,7 +79,7 @@ pub(crate) fn bind_typevar<'db>(
         .find_map(|enclosing_context| enclosing_context.binds_typevar(db, typevar))
         .or_else(|| {
             typevar_binding_context.map(|typevar_binding_context| {
-                typevar.with_binding_context(typevar_binding_context)
+                typevar.with_binding_context(db, typevar_binding_context)
             })
         })
 }
@@ -143,7 +143,7 @@ impl<'db> GenericContext<'db> {
                 else {
                     return None;
                 };
-                Some(typevar.with_binding_context(binding_context))
+                Some(typevar.with_binding_context(db, binding_context))
             }
             // TODO: Support these!
             ast::TypeParam::ParamSpec(_) => None,
@@ -212,9 +212,9 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Parameter<'db> {
-        let mut parameter =
-            Parameter::positional_only(Some(bound_typevar.typevar.name(db).clone()));
-        match bound_typevar.typevar.bound_or_constraints(db) {
+        let typevar = bound_typevar.typevar(db);
+        let mut parameter = Parameter::positional_only(Some(typevar.name(db).clone()));
+        match typevar.bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 // TODO: This should be a type form.
                 parameter = parameter.with_annotated_type(bound);
@@ -272,7 +272,7 @@ impl<'db> GenericContext<'db> {
     ) -> Option<BoundTypeVarInstance<'db>> {
         self.variables(db)
             .iter()
-            .find(|self_bound_typevar| self_bound_typevar.typevar == typevar)
+            .find(|self_bound_typevar| self_bound_typevar.typevar(db) == typevar)
             .copied()
     }
 
@@ -533,7 +533,7 @@ impl<'db> Specialization<'db> {
             .into_iter()
             .zip(self.types(db))
             .map(|(bound_typevar, vartype)| {
-                let variance = match bound_typevar.typevar.variance(db) {
+                let variance = match bound_typevar.typevar(db).variance(db) {
                     TypeVarVariance::Invariant => TypeVarVariance::Invariant,
                     TypeVarVariance::Covariant => variance,
                     TypeVarVariance::Contravariant => variance.flip(),
@@ -582,7 +582,7 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
-            let compatible = match bound_typevar.typevar.variance(db) {
+            let compatible = match bound_typevar.typevar(db).variance(db) {
                 TypeVarVariance::Invariant => match relation {
                     TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
                     TypeRelation::Assignability => {
@@ -620,7 +620,7 @@ impl<'db> Specialization<'db> {
             //   - contravariant: verify that other_type == self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make equivalence false
-            let compatible = match bound_typevar.typevar.variance(db) {
+            let compatible = match bound_typevar.typevar(db).variance(db) {
                 TypeVarVariance::Invariant
                 | TypeVarVariance::Covariant
                 | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
@@ -777,7 +777,7 @@ impl<'db> SpecializationBuilder<'db> {
 
         match (formal, actual) {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar)) => {
-                match bound_typevar.typevar.bound_or_constraints(self.db) {
+                match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty.is_assignable_to(self.db, bound) {
                             return Err(SpecializationError::MismatchedBound {

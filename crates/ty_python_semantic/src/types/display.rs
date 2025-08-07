@@ -208,12 +208,10 @@ impl Display for DisplayRepresentation<'_> {
                 )
             }
             Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(BoundTypeVarInstance {
-                typevar,
-                binding_context,
-            }) => {
-                f.write_str(typevar.name(self.db))?;
-                if let Some(binding_context) = binding_context.name(self.db) {
+            Type::TypeVar(bound_typevar) => {
+                f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+                if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
+                {
                     write!(f, "@{binding_context}")?;
                 }
                 Ok(())
@@ -466,8 +464,9 @@ pub(crate) struct DisplayBoundTypeVarInstance<'db> {
 
 impl Display for DisplayBoundTypeVarInstance<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.bound_typevar.typevar.name(self.db))?;
-        match self.bound_typevar.typevar.bound_or_constraints(self.db) {
+        let typevar = self.bound_typevar.typevar(self.db);
+        f.write_str(typevar.name(self.db))?;
+        match typevar.bound_or_constraints(self.db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 write!(f, ": {}", bound.display(self.db))?;
             }
@@ -529,7 +528,7 @@ impl Display for DisplayGenericContext<'_> {
 
         let non_implicit_variables: Vec<_> = variables
             .iter()
-            .filter(|BoundTypeVarInstance { typevar, .. }| !typevar.is_implicit(self.db))
+            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_implicit(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {
