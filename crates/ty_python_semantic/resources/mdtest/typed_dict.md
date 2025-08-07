@@ -51,16 +51,18 @@ bob.update(age=26)
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py
-# TODO: these should be errors (invalid argument type)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1a: Person = {"name": b"Eve", "age": None}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
 # TODO: these should be errors (missing required key)
 eve2a: Person = {"age": 22}
 eve2b = Person(age=22)
 
-# TODO: these should be errors (additional key)
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
 ```
 
@@ -362,7 +364,7 @@ class TaggedData(TypedDict, Generic[T]):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 
@@ -383,7 +385,7 @@ class TaggedData[T](TypedDict):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 

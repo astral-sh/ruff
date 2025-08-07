@@ -4718,6 +4718,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
+
+            // Validate TypedDict dictionary literal assignments
+            if let Some(typed_dict) = declared.inner_type().into_typed_dict() {
+                if let Some(dict_expr) = value.as_dict_expr() {
+                    // Validate each key-value pair in the dictionary literal
+                    for item in &dict_expr.items {
+                        if let Some(key_expr) = &item.key {
+                            if let ast::Expr::StringLiteral(key_literal) = key_expr {
+                                let key_str = key_literal.value.to_str();
+                                let value_type = self.expression_type(&item.value);
+                                validate_typed_dict_key_assignment(
+                                    &self.context,
+                                    typed_dict,
+                                    key_str,
+                                    value_type,
+                                    target,
+                                    key_expr,
+                                    &item.value,
+                                    TypedDictAssignmentKind::Constructor,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             self.add_declaration_with_binding(
                 target.into(),
                 definition,
@@ -6291,6 +6317,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .bindings(self.db())
             .match_parameters(&call_arguments);
         self.infer_argument_types(arguments, &mut call_arguments, &bindings.argument_forms);
+
+        // Validate TypedDict constructor calls after argument type inference
+        if let Some(class_literal) = callable_type.into_class_literal() {
+            if class_literal.is_typed_dict(self.db()) {
+                let typed_dict_type = crate::types::TypedDictType::from(
+                    self.db(),
+                    crate::types::ClassType::NonGeneric(class_literal),
+                );
+                if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
+                    // Validate keyword arguments for TypedDict constructor
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            // Get the already-inferred argument type
+                            let arg_type = self.expression_type(&keyword.value);
+                            validate_typed_dict_key_assignment(
+                                &self.context,
+                                typed_dict,
+                                arg_name.as_str(),
+                                arg_type,
+                                call_expression,
+                                call_expression,
+                                &keyword.value,
+                                TypedDictAssignmentKind::Constructor,
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         let mut bindings = match bindings.check_types(self.db(), &call_arguments) {
             Ok(bindings) => bindings,
