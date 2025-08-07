@@ -6812,9 +6812,9 @@ pub enum TypeVarKind {
 /// def generic_function(t: T) -> T: ...   # [2]
 /// ```
 ///
-/// we will create and intern a `TypeVarInstance` for the typevar `T` when it is instantiated.
-/// The type of `T` at `[1]` will be a `KnownInstanceType::TypeVar` wrapping this
-/// `TypeVarInstance`. The typevar is not yet bound to any generic context at this point.
+/// we will create a `TypeVarInstance` for the typevar `T` when it is instantiated. The type of `T`
+/// at `[1]` will be a `KnownInstanceType::TypeVar` wrapping this `TypeVarInstance`. The typevar is
+/// not yet bound to any generic context at this point.
 ///
 /// The typevar is used in `generic_function`, which binds it to a new generic context. We will
 /// create a [`BoundTypeVarInstance`] for this new binding of the typevar. The type of `T` at `[2]`
