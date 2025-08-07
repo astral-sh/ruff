@@ -21,8 +21,8 @@ exit_code: 1
     "cell": null,
     "code": "invalid-syntax",
     "end_location": {
-      "column": 1,
-      "row": 5
+      "column": 2,
+      "row": 4
     },
     "filename": "[TMP]/input.py",
     "fix": null,
@@ -38,14 +38,14 @@ exit_code: 1
     "cell": null,
     "code": "invalid-syntax",
     "end_location": {
-      "column": 1,
-      "row": 5
+      "column": 2,
+      "row": 4
     },
     "filename": "[TMP]/input.py",
     "fix": null,
     "location": {
-      "column": 1,
-      "row": 5
+      "column": 2,
+      "row": 4
     },
     "message": "unexpected EOF while parsing",
     "noqa_row": null,

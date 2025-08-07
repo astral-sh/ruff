@@ -22,8 +22,8 @@ exit_code: 1
         <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="2" column="1">
             <failure message="missing closing quote in string literal">line 2, col 1, missing closing quote in string literal</failure>
         </testcase>
-        <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="5" column="1">
-            <failure message="unexpected EOF while parsing">line 5, col 1, unexpected EOF while parsing</failure>
+        <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="4" column="2">
+            <failure message="unexpected EOF while parsing">line 4, col 2, unexpected EOF while parsing</failure>
         </testcase>
     </testsuite>
 </testsuites>

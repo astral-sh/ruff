@@ -29,8 +29,8 @@ exit_code: 1
           "line": 2
         },
         "end": {
-          "column": 1,
-          "line": 5
+          "column": 2,
+          "line": 4
         }
       }
     },
@@ -44,12 +44,12 @@ exit_code: 1
       "path": "input.py",
       "positions": {
         "begin": {
-          "column": 1,
-          "line": 5
+          "column": 2,
+          "line": 4
         },
         "end": {
-          "column": 1,
-          "line": 5
+          "column": 2,
+          "line": 4
         }
       }
     },

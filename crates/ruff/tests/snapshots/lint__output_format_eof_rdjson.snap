@@ -26,8 +26,8 @@ exit_code: 1
         "path": "[TMP]/input.py",
         "range": {
           "end": {
-            "column": 1,
-            "line": 5
+            "column": 2,
+            "line": 4
           },
           "start": {
             "column": 1,
@@ -45,12 +45,12 @@ exit_code: 1
         "path": "[TMP]/input.py",
         "range": {
           "end": {
-            "column": 1,
-            "line": 5
+            "column": 2,
+            "line": 4
           },
           "start": {
-            "column": 1,
-            "line": 5
+            "column": 2,
+            "line": 4
           }
         }
       },

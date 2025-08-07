@@ -112,6 +112,13 @@ impl LineIndex {
     ///
     /// If the byte offset isn't within the bounds of `content`.
     pub fn line_column(&self, offset: TextSize, content: &str) -> LineColumn {
+        // Don't count the new line at the very end of a file as a separate line.
+        let offset = if offset == content.text_len() && content.ends_with(['\r', '\n']) {
+            offset.checked_sub(TextSize::ONE).unwrap_or(offset)
+        } else {
+            offset
+        };
+
         let location = self.source_location(offset, content, PositionEncoding::Utf32);
 
         // Don't count the BOM character as a column, but only on the first line.

@@ -25,7 +25,7 @@ input.py:2:1: invalid-syntax: missing closing quote in string literal
   | |__^
   |
 
-input.py:5:1: invalid-syntax: unexpected EOF while parsing
+input.py:4:2: invalid-syntax: unexpected EOF while parsing
   |
 3 | 'x'
 4 | )

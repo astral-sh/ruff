@@ -30,8 +30,8 @@ exit_code: 1
                   "uri": "[TMP]/input.py"
                 },
                 "region": {
-                  "endColumn": 1,
-                  "endLine": 5,
+                  "endColumn": 2,
+                  "endLine": 4,
                   "startColumn": 1,
                   "startLine": 2
                 }
@@ -52,10 +52,10 @@ exit_code: 1
                   "uri": "[TMP]/input.py"
                 },
                 "region": {
-                  "endColumn": 1,
-                  "endLine": 5,
-                  "startColumn": 1,
-                  "startLine": 5
+                  "endColumn": 2,
+                  "endLine": 4,
+                  "startColumn": 2,
+                  "startLine": 4
                 }
               }
             }

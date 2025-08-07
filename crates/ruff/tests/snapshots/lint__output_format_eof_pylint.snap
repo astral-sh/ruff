@@ -17,6 +17,6 @@ success: false
 exit_code: 1
 ----- stdout -----
 input.py:2: [invalid-syntax] missing closing quote in string literal
-input.py:5: [invalid-syntax] unexpected EOF while parsing
+input.py:4: [invalid-syntax] unexpected EOF while parsing
 
 ----- stderr -----

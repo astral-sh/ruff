@@ -17,6 +17,6 @@ success: false
 exit_code: 1
 ----- stdout -----
 ##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=2;columnnumber=1;code=invalid-syntax;]missing closing quote in string literal
-##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=5;columnnumber=1;code=invalid-syntax;]unexpected EOF while parsing
+##vso[task.logissue type=error;sourcepath=[TMP]/input.py;linenumber=4;columnnumber=2;code=invalid-syntax;]unexpected EOF while parsing
 
 ----- stderr -----

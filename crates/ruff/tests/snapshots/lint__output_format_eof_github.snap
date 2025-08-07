@@ -16,7 +16,7 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=2,col=1,endLine=5,endColumn=1::input.py:2:1: invalid-syntax: missing closing quote in string literal
-::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=5,col=1,endLine=5,endColumn=1::input.py:5:1: invalid-syntax: unexpected EOF while parsing
+::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=2,col=1,endLine=4,endColumn=2::input.py:2:1: invalid-syntax: missing closing quote in string literal
+::error title=Ruff (invalid-syntax),file=[TMP]/input.py,line=4,col=2,endLine=4,endColumn=2::input.py:4:2: invalid-syntax: unexpected EOF while parsing
 
 ----- stderr -----

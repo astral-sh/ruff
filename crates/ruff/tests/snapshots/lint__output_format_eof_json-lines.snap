@@ -16,7 +16,7 @@ info:
 success: false
 exit_code: 1
 ----- stdout -----
-{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":5},"filename":"[TMP]/input.py","fix":null,"location":{"column":1,"row":2},"message":"missing closing quote in string literal","noqa_row":null,"url":null}
-{"cell":null,"code":"invalid-syntax","end_location":{"column":1,"row":5},"filename":"[TMP]/input.py","fix":null,"location":{"column":1,"row":5},"message":"unexpected EOF while parsing","noqa_row":null,"url":null}
+{"cell":null,"code":"invalid-syntax","end_location":{"column":2,"row":4},"filename":"[TMP]/input.py","fix":null,"location":{"column":1,"row":2},"message":"missing closing quote in string literal","noqa_row":null,"url":null}
+{"cell":null,"code":"invalid-syntax","end_location":{"column":2,"row":4},"filename":"[TMP]/input.py","fix":null,"location":{"column":2,"row":4},"message":"unexpected EOF while parsing","noqa_row":null,"url":null}
 
 ----- stderr -----
