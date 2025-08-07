@@ -39,7 +39,7 @@ where
 }
 
 /// Metadata of an option that can either be a [`OptionField`] or [`OptionSet`].
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(::serde::Serialize), serde(untagged))]
 pub enum OptionEntry {
     /// A single option.
@@ -62,7 +62,7 @@ impl Display for OptionEntry {
 ///
 /// It extracts the options by calling the [`OptionsMetadata::record`] of a type implementing
 /// [`OptionsMetadata`].
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone)]
 pub struct OptionSet {
     record: fn(&mut dyn Visit),
     doc: fn() -> Option<&'static str>,

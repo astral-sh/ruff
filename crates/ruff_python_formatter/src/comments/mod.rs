@@ -358,7 +358,10 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
+    pub(crate) fn leading_dangling_trailing<T>(
+        &self,
+        node: T,
+    ) -> LeadingDanglingTrailingComments<'_>
     where
         T: Into<AnyNodeRef<'a>>,
     {

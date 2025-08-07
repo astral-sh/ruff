@@ -301,7 +301,7 @@ impl<'db> SemanticIndex<'db> {
         &self.scopes[id]
     }
 
-    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
+    pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
         self.scope_ids_by_scope.iter().copied()
     }
 
@@ -371,18 +371,18 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter {
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(self, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter {
+    pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter<'_> {
         ChildrenIter::new(self, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
-    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter {
+    pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_> {
         AncestorsIter::new(self, scope)
     }
 
@@ -400,7 +400,7 @@ impl<'db> SemanticIndex<'db> {
     ///         print(x)  # Refers to global x=1, not class x=2
     /// ```
     /// The `method` function can see the global scope but not the class scope.
-    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter {
+    pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
         VisibleAncestorsIter::new(self, scope)
     }
 

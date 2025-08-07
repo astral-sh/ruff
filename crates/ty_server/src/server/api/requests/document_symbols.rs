@@ -22,7 +22,7 @@ impl RequestHandler for DocumentSymbolRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
-    fn document_url(params: &DocumentSymbolParams) -> Cow<Url> {
+    fn document_url(params: &DocumentSymbolParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

@@ -22,7 +22,7 @@ impl RequestHandler for SignatureHelpRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
-    fn document_url(params: &SignatureHelpParams) -> Cow<Url> {
+    fn document_url(params: &SignatureHelpParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 

@@ -750,7 +750,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {

@@ -789,7 +789,7 @@ where
 /// assert_eq!(format_import_from(1, None), ".".to_string());
 /// assert_eq!(format_import_from(1, Some("foo")), ".foo".to_string());
 /// ```
-pub fn format_import_from(level: u32, module: Option<&str>) -> Cow<str> {
+pub fn format_import_from(level: u32, module: Option<&str>) -> Cow<'_, str> {
     match (level, module) {
         (0, Some(module)) => Cow::Borrowed(module),
         (level, module) => {
@@ -1509,7 +1509,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
         [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
             left: Box::new(pep_604_union(rest)),
             op: Operator::BitOr,
-            right: Box::new(pep_604_union(&[elt.clone()])),
+            right: Box::new(pep_604_union(std::slice::from_ref(elt))),
             range: TextRange::default(),
             node_index: AtomicNodeIndex::dummy(),
         }),

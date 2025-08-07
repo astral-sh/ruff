@@ -19,7 +19,7 @@ impl RequestHandler for InlayHintRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
-    fn document_url(params: &InlayHintParams) -> Cow<Url> {
+    fn document_url(params: &InlayHintParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

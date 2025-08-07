@@ -331,7 +331,7 @@ impl GotoTarget<'_> {
     /// Returns `None` if no meaningful string representation can be provided.
     /// This is used by the "references" feature, which looks for references
     /// to this goto target.
-    pub(crate) fn to_string(&self) -> Option<Cow<str>> {
+    pub(crate) fn to_string(&self) -> Option<Cow<'_, str>> {
         match self {
             GotoTarget::Expression(expression) => match expression {
                 ast::ExprRef::Name(name) => Some(Cow::Borrowed(name.id.as_str())),

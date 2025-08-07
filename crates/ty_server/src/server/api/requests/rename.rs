@@ -21,7 +21,7 @@ impl RequestHandler for RenameRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for RenameRequestHandler {
-    fn document_url(params: &RenameParams) -> Cow<Url> {
+    fn document_url(params: &RenameParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position.text_document.uri)
     }
 

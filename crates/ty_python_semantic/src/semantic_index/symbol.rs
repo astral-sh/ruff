@@ -153,7 +153,7 @@ impl SymbolTable {
     }
 
     /// Iterate over the symbols in this symbol table.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Symbol> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
         self.symbols.iter()
     }
 
