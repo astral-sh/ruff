@@ -25,10 +25,12 @@ fn variable_inlay_hints_disabled() -> Result<()> {
     server.open_text_document(foo, &foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>()?;
 
-    let hints =
-        server.inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))?;
+    let hints = server
+        .inlay_hints_request(foo, Range::new(Position::new(0, 0), Position::new(0, 5)))?
+        .unwrap();
+
     assert!(
-        hints.is_none(),
+        hints.is_empty(),
         "Expected no inlay hints, but found: {hints:?}"
     );
 
