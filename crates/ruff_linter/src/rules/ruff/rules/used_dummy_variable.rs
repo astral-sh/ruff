@@ -1,14 +1,14 @@
-use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
 use ruff_python_semantic::{Binding, BindingId, BindingKind, GeneratorKind, ScopeKind};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
+use crate::{Fix, FixAvailability, Violation};
 use crate::{
     checkers::ast::Checker,
     renamer::{Renamer, ShadowedKind},
 };
-use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for "dummy variables" (variables that are named as if to indicate they are unused)
