@@ -9,7 +9,7 @@ F521.py:1:1: F521 `.format` call has invalid format string: Single '{' encounter
 3 | "{foo[}".format(foo=1)
   |
 
-F521.py:2:1: F521 `.format` call has invalid format string: Single '}' encountered in format string
+F521.py:2:1: F521 `.format` call has invalid format string: Unexpected error parsing format string
   |
 1 | "{".format(1)
 2 | "}".format(1)
