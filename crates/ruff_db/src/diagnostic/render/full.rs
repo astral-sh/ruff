@@ -186,7 +186,7 @@ print()
     /// For example, without the fix, we get diagnostics like this:
     ///
     /// ```
-    /// error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+    /// error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
     ///  --> example.py:1:25
     ///   |
     /// 1 | nested_fstrings = f'␈{f'{f'␛'}'}'
@@ -206,13 +206,13 @@ print()
             .builder(
                 "invalid-character-sub",
                 Severity::Error,
-                r#"Invalid unescaped character SUB, use "\x1A" instead"#,
+                r#"Invalid unescaped character SUB, use "\x1a" instead"#,
             )
             .primary("example.py", "1:24", "1:24", "")
             .build();
 
         insta::assert_snapshot!(env.render(&diagnostic), @r#"
-        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:25
           |
         1 | nested_fstrings = f'␈{f'{f'␛'}'}'
@@ -231,13 +231,13 @@ print()
             .builder(
                 "invalid-character-sub",
                 Severity::Error,
-                r#"Invalid unescaped character SUB, use "\x1A" instead"#,
+                r#"Invalid unescaped character SUB, use "\x1a" instead"#,
             )
             .primary("example.py", "1:1", "1:1", "")
             .build();
 
         insta::assert_snapshot!(env.render(&diagnostic), @r#"
-        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1A" instead
+        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
          --> example.py:1:2
           |
         1 | ␈␛
