@@ -6803,8 +6803,7 @@ pub enum TypeVarKind {
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
 /// context, which might be specialized to a concrete type, you want [`BoundTypeVarInstance`]. This
-/// type holds information that does not depend on which generic context the typevar is used in,
-/// which reduces the amount of data that is salsa-interned.
+/// type holds information that does not depend on which generic context the typevar is used in.
 ///
 /// For a legacy typevar:
 ///
