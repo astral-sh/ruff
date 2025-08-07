@@ -731,16 +731,17 @@ help: Pass `maxsplit=1` into `str.split()`
 186 186 | 
 187 187 | ## Test unpacked list literal args (starred expressions)
 
-missing_maxsplit_arg.py:189:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:189:1
     |
 187 | ## Test unpacked list literal args (starred expressions)
 188 | # Errors
 189 | "1,2,3".split(",", *[-1])[0]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 190 |
 191 | ## Test unpacked list variable args
     |
-    = help: Pass `maxsplit=1` into `str.split()`
+help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
 186 186 | 
@@ -752,14 +753,15 @@ missing_maxsplit_arg.py:189:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`
 191 191 | ## Test unpacked list variable args
 192 192 | # Errors
 
-missing_maxsplit_arg.py:194:1: PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+   --> missing_maxsplit_arg.py:194:1
     |
 192 | # Errors
 193 | args_list = [-1]
 194 | "1,2,3".split(",", *args_list)[0]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Pass `maxsplit=1` into `str.split()`
+help: Pass `maxsplit=1` into `str.split()`
 
 ℹ Unsafe fix
 191 191 | ## Test unpacked list variable args
