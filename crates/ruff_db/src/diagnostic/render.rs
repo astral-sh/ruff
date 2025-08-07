@@ -1017,7 +1017,7 @@ fn replace_unprintable<'r>(
     let mut result = String::new();
     for (index, c) in source.char_indices() {
         // normalize `\r` line endings but don't double `\r\n`
-        if c == '\r' && !matches!(source.get(index + 1..index + 2), Some("\n")) {
+        if c == '\r' && !source[index + 1..].starts_with("\n") {
             result.push_str(&source[last_end..index]);
             result.push('\n');
             last_end = index + 1;
