@@ -9,7 +9,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
-    use crate::assert_diagnostics;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
@@ -36,19 +36,25 @@ mod tests {
     #[test_case(Rule::ManualListComprehension, Path::new("PERF401.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
-            "preview__{}_{}",
+            "preview_diff__{}_{}",
             rule_code.noqa_code(),
             path.to_string_lossy()
         );
-        let diagnostics = test_path(
+        let settings_before = LinterSettings {
+            unresolved_target_version: PythonVersion::PY310.into(),
+            ..LinterSettings::for_rule(rule_code)
+        };
+        let settings_after = LinterSettings {
+            preview: PreviewMode::Enabled,
+            unresolved_target_version: PythonVersion::PY310.into(),
+            ..LinterSettings::for_rule(rule_code)
+        };
+        assert_diagnostics_diff!(
+            snapshot,
             Path::new("perflint").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+            &settings_before,
+            &settings_after
+        );
         Ok(())
     }
 }
