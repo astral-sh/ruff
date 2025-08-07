@@ -543,7 +543,7 @@ mod tests {
             }
         }
 
-        fn to_comments(&self) -> Comments {
+        fn to_comments(&self) -> Comments<'_> {
             Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
