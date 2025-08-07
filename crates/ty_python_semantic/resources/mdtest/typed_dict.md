@@ -21,12 +21,10 @@ inferred based on the `TypedDict` definition:
 ```py
 alice: Person = {"name": "Alice", "age": 30}
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
-# TODO: this should be `int | None`
-reveal_type(alice["age"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
+reveal_type(alice["age"])  # revealed: int | None
 
-# TODO: this should reveal `Unknown`, and it should emit an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
 reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
@@ -69,7 +67,7 @@ eve3b = Person(name="Eve", age=25, extra=True)
 Assignments to keys are also validated:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 alice["name"] = None
 
 # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
@@ -79,7 +77,7 @@ bob["name"] = None
 Assignments to non-existing keys are disallowed:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 alice["extra"] = True
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
@@ -136,8 +134,7 @@ alice: Person = {"name": "Alice"}
 # TODO: this should be an invalid-assignment error
 dangerous(alice)
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
 ```
 
 ## Key-based access

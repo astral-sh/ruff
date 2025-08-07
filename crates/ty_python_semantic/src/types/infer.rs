@@ -4707,7 +4707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(value) = value {
             let inferred_ty = self.infer_maybe_standalone_expression(value);
-            let inferred_ty = if target
+            let mut inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
@@ -4740,6 +4740,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                     }
+
+                    // Override the inferred type of the dict literal to be the `TypedDict` type
+                    // This ensures that the dict literal gets the correct type for key access
+                    let typed_dict_type = Type::TypedDict(typed_dict);
+                    inferred_ty = typed_dict_type;
                 }
             }
 
