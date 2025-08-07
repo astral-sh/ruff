@@ -131,7 +131,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::TypeIs(_)) => Ordering::Greater,
 
         (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-            left.class().cmp(&right.class())
+            left.class(db).cmp(&right.class(db))
         }
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
@@ -176,7 +176,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    left.class().cmp(&right.class())
+                    left.class(db).cmp(&right.class(db))
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,

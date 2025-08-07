@@ -73,7 +73,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
-                match (instance.class(), instance.class().known(self.db)) {
+                match (instance.class(self.db), instance.class(self.db).known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
                     (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias

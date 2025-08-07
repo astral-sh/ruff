@@ -1034,10 +1034,10 @@ impl<'db> Bindings<'db> {
                                     );
                                     continue;
                                 };
-                                overload.set_return_type(Type::tuple(
+                                overload.set_return_type(Type::tuple(TupleType::new(
                                     db,
-                                    TupleType::new(db, tuple_spec.as_ref()),
-                                ));
+                                    tuple_spec.as_ref(),
+                                )));
                             }
                         }
 

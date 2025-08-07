@@ -1375,7 +1375,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     };
 
-                    if !instance.class().is_known(self.db(), KnownClass::KwOnly) {
+                    if !instance
+                        .class(self.db())
+                        .is_known(self.db(), KnownClass::KwOnly)
+                    {
                         continue;
                     }
 
@@ -1772,7 +1775,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::NominalInstance(instance)
                 if matches!(
-                    instance.class().known(self.db()),
+                    instance.class(self.db()).known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -3969,7 +3972,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Super instances do not allow attribute assignment
-            Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Super) => {
+            Type::NominalInstance(instance)
+                if instance.class(db).is_known(db, KnownClass::Super) =>
+            {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -4630,7 +4635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Handle various singletons.
         if let Type::NominalInstance(instance) = declared.inner_type() {
             if instance
-                .class()
+                .class(self.db())
                 .is_known(self.db(), KnownClass::SpecialForm)
             {
                 if let Some(name_expr) = target.as_name_expr() {
@@ -8216,9 +8221,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::NominalInstance(nominal1),
                 Type::NominalInstance(nominal2),
-            ) => nominal1.class()
-                .tuple_spec(self.db())
-                .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.class().tuple_spec(self.db())?)))
+            ) => nominal1.tuple_spec(self.db())
+                .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
                     let mut tuple_rich_comparison =
                         |op| self.infer_tuple_rich_comparison(&lhs_tuple, op, &rhs_tuple, range);
@@ -8574,10 +8578,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let tuple_generic_alias = |db: &'db dyn Db, tuple: Option<TupleType<'db>>| {
             let tuple =
                 tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()).unwrap());
-            tuple
-                .to_class_type(db)
-                .map(Type::from)
-                .unwrap_or_else(Type::unknown)
+            Type::from(tuple.to_class_type(db))
         };
 
         // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
@@ -8680,7 +8681,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => nominal
-                .class()
                 .tuple_spec(db)
                 .and_then(|tuple| Some((tuple, i32::try_from(i64_int).ok()?)))
                 .map(|(tuple, i32_int)| {
@@ -8702,11 +8702,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::NominalInstance(maybe_tuple_nominal),
                 Type::NominalInstance(maybe_slice_nominal),
             ) => maybe_tuple_nominal
-                .class()
                 .tuple_spec(db)
                 .as_deref()
                 .and_then(|tuple_spec| {
-                    Some((tuple_spec, maybe_slice_nominal.class().slice_literal(db)?))
+                    Some((tuple_spec, maybe_slice_nominal.class(db).slice_literal(db)?))
                 })
                 .map(|(tuple, SliceLiteral { start, stop, step })| match tuple {
                     TupleSpec::Fixed(tuple) => {
@@ -8745,7 +8744,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `"value"[1:3]`, return `"al"`
             (Type::StringLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
-                .class()
+                .class(db)
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -8783,7 +8782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
             (Type::BytesLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
-                .class()
+                .class(db)
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -8808,7 +8807,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (Type::NominalInstance(nominal), Type::BooleanLiteral(bool))
-                if nominal.class().tuple_spec(db).is_some() =>
+                if nominal.tuple_spec(db).is_some() =>
             {
                 Some(self.infer_subscript_expression_types(
                     subscript,
@@ -9046,7 +9045,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(nominal)
                     if matches!(
-                        nominal.class().known(self.db()),
+                        nominal.class(self.db()).known(self.db()),
                         Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
                     ) =>
                 {
@@ -9089,7 +9088,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
             Some(ty @ (Type::IntLiteral(_) | Type::BooleanLiteral(_))) => SliceArg::Arg(ty),
             Some(ty @ Type::NominalInstance(instance))
-                if instance.class().is_known(self.db(), KnownClass::NoneType) =>
+                if instance
+                    .class(self.db())
+                    .is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(ty)
             }
@@ -10025,9 +10026,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
-                Some(KnownClass::Tuple) => {
-                    Type::tuple(self.db(), self.infer_tuple_type_expression(slice))
-                }
+                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(slice)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
@@ -10095,7 +10094,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(ellipsis);
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
-                    self.store_expression_type(tuple_slice, Type::tuple(self.db(), result));
+                    self.store_expression_type(tuple_slice, Type::tuple(result));
                     return result;
                 }
 
@@ -10130,7 +10129,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
                 // stored in the surrounding `infer_type_expression` call:
-                self.store_expression_type(tuple_slice, Type::tuple(self.db(), ty));
+                self.store_expression_type(tuple_slice, Type::tuple(ty));
 
                 ty
             }
@@ -10807,7 +10806,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             SpecialFormType::Type => self.infer_subclass_of_type_expression(arguments_slice),
             SpecialFormType::Tuple => {
-                Type::tuple(self.db(), self.infer_tuple_type_expression(arguments_slice))
+                Type::tuple(self.infer_tuple_type_expression(arguments_slice))
             }
             SpecialFormType::Generic | SpecialFormType::Protocol => {
                 self.infer_expression(arguments_slice);
@@ -10972,7 +10971,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Some(Parameters::todo());
                     }
                     Type::NominalInstance(nominal)
-                        if nominal.class().is_known(self.db(), KnownClass::ParamSpec) =>
+                        if nominal
+                            .class(self.db())
+                            .is_known(self.db(), KnownClass::ParamSpec) =>
                     {
                         return Some(Parameters::todo());
                     }

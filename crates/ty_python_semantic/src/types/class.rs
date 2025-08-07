@@ -1965,7 +1965,7 @@ impl<'db> ClassLiteral<'db> {
 
                 if field_ty
                     .into_nominal_instance()
-                    .is_some_and(|instance| instance.class().is_known(db, KnownClass::KwOnly))
+                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
@@ -4747,7 +4747,7 @@ impl<'db> ClassType<'db> {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::NoneType) =>
+                if instance.class(db).is_known(db, KnownClass::NoneType) =>
             {
                 Some(None)
             }
@@ -4829,7 +4829,7 @@ impl SlotsKind {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::NominalInstance(nominal) => match nominal
-                .class()
+                .class(db)
                 .tuple_spec(db)
                 .and_then(|spec| spec.len().into_fixed_length())
             {
