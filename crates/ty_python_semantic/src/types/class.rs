@@ -1146,7 +1146,8 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
+#[expect(clippy::ref_option)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn pep695_generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
