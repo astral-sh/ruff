@@ -1273,12 +1273,16 @@ fn format_header<'a>(
                 ..
             } = item
             {
-                if main_range >= range.0 && main_range < range.1 + max(*end_line as usize, 1) {
+                let end_of_range = range.1 + max(*end_line as usize, 1);
+                if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
                         .chars()
                         .count();
                     col = char_column + 1;
                     line_offset = lineno.unwrap_or(1);
+                    break;
+                } else if main_range == end_of_range {
+                    line_offset = lineno.map_or(1, |line| line + 1);
                     break;
                 }
             }
