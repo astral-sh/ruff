@@ -134,7 +134,7 @@ invalid-syntax: f-string: unterminated triple-quoted string
    |
 
 invalid-syntax: unexpected EOF while parsing
-  --> ISC_syntax_error.py:1:1
+  --> ISC_syntax_error.py:30:1
    |
 28 |     "i" "j"
 29 | )
@@ -142,7 +142,7 @@ invalid-syntax: unexpected EOF while parsing
    |
 
 invalid-syntax: f-string: unterminated string
-  --> ISC_syntax_error.py:1:1
+  --> ISC_syntax_error.py:30:1
    |
 28 |     "i" "j"
 29 | )
