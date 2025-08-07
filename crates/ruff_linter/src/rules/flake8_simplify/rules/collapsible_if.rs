@@ -178,7 +178,7 @@ impl<'a> From<&NestedIf<'a>> for AnyNodeRef<'a> {
 }
 
 /// Returns the body, the range of the `if` or `elif` and whether the range is for an `if` or `elif`
-fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
+fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
     let ast::StmtIf {
         test,
         body,

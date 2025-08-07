@@ -10,6 +10,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::ImportAliasResolution;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::definitions_for_keyword_argument;
 use ty_python_semantic::{
@@ -172,12 +173,16 @@ impl GotoTarget<'_> {
 
     /// Gets the navigation ranges for this goto target.
     /// If a stub mapper is provided, definitions from stub files will be mapped to
-    /// their corresponding source file implementations.
+    /// their corresponding source file implementations. The `alias_resolution`
+    /// parameter controls whether import aliases (i.e. "x" in "from a import b as x") are
+    /// resolved or returned as is. We want to resolve them in some cases (like
+    /// "goto declaration") but not in others (like find references or rename).
     pub(crate) fn get_definition_targets(
         &self,
         file: ruff_db::files::File,
         db: &dyn crate::Db,
         stub_mapper: Option<&StubMapper>,
+        alias_resolution: ImportAliasResolution,
     ) -> Option<crate::NavigationTargets> {
         use crate::NavigationTarget;
         use ruff_python_ast as ast;
@@ -229,10 +234,14 @@ impl GotoTarget<'_> {
             GotoTarget::ImportSymbolAlias {
                 alias, import_from, ..
             } => {
-                // Handle both original names and alias names in `from x import y as z` statements
                 let symbol_name = alias.name.as_str();
-                let definitions =
-                    definitions_for_imported_symbol(db, file, import_from, symbol_name);
+                let definitions = definitions_for_imported_symbol(
+                    db,
+                    file,
+                    import_from,
+                    symbol_name,
+                    alias_resolution,
+                );
 
                 definitions_to_navigation_targets(db, stub_mapper, definitions)
             }
@@ -254,12 +263,18 @@ impl GotoTarget<'_> {
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
             GotoTarget::ImportModuleAlias { alias } => {
-                // For import aliases, navigate to the module being aliased
-                // This only applies to regular import statements like "import x.y as z"
-                let full_module_name = alias.name.as_str();
-
-                // Try to resolve the module
-                resolve_module_to_navigation_target(db, full_module_name)
+                if alias_resolution == ImportAliasResolution::ResolveAliases {
+                    let full_module_name = alias.name.as_str();
+                    // Try to resolve the module
+                    resolve_module_to_navigation_target(db, full_module_name)
+                } else {
+                    let alias_range = alias.asname.as_ref().unwrap().range;
+                    Some(crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: alias_range,
+                        full_range: alias.range(),
+                    }))
+                }
             }
 
             // Handle keyword arguments in call expressions
@@ -316,7 +331,7 @@ impl GotoTarget<'_> {
     /// Returns `None` if no meaningful string representation can be provided.
     /// This is used by the "references" feature, which looks for references
     /// to this goto target.
-    pub(crate) fn to_string(&self) -> Option<Cow<str>> {
+    pub(crate) fn to_string(&self) -> Option<Cow<'_, str>> {
         match self {
             GotoTarget::Expression(expression) => match expression {
                 ast::ExprRef::Name(name) => Some(Cow::Borrowed(name.id.as_str())),

@@ -149,7 +149,7 @@ impl Deref for MessageWithLocation<'_> {
 
 fn group_diagnostics_by_filename(
     diagnostics: &[Diagnostic],
-) -> BTreeMap<String, Vec<MessageWithLocation>> {
+) -> BTreeMap<String, Vec<MessageWithLocation<'_>>> {
     let mut grouped_messages = BTreeMap::default();
     for diagnostic in diagnostics {
         grouped_messages

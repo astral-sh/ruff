@@ -217,9 +217,89 @@ def _(m: int, n: int):
 
     tuple_slice = t[m:n]
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
+
+class I0: ...
+class I1: ...
+class I2: ...
+class I3: ...
+class HeterogeneousTupleSubclass(tuple[I0, I1, I2, I3]): ...
+
+def __(t: HeterogeneousTupleSubclass, m: int, n: int):
+    # TODO: should be `tuple[()]`
+    reveal_type(t[0:0])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0]`
+    reveal_type(t[0:1])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1]`
+    reveal_type(t[0:2])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be tuple[I0, I1, I2, I3]`
+    reveal_type(t[0:4])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be tuple[I0, I1, I2, I3]`
+    reveal_type(t[0:5])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1]`
+    reveal_type(t[1:3])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: should be `tuple[I2, I3]`
+    reveal_type(t[-2:4])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I1, I2]`
+    reveal_type(t[-3:-1])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1, I2, I3]`
+    reveal_type(t[-10:10])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: should be `tuple[I0, I1, I2, I3]`
+    reveal_type(t[0:])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I2, I3]`
+    reveal_type(t[2:])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[()]`
+    reveal_type(t[4:])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[()]`
+    reveal_type(t[:0])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1]`
+    reveal_type(t[:2])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1, I2, I3]`
+    reveal_type(t[:10])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1, I2, I3]`
+    reveal_type(t[:])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: should be `tuple[I3, I2, I1, I0]`
+    reveal_type(t[::-1])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I2]`
+    reveal_type(t[::2])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I2, I1, I0]`
+    reveal_type(t[-2:-5:-1])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I3, I1]`
+    reveal_type(t[::-2])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I3, I0]`
+    reveal_type(t[-1::-3])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: should be `tuple[I0, I1]`
+    reveal_type(t[None:2:None])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I1, I2, I3]`
+    reveal_type(t[1:None:1])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I0, I1, I2, I3]`
+    reveal_type(t[None:None:None])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    start = 1
+    stop = None
+    step = 2
+    # TODO: should be `tuple[I1, I3]`
+    reveal_type(t[start:stop:step])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: should be `tuple[I0]`
+    reveal_type(t[False:True])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+    # TODO: should be `tuple[I1, I2]`
+    reveal_type(t[True:3])  # revealed: tuple[I0 | I1 | I2 | I3, ...]
+
+    # TODO: we should emit `zero-stepsize-in-slice` on all of these:
+    t[0:4:0]
+    t[:4:0]
+    t[0::0]
+    t[::0]
+
+    tuple_slice = t[m:n]
+    reveal_type(tuple_slice)  # revealed: tuple[I0 | I1 | I2 | I3, ...]
 ```
 
-## Slices of homogeneous and mixed tuples
+## Indexes into homogeneous and mixed tuples
 
 ```toml
 [environment]

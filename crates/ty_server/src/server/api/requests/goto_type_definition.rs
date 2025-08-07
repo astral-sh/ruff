@@ -20,7 +20,7 @@ impl RequestHandler for GotoTypeDefinitionRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
-    fn document_url(params: &GotoTypeDefinitionParams) -> Cow<Url> {
+    fn document_url(params: &GotoTypeDefinitionParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 

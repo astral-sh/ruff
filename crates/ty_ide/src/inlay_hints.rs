@@ -51,8 +51,13 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     }
 }
 
-pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'_>> {
-    let mut visitor = InlayHintVisitor::new(db, file, range);
+pub fn inlay_hints<'db>(
+    db: &'db dyn Db,
+    file: File,
+    range: TextRange,
+    settings: &InlayHintSettings,
+) -> Vec<InlayHint<'db>> {
+    let mut visitor = InlayHintVisitor::new(db, file, range, settings);
 
     let ast = parsed_module(db, file).load(db);
 
@@ -61,22 +66,36 @@ pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'
     visitor.hints
 }
 
-struct InlayHintVisitor<'db> {
+/// Settings to control the behavior of inlay hints.
+#[derive(Clone, Default, Debug)]
+pub struct InlayHintSettings {
+    /// Whether to show variable type hints.
+    ///
+    /// For example, this would enable / disable hints like the ones quoted below:
+    /// ```python
+    /// x": Literal[1]" = 1
+    /// ```
+    pub variable_types: bool,
+}
+
+struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
     hints: Vec<InlayHint<'db>>,
     in_assignment: bool,
     range: TextRange,
+    settings: &'a InlayHintSettings,
 }
 
-impl<'db> InlayHintVisitor<'db> {
-    fn new(db: &'db dyn Db, file: File, range: TextRange) -> Self {
+impl<'a, 'db> InlayHintVisitor<'a, 'db> {
+    fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
             hints: Vec::new(),
             in_assignment: false,
             range,
+            settings,
         }
     }
 
@@ -95,7 +114,7 @@ impl<'db> InlayHintVisitor<'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
+impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -113,6 +132,10 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
 
         match stmt {
             Stmt::Assign(assign) => {
+                if !self.settings.variable_types {
+                    return;
+                }
+
                 self.in_assignment = true;
                 for target in &assign.targets {
                     self.visit_expr(target);
@@ -246,8 +269,21 @@ mod tests {
     }
 
     impl InlayHintTest {
+        /// Returns the inlay hints for the given test case.
+        ///
+        /// All inlay hints are generated using the applicable settings. Use
+        /// [`inlay_hints_with_settings`] to generate hints with custom settings.
+        ///
+        /// [`inlay_hints_with_settings`]: Self::inlay_hints_with_settings
         fn inlay_hints(&self) -> String {
-            let hints = inlay_hints(&self.db, self.file, self.range);
+            self.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+            })
+        }
+
+        /// Returns the inlay hints for the given test case with custom settings.
+        fn inlay_hints_with_settings(&self, settings: &InlayHintSettings) -> String {
+            let hints = inlay_hints(&self.db, self.file, self.range, settings);
 
             let mut buf = source_text(&self.db, self.file).as_str().to_string();
 
@@ -781,5 +817,19 @@ mod tests {
         process([x=]42)
         process([x=]'hello')
         ");
+    }
+
+    #[test]
+    fn disabled_variable_types() {
+        let test = inlay_hint_test("x = 1");
+
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: false,
+            }),
+            @r"
+        x = 1
+        "
+        );
     }
 }
