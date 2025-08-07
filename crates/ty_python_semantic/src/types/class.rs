@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
@@ -1090,66 +1089,6 @@ impl<'db> ClassType<'db> {
             }
         }
     }
-
-    /// If this class is `tuple`, a specialization of `tuple` (`tuple[int, str]`, etc.),
-    /// *or a subclass of `tuple`, or a subclass of a specialization of `tuple`*,
-    /// return its tuple specification.
-    pub(super) fn tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        // Avoid an expensive MRO traversal for common stdlib classes.
-        if self
-            .known(db)
-            .is_some_and(|known_class| !known_class.is_tuple_subclass())
-        {
-            return None;
-        }
-        self.iter_mro(db)
-            .filter_map(ClassBase::into_class)
-            .find_map(|class| class.own_tuple_spec(db))
-    }
-
-    /// If this class is `tuple` or a specialization of `tuple` (`tuple[int, str]`, etc.),
-    /// return its tuple specification.
-    ///
-    /// You usually don't want to use this method directly, because you usually want to consider
-    /// any subclass of a certain tuple type in the same way as that tuple type itself.
-    /// Use [`ClassType::tuple_spec`] instead.
-    pub(super) fn own_tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        let (class_literal, specialization) = self.class_literal(db);
-        match class_literal.known(db)? {
-            KnownClass::Tuple => Some(
-                specialization
-                    .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                    .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
-            ),
-            KnownClass::VersionInfo => {
-                let python_version = Program::get(db).python_version(db);
-                let int_instance_ty = KnownClass::Int.to_instance(db);
-
-                // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
-                let release_level_ty = {
-                    let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
-                        .iter()
-                        .map(|level| Type::string_literal(db, level))
-                        .collect();
-
-                    // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
-                    // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
-                    // into other types where necessary. Here, however, we know that there are no duplicates
-                    // in this union, so it's probably more efficient to use `UnionType::new()` directly.
-                    Type::Union(UnionType::new(db, elements))
-                };
-
-                Some(Cow::Owned(TupleSpec::from_elements([
-                    Type::IntLiteral(python_version.major.into()),
-                    Type::IntLiteral(python_version.minor.into()),
-                    int_instance_ty,
-                    release_level_ty,
-                    int_instance_ty,
-                ])))
-            }
-            _ => None,
-        }
-    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
@@ -1956,7 +1895,7 @@ impl<'db> ClassLiteral<'db> {
 
                 if field_ty
                     .into_nominal_instance()
-                    .is_some_and(|instance| instance.class().is_known(db, KnownClass::KwOnly))
+                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
@@ -4734,7 +4673,7 @@ impl<'db> ClassType<'db> {
             Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
             Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
             Type::NominalInstance(instance)
-                if instance.class().is_known(db, KnownClass::NoneType) =>
+                if instance.class(db).is_known(db, KnownClass::NoneType) =>
             {
                 Some(None)
             }
@@ -4816,7 +4755,6 @@ impl SlotsKind {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::NominalInstance(nominal) => match nominal
-                .class()
                 .tuple_spec(db)
                 .and_then(|spec| spec.len().into_fixed_length())
             {

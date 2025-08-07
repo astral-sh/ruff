@@ -214,7 +214,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     match ty {
         Type::NominalInstance(instance) => {
-            if instance.class().is_known(db, KnownClass::Bool) {
+            let class = instance.class(db);
+
+            if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
@@ -222,7 +224,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
-            if let Some(spec) = instance.class().tuple_spec(db) {
+            if let Some(spec) = instance.tuple_spec(db) {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
                         let expanded = fixed_length_tuple
@@ -235,7 +237,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                                 }
                             })
                             .multi_cartesian_product()
-                            .map(|types| Type::tuple(db, TupleType::from_elements(db, types)))
+                            .map(|types| Type::tuple(TupleType::from_elements(db, types)))
                             .collect::<Vec<_>>();
 
                         if expanded.len() == 1 {
@@ -249,9 +251,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            let class_literal = instance.class().class_literal(db).0;
-
-            if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
                 return Some(enum_members.collect());
             }
 
@@ -356,15 +356,12 @@ mod tests {
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
-        let variable_length_tuple = Type::tuple(
+        let variable_length_tuple = Type::tuple(TupleType::mixed(
             &db,
-            TupleType::mixed(
-                &db,
-                [bool_ty],
-                int_ty,
-                [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
-            ),
-        );
+            [bool_ty],
+            int_ty,
+            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
+        ));
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());
     }

@@ -1,4 +1,3 @@
-#![expect(dead_code)]
 //! Types describing fixed- and variable-length tuples.
 //!
 //! At runtime, a Python tuple is a fixed-length immutable list of values. There is no restriction
@@ -148,7 +147,7 @@ impl get_size2::GetSize for TupleType<'_> {}
 
 impl<'db> Type<'db> {
     pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
-        Type::tuple(db, TupleType::homogeneous(db, element))
+        Type::tuple(TupleType::homogeneous(db, element))
     }
 
     pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
@@ -156,17 +155,18 @@ impl<'db> Type<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        Type::tuple(
+        Type::tuple(TupleType::from_elements(
             db,
-            TupleType::from_elements(db, elements.into_iter().map(Into::into)),
-        )
+            elements.into_iter().map(Into::into),
+        ))
     }
 
     pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
-        Type::tuple(db, Some(TupleType::empty(db)))
+        Type::tuple(Some(TupleType::empty(db)))
     }
 }
 
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -220,17 +220,22 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
-        KnownClass::Tuple
+    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
+    // `static-frame` as part of a mypy_primer run! This is because it's called
+    // from `NominalInstanceType::class()`, which is a very hot method.
+    #[salsa::tracked]
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
-            .and_then(|class_literal| match class_literal.generic_context(db) {
-                None => Some(ClassType::NonGeneric(class_literal)),
-                Some(generic_context) if generic_context.variables(db).len() != 1 => None,
-                Some(generic_context) => Some(
-                    class_literal
-                        .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
-                ),
-            })
+            .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
+
+        tuple_class.apply_specialization(db, |generic_context| {
+            if generic_context.variables(db).len() == 1 {
+                generic_context.specialize_tuple(db, self)
+            } else {
+                generic_context.default_specialization(db)
+            }
+        })
     }
 
     /// Return a normalized version of `self`.
@@ -279,6 +284,10 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
+    }
+
+    pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        self.tuple(db).is_single_valued(db)
     }
 }
 

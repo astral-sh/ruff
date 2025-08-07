@@ -153,7 +153,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class().class_literal(db).0))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class(db).class_literal(db).0))
                 );
                 ty
             }
@@ -201,7 +201,7 @@ impl Ty {
                 let prefix = prefix.into_iter().map(|ty| ty.into_type(db));
                 let variable = variable.into_type(db);
                 let suffix = suffix.into_iter().map(|ty| ty.into_type(db));
-                Type::tuple(db, TupleType::mixed(db, prefix, variable, suffix))
+                Type::tuple(TupleType::mixed(db, prefix, variable, suffix))
             }
             Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(

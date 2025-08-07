@@ -850,12 +850,11 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2))
-                if nominal1.class().tuple_spec(self.db).is_some() =>
-            {
+            (formal, Type::NominalInstance(actual_nominal)) => {
+                // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
-                    nominal1.class().tuple_spec(self.db),
-                    nominal2.class().tuple_spec(self.db),
+                    formal.tuple_instance_spec(self.db),
+                    actual_nominal.tuple_spec(self.db),
                 ) {
                     let Some(most_precise_length) =
                         formal_tuple.len().most_precise(actual_tuple.len())
@@ -873,14 +872,13 @@ impl<'db> SpecializationBuilder<'db> {
                     {
                         self.infer(*formal_element, *actual_element)?;
                     }
+                    return Ok(());
                 }
-            }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
                 // Extract formal_alias if this is a generic class
                 let formal_alias = match formal {
                     Type::NominalInstance(formal_nominal) => {
-                        formal_nominal.class().into_generic_alias()
+                        formal_nominal.class(self.db).into_generic_alias()
                     }
                     // TODO: This will only handle classes that explicit implement a generic protocol
                     // by listing it as a base class. To handle classes that implicitly implement a
@@ -895,7 +893,7 @@ impl<'db> SpecializationBuilder<'db> {
 
                 if let Some(formal_alias) = formal_alias {
                     let formal_origin = formal_alias.origin(self.db);
-                    for base in actual_nominal.class().iter_mro(self.db) {
+                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
                         let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
                             continue;
                         };
