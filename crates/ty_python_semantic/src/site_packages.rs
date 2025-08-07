@@ -510,7 +510,7 @@ System site-packages will not be used for module resolution.",
         // of the dir we're looking for.
         let version = version.as_ref().map(|v| v.version);
         if let Some(system_sys_prefix) =
-            SysPrefixPath::from_executable_home_path(base_executable_home_path)
+            SysPrefixPath::from_executable_home_path_real(system, base_executable_home_path)
         {
             let real_stdlib_directory = real_stdlib_directory_from_sys_prefix(
                 &system_sys_prefix,
@@ -1239,6 +1239,81 @@ impl SysPrefixPath {
         } else {
             path.parent().map(|path| Self {
                 inner: path.to_path_buf(),
+                origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
+            })
+        }
+    }
+    /// Like `from_executable_home_path` but attempts to resolve through symlink facades
+    /// to find a sys prefix that will actually contain the stdlib.
+    fn from_executable_home_path_real(system: &dyn System, path: &PythonHomePath) -> Option<Self> {
+        let mut home_path = path.0.clone();
+
+        // Try to find the python executable in the given directory and canonicalize it
+        // to resolve any symlink. This is (at least) necessary for homebrew pythons
+        // and the macOS system python.
+        //
+        // In python installations like homebrew, the home path points to a directory like
+        // `/opt/homebrew/opt/python@3.13/bin` and indeed if you look for `../lib/python3.13/`
+        // you *will* find `site-packages` but you *won't* find the stdlib! (For the macOS
+        // system install you won't even find `site-packages` here.)
+        //
+        // However if you look at `/opt/homebrew/opt/python@3.13/bin/python3.13` (the actual
+        // python executable in that dir) you will find that it's a symlink to something like
+        // `../Frameworks/Python.framework/Versions/3.13/bin/python3.13`
+        //
+        // From this Framework binary path if you go to `../../lib/python3.13/` you will then
+        // find the python stdlib as expected (and a different instance of site-packages).
+        //
+        // FIXME: it would be nice to include a "we know the python name" fastpath like in
+        // `real_stdlib_directory_from_sys_prefix`.
+        if let Ok(dir) = system.read_directory(&home_path) {
+            for entry_result in dir {
+                let Ok(entry) = entry_result else {
+                    continue;
+                };
+
+                if entry.file_type().is_directory() {
+                    continue;
+                }
+
+                let path = entry.into_path();
+
+                let name = path.file_name().expect(
+                    "File name to be non-null because path is guaranteed to be a child of `lib`",
+                );
+
+                if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
+                    continue;
+                }
+
+                if system.is_directory(&path) {
+                    continue;
+                }
+
+                let Ok(canonical_path) = system.canonicalize_path(&path) else {
+                    continue;
+                };
+
+                let Some(parent) = canonical_path.parent() else {
+                    continue;
+                };
+
+                home_path = parent.to_path_buf();
+                break;
+            }
+        }
+
+        // No need to check whether `path.parent()` is a directory:
+        // the parent of a canonicalised path that is known to exist
+        // is guaranteed to be a directory.
+        if cfg!(target_os = "windows") {
+            Some(Self {
+                inner: home_path.to_path_buf(),
+                origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
+            })
+        } else {
+            home_path.parent().map(|home_path| Self {
+                inner: home_path.to_path_buf(),
                 origin: SysPrefixPathOrigin::DerivedFromPyvenvCfg,
             })
         }
