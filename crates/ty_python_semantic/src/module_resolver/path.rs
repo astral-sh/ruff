@@ -524,7 +524,9 @@ impl SearchPath {
     pub(crate) fn is_standard_library(&self) -> bool {
         matches!(
             &*self.0,
-            SearchPathInner::StandardLibraryCustom(_) | SearchPathInner::StandardLibraryVendored(_)
+            SearchPathInner::StandardLibraryCustom(_)
+                | SearchPathInner::StandardLibraryVendored(_)
+                | SearchPathInner::StandardLibraryReal(_)
         )
     }
 

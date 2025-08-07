@@ -501,7 +501,7 @@ System site-packages will not be used for module resolution.",
             root_path,
             // We don't need to respect this setting
             include_system_site_packages: _,
-            // FIXME(Gankra): should we inherit info from the parent environment?
+            // We don't need to inherit any info from the parent environment
             parent_environment: _,
         } = self;
 

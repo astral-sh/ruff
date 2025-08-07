@@ -283,7 +283,6 @@ fn run_test(
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
-            // FIXME(Gankra): should this be computed properly?
             real_stdlib_path: None,
         }
         .to_search_paths(db.system(), db.vendored())
