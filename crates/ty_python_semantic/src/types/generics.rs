@@ -43,10 +43,7 @@ fn enclosing_generic_contexts<'db>(
                     .undecorated_type()
                     .expect("function should have undecorated type")
                     .into_function_literal()?
-                    .signature(db)
-                    .iter()
-                    .last()
-                    .expect("function should have at least one overload")
+                    .last_definition_signature(db)
                     .generic_context
             }
             _ => None,

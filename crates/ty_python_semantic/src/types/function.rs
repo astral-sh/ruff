@@ -575,6 +575,30 @@ impl<'db> FunctionLiteral<'db> {
         }))
     }
 
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_signature<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mappings: &'a [TypeMapping<'a, 'db>],
+    ) -> Signature<'db>
+    where
+        'db: 'a,
+    {
+        let inherited_generic_context = self.inherited_generic_context(db);
+        type_mappings.iter().fold(
+            self.last_definition(db)
+                .signature(db, inherited_generic_context),
+            |ty, mapping| ty.apply_type_mapping(db, mapping),
+        )
+    }
+
     fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
@@ -795,6 +819,26 @@ impl<'db> FunctionType<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
 
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the function's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the function's AST and rerun for every change in that file.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_fn=last_definition_signature_cycle_recover,
+        cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db)
+            .last_definition_signature(db, self.type_mappings(db))
+    }
+
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signature(db), false)
@@ -999,6 +1043,22 @@ fn signature_cycle_initial<'db>(
     _function: FunctionType<'db>,
 ) -> CallableSignature<'db> {
     CallableSignature::single(Signature::bottom(db))
+}
+
+fn last_definition_signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Signature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Signature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn last_definition_signature_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _function: FunctionType<'db>,
+) -> Signature<'db> {
+    Signature::bottom(db)
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
