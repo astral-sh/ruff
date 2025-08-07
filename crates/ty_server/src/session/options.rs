@@ -148,7 +148,7 @@ impl GlobalOptions {
         let experimental = self
             .experimental
             .map(|experimental| ExperimentalSettings {
-                rename: experimental.rename.unwrap_or_default(),
+                rename: experimental.rename.unwrap_or(true),
             })
             .unwrap_or_default();
 
