@@ -521,6 +521,16 @@
             }
           ]
         },
+        "invalid-key": {
+          "title": "detects invalid subscript accesses",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys.\n\n## Why is this bad?\nUsing an invalid key will raise a `KeyError` at runtime.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-legacy-type-variable": {
           "title": "detects invalid legacy type variables",
           "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",

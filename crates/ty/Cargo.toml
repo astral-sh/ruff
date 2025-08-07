@@ -16,6 +16,7 @@ license.workspace = true
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "cache"] }
 ruff_python_ast = { workspace = true }
+ty_combine = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["zstd"] }
 ty_server = { workspace = true }
@@ -25,6 +26,7 @@ anyhow = { workspace = true }
 argfile = { workspace = true }
 clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
+clearscreen = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }

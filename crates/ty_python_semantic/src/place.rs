@@ -1,9 +1,10 @@
 use ruff_db::files::File;
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::file_to_module;
+use crate::module_resolver::{KnownModule, file_to_module};
 use crate::semantic_index::definition::{Definition, DefinitionState};
-use crate::semantic_index::place::{PlaceExpr, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
 };
@@ -12,7 +13,7 @@ use crate::types::{
     DynamicType, KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
     UnionType, binding_type, declaration_type, todo_type,
 };
-use crate::{Db, FxOrderSet, KnownModule, Program, resolve_module};
+use crate::{Db, FxOrderSet, Program, resolve_module};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -214,13 +215,13 @@ pub(crate) fn symbol<'db>(
 pub(crate) fn place<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    expr: &PlaceExpr,
+    member: PlaceExprRef,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     place_impl(
         db,
         scope,
-        expr,
+        member,
         RequiresExplicitReExport::No,
         considered_definitions,
     )
@@ -234,12 +235,12 @@ pub(crate) fn class_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     place_table(db, scope)
-        .place_id_by_name(name)
-        .map(|place| {
+        .symbol_id(name)
+        .map(|symbol_id| {
             let place_and_quals = place_by_id(
                 db,
                 scope,
-                place,
+                symbol_id.into(),
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::EndOfScope,
             );
@@ -256,7 +257,7 @@ pub(crate) fn class_symbol<'db>(
             {
                 // Otherwise, we need to check if the symbol has bindings
                 let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_bindings(place);
+                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
                 let inferred = place_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
@@ -640,7 +641,7 @@ fn place_cycle_initial<'db>(
     Place::bound(Type::Never).into()
 }
 
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -763,17 +764,21 @@ fn place_by_id<'db>(
             // `TYPE_CHECKING` is a special variable that should only be assigned `False`
             // at runtime, but is always considered `True` in type checking.
             // See mdtest/known_constants.md#user-defined-type_checking for details.
-            let is_considered_non_modifiable = place_table(db, scope)
-                .place_expr(place_id)
-                .expr
-                .is_name_and(|name| matches!(name, "__slots__" | "TYPE_CHECKING"));
+            let is_considered_non_modifiable = place_id.as_symbol().is_some_and(|symbol_id| {
+                matches!(
+                    place_table(db, scope).symbol(symbol_id).name().as_str(),
+                    "__slots__" | "TYPE_CHECKING"
+                )
+            });
 
-            if scope.file(db).is_stub(db) {
+            if scope.file(db).is_stub(db) || scope.scope(db).visibility().is_private() {
                 // We generally trust module-level undeclared places in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
                 // leads to all sorts of downstream problems. Similarly, type variables are often
                 // defined as `_T = TypeVar("_T")`, without being declared.
+                // Also, if the scope is private, such as a function scope,
+                // meaning that the place cannot be rewritten from elsewhere, we do not union with `Unknown`.
 
                 inferred.into()
             } else {
@@ -830,12 +835,12 @@ fn symbol_impl<'db>(
     }
 
     place_table(db, scope)
-        .place_id_by_name(name)
+        .symbol_id(name)
         .map(|symbol| {
             place_by_id(
                 db,
                 scope,
-                symbol,
+                symbol.into(),
                 requires_explicit_reexport,
                 considered_definitions,
             )
@@ -843,18 +848,17 @@ fn symbol_impl<'db>(
         .unwrap_or_default()
 }
 
-/// Implementation of [`place`].
 fn place_impl<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
-    expr: &PlaceExpr,
+    place: PlaceExprRef,
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("place", ?expr).entered();
+    let _span = tracing::trace_span!("place_impl", ?place).entered();
 
     place_table(db, scope)
-        .place_id_by_expr(expr)
+        .place_id(place)
         .map(|place| {
             place_by_id(
                 db,
@@ -1263,7 +1267,8 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
         return false;
     };
     let table = place_table(db, definition.scope(db));
-    let symbol_name = table.place_expr(definition.place(db)).expect_name();
+    let symbol_id = definition.place(db).expect_symbol();
+    let symbol_name = table.symbol(symbol_id).name();
     all_names.contains(symbol_name)
 }
 
@@ -1272,19 +1277,19 @@ mod implicit_globals {
 
     use crate::db::Db;
     use crate::place::PlaceAndQualifiers;
-    use crate::semantic_index::place::PlaceExpr;
-    use crate::semantic_index::{self, place_table, use_def_map};
+    use crate::semantic_index::symbol::Symbol;
+    use crate::semantic_index::{place_table, use_def_map};
     use crate::types::{KnownClass, Type};
 
     use super::{Place, PlaceFromDeclarationsResult, place_from_declarations};
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
-        expr: &PlaceExpr,
+        name: &str,
     ) -> PlaceFromDeclarationsResult<'db> {
         if !module_type_symbols(db)
             .iter()
-            .any(|module_type_member| Some(module_type_member) == expr.as_name())
+            .any(|module_type_member| module_type_member == name)
         {
             return Ok(Place::Unbound.into());
         }
@@ -1294,12 +1299,12 @@ mod implicit_globals {
         };
         let module_type_scope = module_type_class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
-        let Some(place_id) = place_table.place_id_by_expr(expr) else {
+        let Some(symbol_id) = place_table.symbol_id(name) else {
             return Ok(Place::Unbound.into());
         };
         place_from_declarations(
             db,
-            use_def_map(db, module_type_scope).end_of_scope_declarations(place_id),
+            use_def_map(db, module_type_scope).end_of_scope_symbol_declarations(symbol_id),
         )
     }
 
@@ -1363,7 +1368,7 @@ mod implicit_globals {
     /// Conceptually this function could be a `Set` rather than a list,
     /// but the number of symbols declared in this scope is likely to be very small,
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)
@@ -1378,11 +1383,14 @@ mod implicit_globals {
         let module_type_symbol_table = place_table(db, module_type_scope);
 
         module_type_symbol_table
-            .places()
-            .filter(|place| place.is_declared() && place.is_name())
-            .map(semantic_index::place::PlaceExprWithFlags::expect_name)
+            .symbols()
+            .filter(|symbol| symbol.is_declared())
+            .map(Symbol::name)
             .filter(|symbol_name| {
-                !matches!(&***symbol_name, "__dict__" | "__getattr__" | "__init__")
+                !matches!(
+                    symbol_name.as_str(),
+                    "__dict__" | "__getattr__" | "__init__"
+                )
             })
             .cloned()
             .collect()

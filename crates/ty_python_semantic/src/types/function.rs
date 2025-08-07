@@ -62,13 +62,13 @@ use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Boundness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
-    report_bad_argument_to_get_protocol_members,
+    report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::generics::{GenericContext, walk_generic_context};
@@ -76,9 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassLiteral, ClassType, DeprecatedInstance, DynamicType,
-    KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
-    UnionBuilder, walk_type_mapping,
+    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
+    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -340,12 +340,17 @@ impl<'db> OverloadLiteral<'db> {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         });
+
+        let index = semantic_index(db, scope.file(db));
+        let is_generator = scope.file_scope_id(db).is_generator_function(index);
+
         Signature::from_function(
             db,
             generic_context,
             inherited_generic_context,
             definition,
             function_stmt_node,
+            is_generator,
         )
     }
 
@@ -494,7 +499,7 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).spans(db)
     }
 
-    #[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     fn overloads_and_implementation(
         self,
         db: &'db dyn Db,
@@ -785,7 +790,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(ref), cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
@@ -795,13 +800,13 @@ impl<'db> FunctionType<'db> {
         CallableType::new(db, self.signature(db), false)
     }
 
-    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    /// Convert the `FunctionType` into a [`BoundMethodType`].
     pub(crate) fn into_bound_method_type(
         self,
         db: &'db dyn Db,
         self_instance: Type<'db>,
-    ) -> Type<'db> {
-        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
+    ) -> BoundMethodType<'db> {
+        BoundMethodType::new(db, self, self_instance)
     }
 
     pub(crate) fn has_relation_to(
@@ -896,7 +901,12 @@ fn is_instance_truthiness<'db>(
         if let Type::NominalInstance(instance) = ty {
             if instance
                 .class
-                .is_subclass_of(db, ClassType::NonGeneric(class))
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .any(|c| match c {
+                    ClassType::Generic(c) => c.origin(db) == class,
+                    ClassType::NonGeneric(c) => c == class,
+                })
             {
                 return true;
             }
@@ -965,7 +975,8 @@ fn is_instance_truthiness<'db>(
         | Type::TypeIs(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
-        | Type::Never => {
+        | Type::Never
+        | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear
             // if it's worth the effort.
             Truthiness::Ambiguous
@@ -1049,6 +1060,8 @@ pub enum KnownFunction {
 
     /// `dataclasses.dataclass`
     Dataclass,
+    /// `dataclasses.field`
+    Field,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -1075,10 +1088,14 @@ pub enum KnownFunction {
     EnumMembers,
     /// `ty_extensions.all_members`
     AllMembers,
+    /// `ty_extensions.has_member`
+    HasMember,
     /// `ty_extensions.top_materialization`
     TopMaterialization,
     /// `ty_extensions.bottom_materialization`
     BottomMaterialization,
+    /// `ty_extensions.reveal_protocol_interface`
+    RevealProtocolInterface,
 }
 
 impl KnownFunction {
@@ -1127,7 +1144,7 @@ impl KnownFunction {
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
             }
-            Self::Dataclass => {
+            Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
@@ -1143,6 +1160,8 @@ impl KnownFunction {
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
+            | Self::HasMember
+            | Self::RevealProtocolInterface
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
         }
@@ -1177,6 +1196,16 @@ impl KnownFunction {
                             .message(format_args!("`{}`", revealed_type.display(db))),
                     );
                 }
+            }
+
+            KnownFunction::HasMember => {
+                let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
+                    return;
+                };
+                let ty_members = all_members(db, *ty);
+                overload.set_return_type(Type::BooleanLiteral(
+                    ty_members.iter().any(|m| m.name == member.value(db)),
+                ));
             }
 
             KnownFunction::AssertType => {
@@ -1325,6 +1354,33 @@ impl KnownFunction {
                 report_bad_argument_to_get_protocol_members(context, call_expression, *class);
             }
 
+            KnownFunction::RevealProtocolInterface => {
+                let [Some(param_type)] = parameter_types else {
+                    return;
+                };
+                let Some(protocol_class) = param_type
+                    .into_class_literal()
+                    .and_then(|class| class.into_protocol_class(db))
+                else {
+                    report_bad_argument_to_protocol_interface(
+                        context,
+                        call_expression,
+                        *param_type,
+                    );
+                    return;
+                };
+                if let Some(builder) =
+                    context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
+                {
+                    let mut diag = builder.into_diagnostic("Revealed protocol interface");
+                    let span = context.span(&call_expression.arguments.args[0]);
+                    diag.annotate(Annotation::primary(span).message(format_args!(
+                        "`{}`",
+                        protocol_class.interface(db).display(db)
+                    )));
+                }
+            }
+
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
                 let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
                     return;
@@ -1408,7 +1464,7 @@ pub(crate) mod tests {
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
 
-                KnownFunction::Dataclass => KnownModule::Dataclasses,
+                KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
@@ -1437,6 +1493,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsEquivalentTo
                 | KnownFunction::TopMaterialization
                 | KnownFunction::BottomMaterialization
+                | KnownFunction::HasMember
+                | KnownFunction::RevealProtocolInterface
                 | KnownFunction::AllMembers => KnownModule::TyExtensions,
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,

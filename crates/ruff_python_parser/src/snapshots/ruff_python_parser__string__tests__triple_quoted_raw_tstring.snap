@@ -13,38 +13,36 @@ expression: suite
                     range: 0..11,
                     value: TStringValue {
                         inner: Single(
-                            TString(
-                                TString {
-                                    range: 0..11,
-                                    node_index: AtomicNodeIndex(..),
-                                    elements: [
-                                        Interpolation(
-                                            InterpolatedElement {
-                                                range: 5..8,
-                                                node_index: AtomicNodeIndex(..),
-                                                expression: Name(
-                                                    ExprName {
-                                                        node_index: AtomicNodeIndex(..),
-                                                        range: 6..7,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                debug_text: None,
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                    ],
-                                    flags: TStringFlags {
-                                        quote_style: Double,
-                                        prefix: Raw {
-                                            uppercase_r: false,
+                            TString {
+                                range: 0..11,
+                                node_index: AtomicNodeIndex(..),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 5..8,
+                                            node_index: AtomicNodeIndex(..),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: AtomicNodeIndex(..),
+                                                    range: 6..7,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: None,
+                                            conversion: None,
+                                            format_spec: None,
                                         },
-                                        triple_quoted: true,
+                                    ),
+                                ],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Raw {
+                                        uppercase_r: false,
                                     },
+                                    triple_quoted: true,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

@@ -35,7 +35,9 @@ class InvalidStateError(Error):
     """The operation is not allowed in this state."""
 
 class BrokenExecutor(RuntimeError):
-    """Raised when a executor has become non-functional after a severe failure."""
+    """
+    Raised when a executor has become non-functional after a severe failure.
+    """
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)

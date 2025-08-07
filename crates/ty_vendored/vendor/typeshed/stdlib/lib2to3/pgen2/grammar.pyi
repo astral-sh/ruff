@@ -67,6 +67,7 @@ class Grammar:
     keywords      -- a dict mapping keyword strings to arc labels.
 
     tokens        -- a dict mapping token numbers to arc labels.
+
     """
 
     symbol2number: dict[str, int]
@@ -85,7 +86,9 @@ class Grammar:
         """Load the grammar tables from a pickle file."""
 
     def copy(self) -> Self:
-        """Copy the grammar."""
+        """
+        Copy the grammar.
+        """
 
     def report(self) -> None:
         """Dump the grammar tables to standard output, for debugging."""

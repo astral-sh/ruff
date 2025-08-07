@@ -151,6 +151,7 @@ class SMTPServer(asyncore.dispatcher):
         This function should return None for a normal `250 Ok' response;
         otherwise, it should return the desired response string in RFC 821
         format.
+
         """
 
 class DebuggingServer(SMTPServer): ...

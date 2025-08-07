@@ -798,7 +798,7 @@ fn stdin_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: SyntaxError: Expected one or more symbol names after import
+    -:1:16: invalid-syntax: Expected one or more symbol names after import
       |
     1 | from foo import
       |                ^
@@ -818,14 +818,14 @@ fn stdin_multiple_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: SyntaxError: Expected one or more symbol names after import
+    -:1:16: invalid-syntax: Expected one or more symbol names after import
       |
     1 | from foo import
       |                ^
     2 | bar =
       |
 
-    -:2:6: SyntaxError: Expected an expression
+    -:2:6: invalid-syntax: Expected an expression
       |
     1 | from foo import
     2 | bar =
@@ -847,7 +847,7 @@ fn parse_error_not_included() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:6: SyntaxError: Expected an expression
+    -:1:6: invalid-syntax: Expected an expression
       |
     1 | foo =
       |      ^

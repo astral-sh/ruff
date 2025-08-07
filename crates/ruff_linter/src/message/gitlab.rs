@@ -61,22 +61,17 @@ impl Serialize for SerializedMessages<'_> {
         let mut fingerprints = HashSet::<u64>::with_capacity(self.diagnostics.len());
 
         for diagnostic in self.diagnostics {
-            let start_location = diagnostic.expect_ruff_start_location();
-            let end_location = diagnostic.expect_ruff_end_location();
-
             let filename = diagnostic.expect_ruff_filename();
-            let lines = if self.context.is_notebook(&filename) {
+
+            let (start_location, end_location) = if self.context.is_notebook(&filename) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                json!({
-                    "begin": 1,
-                    "end": 1
-                })
+                Default::default()
             } else {
-                json!({
-                    "begin": start_location.line,
-                    "end": end_location.line
-                })
+                (
+                    diagnostic.expect_ruff_start_location(),
+                    diagnostic.expect_ruff_end_location(),
+                )
             };
 
             let path = self.project_dir.as_ref().map_or_else(
@@ -111,8 +106,11 @@ impl Serialize for SerializedMessages<'_> {
                 "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {
                     "path": path,
-                    "lines": lines
-                }
+                    "positions": {
+                        "begin": start_location,
+                        "end": end_location,
+                    },
+                },
             });
 
             s.serialize_element(&value)?;

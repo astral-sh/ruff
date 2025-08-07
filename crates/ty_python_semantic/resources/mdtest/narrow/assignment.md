@@ -213,23 +213,20 @@ reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
 reveal_type(b[0])  # revealed: Literal[0]
 reveal_type(dd[0])  # revealed: Literal[0]
-# TODO: should be Literal[0]
-reveal_type(cm[0])  # revealed: Unknown
+reveal_type(cm[0])  # revealed: Literal[0]
 
 class C:
     reveal_type(l[0])  # revealed: Literal[0]
     reveal_type(d[0])  # revealed: Literal[0]
     reveal_type(b[0])  # revealed: Literal[0]
     reveal_type(dd[0])  # revealed: Literal[0]
-    # TODO: should be Literal[0]
-    reveal_type(cm[0])  # revealed: Unknown
+    reveal_type(cm[0])  # revealed: Literal[0]
 
 [reveal_type(l[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(d[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(b[0]) for _ in range(1)]  # revealed: Literal[0]
 [reveal_type(dd[0]) for _ in range(1)]  # revealed: Literal[0]
-# TODO: should be Literal[0]
-[reveal_type(cm[0]) for _ in range(1)]  # revealed: Unknown
+[reveal_type(cm[0]) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
     reveal_type(l[0])  # revealed: int | None
@@ -244,8 +241,7 @@ class D(TypedDict):
 
 td = D(x=1, label="a")
 td["x"] = 0
-# TODO: should be Literal[0]
-reveal_type(td["x"])  # revealed: @Todo(Support for `TypedDict`)
+reveal_type(td["x"])  # revealed: Literal[0]
 
 # error: [unresolved-reference]
 does["not"]["exist"] = 0
@@ -253,7 +249,7 @@ does["not"]["exist"] = 0
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
 non_subscriptable = 1
-# error: [non-subscriptable]
+# error: [invalid-assignment]
 non_subscriptable[0] = 0
 # error: [non-subscriptable]
 reveal_type(non_subscriptable[0])  # revealed: Unknown
@@ -318,7 +314,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # TODO: This assignment is invalid and should result in an error.
+    # error: [invalid-assignment] "Method `__setitem__` of type `Overload[(key: SupportsIndex, value: int, /) -> None, (key: slice[Any, Any, Any], value: Iterable[int], /) -> None]` cannot be called with a key of type `Literal[0]` and a value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```

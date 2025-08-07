@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.12.7
+
+This is a follow-up release to 0.12.6. Because of an issue in the package metadata, 0.12.6 failed to publish fully to PyPI and has been yanked. Similarly, there is no GitHub release or Git tag for 0.12.6. The contents of the 0.12.7 release are identical to 0.12.6, except for the updated metadata.
+
+## 0.12.6
+
+### Preview features
+
+- \[`flake8-commas`\] Add support for trailing comma checks in type parameter lists (`COM812`, `COM819`) ([#19390](https://github.com/astral-sh/ruff/pull/19390))
+- \[`pylint`\] Implement auto-fix for `missing-maxsplit-arg` (`PLC0207`) ([#19387](https://github.com/astral-sh/ruff/pull/19387))
+- \[`ruff`\] Offer fixes for `RUF039` in more cases ([#19065](https://github.com/astral-sh/ruff/pull/19065))
+
+### Bug fixes
+
+- Support `.pyi` files in ruff analyze graph ([#19611](https://github.com/astral-sh/ruff/pull/19611))
+- \[`flake8-pyi`\] Preserve inline comment in ellipsis removal (`PYI013`) ([#19399](https://github.com/astral-sh/ruff/pull/19399))
+- \[`perflint`\] Ignore rule if target is `global` or `nonlocal` (`PERF401`) ([#19539](https://github.com/astral-sh/ruff/pull/19539))
+- \[`pyupgrade`\] Fix `UP030` to avoid modifying double curly braces in format strings ([#19378](https://github.com/astral-sh/ruff/pull/19378))
+- \[`refurb`\] Ignore decorated functions for `FURB118` ([#19339](https://github.com/astral-sh/ruff/pull/19339))
+- \[`refurb`\] Mark `int` and `bool` cases for `Decimal.from_float` as safe fixes (`FURB164`) ([#19468](https://github.com/astral-sh/ruff/pull/19468))
+- \[`ruff`\] Fix `RUF033` for named default expressions ([#19115](https://github.com/astral-sh/ruff/pull/19115))
+
+### Rule changes
+
+- \[`flake8-blind-except`\] Change `BLE001` to permit `logging.critical(..., exc_info=True)` ([#19520](https://github.com/astral-sh/ruff/pull/19520))
+
+### Performance
+
+- Add support for specifying minimum dots in detected string imports ([#19538](https://github.com/astral-sh/ruff/pull/19538))
+
 ## 0.12.5
 
 ### Preview features

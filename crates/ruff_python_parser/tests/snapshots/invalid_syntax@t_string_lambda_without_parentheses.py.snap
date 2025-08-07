@@ -20,78 +20,76 @@ Module(
                             range: 44..60,
                             value: TStringValue {
                                 inner: Single(
-                                    TString(
-                                        TString {
-                                            range: 44..60,
-                                            node_index: AtomicNodeIndex(..),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 46..56,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        expression: Lambda(
-                                                            ExprLambda {
-                                                                node_index: AtomicNodeIndex(..),
-                                                                range: 47..56,
-                                                                parameters: Some(
-                                                                    Parameters {
-                                                                        range: 54..55,
-                                                                        node_index: AtomicNodeIndex(
-                                                                            0,
-                                                                        ),
-                                                                        posonlyargs: [],
-                                                                        args: [
-                                                                            ParameterWithDefault {
+                                    TString {
+                                        range: 44..60,
+                                        node_index: AtomicNodeIndex(..),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 46..56,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    expression: Lambda(
+                                                        ExprLambda {
+                                                            node_index: AtomicNodeIndex(..),
+                                                            range: 47..56,
+                                                            parameters: Some(
+                                                                Parameters {
+                                                                    range: 54..55,
+                                                                    node_index: AtomicNodeIndex(
+                                                                        0,
+                                                                    ),
+                                                                    posonlyargs: [],
+                                                                    args: [
+                                                                        ParameterWithDefault {
+                                                                            range: 54..55,
+                                                                            node_index: AtomicNodeIndex(..),
+                                                                            parameter: Parameter {
                                                                                 range: 54..55,
                                                                                 node_index: AtomicNodeIndex(..),
-                                                                                parameter: Parameter {
+                                                                                name: Identifier {
+                                                                                    id: Name("x"),
                                                                                     range: 54..55,
                                                                                     node_index: AtomicNodeIndex(..),
-                                                                                    name: Identifier {
-                                                                                        id: Name("x"),
-                                                                                        range: 54..55,
-                                                                                        node_index: AtomicNodeIndex(..),
-                                                                                    },
-                                                                                    annotation: None,
                                                                                 },
-                                                                                default: None,
+                                                                                annotation: None,
                                                                             },
-                                                                        ],
-                                                                        vararg: None,
-                                                                        kwonlyargs: [],
-                                                                        kwarg: None,
-                                                                    },
-                                                                ),
-                                                                body: Name(
-                                                                    ExprName {
-                                                                        node_index: AtomicNodeIndex(..),
-                                                                        range: 56..56,
-                                                                        id: Name(""),
-                                                                        ctx: Invalid,
-                                                                    },
-                                                                ),
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                                Literal(
-                                                    InterpolatedStringLiteralElement {
-                                                        range: 56..58,
-                                                        node_index: AtomicNodeIndex(..),
-                                                        value: " x",
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                                                            default: None,
+                                                                        },
+                                                                    ],
+                                                                    vararg: None,
+                                                                    kwonlyargs: [],
+                                                                    kwarg: None,
+                                                                },
+                                                            ),
+                                                            body: Name(
+                                                                ExprName {
+                                                                    node_index: AtomicNodeIndex(..),
+                                                                    range: 56..56,
+                                                                    id: Name(""),
+                                                                    ctx: Invalid,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                            Literal(
+                                                InterpolatedStringLiteralElement {
+                                                    range: 56..58,
+                                                    node_index: AtomicNodeIndex(..),
+                                                    value: " x",
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
                                         },
-                                    ),
+                                    },
                                 ),
                             },
                         },

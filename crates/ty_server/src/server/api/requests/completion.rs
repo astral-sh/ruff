@@ -28,13 +28,16 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: CompletionParams,
     ) -> crate::server::Result<Option<CompletionResponse>> {
         let start = Instant::now();
 
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

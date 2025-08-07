@@ -4071,6 +4071,7 @@ class Label(Widget):
         WIDGET-SPECIFIC OPTIONS
 
             height, state, width
+
         """
 
     @overload
@@ -5255,6 +5256,7 @@ class Text(Widget, XView, YView):
             autoseparators, height, maxundo,
             spacing1, spacing2, spacing3,
             state, tabs, undo, width, wrap,
+
         """
 
     @overload
@@ -5567,6 +5569,7 @@ class Text(Widget, XView, YView):
 
         edit_modified, edit_redo, edit_reset, edit_separator
         and edit_undo
+
         """
 
     @overload
@@ -6847,6 +6850,7 @@ class PanedWindow(Widget):
             width may later be adjusted by the movement of sashes
             in the panedwindow. Size may be any value accepted by
             Tk_GetPixels.
+
         """
     paneconfig: Incomplete
     def panes(self):

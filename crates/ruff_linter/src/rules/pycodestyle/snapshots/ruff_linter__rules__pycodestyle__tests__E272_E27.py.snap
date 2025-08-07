@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E27.py:21:2: E272 [*] Multiple spaces before keyword
    |
@@ -51,7 +50,7 @@ E27.py:25:5: E272 [*] Multiple spaces before keyword
 25 | this  and False
    |     ^^ E272
 26 | #: E273
-27 | a and   b
+27 | a and    b
    |
    = help: Replace with single space
 

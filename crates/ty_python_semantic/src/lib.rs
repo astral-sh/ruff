@@ -7,8 +7,8 @@ use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COM
 pub use db::Db;
 pub use module_name::ModuleName;
 pub use module_resolver::{
-    KnownModule, Module, SearchPathValidationError, SearchPaths, resolve_module,
-    resolve_real_module, system_module_search_paths,
+    Module, SearchPathValidationError, SearchPaths, resolve_module, resolve_real_module,
+    system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
@@ -46,6 +46,7 @@ mod util;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 
+type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 type FxOrderSet<V> = ordermap::set::OrderSet<V, BuildHasherDefault<FxHasher>>;
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, BuildHasherDefault<FxHasher>>;
 type FxIndexSet<V> = indexmap::IndexSet<V, BuildHasherDefault<FxHasher>>;

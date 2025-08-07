@@ -9,7 +9,9 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance};
+use crate::types::{
+    DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypedDictType,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -19,15 +21,21 @@ impl<'db> Type<'db> {
         match (class, class.known(db)) {
             (_, Some(KnownClass::Any)) => Self::Dynamic(DynamicType::Any),
             (ClassType::NonGeneric(_), Some(KnownClass::Tuple)) => {
-                TupleType::homogeneous(db, Type::unknown())
+                Type::tuple(TupleType::homogeneous(db, Type::unknown()))
             }
             (ClassType::Generic(alias), Some(KnownClass::Tuple)) => {
                 Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
             }
-            _ if class.class_literal(db).0.is_protocol(db) => {
-                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+            _ => {
+                let class_literal = class.class_literal(db).0;
+                if class_literal.is_protocol(db) {
+                    Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+                } else if class_literal.is_typed_dict(db) {
+                    TypedDictType::from(db, class)
+                } else {
+                    Self::NominalInstance(NominalInstanceType::from_class(class))
+                }
             }
-            _ => Self::NominalInstance(NominalInstanceType::from_class(class)),
         }
     }
 
@@ -125,15 +133,17 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
-        self.class.known(db).is_some_and(KnownClass::is_singleton)
-            || is_single_member_enum(db, self.class.class_literal(db).0)
+        self.class
+            .known(db)
+            .map(KnownClass::is_singleton)
+            .unwrap_or_else(|| is_single_member_enum(db, self.class.class_literal(db).0))
     }
 
     pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.class
             .known(db)
-            .is_some_and(KnownClass::is_single_valued)
-            || is_single_member_enum(db, self.class.class_literal(db).0)
+            .map(KnownClass::is_single_valued)
+            .unwrap_or_else(|| is_single_member_enum(db, self.class.class_literal(db).0))
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {

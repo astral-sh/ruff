@@ -323,7 +323,6 @@ impl GotoTarget<'_> {
                 }
             }
 
-            // TODO: Handle string literals that map to TypedDict fields
             _ => None,
         }
     }

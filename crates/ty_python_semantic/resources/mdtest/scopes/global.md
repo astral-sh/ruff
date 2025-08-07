@@ -262,3 +262,28 @@ def f():
     global __file__  # allowed, implicit global
     global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
 ```
+
+## References to variables before they are defined within a class scope are considered global
+
+If we try to access a variable in a class before it has been defined, the lookup will fall back to
+global.
+
+```py
+x: str = "a"
+
+def f(x: int, y: int):
+    class C:
+        reveal_type(x)  # revealed: int
+
+    class D:
+        x = None
+        reveal_type(x)  # revealed: None
+
+    class E:
+        reveal_type(x)  # revealed: str
+        x = None
+
+        # error: [unresolved-reference]
+        reveal_type(y)  # revealed: Unknown
+        y = None
+```

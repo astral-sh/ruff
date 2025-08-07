@@ -9,6 +9,7 @@ expression: initialization_result
       "openClose": true,
       "change": 2
     },
+    "selectionRangeProvider": true,
     "hoverProvider": true,
     "completionProvider": {
       "triggerCharacters": [
@@ -28,6 +29,8 @@ expression: initialization_result
     "typeDefinitionProvider": true,
     "referencesProvider": true,
     "documentHighlightProvider": true,
+    "documentSymbolProvider": true,
+    "workspaceSymbolProvider": true,
     "renameProvider": {
       "prepareProvider": true
     },
@@ -64,7 +67,8 @@ expression: initialization_result
     "diagnosticProvider": {
       "identifier": "ty",
       "interFileDependencies": true,
-      "workspaceDiagnostics": false
+      "workspaceDiagnostics": true,
+      "workDoneProgress": true
     }
   },
   "serverInfo": {
