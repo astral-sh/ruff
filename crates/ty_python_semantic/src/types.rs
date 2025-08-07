@@ -2520,7 +2520,7 @@ impl<'db> Type<'db> {
 
     /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
     /// [`_PyType_Lookup`] in CPython's `Objects/typeobject.c`. It should typically be called through
-    /// [Type::class_member], unless it is known that `self` is a class-like type. This function returns
+    /// [`Type::class_member`], unless it is known that `self` is a class-like type. This function returns
     /// `None` if called on an instance-like type.
     ///
     /// [descriptor guide]: https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
@@ -5030,7 +5030,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)
+    /// Given a class literal or non-dynamic `SubclassOf` type, try calling it (creating an instance)
     /// and return the resulting instance type.
     ///
     /// Models `type.__call__` behavior.
@@ -6387,7 +6387,7 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    fn instance_fallback(self, db: &dyn Db) -> Type {
+    fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
         self.class().to_instance(db)
     }
 
@@ -8016,7 +8016,7 @@ impl Truthiness {
         }
     }
 
-    fn into_type(self, db: &dyn Db) -> Type {
+    fn into_type(self, db: &dyn Db) -> Type<'_> {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
             Self::AlwaysFalse => Type::BooleanLiteral(false),
@@ -8716,7 +8716,7 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
     }
 
-    pub fn iter(&self, db: &'db dyn Db) -> Iter<Type<'db>> {
+    pub fn iter(&self, db: &'db dyn Db) -> Iter<'_, Type<'db>> {
         self.elements(db).iter()
     }
 

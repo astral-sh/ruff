@@ -212,7 +212,7 @@ impl Diagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -654,7 +654,7 @@ impl SubDiagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -1099,7 +1099,7 @@ enum DiagnosticSource {
 
 impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode {
+    fn as_source_code(&self) -> SourceCode<'_, '_> {
         match self {
             DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
             DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),

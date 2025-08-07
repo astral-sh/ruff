@@ -20,7 +20,7 @@ impl RequestHandler for SelectionRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SelectionRangeRequestHandler {
-    fn document_url(params: &SelectionRangeParams) -> Cow<Url> {
+    fn document_url(params: &SelectionRangeParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

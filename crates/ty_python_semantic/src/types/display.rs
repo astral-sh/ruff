@@ -20,7 +20,7 @@ use crate::types::{
 };
 
 impl<'db> Type<'db> {
-    pub fn display(&self, db: &'db dyn Db) -> DisplayType {
+    pub fn display(&self, db: &'db dyn Db) -> DisplayType<'_> {
         DisplayType { ty: self, db }
     }
     fn representation(self, db: &'db dyn Db) -> DisplayRepresentation<'db> {
@@ -1035,23 +1035,23 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
 }
 
 pub(crate) trait TypeArrayDisplay<'db> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray;
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db>;
 }
 
 impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }
 
 impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
-    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray {
+    fn display(&self, db: &'db dyn Db) -> DisplayTypeArray<'_, 'db> {
         DisplayTypeArray { types: self, db }
     }
 }

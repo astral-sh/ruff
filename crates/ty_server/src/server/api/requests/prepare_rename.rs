@@ -20,7 +20,7 @@ impl RequestHandler for PrepareRenameRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
-    fn document_url(params: &TextDocumentPositionParams) -> Cow<Url> {
+    fn document_url(params: &TextDocumentPositionParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 

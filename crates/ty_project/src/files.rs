@@ -38,7 +38,7 @@ impl IndexedFiles {
         }
     }
 
-    pub(super) fn get(&self) -> Index {
+    pub(super) fn get(&self) -> Index<'_> {
         let state = self.state.lock().unwrap();
 
         match &*state {
@@ -57,7 +57,7 @@ impl IndexedFiles {
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut> {
+    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut<'_>> {
         // Calling `trigger_cancellation` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set (this `db` is the only alive db).
         db.trigger_cancellation();
