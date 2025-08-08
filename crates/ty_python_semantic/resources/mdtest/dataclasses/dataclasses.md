@@ -116,7 +116,7 @@ If attributes without default values are declared after attributes with default 
 @dataclass
 class D:
     x: int = 1
-    # TODO: this should be an error: field without default defined after field with default
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
 ```
 

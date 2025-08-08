@@ -38,6 +38,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DIVISION_BY_ZERO);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
+    registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -332,6 +333,32 @@ declare_lint! {
     /// ```
     pub(crate) static DUPLICATE_KW_ONLY = {
         summary: "detects dataclass definitions with more than one usage of `KW_ONLY`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclass definitions where required fields are defined after
+    /// fields with default values.
+    ///
+    /// ## Why is this bad?
+    /// In dataclasses, all required fields (fields without default values) must be
+    /// defined before fields with default values. This is a Python requirement that
+    /// will raise a `TypeError` at runtime if violated.
+    ///
+    /// ## Example
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass
+    /// class Example:
+    ///     x: int = 1    # Field with default value
+    ///     y: str        # Error: Required field after field with default
+    /// ```
+    pub(crate) static DATACLASS_FIELD_ORDER = {
+        summary: "detects dataclass definitions with required fields after fields with default values",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
