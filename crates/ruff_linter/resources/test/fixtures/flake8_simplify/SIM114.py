@@ -73,6 +73,36 @@ elif result.eofs == "X":
 elif result.eofs == "C":
     errors = 1
 
+if x == 1:
+    return True
+# This is a standalone comment explaining something important
+elif x == 2:
+    return True
+
+if x == 1:
+    return True  # case one
+elif x == 2:
+    return True  # case two
+
+if isinstance(exc, HTTPError) and (
+     (500 <= exc.status <= 599)
+     or exc.status == 408  # server errors
+     or exc.status == 429  # request timeout
+):  # too many requests
+     return True
+
+# Consider all SSL errors as temporary. There are a lot of bug
+# reports from people where various SSL errors cause a crash
+elif isinstance(exc, ssl.SSLError):
+     return True
+
+
+if a:
+    # Ignore branches with diverging comments because it means we're repeating
+    # the bodies because we have different reasons for each branch
+    x = 1
+elif c:
+    x = 1
 
 # OK
 def complicated_calc(*arg, **kwargs):
@@ -104,12 +134,6 @@ if result.eofs == "F":
 else:
     errors = 1
 
-if a:
-    # Ignore branches with diverging comments because it means we're repeating
-    # the bodies because we have different reasons for each branch
-    x = 1
-elif c:
-    x = 1
 
 
 def func():
@@ -157,3 +181,28 @@ elif True:
     print(1)
 else:
     print(2)
+
+if x == 1:  # check for one
+    return True
+elif x == 2:  # check for two  
+    return True
+
+if x == 1:
+    return True  # always true
+    # end of branch
+elif x == 2:
+    return True  # always true
+    # end of branch
+
+if x == 1:
+    return True
+    #
+elif x == 2:
+    return True
+    #
+
+if isinstance(obj, str):  # string check
+    process(obj)  # process it
+elif isinstance(obj, int):  # number check
+    process(obj)  # process it
+
