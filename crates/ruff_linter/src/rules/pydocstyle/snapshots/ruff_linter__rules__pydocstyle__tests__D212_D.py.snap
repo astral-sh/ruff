@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
+D212 [*] Multi-line docstring summary should start at the first line
+   --> D.py:129:5
     |
 127 |   @expect('D212: Multi-line docstring summary should start at the first line')
 128 |   def asdlkfasd():
 129 | /     """
 130 | |     Wrong.
 131 | |     """
-    | |_______^ D212
+    | |_______^
     |
-    = help: Remove whitespace after opening quotes
+help: Remove whitespace after opening quotes
 
 ℹ Safe fix
 126 126 |         '(found 3)')
@@ -23,16 +24,17 @@ D.py:129:5: D212 [*] Multi-line docstring summary should start at the first line
 132 131 | 
 133 132 | 
 
-D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
+D212 [*] Multi-line docstring summary should start at the first line
+   --> D.py:597:5
     |
 595 |   @expect('D212: Multi-line docstring summary should start at the first line')
 596 |   def one_liner():
 597 | /     """
 598 | |
 599 | |     Wrong."""
-    | |_____________^ D212
+    | |_____________^
     |
-    = help: Remove whitespace after opening quotes
+help: Remove whitespace after opening quotes
 
 ℹ Safe fix
 594 594 |         '(found 3)')
@@ -46,16 +48,17 @@ D.py:597:5: D212 [*] Multi-line docstring summary should start at the first line
 601 599 | 
 602 600 | @expect('D200: One-line docstring should fit on one line with quotes '
 
-D.py:624:5: D212 [*] Multi-line docstring summary should start at the first line
+D212 [*] Multi-line docstring summary should start at the first line
+   --> D.py:624:5
     |
 622 |   @expect('D212: Multi-line docstring summary should start at the first line')
 623 |   def one_liner():
 624 | /     """
 625 | |
 626 | |     "Wrong."""
-    | |______________^ D212
+    | |______________^
     |
-    = help: Remove whitespace after opening quotes
+help: Remove whitespace after opening quotes
 
 ℹ Safe fix
 621 621 |         '(found 3)')

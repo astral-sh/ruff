@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:17:23
    |
 16 |     def wrong(self):
 17 |         parent = super(Child, self)  # wrong
-   |                       ^^^^^^^^^^^^^ UP008
+   |                       ^^^^^^^^^^^^^
 18 |         super(Child, self).method  # wrong
 19 |         super(
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 14 14 |         Parent.super(1, 2)  # ok
@@ -21,16 +22,17 @@ UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 19 19 |         super(
 20 20 |             Child,
 
-UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:18:14
    |
 16 |     def wrong(self):
 17 |         parent = super(Child, self)  # wrong
 18 |         super(Child, self).method  # wrong
-   |              ^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^
 19 |         super(
 20 |             Child,
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 15 15 | 
@@ -42,7 +44,8 @@ UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 20 20 |             Child,
 21 21 |             self,
 
-UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:19:14
    |
 17 |           parent = super(Child, self)  # wrong
 18 |           super(Child, self).method  # wrong
@@ -51,9 +54,9 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 20 | |             Child,
 21 | |             self,
 22 | |         ).method()  # wrong
-   | |_________^ UP008
+   | |_________^
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 16 16 |     def wrong(self):
@@ -68,15 +71,16 @@ UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 24 21 | 
 25 22 | class BaseClass:
 
-UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:36:14
    |
 34 | class MyClass(BaseClass):
 35 |     def normal(self):
 36 |         super(MyClass, self).f()  # can use super()
-   |              ^^^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^^^
 37 |         super().f()
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 33 33 | 
@@ -88,14 +92,15 @@ UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 38 38 | 
 39 39 |     def different_argument(self, other):
 
-UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:50:18
    |
 49 |         def inner_argument(self):
 50 |             super(MyClass, self).f()  # can use super()
-   |                  ^^^^^^^^^^^^^^^ UP008
+   |                  ^^^^^^^^^^^^^^^
 51 |             super().f()
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 47 47 |             super(MyClass, self).f()  # CANNOT use super()
@@ -107,15 +112,16 @@ UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
 52 52 | 
 53 53 |         outer_argument()
 
-UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:74:14
    |
 72 | class DataClass:
 73 |     def normal(self):
 74 |         super(DataClass, self).f()  # Error
-   |              ^^^^^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^^^^^
 75 |         super().f()  # OK
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 71 71 | @dataclass
@@ -127,14 +133,15 @@ UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 76 76 | 
 77 77 | 
 
-UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+  --> UP008.py:92:14
    |
 90 | class B(A):
 91 |     def bar(self):
 92 |         super(__class__, self).foo()
-   |              ^^^^^^^^^^^^^^^^^ UP008
+   |              ^^^^^^^^^^^^^^^^^
    |
-   = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 89 89 | 
@@ -146,14 +153,15 @@ UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 94 94 | 
 95 95 | # see: https://github.com/astral-sh/ruff/issues/18684
 
-UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:107:23
     |
 105 | class C:
 106 |     def f(self):
 107 |         builtins.super(C, self)
-    |                       ^^^^^^^^^ UP008
+    |                       ^^^^^^^^^
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 104 104 | 
@@ -165,7 +173,8 @@ UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
 109 109 | 
 110 110 | # see: https://github.com/astral-sh/ruff/issues/18533
 
-UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:113:14
     |
 111 |   class ClassForCommentEnthusiasts(BaseClass):
 112 |       def with_comments(self):
@@ -175,11 +184,11 @@ UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 115 | |             ClassForCommentEnthusiasts,
 116 | |             self
 117 | |         ).f()
-    | |_________^ UP008
+    | |_________^
 118 |           super(
 119 |               ClassForCommentEnthusiasts,
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 110 110 | # see: https://github.com/astral-sh/ruff/issues/18533
@@ -195,7 +204,8 @@ UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 119 115 |             ClassForCommentEnthusiasts,
 120 116 |             # even more helpful comment
 
-UP008.py:118:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:118:14
     |
 116 |               self
 117 |           ).f()
@@ -205,11 +215,11 @@ UP008.py:118:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 120 | |             # even more helpful comment
 121 | |             self
 122 | |         ).f()
-    | |_________^ UP008
+    | |_________^
 123 |           super(
 124 |               ClassForCommentEnthusiasts,
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 115 115 |             ClassForCommentEnthusiasts,
@@ -225,7 +235,8 @@ UP008.py:118:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 124 120 |             ClassForCommentEnthusiasts,
 125 121 |             self
 
-UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:123:14
     |
 121 |               self
 122 |           ).f()
@@ -235,9 +246,9 @@ UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 125 | |             self
 126 | |             # also a comment
 127 | |         ).f()
-    | |_________^ UP008
+    | |_________^
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 120 120 |             # even more helpful comment
@@ -253,45 +264,49 @@ UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
 129 125 | 
 130 126 | # Issue #19096: super calls with keyword arguments should emit diagnostic but not be fixed
 
-UP008.py:133:21: UP008 Use `super()` instead of `super(__class__, self)`
+UP008 Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:133:21
     |
 131 | class Ord(int):
 132 |     def __len__(self):
 133 |         return super(Ord, self, uhoh=True, **{"error": True}).bit_length()
-    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 134 |
 135 | class ExampleWithKeywords:
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
-UP008.py:137:14: UP008 Use `super()` instead of `super(__class__, self)`
+UP008 Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:137:14
     |
 135 | class ExampleWithKeywords:
 136 |     def method1(self):
 137 |         super(ExampleWithKeywords, self, invalid=True).some_method()  # Should emit diagnostic but NOT be fixed
-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 138 |     
 139 |     def method2(self):
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
-UP008.py:140:14: UP008 Use `super()` instead of `super(__class__, self)`
+UP008 Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:140:14
     |
 139 |     def method2(self):
 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed
-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 141 |     
 142 |     def method3(self):
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
-UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008 [*] Use `super()` instead of `super(__class__, self)`
+   --> UP008.py:143:14
     |
 142 |     def method3(self):
 143 |         super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP008
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Remove `super()` parameters
+help: Remove `super()` parameters
 
 ℹ Unsafe fix
 140 140 |         super(ExampleWithKeywords, self, **{"kwarg": "value"}).some_method()  # Should emit diagnostic but NOT be fixed

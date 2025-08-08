@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
 ---
-G010.py:6:9: G010 [*] Logging statement uses `warn` instead of `warning`
+G010 [*] Logging statement uses `warn` instead of `warning`
+ --> G010.py:6:9
   |
 4 | from logging_setup import logger
 5 |
 6 | logging.warn("Hello World!")
-  |         ^^^^ G010
+  |         ^^^^
 7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
 8 | logger.warn("Hello world!")
   |
-  = help: Convert to `warning`
+help: Convert to `warning`
 
 ℹ Safe fix
 3 3 | 
@@ -22,16 +23,17 @@ G010.py:6:9: G010 [*] Logging statement uses `warn` instead of `warning`
 8 8 | logger.warn("Hello world!")
 9 9 | 
 
-G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
+G010 [*] Logging statement uses `warn` instead of `warning`
+  --> G010.py:8:8
    |
  6 | logging.warn("Hello World!")
  7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
  8 | logger.warn("Hello world!")
-   |        ^^^^ G010
+   |        ^^^^
  9 |
 10 | logging . warn("Hello World!")
    |
-   = help: Convert to `warning`
+help: Convert to `warning`
 
 ℹ Safe fix
 5 5 | 
@@ -43,16 +45,17 @@ G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
 10 10 | logging . warn("Hello World!")
 11 11 | 
 
-G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
+G010 [*] Logging statement uses `warn` instead of `warning`
+  --> G010.py:10:11
    |
  8 | logger.warn("Hello world!")
  9 |
 10 | logging . warn("Hello World!")
-   |           ^^^^ G010
+   |           ^^^^
 11 |
 12 | from logging import warn, warning, exception
    |
-   = help: Convert to `warning`
+help: Convert to `warning`
 
 ℹ Safe fix
 7  7  | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
@@ -64,15 +67,16 @@ G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
 12 12 | from logging import warn, warning, exception
 13 13 | warn("foo")
 
-G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`
+G010 [*] Logging statement uses `warn` instead of `warning`
+  --> G010.py:13:1
    |
 12 | from logging import warn, warning, exception
 13 | warn("foo")
-   | ^^^^ G010
+   | ^^^^
 14 | warning("foo")
 15 | exception("foo")
    |
-   = help: Convert to `warning`
+help: Convert to `warning`
 
 ℹ Safe fix
 10 10 | logging . warn("Hello World!")

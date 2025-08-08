@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_jdbc.py:8:1: AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in Airflow 3.0;
+AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in Airflow 3.0;
+ --> AIR302_jdbc.py:8:1
   |
 6 | )
 7 |
 8 | JdbcHook()
-  | ^^^^^^^^ AIR302
+  | ^^^^^^^^
 9 | jaydebeapi()
   |
-  = help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `JdbcHook` from `airflow.providers.jdbc.hooks.jdbc` instead.
+help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `JdbcHook` from `airflow.providers.jdbc.hooks.jdbc` instead.
 
 ℹ Unsafe fix
 1 1 | from __future__ import annotations
@@ -23,13 +24,14 @@ AIR302_jdbc.py:8:1: AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into 
 8 8 | JdbcHook()
 9 9 | jaydebeapi()
 
-AIR302_jdbc.py:9:1: AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in Airflow 3.0;
+AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in Airflow 3.0;
+ --> AIR302_jdbc.py:9:1
   |
 8 | JdbcHook()
 9 | jaydebeapi()
-  | ^^^^^^^^^^ AIR302
+  | ^^^^^^^^^^
   |
-  = help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `airflow.providers.jdbc.hooks.jdbc` instead.
+help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `airflow.providers.jdbc.hooks.jdbc` instead.
 
 ℹ Unsafe fix
 2 2 | 

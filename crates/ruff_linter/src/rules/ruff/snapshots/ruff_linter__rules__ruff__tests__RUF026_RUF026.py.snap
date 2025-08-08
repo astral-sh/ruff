@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:11:5
    |
 10 | def func():
 11 |     defaultdict(default_factory=int)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=int)`
+help: Replace with `defaultdict(default_factory=int)`
 
 ℹ Unsafe fix
 8  8  | 
@@ -19,13 +20,14 @@ RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 13 13 | 
 14 14 | def func():
 
-RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:15:5
    |
 14 | def func():
 15 |     defaultdict(default_factory=float)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=float)`
+help: Replace with `defaultdict(default_factory=float)`
 
 ℹ Unsafe fix
 12 12 | 
@@ -37,13 +39,14 @@ RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 17 17 | 
 18 18 | def func():
 
-RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:19:5
    |
 18 | def func():
 19 |     defaultdict(default_factory=dict)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=dict)`
+help: Replace with `defaultdict(default_factory=dict)`
 
 ℹ Unsafe fix
 16 16 | 
@@ -55,13 +58,14 @@ RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 21 21 | 
 22 22 | def func():
 
-RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:23:5
    |
 22 | def func():
 23 |     defaultdict(default_factory=list)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=list)`
+help: Replace with `defaultdict(default_factory=list)`
 
 ℹ Unsafe fix
 20 20 | 
@@ -73,13 +77,14 @@ RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 25 25 | 
 26 26 | def func():
 
-RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:27:5
    |
 26 | def func():
 27 |     defaultdict(default_factory=tuple)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 24 24 | 
@@ -91,14 +96,15 @@ RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 29 29 | 
 30 30 | def func():
 
-RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:34:5
    |
 32 |         pass
 33 |
 34 |     defaultdict(default_factory=foo)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=foo)`
+help: Replace with `defaultdict(default_factory=foo)`
 
 ℹ Unsafe fix
 31 31 |     def foo():
@@ -110,13 +116,14 @@ RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 36 36 | 
 37 37 | def func():
 
-RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:38:5
    |
 37 | def func():
 38 |     defaultdict(default_factory=lambda: 1)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=lambda: 1)`
+help: Replace with `defaultdict(default_factory=lambda: 1)`
 
 ℹ Unsafe fix
 35 35 | 
@@ -128,14 +135,15 @@ RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 40 40 | 
 41 41 | def func():
 
-RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:44:5
    |
 42 |     from collections import deque
 43 |
 44 |     defaultdict(default_factory=deque)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=deque)`
+help: Replace with `defaultdict(default_factory=deque)`
 
 ℹ Unsafe fix
 41 41 | def func():
@@ -147,14 +155,15 @@ RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 46 46 | 
 47 47 | def func():
 
-RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:52:5
    |
 50 |             pass
 51 |
 52 |     defaultdict(default_factory=MyCallable())  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=MyCallable())`
+help: Replace with `defaultdict(default_factory=MyCallable())`
 
 ℹ Unsafe fix
 49 49 |         def __call__(self):
@@ -166,13 +175,14 @@ RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 54 54 | 
 55 55 | def func():
 
-RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:56:5
    |
 55 | def func():
 56 |     defaultdict(default_factory=tuple, member=1)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 53 53 | 
@@ -184,13 +194,14 @@ RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 58 58 | 
 59 59 | def func():
 
-RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:60:5
    |
 59 | def func():
 60 |     defaultdict(member=1, default_factory=tuple)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 57 57 | 
@@ -202,13 +213,14 @@ RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 62 62 | 
 63 63 | def func():
 
-RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:64:5
    |
 63 | def func():
 64 |     defaultdict(member=1, default_factory=tuple,)  # RUF026
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF026
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 61 61 | 
@@ -220,16 +232,17 @@ RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 66 66 | 
 67 67 | def func():
 
-RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:68:5
    |
 67 |   def func():
 68 | /     defaultdict(
 69 | |         member=1,
 70 | |         default_factory=tuple,
 71 | |     )  # RUF026
-   | |_____^ RUF026
+   | |_____^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 66 66 | 
@@ -242,16 +255,17 @@ RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `d
 72 71 | 
 73 72 | 
 
-RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+  --> RUF026.py:75:5
    |
 74 |   def func():
 75 | /     defaultdict(
 76 | |         default_factory=tuple,
 77 | |         member=1,
 78 | |     )  # RUF026
-   | |_____^ RUF026
+   | |_____^
    |
-   = help: Replace with `defaultdict(default_factory=tuple)`
+help: Replace with `defaultdict(default_factory=tuple)`
 
 ℹ Unsafe fix
 73 73 | 

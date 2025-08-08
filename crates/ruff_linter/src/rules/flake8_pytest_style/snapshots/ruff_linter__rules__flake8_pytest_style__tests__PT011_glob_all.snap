@@ -1,80 +1,89 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT011.py:13:24: PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:13:24
    |
 12 | def test_ok_different_error_from_config():
 13 |     with pytest.raises(ZeroDivisionError):
-   |                        ^^^^^^^^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^^^^^^^^
 14 |         raise ZeroDivisionError("Can't divide by 0")
    |
 
-PT011.py:25:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:25:24
    |
 24 | def test_error_no_argument_given():
 25 |     with pytest.raises(ValueError):
-   |                        ^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^
 26 |         raise ValueError("Can't divide 1 by 0")
    |
 
-PT011.py:28:43: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:28:43
    |
 26 |         raise ValueError("Can't divide 1 by 0")
 27 |
 28 |     with pytest.raises(expected_exception=ValueError):
-   |                                           ^^^^^^^^^^ PT011
+   |                                           ^^^^^^^^^^
 29 |         raise ValueError("Can't divide 1 by 0")
    |
 
-PT011.py:31:24: PT011 `pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:31:24
    |
 29 |         raise ValueError("Can't divide 1 by 0")
 30 |
 31 |     with pytest.raises(socket.error):
-   |                        ^^^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^^^
 32 |         raise ValueError("Can't divide 1 by 0")
    |
 
-PT011.py:34:24: PT011 `pytest.raises(pickle.PicklingError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(pickle.PicklingError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:34:24
    |
 32 |         raise ValueError("Can't divide 1 by 0")
 33 |
 34 |     with pytest.raises(PicklingError):
-   |                        ^^^^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^^^^
 35 |         raise PicklingError("Can't pickle")
    |
 
-PT011.py:37:24: PT011 `pytest.raises(pickle.UnpicklingError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(pickle.UnpicklingError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:37:24
    |
 35 |         raise PicklingError("Can't pickle")
 36 |
 37 |     with pytest.raises(UnpicklingError):
-   |                        ^^^^^^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^^^^^^
 38 |         raise UnpicklingError("Can't unpickle")
    |
 
-PT011.py:42:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:42:24
    |
 41 | def test_error_match_is_empty():
 42 |     with pytest.raises(ValueError, match=None):
-   |                        ^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^
 43 |         raise ValueError("Can't divide 1 by 0")
    |
 
-PT011.py:45:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:45:24
    |
 43 |         raise ValueError("Can't divide 1 by 0")
 44 |
 45 |     with pytest.raises(ValueError, match=""):
-   |                        ^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^
 46 |         raise ValueError("Can't divide 1 by 0")
    |
 
-PT011.py:48:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+  --> PT011.py:48:24
    |
 46 |         raise ValueError("Can't divide 1 by 0")
 47 |
 48 |     with pytest.raises(ValueError, match=f""):
-   |                        ^^^^^^^^^^ PT011
+   |                        ^^^^^^^^^^
 49 |         raise ValueError("Can't divide 1 by 0")
    |
