@@ -1273,6 +1273,9 @@ fn format_header<'a>(
                 ..
             } = item
             {
+                // At the very end of the `main_range`, report the location as the first character
+                // in the next line instead of falling back to the default location of `1:1`. This
+                // is another divergence from upstream.
                 let end_of_range = range.1 + max(*end_line as usize, 1);
                 if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
