@@ -16,6 +16,24 @@ def __getattr__(name: str) -> str:
     return "hi"
 ```
 
+## `from import` with `__getattr__`
+
+At runtime, if `module` has a `__getattr__` implementation, you can do `from module import whatever`
+and it will exercise the `__getattr__` when `whatever` is not found as a normal attribute.
+
+```py
+from module_with_getattr import nonexistent_attr
+
+reveal_type(nonexistent_attr)  # revealed: int
+```
+
+`module_with_getattr.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    return 42
+```
+
 ## Precedence: explicit attributes take priority over `__getattr__`
 
 ```py
