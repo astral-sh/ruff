@@ -1,7 +1,4 @@
-use std::fmt::{Display, Formatter};
 use std::io::Write;
-
-use colored::Colorize;
 
 use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
 
@@ -91,49 +88,6 @@ impl Emitter for TextEmitter {
         }
 
         Ok(())
-    }
-}
-
-pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Diagnostic,
-    pub(crate) show_fix_status: bool,
-    pub(crate) unsafe_fixes: UnsafeFixes,
-}
-
-impl Display for RuleCodeAndBody<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        if self.show_fix_status {
-            if let Some(fix) = self.message.fix() {
-                // Do not display an indicator for inapplicable fixes
-                if fix.applies(self.unsafe_fixes.required_applicability()) {
-                    if let Some(code) = self.message.secondary_code() {
-                        write!(f, "{} ", code.red().bold())?;
-                    }
-                    return write!(
-                        f,
-                        "{fix}{body}",
-                        fix = format_args!("[{}] ", "*".cyan()),
-                        body = self.message.body(),
-                    );
-                }
-            }
-        }
-
-        if let Some(code) = self.message.secondary_code() {
-            write!(
-                f,
-                "{code} {body}",
-                code = code.red().bold(),
-                body = self.message.body(),
-            )
-        } else {
-            write!(
-                f,
-                "{code}: {body}",
-                code = self.message.id().as_str().red().bold(),
-                body = self.message.body(),
-            )
-        }
     }
 }
 
