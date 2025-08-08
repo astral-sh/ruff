@@ -606,29 +606,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let popped_place_table = &self.place_tables[popped_scope_id];
             let mut bound_global_symbols = Vec::new();
             for symbol in popped_place_table.symbols() {
-                // Collect new implicit (not `nonlocal`) free variables.
-                //
-                // NOTE: Because these variables aren't bound (won't wind up in
-                // `nested_scopes_with_bindings`) and aren't `nonlocal` (can't trigger `nonlocal`
-                // syntax errors), collecting them currently has no effect. We could consider
-                // removing this bit and renaming `free_variables` to say `unresolved_nonlocals`?
-                if symbol.is_used()
-                    && !symbol.is_bound()
-                    && !symbol.is_declared()
-                    && !symbol.is_global()
-                    // `nonlocal` variables are handled in `visit_stmt`, which lets us stash an AST
-                    // reference.
-                    && !symbol.is_nonlocal()
-                {
-                    parent_free_variables
-                        .entry(symbol.name().clone())
-                        .or_default()
-                        .push(FreeVariable {
-                            scope_id: popped_scope_id,
-                            nonlocal_identifier: None,
-                        });
-                }
-
                 // Record bindings of global variables. Put these in a temporary Vec as another
                 // borrowck workaround.
                 if symbol.is_global() && symbol.is_bound() {
