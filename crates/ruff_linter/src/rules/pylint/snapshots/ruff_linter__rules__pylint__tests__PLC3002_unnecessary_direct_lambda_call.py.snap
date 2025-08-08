@@ -15,6 +15,8 @@ unnecessary_direct_lambda_call.py:5:9: PLC3002 Lambda expression called directly
 4 | y = (lambda x: x**2 + 2*x + 1)(a)  # [unnecessary-direct-lambda-call]
 5 | y = max((lambda x: x**2)(a), (lambda x: x+1)(a))  # [unnecessary-direct-lambda-call,unnecessary-direct-lambda-call]
   |         ^^^^^^^^^^^^^^^^^^^ PLC3002
+6 |
+7 | def function():
   |
 
 unnecessary_direct_lambda_call.py:5:30: PLC3002 Lambda expression called directly. Execute the expression inline instead.
@@ -22,4 +24,52 @@ unnecessary_direct_lambda_call.py:5:30: PLC3002 Lambda expression called directl
 4 | y = (lambda x: x**2 + 2*x + 1)(a)  # [unnecessary-direct-lambda-call]
 5 | y = max((lambda x: x**2)(a), (lambda x: x+1)(a))  # [unnecessary-direct-lambda-call,unnecessary-direct-lambda-call]
   |                              ^^^^^^^^^^^^^^^^^^ PLC3002
+6 |
+7 | def function():
   |
+
+unnecessary_direct_lambda_call.py:9:12: PLC3002 Lambda expression called directly. Execute the expression inline instead.
+   |
+ 7 | def function():
+ 8 |     # Safe - no comprehensions, no class scope issues
+ 9 |     area = (lambda r: 3.14 * r ** 2)(radius)  # PLC3002
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC3002
+10 |
+11 |     # Safe - simple expression
+   |
+
+unnecessary_direct_lambda_call.py:12:14: PLC3002 Lambda expression called directly. Execute the expression inline instead.
+   |
+11 |     # Safe - simple expression
+12 |     result = (lambda x, y: x + y)(1, 2)  # PLC3002
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC3002
+13 |
+14 | def function():
+   |
+
+unnecessary_direct_lambda_call.py:17:14: PLC3002 Lambda expression called directly. Execute the expression inline instead.
+   |
+15 |     numbers = [1, 2, 3]
+16 |     # Safe - comprehension but in function scope, not class scope
+17 |     result = (lambda lst: [x * 2 for x in lst])(numbers)  # PLC3002
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC3002
+   |
+
+unnecessary_direct_lambda_call.py:22:9: PLC3002 Lambda expression called directly. Execute the expression inline instead.
+   |
+20 | class A:
+21 |     # Safe - comprehension doesn't reference class variables
+22 |     y = (lambda: [i for i in range(3)])()  # PLC3002
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC3002
+23 |
+24 |     # Safe - uses lambda parameter, not class variable
+   |
+
+unnecessary_direct_lambda_call.py:25:9: PLC3002 Lambda expression called directly. Execute the expression inline instead.
+   |
+24 |     # Safe - uses lambda parameter, not class variable
+25 |     z = (lambda data: [x for x in data])([1, 2, 3])  # PLC3002
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC3002
+26 |
+27 | class A:
+   |
