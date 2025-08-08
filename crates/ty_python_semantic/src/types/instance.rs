@@ -11,9 +11,10 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypedDictType,
+    ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    TypedDictType, UnionType,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -105,7 +106,10 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 
 impl<'db> NominalInstanceType<'db> {
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
-        self.0.class(db)
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
+            NominalInstanceInner::NonTuple(class) => class,
+        }
     }
 
     /// If this is an instance type where the class has a tuple spec, returns the tuple spec.
@@ -113,7 +117,63 @@ impl<'db> NominalInstanceType<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.0.tuple_spec(db)
+        fn own_tuple_spec_of_class<'db>(
+            db: &'db dyn Db,
+            class: ClassType<'db>,
+        ) -> Option<Cow<'db, TupleSpec<'db>>> {
+            let (class_literal, specialization) = class.class_literal(db);
+            match class_literal.known(db)? {
+                KnownClass::Tuple => Some(
+                    specialization
+                        .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
+                        .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
+                ),
+                KnownClass::VersionInfo => {
+                    let python_version = Program::get(db).python_version(db);
+                    let int_instance_ty = KnownClass::Int.to_instance(db);
+
+                    // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+                    let release_level_ty = {
+                        let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                            .iter()
+                            .map(|level| Type::string_literal(db, level))
+                            .collect();
+
+                        // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+                        // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+                        // into other types where necessary. Here, however, we know that there are no duplicates
+                        // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+                        Type::Union(UnionType::new(db, elements))
+                    };
+
+                    Some(Cow::Owned(TupleSpec::from_elements([
+                        Type::IntLiteral(python_version.major.into()),
+                        Type::IntLiteral(python_version.minor.into()),
+                        int_instance_ty,
+                        release_level_ty,
+                        int_instance_ty,
+                    ])))
+                }
+                _ => None,
+            }
+        }
+
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
+            NominalInstanceInner::NonTuple(class) => {
+                // Avoid an expensive MRO traversal for common stdlib classes.
+                if class
+                    .known(db)
+                    .is_some_and(|known_class| !known_class.is_tuple_subclass())
+                {
+                    return None;
+                }
+                class
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .find_map(|class| own_tuple_spec_of_class(db, class))
+            }
+        }
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
@@ -127,7 +187,10 @@ impl<'db> NominalInstanceType<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
     pub(super) fn own_tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        self.0.own_tuple_spec(db)
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
+            NominalInstanceInner::NonTuple(_) => None,
+        }
     }
 
     pub(super) fn normalized_impl(
@@ -135,86 +198,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &mut TypeTransformer<'db>,
     ) -> Type<'db> {
-        self.0.normalized_impl(db, visitor)
-    }
-
-    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
-        self.0.materialize(db, variance)
-    }
-
-    pub(super) fn has_relation_to(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        relation: TypeRelation,
-    ) -> bool {
-        self.0.has_relation_to(db, other.0, relation)
-    }
-
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.0.is_equivalent_to(db, other.0)
-    }
-
-    pub(super) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &mut PairVisitor<'db>,
-    ) -> bool {
-        self.0.is_disjoint_from_impl(db, other.0, visitor)
-    }
-
-    pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
-        self.0.is_singleton(db)
-    }
-
-    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        self.0.is_single_valued(db)
-    }
-
-    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        SubclassOfType::from(db, self.class(db))
-    }
-
-    pub(super) fn apply_type_mapping<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-    ) -> Type<'db> {
-        self.0.apply_type_mapping(db, type_mapping)
-    }
-
-    pub(super) fn find_legacy_typevars(
-        self,
-        db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
-    ) {
-        self.0.find_legacy_typevars(db, typevars);
-    }
-}
-
-impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
-    fn from(value: NominalInstanceType<'db>) -> Self {
-        Self::NominalInstance(value)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-enum NominalInstanceInner<'db> {
-    ExactTuple(TupleType<'db>),
-    NonTuple(ClassType<'db>),
-}
-
-impl<'db> NominalInstanceInner<'db> {
-    fn class(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::ExactTuple(tuple) => tuple.to_class_type(db),
-            Self::NonTuple(class) => class,
-        }
-    }
-
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Type<'db> {
-        match self {
+        match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.normalized_impl(db, visitor))
             }
@@ -224,8 +208,8 @@ impl<'db> NominalInstanceInner<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
-        match self {
+    pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Type<'db> {
+        match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Type::tuple(tuple.materialize(db, variance)),
             NominalInstanceInner::NonTuple(class) => {
                 Type::non_tuple_instance(class.materialize(db, variance))
@@ -233,56 +217,37 @@ impl<'db> NominalInstanceInner<'db> {
         }
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
-        match (self, other) {
-            (Self::ExactTuple(tuple1), Self::ExactTuple(tuple2)) => {
-                tuple1.has_relation_to(db, tuple2, relation)
-            }
+    pub(super) fn has_relation_to(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+    ) -> bool {
+        match (self.0, other.0) {
+            (
+                NominalInstanceInner::ExactTuple(tuple1),
+                NominalInstanceInner::ExactTuple(tuple2),
+            ) => tuple1.has_relation_to(db, tuple2, relation),
             _ => self
                 .class(db)
                 .has_relation_to(db, other.class(db), relation),
         }
     }
 
-    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        match (self, other) {
-            (Self::ExactTuple(tuple1), Self::ExactTuple(tuple2)) => {
-                tuple1.is_equivalent_to(db, tuple2)
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.0, other.0) {
+            (
+                NominalInstanceInner::ExactTuple(tuple1),
+                NominalInstanceInner::ExactTuple(tuple2),
+            ) => tuple1.is_equivalent_to(db, tuple2),
+            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
+                class1.is_equivalent_to(db, class2)
             }
-            (Self::NonTuple(class1), Self::NonTuple(class2)) => class1.is_equivalent_to(db, class2),
             _ => false,
         }
     }
 
-    /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
-    /// tuple spec.
-    ///
-    /// You usually don't want to use this method, as you usually want to consider a subclass
-    /// of a tuple type in the same way as the `tuple` type itself. Only use this method if you
-    /// are certain that a *literal tuple* is required, and that a subclass of tuple will not
-    /// do.
-    ///
-    /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
-    /// But for a subclass of `tuple[int, str]`, it will return `None`.
-    fn own_tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        match self {
-            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
-            NominalInstanceInner::NonTuple(_) => None,
-        }
-    }
-
-    /// If this is an instance type where the class has a tuple spec, returns the tuple spec.
-    ///
-    /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
-    /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
-    fn tuple_spec(self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        match self {
-            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
-            NominalInstanceInner::NonTuple(class) => class.tuple_spec(db),
-        }
-    }
-
-    fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
         other: Self,
@@ -302,8 +267,8 @@ impl<'db> NominalInstanceInner<'db> {
             .could_coexist_in_mro_with(db, other.class(db))
     }
 
-    fn is_singleton(self, db: &'db dyn Db) -> bool {
-        match self {
+    pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
+        match self.0 {
             NominalInstanceInner::ExactTuple(_) => false,
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
@@ -312,19 +277,27 @@ impl<'db> NominalInstanceInner<'db> {
         }
     }
 
-    fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        match self {
+    pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
+        match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
-                .or_else(|| Some(class.tuple_spec(db)?.is_single_valued(db)))
+                .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
                 .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
         }
     }
 
-    fn apply_type_mapping(self, db: &'db dyn Db, type_mapping: &TypeMapping<'_, 'db>) -> Type<'db> {
-        match self {
+    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        SubclassOfType::from(db, self.class(db))
+    }
+
+    pub(super) fn apply_type_mapping<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Type<'db> {
+        match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Type::tuple(tuple.apply_type_mapping(db, type_mapping))
             }
@@ -334,16 +307,28 @@ impl<'db> NominalInstanceInner<'db> {
         }
     }
 
-    fn find_legacy_typevars(
+    pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        match self {
+        match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.find_legacy_typevars(db, typevars),
             NominalInstanceInner::NonTuple(class) => class.find_legacy_typevars(db, typevars),
         }
     }
+}
+
+impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
+    fn from(value: NominalInstanceType<'db>) -> Self {
+        Self::NominalInstance(value)
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+enum NominalInstanceInner<'db> {
+    ExactTuple(TupleType<'db>),
+    NonTuple(ClassType<'db>),
 }
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
