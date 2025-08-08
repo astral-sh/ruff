@@ -5,7 +5,7 @@ use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{Exit, Notification};
 use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
+    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
@@ -16,8 +16,7 @@ use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use settings::GlobalSettings;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
@@ -29,8 +28,10 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::WorkspaceSettings;
-use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -91,8 +92,6 @@ pub(crate) struct Session {
     shutdown_requested: bool,
 
     /// Whether the server has dynamically registered the diagnostic capability with the client.
-    diagnostic_capability_registered: bool,
-
     /// Is the connected client a `TestServer` instance.
     in_test: bool,
 
@@ -107,6 +106,10 @@ pub(crate) struct Session {
     /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
+
+    /// Registrations is a set of LSP methods that have been dynamically registered with the
+    /// client.
+    registrations: HashSet<String>,
 }
 
 /// LSP State for a Project
@@ -166,10 +169,10 @@ impl Session {
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
-            diagnostic_capability_registered: false,
             in_test,
             suspended_workspace_diagnostics_request: None,
             revision: 0,
+            registrations: HashSet::new(),
         })
     }
 
@@ -568,6 +571,7 @@ impl Session {
         }
 
         self.register_diagnostic_capability(client);
+        self.register_rename_capability(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -583,11 +587,13 @@ impl Session {
         }
     }
 
+    // TODO: Merge the following two methods as `register_capability` and `unregister_capability`
+
     /// Sends a registration notification to the client to enable / disable workspace diagnostics
-    /// as per the `diagnostic_mode`.
+    /// as per the `ty.diagnosticMode` global setting.
     ///
     /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
-    /// capabilities.
+    /// capability.
     fn register_diagnostic_capability(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
 
@@ -598,9 +604,11 @@ impl Session {
             return;
         }
 
-        let diagnostic_mode = self.global_settings.diagnostic_mode;
+        let registered = self
+            .registrations
+            .contains(DocumentDiagnosticRequest::METHOD);
 
-        if self.diagnostic_capability_registered {
+        if registered {
             client.send_request::<UnregisterCapability>(
                 self,
                 UnregistrationParams {
@@ -614,6 +622,8 @@ impl Session {
                 },
             );
         }
+
+        let diagnostic_mode = self.global_settings.diagnostic_mode;
 
         let registration = Registration {
             id: DIAGNOSTIC_REGISTRATION_ID.into(),
@@ -643,7 +653,68 @@ impl Session {
             },
         );
 
-        self.diagnostic_capability_registered = true;
+        if !registered {
+            self.registrations
+                .insert(DocumentDiagnosticRequest::METHOD.to_string());
+        }
+    }
+
+    /// Sends a registration notification to the client to enable / disable rename capability as
+    /// per the `ty.experimental.rename` global setting.
+    ///
+    /// This method is a no-op if the client doesn't support dynamic registration of rename
+    /// capability.
+    fn register_rename_capability(&mut self, client: &Client) {
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
+
+        if !self
+            .resolved_client_capabilities
+            .supports_rename_dynamic_registration()
+        {
+            return;
+        }
+
+        let registered = self.registrations.contains(Rename::METHOD);
+
+        if registered {
+            client.send_request::<UnregisterCapability>(
+                self,
+                UnregistrationParams {
+                    unregisterations: vec![Unregistration {
+                        id: RENAME_REGISTRATION_ID.into(),
+                        method: Rename::METHOD.into(),
+                    }],
+                },
+                move |_: &Client, ()| {
+                    tracing::debug!("Unregistered rename capability");
+                },
+            );
+        }
+
+        if !self.global_settings.experimental.rename {
+            tracing::debug!("Rename capability is disabled in the client settings");
+            return;
+        }
+
+        let registration = Registration {
+            id: RENAME_REGISTRATION_ID.into(),
+            method: Rename::METHOD.into(),
+            register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+        };
+
+        client.send_request::<RegisterCapability>(
+            self,
+            RegistrationParams {
+                registrations: vec![registration],
+            },
+            move |_: &Client, ()| {
+                tracing::debug!("Registered rename capability");
+            },
+        );
+
+        if !registered {
+            self.registrations.insert(Rename::METHOD.to_string());
+        }
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
@@ -750,7 +821,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {

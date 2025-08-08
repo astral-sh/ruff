@@ -13,7 +13,7 @@ use ruff_text_size::{Ranged, TextSize};
 use crate::Locator;
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines {
+pub(crate) fn doc_lines_from_tokens(tokens: &Tokens) -> DocLines<'_> {
     DocLines::new(tokens)
 }
 

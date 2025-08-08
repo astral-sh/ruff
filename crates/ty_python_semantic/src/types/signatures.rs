@@ -1183,7 +1183,7 @@ impl<'db> Parameters<'db> {
         self.value.len()
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
         self.value.iter()
     }
 

@@ -28,6 +28,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod initialize;
+mod inlay_hints;
 mod publish_diagnostics;
 mod pull_diagnostics;
 
@@ -48,20 +49,21 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, HoverRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
-    WorkspaceDiagnosticRequest,
+    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
+    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, NumberOrString, PartialResultParams,
-    Position, PreviousResultId, PublishDiagnosticsClientCapabilities,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReportResult, WorkspaceFolder,
+    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
+    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -725,6 +727,23 @@ impl TestServer {
         let id = self.send_request::<HoverRequest>(params);
         self.await_response::<HoverRequest>(&id)
     }
+
+    /// Sends a `textDocument/inlayHint` request for the document at the given path and range.
+    pub(crate) fn inlay_hints_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        range: Range,
+    ) -> Result<Option<Vec<InlayHint>>> {
+        let params = InlayHintParams {
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
+            range,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        let id = self.send_request::<InlayHintRequest>(params);
+        self.await_response::<InlayHintRequest>(&id)
+    }
 }
 
 impl fmt::Debug for TestServer {
@@ -868,7 +887,7 @@ impl TestServerBuilder {
     pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .diagnostic = if enabled {
             Some(DiagnosticClientCapabilities::default())
         } else {
@@ -881,9 +900,20 @@ impl TestServerBuilder {
     pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .diagnostic
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable dynamic registration of rename capability
+    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .rename
+            .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self
     }
@@ -892,8 +922,21 @@ impl TestServerBuilder {
     pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .configuration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable inlay hints capability
+    pub(crate) fn enable_inlay_hints(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .inlay_hint = if enabled {
+            Some(InlayHintClientCapabilities::default())
+        } else {
+            None
+        };
         self
     }
 
@@ -902,7 +945,7 @@ impl TestServerBuilder {
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .did_change_watched_files = if enabled {
             Some(DidChangeWatchedFilesClientCapabilities::default())
         } else {
