@@ -700,7 +700,12 @@ impl Session {
         }
 
         for unregistration in &unregistrations {
-            self.registrations.remove(&unregistration.method);
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
         }
 
         client.send_request::<UnregisterCapability>(
