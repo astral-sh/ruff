@@ -1299,15 +1299,12 @@ reveal_type(Nope)  # revealed: Unknown
 ## `global` statements in non-global scopes
 
 Python allows `global` statements in function bodies to add new variables to the global scope, but
-we require a matching global binding or declaration. We lint on unresolved `global` statements, and
 we don't include the symbols they might define in `*` imports:
 
 `a.py`:
 
 ```py
 def f():
-    # error: [unresolved-global] "Invalid global declaration of `g`: `g` has no declarations or bindings in the global scope"
-    # error: [unresolved-global] "Invalid global declaration of `h`: `h` has no declarations or bindings in the global scope"
     global g, h
 
     g = True

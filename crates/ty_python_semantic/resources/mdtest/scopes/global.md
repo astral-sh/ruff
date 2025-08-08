@@ -241,26 +241,32 @@ def f():
 # TODO: reveal_type(x)  # revealed: Unknown | Literal["1"]
 ```
 
-## Global variables need an explicit definition in the global scope
+## Global variables don't need an explicit definition in the global scope
 
 You're allowed to use the `global` keyword to define new global variables that don't have any
-explicit definition in the global scope, but we consider that fishy and prefer to lint on it:
+explicit definition in the global scope:
 
 ```py
-x = 1
-y: int
-# z is neither bound nor declared in the global scope
-
 def f():
-    global x, y, z  # error: [unresolved-global] "Invalid global declaration of `z`: `z` has no declarations or bindings in the global scope"
+    global x
+    x = 42
+
+def g():
+    print(x)  # allowed, resolves to the global `x` defined by `f`
+
+def h():
+    print(y)  # error: [unresolved-reference]
 ```
 
-You don't need a definition for implicit globals, but you do for built-ins:
+However, this only affects the "public" type of the global. It's still considered unbound when
+module-scope code refers to it locally.
 
 ```py
 def f():
-    global __file__  # allowed, implicit global
-    global int  # error: [unresolved-global] "Invalid global declaration of `int`: `int` has no declarations or bindings in the global scope"
+    global x
+    x = 42
+
+print(x)  # error: [unresolved-reference]
 ```
 
 ## References to variables before they are defined within a class scope are considered global

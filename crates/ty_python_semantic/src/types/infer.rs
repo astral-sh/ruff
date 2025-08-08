@@ -97,8 +97,8 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_PARAMETER_DEFAULT,
     INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
+    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
     report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
     report_invalid_assignment, report_invalid_attribute_assignment,
@@ -2547,8 +2547,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ast::Stmt::Raise(raise) => self.infer_raise_statement(raise),
             ast::Stmt::Return(ret) => self.infer_return_statement(ret),
             ast::Stmt::Delete(delete) => self.infer_delete_statement(delete),
-            ast::Stmt::Global(global) => self.infer_global_statement(global),
-            ast::Stmt::Nonlocal(_)
+            ast::Stmt::Global(_)
+            | ast::Stmt::Nonlocal(_)
             | ast::Stmt::Break(_)
             | ast::Stmt::Continue(_)
             | ast::Stmt::Pass(_)
@@ -5296,61 +5296,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = delete;
         for target in targets {
             self.infer_expression(target);
-        }
-    }
-
-    fn infer_global_statement(&mut self, global: &ast::StmtGlobal) {
-        // CPython allows examples like this, where a global variable is never explicitly defined
-        // in the global scope:
-        //
-        // ```py
-        // def f():
-        //     global x
-        //     x = 1
-        // def g():
-        //     print(x)
-        // ```
-        //
-        // However, allowing this pattern would make it hard for us to guarantee
-        // accurate analysis about the types and boundness of global-scope symbols,
-        // so we require the variable to be explicitly defined (either bound or declared)
-        // in the global scope.
-        let ast::StmtGlobal {
-            node_index: _,
-            range: _,
-            names,
-        } = global;
-        let global_place_table = self.index.place_table(FileScopeId::global());
-        for name in names {
-            if let Some(symbol_id) = global_place_table.symbol_id(name) {
-                let symbol = global_place_table.symbol(symbol_id);
-                if symbol.is_bound() || symbol.is_declared() {
-                    // This name is explicitly defined in the global scope (not just in function
-                    // bodies that mark it `global`).
-                    continue;
-                }
-            }
-            if !module_type_implicit_global_symbol(self.db(), name)
-                .place
-                .is_unbound()
-            {
-                // This name is an implicit global like `__file__` (but not a built-in like `int`).
-                continue;
-            }
-            // This variable isn't explicitly defined in the global scope, nor is it an
-            // implicit global from `types.ModuleType`, so we consider this `global` statement invalid.
-            let Some(builder) = self.context.report_lint(&UNRESOLVED_GLOBAL, name) else {
-                return;
-            };
-            let mut diag =
-                builder.into_diagnostic(format_args!("Invalid global declaration of `{name}`"));
-            diag.set_primary_message(format_args!(
-                "`{name}` has no declarations or bindings in the global scope"
-            ));
-            diag.info("This limits ty's ability to make accurate inferences about the boundness and types of global-scope symbols");
-            diag.info(format_args!(
-                "Consider adding a declaration to the global scope, e.g. `{name}: int`"
-            ));
         }
     }
 
