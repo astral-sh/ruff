@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 use std::num::NonZeroUsize;
@@ -6,11 +7,11 @@ use colored::Colorize;
 
 use ruff_db::diagnostic::Diagnostic;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::OneIndexed;
+use ruff_source_file::{LineColumn, OneIndexed};
 
 use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
-use crate::message::{Emitter, EmitterContext, MessageWithLocation, group_diagnostics_by_filename};
+use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
 #[derive(Default)]
@@ -80,6 +81,35 @@ impl Emitter for GroupedEmitter {
 
         Ok(())
     }
+}
+
+struct MessageWithLocation<'a> {
+    message: &'a Diagnostic,
+    start_location: LineColumn,
+}
+
+impl std::ops::Deref for MessageWithLocation<'_> {
+    type Target = Diagnostic;
+
+    fn deref(&self) -> &Self::Target {
+        self.message
+    }
+}
+
+fn group_diagnostics_by_filename(
+    diagnostics: &[Diagnostic],
+) -> BTreeMap<String, Vec<MessageWithLocation<'_>>> {
+    let mut grouped_messages = BTreeMap::default();
+    for diagnostic in diagnostics {
+        grouped_messages
+            .entry(diagnostic.expect_ruff_filename())
+            .or_insert_with(Vec::new)
+            .push(MessageWithLocation {
+                message: diagnostic,
+                start_location: diagnostic.expect_ruff_start_location(),
+            });
+    }
+    grouped_messages
 }
 
 struct DisplayGroupedMessage<'a> {
