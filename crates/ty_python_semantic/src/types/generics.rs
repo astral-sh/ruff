@@ -792,6 +792,38 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
+            (Type::Union(formal), _) => {
+                // TODO: We haven't implemented a full unification solver yet. If typevars appear
+                // in multiple union elements, we ideally want to express that _only one_ of them
+                // needs to match, and that we should infer the smallest type mapping that allows
+                // that.
+                //
+                // For now, we punt on handling multiple typevar elements. Instead, if _precisely
+                // one_ union element _is_ a typevar (not _contains_ a typevar), then we go ahead
+                // and add a mapping between that typevar and the actual type. (Note that we've
+                // already handled above the case where the actual is assignable to a _non-typevar_
+                // union element.)
+                let mut typevars = formal.iter(self.db).filter_map(|ty| match ty {
+                    Type::TypeVar(typevar) => Some(*typevar),
+                    _ => None,
+                });
+                let typevar = typevars.next();
+                let additional_typevars = typevars.next();
+                if let (Some(typevar), None) = (typevar, additional_typevars) {
+                    self.add_type_mapping(typevar, actual);
+                }
+            }
+
+            (Type::Intersection(formal), _) => {
+                // The actual type must be assignable to every (positive) element of the
+                // formal intersection, so we must infer type mappings for each of them. (The
+                // actual type must also be disjoint from every negative element of the
+                // intersection, but that doesn't help us infer any type mappings.)
+                for positive in formal.iter_positive(self.db) {
+                    self.infer(positive, actual)?;
+                }
+            }
+
             (Type::TypeVar(typevar), ty) | (ty, Type::TypeVar(typevar)) => {
                 match typevar.bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -874,38 +906,6 @@ impl<'db> SpecializationBuilder<'db> {
                         self.infer(*formal_ty, *base_ty)?;
                     }
                     return Ok(());
-                }
-            }
-
-            (Type::Union(formal), _) => {
-                // TODO: We haven't implemented a full unification solver yet. If typevars appear
-                // in multiple union elements, we ideally want to express that _only one_ of them
-                // needs to match, and that we should infer the smallest type mapping that allows
-                // that.
-                //
-                // For now, we punt on handling multiple typevar elements. Instead, if _precisely
-                // one_ union element _is_ a typevar (not _contains_ a typevar), then we go ahead
-                // and add a mapping between that typevar and the actual type. (Note that we've
-                // already handled above the case where the actual is assignable to a _non-typevar_
-                // union element.)
-                let mut typevars = formal.iter(self.db).filter_map(|ty| match ty {
-                    Type::TypeVar(typevar) => Some(*typevar),
-                    _ => None,
-                });
-                let typevar = typevars.next();
-                let additional_typevars = typevars.next();
-                if let (Some(typevar), None) = (typevar, additional_typevars) {
-                    self.add_type_mapping(typevar, actual);
-                }
-            }
-
-            (Type::Intersection(formal), _) => {
-                // The actual type must be assignable to every (positive) element of the
-                // formal intersection, so we must infer type mappings for each of them. (The
-                // actual type must also be disjoint from every negative element of the
-                // intersection, but that doesn't help us infer any type mappings.)
-                for positive in formal.iter_positive(self.db) {
-                    self.infer(positive, actual)?;
                 }
             }
 
