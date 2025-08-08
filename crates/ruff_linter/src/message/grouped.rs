@@ -171,14 +171,6 @@ mod tests {
     }
 
     #[test]
-    fn show_source() {
-        let mut emitter = GroupedEmitter::default();
-        let content = capture_emitter_output(&mut emitter, &create_diagnostics());
-
-        assert_snapshot!(content);
-    }
-
-    #[test]
     fn fix_status() {
         let mut emitter = GroupedEmitter::default().with_show_fix_status(true);
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
