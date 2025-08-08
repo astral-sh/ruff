@@ -37,48 +37,41 @@ def __getattr__(name: str) -> str:
     return "dynamic"
 ```
 
-## Precedence: submodules vs `__getattr__` - Case 1
+## Precedence: submodules vs `__getattr__`
+
+If a package's `__init__.py` (e.g. `mod/__init__.py`) defines a `__getattr__` function, and there is
+also a submodule file present (e.g. `mod/sub.py`), then:
+
+- If you do `import mod` (without importing the submodule directly), accessing `mod.sub` will call
+    `mod.__getattr__('sub')`, so `reveal_type(mod.sub)` will show the return type of `__getattr__`.
+- If you do `import mod.sub` (importing the submodule directly), then `mod.sub` refers to the actual
+    submodule, so `reveal_type(mod.sub)` will show the type of the submodule itself.
+
+`mod/__init__.py`:
 
 ```py
-# if `mod/__init__.py` has a `__getattr__`, and there also exists a `mod/sub.py`
-# if we have `import mod;` `reveal_type(mod.sub)` returns the type of `__getattr__`.
+def __getattr__(name: str) -> str:
+    return "from_getattr"
+```
+
+`mod/sub.py`:
+
+```py
+value = 42
+```
+
+`test_import_mod.py`:
+
+```py
 import mod
 
 reveal_type(mod.sub)  # revealed: str
 ```
 
-`mod/__init__.py`:
+`test_import_mod_sub.py`:
 
 ```py
-def __getattr__(name: str) -> str:
-    return "from_getattr"
-```
-
-`mod/sub.py`:
-
-```py
-value = 42
-```
-
-## Precedence: submodules vs `__getattr__` - Case 2
-
-```py
-# if `mod/__init__.py` has a `__getattr__`, and there also exists a `mod/sub.py`
-# if we have `import mod.sub;` `reveal_type(mod.sub)` returns the type of the submodule.
 import mod.sub
 
 reveal_type(mod.sub)  # revealed: <module 'mod.sub'>
-```
-
-`mod/__init__.py`:
-
-```py
-def __getattr__(name: str) -> str:
-    return "from_getattr"
-```
-
-`mod/sub.py`:
-
-```py
-value = 42
 ```
