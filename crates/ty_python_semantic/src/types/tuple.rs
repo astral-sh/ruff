@@ -165,6 +165,7 @@ impl<'db> Type<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -218,6 +219,9 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
+    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
+    // `static-frame` as part of a mypy_primer run! This is because it's called
+    // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         KnownClass::Tuple
