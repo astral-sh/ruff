@@ -3539,11 +3539,11 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::NominalInstance(instance) => match instance.class.known(db) {
-                Some(KnownClass::Tuple) => try_dunder_bool()?,
-                Some(known_class) => known_class.bool(),
-                None => try_dunder_bool()?,
-            },
+            Type::NominalInstance(NominalInstanceType { class, .. }) => class
+                .known(db)
+                .and_then(KnownClass::bool)
+                .map(Ok)
+                .unwrap_or_else(try_dunder_bool)?,
 
             Type::ProtocolInstance(_) => try_dunder_bool()?,
 

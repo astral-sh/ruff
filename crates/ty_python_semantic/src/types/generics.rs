@@ -263,7 +263,7 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
-        if matches!(self.known_class(db), Some(KnownClass::Tuple)) {
+        if self.known_class(db) == Some(KnownClass::Tuple) {
             Specialization::new(
                 db,
                 self,

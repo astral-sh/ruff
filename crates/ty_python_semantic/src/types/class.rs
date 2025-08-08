@@ -3173,7 +3173,10 @@ impl KnownClass {
 
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
-    pub(crate) const fn bool(self) -> Truthiness {
+    ///
+    /// Returns `None` for `KnownClass::Tuple`, since the truthiness of a tuple
+    /// depends on its spec.
+    pub(crate) const fn bool(self) -> Option<Truthiness> {
         match self {
             // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
             // variant if the class's `__bool__` method always returns the same thing *and* the
@@ -3199,9 +3202,9 @@ impl KnownClass {
             | Self::GeneratorType
             | Self::AsyncGeneratorType
             | Self::MethodWrapperType
-            | Self::CoroutineType => Truthiness::AlwaysTrue,
+            | Self::CoroutineType => Some(Truthiness::AlwaysTrue),
 
-            Self::NoneType => Truthiness::AlwaysFalse,
+            Self::NoneType => Some(Truthiness::AlwaysFalse),
 
             Self::Any
             | Self::BaseException
@@ -3218,7 +3221,6 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::Set
-            | Self::Tuple
             | Self::Int
             | Self::Type
             | Self::Bytes
@@ -3257,7 +3259,9 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
-            | Self::TypedDictFallback => Truthiness::Ambiguous,
+            | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
+
+            Self::Tuple => None,
         }
     }
 
@@ -4023,8 +4027,10 @@ impl KnownClass {
         }
     }
 
-    /// Return true if all instances of this `KnownClass` compare equal.
-    pub(super) const fn is_single_valued(self) -> bool {
+    /// Returns `Some(true)` if all instances of this `KnownClass` compare equal.
+    /// Returns `None` for `KnownClass::Tuple`, since whether or not a tuple type
+    /// is single-valued depends on the tuple spec.
+    pub(super) const fn is_single_valued(self) -> Option<bool> {
         match self {
             Self::NoneType
             | Self::NoDefaultType
@@ -4032,7 +4038,7 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::TypeAliasType
             | Self::UnionType
-            | Self::NotImplementedType => true,
+            | Self::NotImplementedType => Some(true),
 
             Self::Any
             | Self::Bool
@@ -4045,7 +4051,6 @@ impl KnownClass {
             | Self::Complex
             | Self::Str
             | Self::List
-            | Self::Tuple
             | Self::Set
             | Self::FrozenSet
             | Self::Dict
@@ -4097,7 +4102,9 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
-            | Self::TypedDictFallback => false,
+            | Self::TypedDictFallback => Some(false),
+
+            Self::Tuple => None,
         }
     }
 

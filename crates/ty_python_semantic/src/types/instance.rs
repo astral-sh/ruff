@@ -161,13 +161,10 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     pub(super) fn is_single_valued(self, db: &'db dyn Db) -> bool {
-        if let Some(tuple_spec) = self.class.tuple_spec(db) {
-            return tuple_spec.is_single_valued(db);
-        }
-
         self.class
             .known(db)
-            .map(KnownClass::is_single_valued)
+            .and_then(KnownClass::is_single_valued)
+            .or_else(|| Some(self.class.tuple_spec(db)?.is_single_valued(db)))
             .unwrap_or_else(|| is_single_member_enum(db, self.class.class_literal(db).0))
     }
 
