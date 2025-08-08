@@ -66,7 +66,7 @@ impl Loop {
     }
 }
 
-struct ScopeInfo<'ast> {
+struct ScopeInfo {
     file_scope_id: FileScopeId,
 
     /// Current loop state; None if we are not currently visiting a loop
@@ -91,15 +91,15 @@ struct ScopeInfo<'ast> {
     ///     # When we pop `f`, this binding of `x` will resolve the free variable from `g`.
     ///     x = 1
     /// ```
-    free_variables: FxHashMap<ast::name::Name, Vec<FreeVariable<'ast>>>,
+    free_variables: FxHashMap<ast::name::Name, Vec<FreeVariable>>,
 }
 
-struct FreeVariable<'ast> {
+struct FreeVariable {
     scope_id: FileScopeId,
     // If this variable is `nonlocal`, then this is `Some` reference to its identifier in the
     // `nonlocal` statement. In that case, it's an error if we don't resolve it before we reach the
     // global scope (or if we resolve it in a scope where it's `global`).
-    nonlocal_identifier: Option<&'ast ast::Identifier>,
+    nonlocal_identifier: Option<TextRange>,
 }
 
 pub(super) struct SemanticIndexBuilder<'db, 'ast> {
@@ -108,7 +108,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     file: File,
     source_type: PySourceType,
     module: &'ast ParsedModuleRef,
-    scope_stack: Vec<ScopeInfo<'ast>>,
+    scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
@@ -197,13 +197,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         builder
     }
 
-    fn current_scope_info(&self) -> &ScopeInfo<'ast> {
+    fn current_scope_info(&self) -> &ScopeInfo {
         self.scope_stack
             .last()
             .expect("SemanticIndexBuilder should have created a root scope")
     }
 
-    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo<'ast> {
+    fn current_scope_info_mut(&mut self) -> &mut ScopeInfo {
         self.scope_stack
             .last_mut()
             .expect("SemanticIndexBuilder should have created a root scope")
@@ -502,71 +502,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // If we've popped a scope that free variables from nested (previously popped) scopes can
         // refer to (i.e. not a class body), try to resolve outstanding free variables.
         if kind.is_function_like() || popped_scope_id.is_global() {
-            // Look up each free variable name in the popped scope, and see if we've resolved it.
-            // Collect these in a separate list, to avoid borrowck woes.
-            struct Resolution {
-                name: ast::name::Name,
-                symbol_id: ScopedSymbolId,
-                // Either the symbol is declared `global`, or this is the global scope.
-                is_global: bool,
-            }
-            let mut resolutions = Vec::new();
-            for name in popped_free_variables.keys() {
-                if let Some(symbol_id) = self.place_tables[popped_scope_id].symbol_id(name.as_str())
-                {
-                    // If a name is local or `global` here (i.e. bound or declared, and not marked
-                    // `nonlocal`), then free variables of that name resolve here. Note that
-                    // popping scopes in the normal stack order means that free variables resolve
-                    // (correctly) to the closest scope with a matching definition.
-                    let symbol = self.place_tables[popped_scope_id].symbol(symbol_id);
-                    if symbol.is_local() || symbol.is_global() {
-                        resolutions.push(Resolution {
-                            name: name.clone(),
-                            symbol_id,
-                            is_global: symbol.is_global() || popped_scope_id.is_global(),
-                        });
-                    }
-                }
-            }
-
-            // Remove each resolved name along with all its references from
-            // `popped_free_variables`. For each reference, if it's bound in its nested scope, add
-            // an entry to `nested_scopes_with_bindings` in the popped scope's symbol table. This
-            // is also where we flag any `nonlocal` statements that resolve to globals, which is a
-            // semantic syntax error.
-            for resolution in resolutions {
-                let resolved_variables = popped_free_variables.remove(&resolution.name).unwrap();
-                for FreeVariable {
-                    scope_id: nested_scope_id,
-                    nonlocal_identifier,
-                } in resolved_variables
-                {
-                    let nested_symbol_is_nonlocal = nonlocal_identifier.is_some();
-                    if nested_symbol_is_nonlocal && resolution.is_global {
-                        // If the symbol is declared `nonlocal` in the nested scope (rather than
-                        // just used without a local binding or declaration), then it's a syntax
-                        // error for it to resolve to the global scope or to a `global` statement.
-                        self.report_semantic_error(SemanticSyntaxError {
-                            kind: SemanticSyntaxErrorKind::NoBindingForNonlocal(
-                                resolution.name.clone().into(),
-                            ),
-                            range: nonlocal_identifier.unwrap().range(),
-                            python_version: self.python_version,
-                        });
-                    } else {
-                        let nested_place_table = &self.place_tables[nested_scope_id];
-                        let nested_symbol_id =
-                            nested_place_table.symbol_id(&resolution.name).unwrap();
-                        let nested_symbol = nested_place_table.symbol(nested_symbol_id);
-                        if nested_symbol.is_bound() {
-                            self.place_tables[popped_scope_id].add_nested_scope_with_binding(
-                                resolution.symbol_id,
-                                nested_scope_id,
-                            );
+            popped_free_variables.retain(|name, references| {
+                let popped_place_table = &self.place_tables[popped_scope_id];
+                if let Some(symbol_id) = popped_place_table.symbol_id(name.as_str()) {
+                    let symbol = popped_place_table.symbol(symbol_id);
+                    let symbol_is_resolved = symbol.is_local() || symbol.is_global();
+                    let resolution_is_global = symbol.is_global() || popped_scope_id.is_global();
+                    if symbol_is_resolved {
+                        for FreeVariable {
+                            scope_id: nested_scope_id,
+                            nonlocal_identifier,
+                        } in references
+                        {
+                            if let Some(nonlocal_identifier_range) = nonlocal_identifier {
+                                if resolution_is_global {
+                                    // If the symbol is declared `nonlocal` in the nested scope (rather than
+                                    // just used without a local binding or declaration), then it's a syntax
+                                    // error for it to resolve to the global scope or to a `global` statement.
+                                    self.report_semantic_error(SemanticSyntaxError {
+                                        kind: SemanticSyntaxErrorKind::NoBindingForNonlocal(
+                                            name.clone().into(),
+                                        ),
+                                        range: *nonlocal_identifier_range,
+                                        python_version: self.python_version,
+                                    });
+                                    continue;
+                                }
+                            }
+                            let nested_place_table = &self.place_tables[*nested_scope_id];
+                            let nested_symbol_id = nested_place_table.symbol_id(name).unwrap();
+                            let nested_symbol = nested_place_table.symbol(nested_symbol_id);
+                            if nested_symbol.is_bound() {
+                                self.place_tables[popped_scope_id]
+                                    .add_nested_scope_with_binding(symbol_id, *nested_scope_id);
+                            }
                         }
+                        // This name was resolved. Remove it and its references.
+                        return false;
                     }
                 }
-            }
+                // This name was not resolved. Retain it. We'll add it to the parent scope's
+                // collection below.
+                true
+            });
         }
 
         if popped_scope_id.is_global() {
@@ -2375,7 +2353,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .or_default()
                         .push(FreeVariable {
                             scope_id,
-                            nonlocal_identifier: Some(name),
+                            nonlocal_identifier: Some(name.range),
                         });
                 }
                 walk_stmt(self, stmt);

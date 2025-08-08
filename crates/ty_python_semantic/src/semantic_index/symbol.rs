@@ -276,6 +276,9 @@ impl SymbolTableBuilder {
             .map
             .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
         table.nested_scopes_with_bindings.shrink_to_fit();
+        for scopes_vec in table.nested_scopes_with_bindings.values_mut() {
+            scopes_vec.shrink_to_fit();
+        }
         table
     }
 }
