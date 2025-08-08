@@ -35,7 +35,6 @@ f"{ascii(bla)}"  # OK
     f" that flows {repr(obj)} of type {type(obj)}.{additional_message}"  # RUF010
 )
 
-
 # https://github.com/astral-sh/ruff/issues/16325
 f"{str({})}"
 
@@ -56,3 +55,44 @@ f"{str(object=3)}"
 f"{str(x for x in [])}"
 
 f"{str((x for x in []))}"
+
+# test f-strings with comments
+
+## SAFE CASES
+f"{ascii((  # comment inside
+    1
+))}"
+
+f"{ascii([
+    1,  # first item
+    2  # second item
+])}"
+
+f"{repr({
+    'a': 1,  # comment 1
+    'b': 2,  # comment 2
+})}"
+
+f"{ascii((
+    [1, 2, 3][  # accessing list
+        0  # first element
+    ]
+))}"
+
+f"{str(
+    some_function(
+        arg1,  # first argument
+        arg2  # second argument
+    ) + other_value  # addition
+)}"
+
+## UNSAFE CASES
+f"{ascii  # this comment will be lost
+(1)}"
+
+f"{str  # comment here
+(my_var)}"
+
+f"{repr
+# this comment is lost
+(value)}"
