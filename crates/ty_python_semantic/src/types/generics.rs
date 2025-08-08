@@ -792,7 +792,7 @@ impl<'db> SpecializationBuilder<'db> {
         }
 
         match (formal, actual) {
-                        (Type::Union(formal), _) => {
+            (Type::Union(formal), _) => {
                 // TODO: We haven't implemented a full unification solver yet. If typevars appear
                 // in multiple union elements, we ideally want to express that _only one_ of them
                 // needs to match, and that we should infer the smallest type mapping that allows
