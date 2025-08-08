@@ -944,6 +944,26 @@ UP032_0.py:129:1: UP032 [*] Use f-string instead of `format` call
 131 131 | ###
 132 132 | # Non-errors
 
+UP032_0.py:136:1: UP032 [*] Use f-string instead of `format` call
+    |
+135 | # False-negative: RustPython doesn't parse the `\N{snowman}`.
+136 | "\N{snowman} {}".format(a)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+137 |
+138 | "{".format(a)
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+133 133 | ###
+134 134 | 
+135 135 | # False-negative: RustPython doesn't parse the `\N{snowman}`.
+136     |-"\N{snowman} {}".format(a)
+    136 |+f"\N{snowman} {a}"
+137 137 | 
+138 138 | "{".format(a)
+139 139 | 
+
 UP032_0.py:160:1: UP032 [*] Use f-string instead of `format` call
     |
 158 |   r'"\N{snowman} {}".format(a)'

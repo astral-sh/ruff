@@ -593,6 +593,44 @@ impl FormatString {
         let mut cur_text = text;
         let mut result_string = String::new();
         while !cur_text.is_empty() {
+            // Check for Unicode escape sequences like \N{...}
+            if cur_text.starts_with("\\N{") {
+                result_string.push_str("\\N");
+                let rest = &cur_text[2..];
+                let mut chars = rest.chars();
+                if let Some('{') = chars.next() {
+                    result_string.push('{');
+                } else {
+                    result_string.truncate(result_string.len() - 2);
+                    result_string.push_str(cur_text);
+                    cur_text = "";
+                    continue;
+                }
+
+                loop {
+                    match chars.next() {
+                        Some('{') => {
+                            return Err(FormatParseError::UnescapedStartBracketInLiteral);
+                        }
+                        Some('}') => {
+                            result_string.push('}');
+                            let consumed = rest.len() - chars.as_str().len();
+                            cur_text = &rest[consumed..];
+                            break;
+                        }
+                        Some(ch) => {
+                            result_string.push(ch);
+                        }
+                        None => {
+                            result_string.push_str(chars.as_str());
+                            cur_text = "";
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
             match FormatString::parse_literal_single(cur_text) {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
@@ -694,12 +732,28 @@ impl<'a> FromTemplate<'a> for FormatString {
         while !cur_text.is_empty() {
             // Try to parse both literals and bracketed format parts until we
             // run out of text
-            cur_text = FormatString::parse_literal(cur_text)
-                .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
-                .map(|(part, new_text)| {
+            match FormatString::parse_literal(cur_text) {
+                Ok((part, new_text)) => {
                     parts.push(part);
-                    new_text
-                })?;
+                    cur_text = new_text;
+                }
+                Err(FormatParseError::UnescapedStartBracketInLiteral) => {
+                    if cur_text.starts_with('{') {
+                        let (part, new_text) =
+                            FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes)?;
+                        parts.push(part);
+                        cur_text = new_text;
+                    } else {
+                        return Err(FormatParseError::UnescapedStartBracketInLiteral);
+                    }
+                }
+                Err(_) => {
+                    let (part, new_text) =
+                        FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes)?;
+                    parts.push(part);
+                    cur_text = new_text;
+                }
+            }
         }
         Ok(FormatString {
             format_parts: parts,
@@ -1018,6 +1072,45 @@ mod tests {
         assert_eq!(
             FieldName::parse("key[0]after"),
             Err(FormatParseError::InvalidCharacterAfterRightBracket)
+        );
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape() {
+        let result = FormatString::from_str("\\N{LATIN SMALL LETTER A}");
+        assert!(result.is_ok());
+
+        let format_string = result.unwrap();
+        assert_eq!(format_string.format_parts.len(), 1);
+        match &format_string.format_parts[0] {
+            FormatPart::Literal(literal) => {
+                assert_eq!(literal, "\\N{LATIN SMALL LETTER A}");
+            }
+            FormatPart::Field { .. } => panic!("Expected literal part"),
+        }
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape_incomplete() {
+        let result = FormatString::from_str("\\N{incomplete");
+        assert!(result.is_ok());
+
+        let format_string = result.unwrap();
+        assert_eq!(format_string.format_parts.len(), 1);
+        match &format_string.format_parts[0] {
+            FormatPart::Literal(literal) => {
+                assert_eq!(literal, "\\N{incomplete");
+            }
+            FormatPart::Field { .. } => panic!("Expected literal part"),
+        }
+    }
+
+    #[test]
+    fn test_format_parse_unicode_escape_nested() {
+        let result = FormatString::from_str("\\N{LATIN {SMALL} LETTER A}");
+        assert_eq!(
+            result,
+            Err(FormatParseError::UnescapedStartBracketInLiteral)
         );
     }
 }
