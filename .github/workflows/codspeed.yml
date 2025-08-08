@@ -48,9 +48,8 @@ jobs:
         env:
           CODSPEED_ENV: 1
           # CODSPEED_LOG: debug
-          CODSPEED_USE_PERF: 1
+          CODSPEED_USE_PERF: true
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
-          runner-version: 3.6.0-beta.3
           upload-url: https://api.staging.preview.codspeed.io/upload
