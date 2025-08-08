@@ -508,3 +508,53 @@ fn not_register_rename_capability_when_disabled() -> Result<()> {
 
     Ok(())
 }
+
+/// Tests that the server can register multiple capabilities at once.
+///
+/// This test would need to be updated when the server supports additional capabilities in the
+/// future.
+#[test]
+fn register_multiple_capabilities() -> Result<()> {
+    let workspace_root = SystemPath::new("foo");
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_experimental_rename(true)
+                .with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_rename_dynamic_registration(true)
+        .enable_diagnostic_dynamic_registration(true)
+        .build()?
+        .wait_until_workspaces_are_initialized()?;
+
+    let (_, params) = server.await_request::<RegisterCapability>()?;
+    let registrations = params.registrations;
+
+    assert_eq!(registrations.len(), 2);
+
+    insta::assert_json_snapshot!(registrations, @r#"
+    [
+      {
+        "id": "ty/textDocument/diagnostic",
+        "method": "textDocument/diagnostic",
+        "registerOptions": {
+          "documentSelector": null,
+          "identifier": "ty",
+          "interFileDependencies": true,
+          "workDoneProgress": true,
+          "workspaceDiagnostics": true
+        }
+      },
+      {
+        "id": "ty/textDocument/rename",
+        "method": "textDocument/rename",
+        "registerOptions": {
+          "prepareProvider": true
+        }
+      }
+    ]
+    "#);
+
+    Ok(())
+}
