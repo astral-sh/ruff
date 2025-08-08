@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_semantic::{Binding, BindingId};
+use ruff_python_semantic::{Binding, BindingId, BindingKind, GeneratorKind, ScopeKind};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
 
@@ -126,7 +126,7 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
     // autofixing the diagnostic for assignments. See:
     // - <https://github.com/astral-sh/ruff/issues/14790>
     // - <https://github.com/astral-sh/ruff/issues/14799>
-    if !binding.kind.is_assignment() {
+    if !binding.kind.is_assignment() && !matches!(binding.kind, BindingKind::LoopVar) {
         return;
     }
 
@@ -139,7 +139,19 @@ pub(crate) fn used_dummy_variable(checker: &Checker, binding: &Binding, binding_
 
     // Only variables defined in function scopes
     let scope = &semantic.scopes[binding.scope];
-    if !scope.kind.is_function() {
+    let is_allowed_scope = scope.kind.is_function()
+        || matches!(
+            scope.kind,
+            ScopeKind::Generator {
+                kind: GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension
+                    | GeneratorKind::Generator,
+                ..
+            }
+        );
+
+    if !is_allowed_scope {
         return;
     }
 
