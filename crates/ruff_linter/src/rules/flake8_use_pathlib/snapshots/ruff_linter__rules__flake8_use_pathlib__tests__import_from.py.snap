@@ -31,6 +31,7 @@ import_from.py:11:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
 12 | makedirs(p)
 13 | rename(p)
    |
+   = help: Replace with `Path(...).mkdir()`
 
 import_from.py:12:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
    |
@@ -41,6 +42,7 @@ import_from.py:12:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(pa
 13 | rename(p)
 14 | replace(p)
    |
+   = help: Replace with `Path(...).mkdir(parents=True)`
 
 import_from.py:13:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
    |

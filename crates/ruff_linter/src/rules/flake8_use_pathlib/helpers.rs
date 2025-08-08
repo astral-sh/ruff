@@ -1,9 +1,10 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::{Applicability, Edit, Fix, Violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::{Applicability, Edit, Fix, Violation};
 
 pub(crate) fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
     arguments
@@ -182,4 +183,11 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
             ))
         });
     }
+}
+
+pub(crate) fn has_unknown_keywords(arguments: &ast::Arguments, allowed: &[&str]) -> bool {
+    arguments
+        .keywords
+        .iter()
+        .any(|kw| kw.arg.as_deref().is_none_or(|arg| !allowed.contains(&arg)))
 }
