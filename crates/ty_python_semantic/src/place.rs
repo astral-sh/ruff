@@ -651,32 +651,6 @@ fn place_by_id<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
 
-    // If there are any nested bindings (via `global` or `nonlocal` variables) for this symbol,
-    // infer them and union the results. Nested bindings aren't allowed to have declarations or
-    // qualifiers, and we can just union their inferred types.
-    let mut nested_bindings_union = UnionBuilder::new(db);
-    if let Some(symbol_id) = place_id.as_symbol() {
-        let current_place_table = place_table(db, scope);
-        let symbol = current_place_table.symbol(symbol_id);
-        for nested_file_scope_id in place_table(db, scope).nested_scopes_with_bindings(symbol_id) {
-            let nested_scope_id = nested_file_scope_id.to_scope_id(db, scope.file(db));
-            let nested_place_table = place_table(db, nested_scope_id);
-            let nested_symbol_id = nested_place_table
-                .symbol_id(symbol.name())
-                .expect("nested_scopes_with_bindings says this reference exists");
-            let nested_place = place_by_id(
-                db,
-                nested_scope_id,
-                ScopedPlaceId::Symbol(nested_symbol_id),
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::AllReachable,
-            );
-            if let Place::Type(nested_type, _) = nested_place.place {
-                nested_bindings_union.add_in_place(nested_type);
-            }
-        }
-    }
-
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
@@ -690,6 +664,47 @@ fn place_by_id<'db>(
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
         ConsideredDefinitions::AllReachable => use_def.all_reachable_bindings(place_id),
+    };
+
+    // If there are any nested bindings (via `global` or `nonlocal` variables) for this symbol,
+    // infer them and union the results. Note that this is potentially recursive, and we can
+    // trigger fixed-point iteration here in cases like this:
+    // ```
+    // def f():
+    //     x = 1
+    //     def g():
+    //         nonlocal x
+    //         x += 1
+    // ```
+    let nested_bindings = || {
+        // For performance reasons, avoid creating a union unless we have more one binding.
+        let mut union = UnionBuilder::new(db);
+        if let Some(symbol_id) = place_id.as_symbol() {
+            let current_place_table = place_table(db, scope);
+            let symbol = current_place_table.symbol(symbol_id);
+            for &nested_file_scope_id in
+                place_table(db, scope).nested_scopes_with_bindings(symbol_id)
+            {
+                let nested_scope_id = nested_file_scope_id.to_scope_id(db, scope.file(db));
+                let nested_place_table = place_table(db, nested_scope_id);
+                let nested_symbol_id = nested_place_table
+                    .symbol_id(symbol.name())
+                    .expect("nested_scopes_with_bindings says this reference exists");
+                let place = place_by_id(
+                    db,
+                    nested_scope_id,
+                    ScopedPlaceId::Symbol(nested_symbol_id),
+                    RequiresExplicitReExport::No,
+                    ConsideredDefinitions::AllReachable,
+                );
+                // Nested bindings aren't allowed to have declarations or qualifiers, so we can
+                // just extract their inferred types.
+                if let Place::Type(nested_type, _) = place.place {
+                    union.add_in_place(nested_type);
+                }
+            }
+        }
+        union
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
@@ -751,17 +766,11 @@ fn place_by_id<'db>(
                     // TODO: We probably don't want to report `Bound` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    Place::Type(
-                        nested_bindings_union.add(declared_ty).build(),
-                        Boundness::Bound,
-                    )
+                    Place::Type(nested_bindings().add(declared_ty).build(), Boundness::Bound)
                 }
                 // Place is possibly undeclared and (possibly) bound
                 Place::Type(inferred_ty, boundness) => Place::Type(
-                    nested_bindings_union
-                        .add(inferred_ty)
-                        .add(declared_ty)
-                        .build(),
+                    nested_bindings().add(inferred_ty).add(declared_ty).build(),
                     if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Boundness::Bound
                     } else {
@@ -784,13 +793,12 @@ fn place_by_id<'db>(
 
             // If there are nested bindings, union whatever we inferred from those into what we've
             // inferred here.
-            if let Some(nested_bindings_type) = nested_bindings_union.try_build() {
-                match &mut inferred {
-                    Place::Type(inferred_type, _) => {
-                        *inferred_type =
-                            UnionType::from_elements(db, [*inferred_type, nested_bindings_type]);
-                    }
-                    Place::Unbound => {
+            match &mut inferred {
+                Place::Type(inferred_type, _) => {
+                    *inferred_type = nested_bindings().add(*inferred_type).build();
+                }
+                Place::Unbound => {
+                    if let Some(nested_bindings_type) = nested_bindings().try_build() {
                         inferred = Place::Type(nested_bindings_type, Boundness::PossiblyUnbound);
                     }
                 }

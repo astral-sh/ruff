@@ -201,7 +201,7 @@ x = 42
 
 def f():
     global x
-    reveal_type(x)  # revealed: Unknown | Literal[42, "56"]
+    reveal_type(x)  # revealed: Unknown | Literal["56", 42]
     x = "56"
     reveal_type(x)  # revealed: Literal["56"]
 ```

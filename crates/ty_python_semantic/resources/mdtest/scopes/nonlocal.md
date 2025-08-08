@@ -106,12 +106,12 @@ def a():
                 nonlocal x
                 # It's counterintuitive that 4 gets included here, since we haven't reached the
                 # binding in this scope, but this function might get called more than once.
-                reveal_type(x)  # revealed: Literal[2, 3, 4]
+                reveal_type(x)  # revealed: Literal[3, 4, 2]
                 x = 4
                 reveal_type(x)  # revealed: Literal[4]
 
                 def e():
-                    reveal_type(x)  # revealed: Literal[2, 3, 4]
+                    reveal_type(x)  # revealed: Literal[3, 4, 2]
 ```
 
 In addition to parent scopes, we also consider sibling scopes, child scopes,
@@ -131,7 +131,7 @@ def a():
         def d():
             nonlocal x
             x = 3
-        reveal_type(x)  # revealed: Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Literal[2, 3, 1]
     # `x` is local here, so we don't look at nested scopes.
     reveal_type(x)  # revealed: Literal[1]
 ```

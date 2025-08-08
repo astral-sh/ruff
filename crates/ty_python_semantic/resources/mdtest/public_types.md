@@ -312,7 +312,7 @@ def outer() -> None:
     set_x()
 
     def inner() -> None:
-        reveal_type(x)  # revealed: None | Literal[1]
+        reveal_type(x)  # revealed: Literal[1] | None
     inner()
 ```
 
