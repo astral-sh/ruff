@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                 let needs_trailing_comma = if let [item] = elts.as_slice() {
                     SimpleTokenizer::new(
                         checker.locator().contents(),
-                        TextRange::new(item.end(), call.end()),
+                        TextRange::new(item.end(), argument.end()),
                     )
                     .all(|token| token.kind != SimpleTokenKind::Comma)
                 } else {
