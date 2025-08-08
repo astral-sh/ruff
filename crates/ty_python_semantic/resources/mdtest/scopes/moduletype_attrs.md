@@ -78,7 +78,7 @@ reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
 
 def nested_scope():
     global __loader__
-    reveal_type(__loader__)  # revealed: LoaderProtocol | None
+    reveal_type(__loader__)  # revealed: Unknown | LoaderProtocol | None
     __loader__ = 56  # error: [invalid-assignment] "Object of type `Literal[56]` is not assignable to `LoaderProtocol | None`"
 ```
 

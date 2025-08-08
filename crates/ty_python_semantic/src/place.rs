@@ -651,6 +651,32 @@ fn place_by_id<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
 
+    // If there are any nested bindings (via `global` or `nonlocal` variables) for this symbol,
+    // infer them and union the results. Nested bindings aren't allowed to have declarations or
+    // qualifiers, and we can just union their inferred types.
+    let mut nested_bindings_union = UnionBuilder::new(db);
+    if let Some(symbol_id) = place_id.as_symbol() {
+        let current_place_table = place_table(db, scope);
+        let symbol = current_place_table.symbol(symbol_id);
+        for nested_file_scope_id in place_table(db, scope).nested_scopes_with_bindings(symbol_id) {
+            let nested_scope_id = nested_file_scope_id.to_scope_id(db, scope.file(db));
+            let nested_place_table = place_table(db, nested_scope_id);
+            let nested_symbol_id = nested_place_table
+                .symbol_id(symbol.name())
+                .expect("nested_scopes_with_bindings says this reference exists");
+            let nested_place = place_by_id(
+                db,
+                nested_scope_id,
+                ScopedPlaceId::Symbol(nested_symbol_id),
+                RequiresExplicitReExport::No,
+                ConsideredDefinitions::AllReachable,
+            );
+            if let Place::Type(nested_type, _) = nested_place.place {
+                nested_bindings_union.add_in_place(nested_type);
+            }
+        }
+    }
+
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
 
@@ -725,11 +751,17 @@ fn place_by_id<'db>(
                     // TODO: We probably don't want to report `Bound` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    Place::Type(declared_ty, Boundness::Bound)
+                    Place::Type(
+                        nested_bindings_union.add(declared_ty).build(),
+                        Boundness::Bound,
+                    )
                 }
                 // Place is possibly undeclared and (possibly) bound
                 Place::Type(inferred_ty, boundness) => Place::Type(
-                    UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    nested_bindings_union
+                        .add(inferred_ty)
+                        .add(declared_ty)
+                        .build(),
                     if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Boundness::Bound
                     } else {
@@ -740,7 +772,8 @@ fn place_by_id<'db>(
 
             PlaceAndQualifiers { place, qualifiers }
         }
-        // Place is undeclared, return the union of `Unknown` with the inferred type
+        // Place is undeclared, return the inferred type, and union it with `Unknown` if the place
+        // is public.
         Ok(PlaceAndQualifiers {
             place: Place::Unbound,
             qualifiers: _,
@@ -748,6 +781,20 @@ fn place_by_id<'db>(
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis;
             let mut inferred = place_from_bindings_impl(db, bindings, requires_explicit_reexport);
+
+            // If there are nested bindings, union whatever we inferred from those into what we've
+            // inferred here.
+            if let Some(nested_bindings_type) = nested_bindings_union.try_build() {
+                match &mut inferred {
+                    Place::Type(inferred_type, _) => {
+                        *inferred_type =
+                            UnionType::from_elements(db, [*inferred_type, nested_bindings_type]);
+                    }
+                    Place::Unbound => {
+                        inferred = Place::Type(nested_bindings_type, Boundness::PossiblyUnbound);
+                    }
+                }
+            }
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Type(ty, Boundness::PossiblyUnbound) = inferred {

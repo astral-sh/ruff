@@ -104,16 +104,20 @@ def a():
 
             def d():
                 nonlocal x
-                reveal_type(x)  # revealed: Literal[3, 2]
+                # It's counterintuitive that 4 gets included here, since we haven't reached the
+                # binding in this scope, but this function might get called more than once.
+                reveal_type(x)  # revealed: Literal[2, 3, 4]
                 x = 4
                 reveal_type(x)  # revealed: Literal[4]
 
                 def e():
-                    reveal_type(x)  # revealed: Literal[4, 3, 2]
+                    reveal_type(x)  # revealed: Literal[2, 3, 4]
 ```
 
-However, currently the union of types that we build is incomplete. We walk parent scopes, but not
-sibling scopes, child scopes, second-cousin-once-removed scopes, etc:
+In addition to parent scopes, we also consider sibling scopes, child scopes,
+second-cousin-once-removed scopes, etc. However, we only fall back to bindings from other scopes
+when a place is unbound or possibly unbound in the current scope. In other words, nested bindings
+are only included in the "public type" of a variable:
 
 ```py
 def a():
@@ -121,13 +125,15 @@ def a():
     def b():
         nonlocal x
         x = 2
+        reveal_type(x)  # revealed: Literal[2]
 
     def c():
         def d():
             nonlocal x
             x = 3
-        # TODO: This should include 2 and 3.
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
+    # `x` is local here, so we don't look at nested scopes.
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Local variable bindings "look ahead" to any assignment in the current scope
@@ -365,10 +371,10 @@ def f():
     x = 1
     def g():
         nonlocal x
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: int
         x += 1
-        reveal_type(x)  # revealed: Literal[2]
-    # TODO: should be `Unknown | Literal[1]`
+        reveal_type(x)  # revealed: int
+    # TODO: should be `int`
     reveal_type(x)  # revealed: Literal[1]
 ```
 
