@@ -3,15 +3,14 @@
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
-use super::{ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
+use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::semantic_index::definition::Definition;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::TupleType;
-use crate::types::{
-    DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypedDictType,
-};
+use crate::types::{DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypedDictType};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -161,9 +160,11 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        self.class.find_legacy_typevars(db, typevars);
+        self.class
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 }
 
@@ -342,14 +343,15 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
-                class.find_legacy_typevars(db, typevars);
+                class.find_legacy_typevars(db, binding_context, typevars);
             }
             Protocol::Synthesized(synthesized) => {
-                synthesized.find_legacy_typevars(db, typevars);
+                synthesized.find_legacy_typevars(db, binding_context, typevars);
             }
         }
     }
@@ -385,8 +387,9 @@ impl<'db> Protocol<'db> {
 }
 
 mod synthesized_protocol {
+    use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{TypeMapping, TypeTransformer, TypeVarInstance, TypeVarVariance};
+    use crate::types::{BoundTypeVarInstance, TypeMapping, TypeTransformer, TypeVarVariance};
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -427,9 +430,10 @@ mod synthesized_protocol {
         pub(super) fn find_legacy_typevars(
             self,
             db: &'db dyn Db,
-            typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+            binding_context: Option<Definition<'db>>,
+            typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         ) {
-            self.0.find_legacy_typevars(db, typevars);
+            self.0.find_legacy_typevars(db, binding_context, typevars);
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {

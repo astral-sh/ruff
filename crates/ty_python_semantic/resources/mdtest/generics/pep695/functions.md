@@ -404,3 +404,24 @@ def decorated[T](t: T) -> None:
     # error: [redundant-cast]
     reveal_type(cast(T, t))  # revealed: T@decorated
 ```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import overload
+
+def outer[T](t: T) -> None:
+    def inner[T](t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer[T](t: T) -> None: ...
+def overloaded_outer[T](t: T | None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+```

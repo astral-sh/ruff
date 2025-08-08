@@ -102,7 +102,7 @@ def silence[T: type[BaseException]](
     try:
         func()
     except exception_type as e:
-        reveal_type(e)  # revealed: T'instance
+        reveal_type(e)  # revealed: T'instance@silence
 
 def silence2[T: (
     type[ValueError],
@@ -111,7 +111,7 @@ def silence2[T: (
     try:
         func()
     except exception_type as e:
-        reveal_type(e)  # revealed: T'instance
+        reveal_type(e)  # revealed: T'instance@silence2
 ```
 
 ## Invalid exception handlers

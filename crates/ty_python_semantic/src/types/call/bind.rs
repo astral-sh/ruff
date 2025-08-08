@@ -2857,7 +2857,7 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let typevar = error.typevar();
+                let typevar = error.bound_typevar().typevar(context.db());
                 let argument_type = error.argument_type();
                 let argument_ty_display = argument_type.display(context.db());
 

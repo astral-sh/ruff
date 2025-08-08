@@ -371,10 +371,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        T@Alias
+        typing.TypeVar[T: int = bool]
         ---------------------------------------------
         ```python
-        T@Alias
+        typing.TypeVar[T: int = bool]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

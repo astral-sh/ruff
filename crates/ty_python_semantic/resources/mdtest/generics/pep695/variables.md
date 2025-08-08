@@ -17,7 +17,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 ```py
 def f[T]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: typing.TypeVar[T]
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -32,6 +32,8 @@ python-version = "3.13"
 
 ```py
 def f[T = int]():
+    reveal_type(type(T))  # revealed: <class 'TypeVar'>
+    reveal_type(T)  # revealed: typing.TypeVar[T = int]
     reveal_type(T.__default__)  # revealed: int
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -63,6 +65,8 @@ class Invalid[S = T]: ...
 
 ```py
 def f[T: int]():
+    reveal_type(type(T))  # revealed: <class 'TypeVar'>
+    reveal_type(T)  # revealed: typing.TypeVar[T: int]
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -74,6 +78,8 @@ def g[S]():
 
 ```py
 def f[T: (int, str)]():
+    reveal_type(type(T))  # revealed: <class 'TypeVar'>
+    reveal_type(T)  # revealed: typing.TypeVar[T: (int, str)]
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
 
