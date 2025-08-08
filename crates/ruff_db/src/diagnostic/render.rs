@@ -655,6 +655,22 @@ impl<'r> RenderableSnippet<'r> {
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
+        // Strip the BOM from the beginning of the snippet, if present. Doing this here saves us the
+        // trouble of updating the annotation ranges in `replace_unprintable`, and also allows us to
+        // check that the BOM is at the very beginning of the file, not just the beginning of the
+        // snippet.
+        const BOM: char = '\u{feff}';
+        let bom_len = BOM.text_len();
+        let (snippet, snippet_start) =
+            if snippet_start == TextSize::ZERO && snippet.starts_with(BOM) {
+                (
+                    &snippet[bom_len.to_usize()..],
+                    snippet_start + TextSize::new(bom_len.to_u32()),
+                )
+            } else {
+                (snippet, snippet_start)
+            };
+
         let annotations = anns
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
@@ -1000,7 +1016,12 @@ fn replace_unprintable<'r>(
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        if let Some(printable) = unprintable_replacement(c) {
+        // normalize `\r` line endings but don't double `\r\n`
+        if c == '\r' && !source[index + 1..].starts_with("\n") {
+            result.push_str(&source[last_end..index]);
+            result.push('\n');
+            last_end = index + 1;
+        } else if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
 
             let len = printable.text_len().to_u32();
