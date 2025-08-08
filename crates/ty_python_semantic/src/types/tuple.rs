@@ -1,4 +1,3 @@
-#![expect(dead_code)]
 //! Types describing fixed- and variable-length tuples.
 //!
 //! At runtime, a Python tuple is a fixed-length immutable list of values. There is no restriction
