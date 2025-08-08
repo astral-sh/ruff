@@ -4662,7 +4662,7 @@ impl<'db> Type<'db> {
                     let iterator = dunder_aiter_bindings.return_type(db);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(Ok(result)) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
-                        Ok(Err(AwaitError::InvalidReturnType(_))) => {
+                        Ok(Err(AwaitError::InvalidReturnType(..))) => {
                             Err(IterationError::UnboundAiterError)
                         } // TODO: __anext__ is bound, but is not properly awaitable
                         Err(dunder_anext_error) | Ok(Err(AwaitError::Call(dunder_anext_error))) => {
@@ -4875,11 +4875,11 @@ impl<'db> Type<'db> {
     fn try_await(self, db: &'db dyn Db) -> Result<Type<'db>, AwaitError<'db>> {
         let await_result = self.try_call_dunder(db, "__await__", CallArguments::none());
         match await_result {
-            Ok(binding) => {
-                let return_type = binding.return_type(db);
-                Ok(return_type
-                    .generator_return_type(db)
-                    .ok_or(AwaitError::InvalidReturnType(return_type))?)
+            Ok(bindings) => {
+                let return_type = bindings.return_type(db);
+                Ok(return_type.generator_return_type(db).ok_or_else(|| {
+                    AwaitError::InvalidReturnType(return_type, Box::new(bindings))
+                })?)
             }
             Err(call_error) => Err(AwaitError::Call(call_error)),
         }
@@ -6820,7 +6820,7 @@ enum AwaitError<'db> {
     /// arguments.
     Call(CallDunderError<'db>),
     /// `__await__` resolved successfully, but its return type is known not to be a generator.
-    InvalidReturnType(Type<'db>),
+    InvalidReturnType(Type<'db>, Box<Bindings<'db>>),
 }
 
 impl<'db> AwaitError<'db> {
@@ -6828,9 +6828,9 @@ impl<'db> AwaitError<'db> {
         &self,
         context: &InferContext<'db, '_>,
         context_expression_type: Type<'db>,
-        content_expression_node: ast::AnyNodeRef,
+        context_expression_node: ast::AnyNodeRef,
     ) {
-        let Some(builder) = context.report_lint(&INVALID_AWAIT, content_expression_node) else {
+        let Some(builder) = context.report_lint(&INVALID_AWAIT, context_expression_node) else {
             return;
         };
 
@@ -6840,20 +6840,65 @@ impl<'db> AwaitError<'db> {
             format_args!("`{type}` is not awaitable", type = context_expression_type.display(db)),
         );
         match self {
-            Self::Call(CallDunderError::CallError(..)) => {
-                // TODO: Indicate definition error, not usage error.
-                diag.info(
-                    "`__await__` expects additional arguments and cannot be called implicitly",
-                );
+            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                diag.info("`__await__` expects invalid arguments and cannot be called implicitly");
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.parameters)
+                            .message("parameters here"),
+                    );
+                }
             }
-            Self::Call(CallDunderError::PossiblyUnbound(..)) => {
+            Self::Call(CallDunderError::CallError(
+                kind @ (CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable),
+                bindings,
+            )) => {
+                let possibly = if matches!(kind, CallErrorKind::PossiblyNotCallable) {
+                    " possibly"
+                } else {
+                    ""
+                };
+                diag.info(format_args!("`__await__` is{possibly} not callable"));
+                if let Some(definition) = bindings.callable_type().definition(db)
+                    && let Some(definition_range) = definition.focus_range(db)
+                {
+                    diag.annotate(
+                        Annotation::secondary(definition_range.into())
+                            .message("attribute defined here"),
+                    );
+                }
+            }
+            Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
                 diag.info("`__await__` is possibly unbound");
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.signature)
+                            .message("method defined here"),
+                    );
+                }
             }
-            Self::Call(CallDunderError::MethodNotAvailable) => diag.info("`__await__` is missing"),
-            Self::InvalidReturnType(return_type) => diag.info(format_args!(
-                "`__await__` returns `{return_type}`, which is not a valid iterator",
-                return_type = return_type.display(db)
-            )),
+            Self::Call(CallDunderError::MethodNotAvailable) => {
+                diag.info("`__await__` is missing");
+                if let Some(type_definition) = context_expression_type.definition(db)
+                    && let Some(definition_range) = type_definition.focus_range(db)
+                {
+                    diag.annotate(
+                        Annotation::secondary(definition_range.into()).message("type defined here"),
+                    );
+                }
+            }
+            Self::InvalidReturnType(return_type, bindings) => {
+                diag.info(format_args!(
+                    "`__await__` returns `{return_type}`, which is not a valid iterator",
+                    return_type = return_type.display(db)
+                ));
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.signature)
+                            .message("method defined here"),
+                    );
+                }
+            }
         }
     }
 }
