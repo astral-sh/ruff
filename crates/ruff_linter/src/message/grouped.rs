@@ -10,14 +10,13 @@ use ruff_source_file::OneIndexed;
 
 use crate::fs::relativize_path;
 use crate::message::diff::calculate_print_width;
-use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
+use crate::message::text::RuleCodeAndBody;
 use crate::message::{Emitter, EmitterContext, MessageWithLocation, group_diagnostics_by_filename};
 use crate::settings::types::UnsafeFixes;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
-    show_source: bool,
     unsafe_fixes: UnsafeFixes,
 }
 
@@ -25,12 +24,6 @@ impl GroupedEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
-        self
-    }
-
-    #[must_use]
-    pub fn with_show_source(mut self, show_source: bool) -> Self {
-        self.show_source = show_source;
         self
     }
 
@@ -76,18 +69,14 @@ impl Emitter for GroupedEmitter {
                         message,
                         show_fix_status: self.show_fix_status,
                         unsafe_fixes: self.unsafe_fixes,
-                        show_source: self.show_source,
                         row_length,
                         column_length,
                     }
                 )?;
             }
 
-            // Print a blank line between files, unless we're showing the source, in which case
-            // we'll have already printed a blank line between messages.
-            if !self.show_source {
-                writeln!(writer)?;
-            }
+            // Print a blank line between files.
+            writeln!(writer)?;
         }
 
         Ok(())
@@ -98,7 +87,6 @@ struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
     show_fix_status: bool,
     unsafe_fixes: UnsafeFixes,
-    show_source: bool,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
     notebook_index: Option<&'a NotebookIndex>,
@@ -152,50 +140,6 @@ impl Display for DisplayGroupedMessage<'_> {
             },
         )?;
 
-        if self.show_source {
-            use std::fmt::Write;
-            let mut padded = PadAdapter::new(f);
-            writeln!(
-                padded,
-                "{}",
-                MessageCodeFrame {
-                    message,
-                    notebook_index: self.notebook_index
-                }
-            )?;
-        }
-
-        Ok(())
-    }
-}
-
-/// Adapter that adds a '  ' at the start of every line without the need to copy the string.
-/// Inspired by Rust's `debug_struct()` internal implementation that also uses a `PadAdapter`.
-struct PadAdapter<'buf> {
-    buf: &'buf mut (dyn std::fmt::Write + 'buf),
-    on_newline: bool,
-}
-
-impl<'buf> PadAdapter<'buf> {
-    fn new(buf: &'buf mut (dyn std::fmt::Write + 'buf)) -> Self {
-        Self {
-            buf,
-            on_newline: true,
-        }
-    }
-}
-
-impl std::fmt::Write for PadAdapter<'_> {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        for s in s.split_inclusive('\n') {
-            if self.on_newline {
-                self.buf.write_str("  ")?;
-            }
-
-            self.on_newline = s.ends_with('\n');
-            self.buf.write_str(s)?;
-        }
-
         Ok(())
     }
 }
@@ -228,7 +172,7 @@ mod tests {
 
     #[test]
     fn show_source() {
-        let mut emitter = GroupedEmitter::default().with_show_source(true);
+        let mut emitter = GroupedEmitter::default();
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
@@ -236,9 +180,7 @@ mod tests {
 
     #[test]
     fn fix_status() {
-        let mut emitter = GroupedEmitter::default()
-            .with_show_fix_status(true)
-            .with_show_source(true);
+        let mut emitter = GroupedEmitter::default().with_show_fix_status(true);
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
         assert_snapshot!(content);
@@ -248,7 +190,6 @@ mod tests {
     fn fix_status_unsafe() {
         let mut emitter = GroupedEmitter::default()
             .with_show_fix_status(true)
-            .with_show_source(true)
             .with_unsafe_fixes(UnsafeFixes::Enabled);
         let content = capture_emitter_output(&mut emitter, &create_diagnostics());
 
