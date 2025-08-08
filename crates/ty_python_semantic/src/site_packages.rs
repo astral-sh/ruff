@@ -1718,6 +1718,10 @@ mod tests {
                     &expected_venv_site_packages
                 );
             }
+
+            let stdlib_directory = venv.real_stdlib_directory(&self.system).unwrap();
+            let expected_stdlib_directory = self.expected_system_stdlib();
+            assert_eq!(stdlib_directory, expected_stdlib_directory);
         }
 
         #[track_caller]
@@ -1745,6 +1749,10 @@ mod tests {
                 site_packages_directories,
                 std::slice::from_ref(&expected_site_packages)
             );
+
+            let stdlib_directory = env.real_stdlib_directory(&self.system).unwrap();
+            let expected_stdlib_directory = self.expected_system_stdlib();
+            assert_eq!(stdlib_directory, expected_stdlib_directory);
         }
 
         fn expected_system_site_packages(&self) -> SystemPathBuf {
@@ -1758,6 +1766,21 @@ mod tests {
             } else {
                 SystemPathBuf::from(&*format!(
                     "/Python3.{minor_version}/lib/python3.{minor_version}/site-packages"
+                ))
+            }
+        }
+
+        fn expected_system_stdlib(&self) -> SystemPathBuf {
+            let minor_version = self.minor_version;
+            if cfg!(target_os = "windows") {
+                SystemPathBuf::from(&*format!(r"\Python3.{minor_version}\Lib"))
+            } else if self.free_threaded {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}t"
+                ))
+            } else {
+                SystemPathBuf::from(&*format!(
+                    "/Python3.{minor_version}/lib/python3.{minor_version}"
                 ))
             }
         }
