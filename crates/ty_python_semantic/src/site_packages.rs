@@ -831,6 +831,43 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
     }
 }
 
+impl std::error::Error for StdlibDiscoveryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::CouldNotReadLibDirectory(_, io_err) => Some(io_err),
+            Self::NoStdlibFound(_) => None,
+            Self::NoSysPrefixFound(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for StdlibDiscoveryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSysPrefixFound(path) => {
+                write!(
+                    f,
+                    "Failed to resolve a `sys.prefix` from the `pyvenv.cfg` file at `{path}`"
+                )
+            }
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _) => display_error(
+                f,
+                origin,
+                inner,
+                "Failed to iterate over the contents of the `lib` directory of the Python installation",
+                None,
+            ),
+            Self::NoStdlibFound(SysPrefixPath { inner, origin }) => display_error(
+                f,
+                origin,
+                inner,
+                &format!("Invalid {origin}"),
+                Some("Could not find a stdlib directory for this Python installation/executable"),
+            ),
+        }
+    }
+}
+
 fn display_error(
     f: &mut std::fmt::Formatter<'_>,
     sys_prefix_origin: &SysPrefixPathOrigin,
@@ -1119,9 +1156,7 @@ fn real_stdlib_directory_from_sys_prefix(
             continue;
         }
 
-        if system.is_directory(&path) {
-            return Ok(path);
-        }
+        return Ok(path);
     }
     Err(StdlibDiscoveryError::NoStdlibFound(
         sys_prefix_path.to_owned(),
@@ -1283,10 +1318,6 @@ impl SysPrefixPath {
                 );
 
                 if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
-                    continue;
-                }
-
-                if system.is_directory(&path) {
                     continue;
                 }
 

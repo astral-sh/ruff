@@ -168,7 +168,9 @@ impl Options {
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
             // For now this is considered non-fatal, we don't Need this for anything.
-            python_environment.real_stdlib_path(system).ok()
+            python_environment.real_stdlib_path(system).map_err(|err| {
+                tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
+            }).ok()
         });
 
         let python_version = options_python_version
