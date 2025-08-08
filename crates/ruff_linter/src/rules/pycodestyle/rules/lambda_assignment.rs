@@ -105,18 +105,14 @@ pub(crate) fn lambda_assignment(
             }
         }
 
-        // Otherwise, if the assignment is in a class body, flag it, but use a display-only fix.
-        // Rewriting safely would require making this a static method.
-        //
-        // Similarly, if the lambda is shadowing a variable in the current scope,
+        // If the lambda is shadowing a variable in the current scope (annotation shadowing),
         // rewriting it as a function declaration may break type-checking.
         // See: https://github.com/astral-sh/ruff/issues/5421
-        if checker.semantic().current_scope().kind.is_class()
-            || checker
-                .semantic()
-                .current_scope()
-                .get_all(id)
-                .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
+        if checker
+            .semantic()
+            .current_scope()
+            .get_all(id)
+            .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
         {
             diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
                 indented,
