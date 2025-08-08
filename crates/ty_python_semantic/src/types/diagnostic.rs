@@ -569,8 +569,8 @@ declare_lint! {
     ///         return 5
     ///
     /// async def main() -> None:
-    ///     await InvalidAwait()  # error: TODO:
-    ///     await 42  # error: TODO:
+    ///     await InvalidAwait()  # error: [invalid-await]
+    ///     await 42  # error: [invalid-await]
     ///
     /// asyncio.run(main())
     /// ```
