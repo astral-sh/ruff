@@ -6,6 +6,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::Constraints;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
@@ -114,21 +115,25 @@ impl<'db> NominalInstanceType<'db> {
         Self::from_class(self.class.materialize(db, variance))
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         self.class.has_relation_to(db, other.class, relation)
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         self.class.is_equivalent_to(db, other.class)
     }
 
-    pub(super) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
-        !self.class.could_coexist_in_mro_with(db, other.class)
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+    ) -> C {
+        C::from_bool(db, !self.class.could_coexist_in_mro_with(db, other.class))
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -268,30 +273,33 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-    ) -> bool {
-        other
-            .inner
-            .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db))
+    ) -> C {
+        C::from_bool(
+            db,
+            other
+                .inner
+                .interface(db)
+                .is_sub_interface_of(db, self.inner.interface(db)),
+        )
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return true;
+            return C::always(db);
         }
-        self_normalized == other.normalized(db)
+        C::from_bool(db, self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -299,13 +307,13 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         _other: Self,
         _visitor: &mut PairVisitor<'db>,
-    ) -> bool {
-        false
+    ) -> C {
+        C::never(db)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
