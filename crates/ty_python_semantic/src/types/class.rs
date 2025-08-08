@@ -273,8 +273,6 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
     ) {
-        // A tuple's specialization will include all of its element types, so we don't need to also
-        // look in `self.tuple`.
         self.specialization(db).find_legacy_typevars(db, typevars);
     }
 
