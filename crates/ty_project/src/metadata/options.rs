@@ -1387,7 +1387,7 @@ impl std::error::Error for ToSettingsError {}
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::DEFAULT_LINT_REGISTRY;
-    use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
+    use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
     use std::borrow::Cow;
     use ty_python_semantic::lint::Level;
 

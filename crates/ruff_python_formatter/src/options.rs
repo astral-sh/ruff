@@ -398,7 +398,7 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::{json_schema, Schema, SchemaGenerator};
+    use schemars::{Schema, SchemaGenerator, json_schema};
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
     pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {

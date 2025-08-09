@@ -57,7 +57,7 @@ impl Default for PythonPlatform {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::PythonPlatform;
-    use schemars::{json_schema, JsonSchema, SchemaGenerator, Schema};
+    use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
     use std::borrow::Cow;
 
     impl JsonSchema for PythonPlatform {

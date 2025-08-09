@@ -6,7 +6,7 @@
 //! bindings to the Workspace API
 
 use crate::{TextRange, TextSize};
-use schemars::{JsonSchema, SchemaGenerator, Schema};
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use std::borrow::Cow;
 
 impl JsonSchema for TextSize {

@@ -259,7 +259,7 @@ pub struct PreviewOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
-    use schemars::{json_schema, JsonSchema, Schema, SchemaGenerator};
+    use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
     use strum::IntoEnumIterator;
 
     use crate::RuleSelector;
@@ -319,7 +319,7 @@ mod schema {
             .sorted()
             .map(serde_json::Value::String)
             .collect();
-            
+
             json_schema!({
                 "type": "string",
                 "enum": enum_values

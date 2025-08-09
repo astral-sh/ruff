@@ -1,6 +1,5 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
-use schemars::JsonSchema;
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -577,16 +576,19 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
     }
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         let mut common_schema = LintCommonOptions::json_schema(generator);
-        
+
         // Mark all properties as deprecated
-        if let Some(properties) = common_schema.get_mut("properties").and_then(|p| p.as_object_mut()) {
+        if let Some(properties) = common_schema
+            .get_mut("properties")
+            .and_then(|p| p.as_object_mut())
+        {
             for property_value in properties.values_mut() {
                 if let Some(property_obj) = property_value.as_object_mut() {
                     property_obj.insert("deprecated".to_string(), true.into());
                 }
             }
         }
-        
+
         common_schema
     }
 }
