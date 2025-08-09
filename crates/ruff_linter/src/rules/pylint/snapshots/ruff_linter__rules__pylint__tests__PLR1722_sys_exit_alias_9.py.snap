@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
-sys_exit_alias_9.py:2:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+PLR1722 [*] Use `sys.exit()` instead of `exit`
+ --> sys_exit_alias_9.py:2:5
   |
 1 | def main():
 2 |     exit(0)
-  |     ^^^^ PLR1722
+  |     ^^^^
   |
-  = help: Replace `exit` with `sys.exit()`
+help: Replace `exit` with `sys.exit()`
 
 ℹ Unsafe fix
   1 |+import sys

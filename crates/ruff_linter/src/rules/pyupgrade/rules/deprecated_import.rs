@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{Alias, StmtImportFrom};
+use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
@@ -10,8 +10,11 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::rules::pyupgrade::fixes;
+use crate::rules::pyupgrade::rules::unnecessary_future_import::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
+
+use super::RequiredImports;
 
 /// An import was moved and renamed as part of a deprecation.
 /// For example, `typing.AbstractSet` was moved to `collections.abc.Set`.
@@ -410,6 +413,7 @@ struct ImportReplacer<'a> {
     stylist: &'a Stylist<'a>,
     tokens: &'a Tokens,
     version: PythonVersion,
+    required_imports: &'a RequiredImports,
 }
 
 impl<'a> ImportReplacer<'a> {
@@ -420,6 +424,7 @@ impl<'a> ImportReplacer<'a> {
         stylist: &'a Stylist<'a>,
         tokens: &'a Tokens,
         version: PythonVersion,
+        required_imports: &'a RequiredImports,
     ) -> Self {
         Self {
             import_from_stmt,
@@ -428,6 +433,7 @@ impl<'a> ImportReplacer<'a> {
             stylist,
             tokens,
             version,
+            required_imports,
         }
     }
 
@@ -437,6 +443,13 @@ impl<'a> ImportReplacer<'a> {
         if self.module == "typing" {
             if self.version >= PythonVersion::PY39 {
                 for member in &self.import_from_stmt.names {
+                    if is_import_required_by_isort(
+                        self.required_imports,
+                        StmtRef::ImportFrom(self.import_from_stmt),
+                        member,
+                    ) {
+                        continue;
+                    }
                     if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
                         if &member.name == *name {
                             Some(*target)
@@ -673,7 +686,13 @@ impl<'a> ImportReplacer<'a> {
         let mut matched_names = vec![];
         let mut unmatched_names = vec![];
         for name in &self.import_from_stmt.names {
-            if candidates.contains(&name.name.as_str()) {
+            if is_import_required_by_isort(
+                self.required_imports,
+                StmtRef::ImportFrom(self.import_from_stmt),
+                name,
+            ) {
+                unmatched_names.push(name);
+            } else if candidates.contains(&name.name.as_str()) {
                 matched_names.push(name);
             } else {
                 unmatched_names.push(name);
@@ -726,6 +745,7 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         checker.stylist(),
         checker.tokens(),
         checker.target_version(),
+        &checker.settings().isort.required_imports,
     );
 
     for (operation, fix) in fixer.without_renames() {

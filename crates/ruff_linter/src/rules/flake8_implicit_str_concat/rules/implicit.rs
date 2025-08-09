@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
-use crate::settings::LinterSettings;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -108,13 +107,15 @@ pub(crate) fn implicit(
     tokens: &Tokens,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     for (a_token, b_token) in tokens
         .iter()
         .filter(|token| {
             token.kind() != TokenKind::Comment
-                && (settings.flake8_implicit_str_concat.allow_multiline
+                && (context
+                    .settings()
+                    .flake8_implicit_str_concat
+                    .allow_multiline
                     || token.kind() != TokenKind::NonLogicalNewline)
         })
         .tuple_windows()

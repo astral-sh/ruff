@@ -65,10 +65,10 @@ MaybeNone: TypeAlias = Any  # stable
 # In cases where the sentinel object is exported and can be used by user code,
 # a construct like this is better:
 #
-# _SentinelType = NewType("_SentinelType", object)
-# sentinel: _SentinelType
+# _SentinelType = NewType("_SentinelType", object)  # does not exist at runtime
+# sentinel: Final[_SentinelType]
 # def foo(x: int | None | _SentinelType = ...) -> None: ...
-sentinel: Any
+sentinel: Any  # stable
 
 # stable
 class IdentityFunction(Protocol):

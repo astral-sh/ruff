@@ -21,7 +21,7 @@ where
 }
 
 /// Formats the passed comments as leading comments
-pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadingComments {
+pub(crate) const fn leading_comments(comments: &[SourceComment]) -> FormatLeadingComments<'_> {
     FormatLeadingComments::Comments(comments)
 }
 
@@ -135,7 +135,7 @@ impl Format<PyFormatContext<'_>> for FormatLeadingAlternateBranchComments<'_> {
 }
 
 /// Formats the passed comments as trailing comments
-pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments {
+pub(crate) fn trailing_comments(comments: &[SourceComment]) -> FormatTrailingComments<'_> {
     FormatTrailingComments(comments)
 }
 
@@ -199,7 +199,7 @@ where
     FormatDanglingComments::Node(node.into())
 }
 
-pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingComments {
+pub(crate) fn dangling_comments(comments: &[SourceComment]) -> FormatDanglingComments<'_> {
     FormatDanglingComments::Comments(comments)
 }
 
@@ -260,7 +260,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingComments<'_> {
 /// ```
 pub(crate) fn dangling_open_parenthesis_comments(
     comments: &[SourceComment],
-) -> FormatDanglingOpenParenthesisComments {
+) -> FormatDanglingOpenParenthesisComments<'_> {
     FormatDanglingOpenParenthesisComments { comments }
 }
 
@@ -292,7 +292,7 @@ impl Format<PyFormatContext<'_>> for FormatDanglingOpenParenthesisComments<'_> {
 ///
 /// * Adds a whitespace between `#` and the comment text except if the first character is a `#`, `:`, `'`, or `!`
 /// * Replaces non breaking whitespaces with regular whitespaces except if in front of a `types:` comment
-pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment {
+pub(crate) const fn format_comment(comment: &SourceComment) -> FormatComment<'_> {
     FormatComment { comment }
 }
 
@@ -361,7 +361,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
 /// * Expands parent node.
 pub(crate) const fn trailing_end_of_line_comment(
     comment: &SourceComment,
-) -> FormatTrailingEndOfLineComment {
+) -> FormatTrailingEndOfLineComment<'_> {
     FormatTrailingEndOfLineComment { comment }
 }
 
@@ -537,7 +537,7 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 pub(crate) fn empty_lines_before_trailing_comments(
     comments: &[SourceComment],
     node_kind: NodeKind,
-) -> FormatEmptyLinesBeforeTrailingComments {
+) -> FormatEmptyLinesBeforeTrailingComments<'_> {
     FormatEmptyLinesBeforeTrailingComments {
         comments,
         node_kind,
@@ -589,7 +589,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
 /// additional empty line before the comment.
 pub(crate) fn empty_lines_after_leading_comments(
     comments: &[SourceComment],
-) -> FormatEmptyLinesAfterLeadingComments {
+) -> FormatEmptyLinesAfterLeadingComments<'_> {
     FormatEmptyLinesAfterLeadingComments { comments }
 }
 

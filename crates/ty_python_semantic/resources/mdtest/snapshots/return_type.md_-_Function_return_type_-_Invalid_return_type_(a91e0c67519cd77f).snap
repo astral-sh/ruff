@@ -85,7 +85,7 @@ info: rule `invalid-return-type` is enabled by default
 ```
 
 ```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `T`
+error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `T@m`
   --> src/mdtest_snippet.py:18:16
    |
 17 | # error: [invalid-return-type]

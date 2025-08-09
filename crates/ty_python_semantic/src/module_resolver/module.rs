@@ -59,7 +59,7 @@ impl<'db> Module<'db> {
     }
 
     /// Is this a module that we special-case somehow? If so, which one?
-    pub fn known(self, db: &'db dyn Database) -> Option<KnownModule> {
+    pub(crate) fn known(self, db: &'db dyn Database) -> Option<KnownModule> {
         match self {
             Module::File(module) => module.known(db),
             Module::Namespace(_) => None,
@@ -67,7 +67,7 @@ impl<'db> Module<'db> {
     }
 
     /// Does this module represent the given known module?
-    pub fn is_known(self, db: &'db dyn Database, known_module: KnownModule) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Database, known_module: KnownModule) -> bool {
         self.known(db) == Some(known_module)
     }
 
@@ -281,7 +281,7 @@ pub enum KnownModule {
 }
 
 impl KnownModule {
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Builtins => "builtins",
             Self::Enum => "enum",
@@ -305,7 +305,7 @@ impl KnownModule {
         }
     }
 
-    pub fn name(self) -> ModuleName {
+    pub(crate) fn name(self) -> ModuleName {
         ModuleName::new_static(self.as_str())
             .unwrap_or_else(|| panic!("{self} should be a valid module name!"))
     }
@@ -321,27 +321,23 @@ impl KnownModule {
         }
     }
 
-    pub const fn is_builtins(self) -> bool {
+    pub(crate) const fn is_builtins(self) -> bool {
         matches!(self, Self::Builtins)
     }
 
-    pub const fn is_typing(self) -> bool {
+    pub(crate) const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
     }
 
-    pub const fn is_ty_extensions(self) -> bool {
+    pub(crate) const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
     }
 
-    pub const fn is_inspect(self) -> bool {
+    pub(crate) const fn is_inspect(self) -> bool {
         matches!(self, Self::Inspect)
     }
 
-    pub const fn is_enum(self) -> bool {
-        matches!(self, Self::Enum)
-    }
-
-    pub const fn is_importlib(self) -> bool {
+    pub(crate) const fn is_importlib(self) -> bool {
         matches!(self, Self::ImportLib)
     }
 }

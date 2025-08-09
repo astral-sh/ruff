@@ -203,6 +203,7 @@ def Comment(text: str | None = None) -> _CallableElement:
     serializes as an XML comment.
 
     *text* is a string containing the comment string.
+
     """
 
 def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElement:
@@ -213,6 +214,7 @@ def ProcessingInstruction(target: str, text: str | None = None) -> _CallableElem
 
     *target* is a string containing the processing instruction, *text* is a
     string containing the processing instruction contents, if any.
+
     """
 
 PI = ProcessingInstruction
@@ -229,6 +231,7 @@ class QName:
     *tag* is an optional argument which if given, will make the first
     argument (text_or_uri) be interpreted as a URI, and this argument (tag)
     be interpreted as a local name.
+
     """
 
     text: str
@@ -251,6 +254,7 @@ class ElementTree(Generic[_Root]):
     *element* is an optional root element node,
     *file* is an optional file handle or file name of an XML file whose
     contents will be used to initialize the tree with.
+
     """
 
     def __init__(self, element: Element | None = None, file: _FileRead | None = None) -> None: ...
@@ -266,6 +270,7 @@ class ElementTree(Generic[_Root]):
         ParseError is raised if the parser fails to parse the document.
 
         Returns the root element of the given source document.
+
         """
 
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]:
@@ -275,6 +280,7 @@ class ElementTree(Generic[_Root]):
 
         *tag* is a string with the tag name to iterate over
         (default is to return all elements).
+
         """
 
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None:
@@ -286,6 +292,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return the first matching element, or None if no element was found.
+
         """
 
     @overload
@@ -298,6 +305,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return the first matching element, or None if no element was found.
+
         """
 
     @overload
@@ -311,6 +319,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return list containing all matching elements in document order.
+
         """
 
     @overload
@@ -323,6 +332,7 @@ class ElementTree(Generic[_Root]):
         *namespaces* is an optional mapping from namespace prefix to full name.
 
         Return an iterable yielding all matching elements in document order.
+
         """
 
     @overload
@@ -358,6 +368,7 @@ class ElementTree(Generic[_Root]):
                                     they are emitted as a single self-closed
                                     tag, otherwise they are emitted as a pair
                                     of start/end tags
+
         """
 
     def write_c14n(self, file: _FileWriteC14N) -> None: ...
@@ -374,6 +385,7 @@ def register_namespace(prefix: str, uri: str) -> None:
     attributes in this namespace will be serialized with prefix if possible.
 
     ValueError is raised if prefix is reserved or is invalid.
+
     """
 
 @overload
@@ -397,6 +409,7 @@ def tostring(
     sets the default XML namespace (for "xmlns").
 
     Returns an (optionally) encoded string containing the XML data.
+
     """
 
 @overload
@@ -457,6 +470,7 @@ def dump(elem: Element | ElementTree[Any]) -> None:
     *elem* is either an ElementTree, or a single Element.  The exact output
     format is implementation dependent.  In this version, it's written as an
     ordinary XML file.
+
     """
 
 def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
@@ -482,6 +496,7 @@ def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTre
     *parser* is an optional parser instance defaulting to XMLParser.
 
     Return an ElementTree instance.
+
     """
 
 # This class is defined inside the body of iterparse
@@ -506,6 +521,7 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XM
     a list of events to report back, *parser* is an optional parser instance.
 
     Returns an iterator providing (event, elem) pairs.
+
     """
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
@@ -540,6 +556,7 @@ def XML(text: str | ReadableBuffer, parser: XMLParser | None = None) -> Element:
     optional parser instance, defaulting to the standard XMLParser.
 
     Returns an Element instance.
+
     """
 
 def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[Element, dict[str, Element]]:
@@ -550,6 +567,7 @@ def XMLID(text: str | ReadableBuffer, parser: XMLParser | None = None) -> tuple[
 
     Returns an (Element, dict) tuple, in which the
     dict maps element id:s to elements.
+
     """
 
 # This is aliased to XML in the source.
@@ -562,6 +580,7 @@ def fromstringlist(sequence: Sequence[str | ReadableBuffer], parser: XMLParser |
     instance, defaulting to the standard XMLParser.
 
     Returns an Element instance.
+
     """
 
 # This type is both not precise enough and too precise. The TreeBuilder
@@ -600,7 +619,8 @@ class TreeBuilder:
     def pi(self, target: str, text: str | None = None, /) -> Element[Any]: ...
 
 class C14NWriterTarget:
-    """Canonicalization writer target for the XMLParser.
+    """
+    Canonicalization writer target for the XMLParser.
 
     Serialises parse events to XML C14N 2.0.
 

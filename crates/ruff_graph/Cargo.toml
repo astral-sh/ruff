@@ -20,6 +20,7 @@ ty_python_semantic = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
+memchr = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }

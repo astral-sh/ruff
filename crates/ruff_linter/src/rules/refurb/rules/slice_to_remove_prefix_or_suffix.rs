@@ -139,7 +139,7 @@ pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtI
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData<'_>> {
     let ast::ExprIf {
         test,
         body,
@@ -166,7 +166,7 @@ fn affix_removal_data_expr(if_expr: &ast::ExprIf) -> Option<RemoveAffixData> {
 /// where `func` is either `startswith` or `endswith`,
 /// this function collects `text`,`func`, `affix`, and the non-null
 /// bound of the slice. Otherwise, returns `None`.
-fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
+fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData<'_>> {
     let ast::StmtIf {
         test,
         body,

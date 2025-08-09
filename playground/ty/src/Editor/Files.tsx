@@ -199,6 +199,6 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
 }
 
 export function isPythonFile(handle: FileHandle): boolean {
-  const extension = handle?.path().toLowerCase().split(".").pop() ?? "";
+  const extension = handle.path().toLowerCase().split(".").pop() ?? "";
   return ["py", "pyi", "pyw"].includes(extension);
 }

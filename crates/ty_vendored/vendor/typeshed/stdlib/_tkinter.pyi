@@ -131,7 +131,9 @@ if sys.version_info >= (3, 13):
         use: str | None = None,
         /,
     ):
-        """wantTk
+        """
+
+        wantTk
           if false, then Tk_Init() doesn't get called
         sync
           if true, then pass -sync to wish
@@ -151,7 +153,9 @@ else:
         use: str | None = None,
         /,
     ):
-        """wantTk
+        """
+
+        wantTk
           if false, then Tk_Init() doesn't get called
         sync
           if true, then pass -sync to wish

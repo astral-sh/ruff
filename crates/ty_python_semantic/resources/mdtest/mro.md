@@ -536,19 +536,19 @@ T = TypeVar("T")
 
 class peekable(Generic[T], Iterator[T]): ...
 
-# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'peekable[Unknown]'>, <class 'Iterator[T@peekable]'>, <class 'Iterable[T@peekable]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(peekable.__mro__)
 
 class peekable2(Iterator[T], Generic[T]): ...
 
-# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T]'>, <class 'Iterable[T]'>, typing.Protocol, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'peekable2[Unknown]'>, <class 'Iterator[T@peekable2]'>, <class 'Iterable[T@peekable2]'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(peekable2.__mro__)
 
 class Base: ...
 class Intermediate(Base, Generic[T]): ...
 class Sub(Intermediate[T], Base): ...
 
-# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T]'>, <class 'Base'>, typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'Sub[Unknown]'>, <class 'Intermediate[T@Sub]'>, <class 'Base'>, typing.Generic, <class 'object'>]
 reveal_type(Sub.__mro__)
 ```
 

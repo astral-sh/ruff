@@ -267,7 +267,7 @@ struct Terminal<'a> {
     stmt: &'a Stmt,
 }
 
-fn match_loop(stmt: &Stmt) -> Option<Loop> {
+fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
     let Stmt::For(ast::StmtFor {
         body, target, iter, ..
     }) = stmt
@@ -324,7 +324,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
 ///         return True
 /// return False
 /// ```
-fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
+fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
     let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
         return None;
     };

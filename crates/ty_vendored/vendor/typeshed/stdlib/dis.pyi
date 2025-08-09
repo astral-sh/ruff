@@ -255,6 +255,7 @@ def findlabels(code: _HaveCodeType) -> list[int]:
     """Detect all offsets in a byte code which are jump targets.
 
     Return the list of offsets.
+
     """
 
 def findlinestarts(code: _HaveCodeType) -> Iterator[tuple[int, int]]:

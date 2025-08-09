@@ -47,8 +47,7 @@ __all__ = [
     "BadOptionError",
     "check_choice",
 ]
-# pytype is not happy with `NO_DEFAULT: Final = ("NO", "DEFAULT")`
-NO_DEFAULT: Final[tuple[Literal["NO"], Literal["DEFAULT"]]]
+NO_DEFAULT: Final = ("NO", "DEFAULT")
 SUPPRESS_HELP: Final = "SUPPRESSHELP"
 SUPPRESS_USAGE: Final = "SUPPRESSUSAGE"
 
@@ -61,19 +60,24 @@ class OptParseError(Exception):
     def __init__(self, msg: str) -> None: ...
 
 class BadOptionError(OptParseError):
-    """Raised if an invalid option is seen on the command line."""
+    """
+    Raised if an invalid option is seen on the command line.
+    """
 
     opt_str: str
     def __init__(self, opt_str: str) -> None: ...
 
 class AmbiguousOptionError(BadOptionError):
-    """Raised if an ambiguous option is seen on the command line."""
+    """
+    Raised if an ambiguous option is seen on the command line.
+    """
 
     possibilities: Iterable[str]
     def __init__(self, opt_str: str, possibilities: Sequence[str]) -> None: ...
 
 class OptionError(OptParseError):
-    """Raised if an Option instance is created with invalid or
+    """
+    Raised if an Option instance is created with invalid or
     inconsistent arguments.
     """
 
@@ -81,15 +85,19 @@ class OptionError(OptParseError):
     def __init__(self, msg: str, option: Option) -> None: ...
 
 class OptionConflictError(OptionError):
-    """Raised if conflicting options are added to an OptionParser."""
+    """
+    Raised if conflicting options are added to an OptionParser.
+    """
 
 class OptionValueError(OptParseError):
-    """Raised if an invalid option value is encountered on the command
+    """
+    Raised if an invalid option value is encountered on the command
     line.
     """
 
 class HelpFormatter:
-    """Abstract base class for formatting option help.  OptionParser
+    """
+    Abstract base class for formatting option help.  OptionParser
     instances should use one of the HelpFormatter subclasses for
     formatting help; by default IndentedHelpFormatter is used.
 
@@ -191,22 +199,23 @@ class TitledHelpFormatter(HelpFormatter):
     def format_usage(self, usage: str) -> str: ...
 
 class Option:
-    """Instance attributes:
-    _short_opts : [string]
-    _long_opts : [string]
+    """
+    Instance attributes:
+      _short_opts : [string]
+      _long_opts : [string]
 
-    action : string
-    type : string
-    dest : string
-    default : any
-    nargs : int
-    const : any
-    choices : [string]
-    callback : function
-    callback_args : (any*)
-    callback_kwargs : { string : any }
-    help : string
-    metavar : string
+      action : string
+      type : string
+      dest : string
+      default : any
+      nargs : int
+      const : any
+      choices : [string]
+      callback : function
+      callback_args : (any*)
+      callback_kwargs : { string : any }
+      help : string
+      metavar : string
     """
 
     ACTIONS: tuple[str, ...]
@@ -273,7 +282,8 @@ class Option:
 make_option = Option
 
 class OptionContainer:
-    """Abstract base class.
+    """
+    Abstract base class.
 
     Class attributes:
       standard_option_list : [Option]
@@ -299,6 +309,7 @@ class OptionContainer:
 
     [1] These mappings are common to (shared by) all components of the
         controlling OptionParser, where they are initially created.
+
     """
 
     _long_opt: dict[str, Option]
@@ -365,14 +376,16 @@ class Values:
     def __init__(self, defaults: Mapping[str, object] | None = None) -> None: ...
     def _update(self, dict: Mapping[str, object], mode: Literal["careful", "loose"]) -> None: ...
     def _update_careful(self, dict: Mapping[str, object]) -> None:
-        """Update the option values from an arbitrary dictionary, but only
+        """
+        Update the option values from an arbitrary dictionary, but only
         use keys from dict that already have a corresponding attribute
         in self.  Any keys in dict without a corresponding attribute
         are silently ignored.
         """
 
     def _update_loose(self, dict: Mapping[str, object]) -> None:
-        """Update the option values from an arbitrary dictionary,
+        """
+        Update the option values from an arbitrary dictionary,
         using all keys from the dictionary regardless of whether
         they have a corresponding attribute in self or not.
         """
@@ -389,7 +402,8 @@ class Values:
     def __eq__(self, other: object) -> bool: ...
 
 class OptionParser(OptionContainer):
-    """Class attributes:
+    """
+    Class attributes:
       standard_option_list : [Option]
         list of standard options that will be accepted by all instances
         of this parser class (intended to be overridden by subclasses).
@@ -453,6 +467,7 @@ class OptionParser(OptionContainer):
     OptionParser is not thread-safe.  If, for some perverse reason, you
     need to parse command-line arguments simultaneously in different
     threads, use different OptionParser instances.
+
     """
 
     allow_interspersed_args: bool
@@ -514,7 +529,8 @@ class OptionParser(OptionContainer):
     @overload
     def add_option_group(self, title: str, /, description: str | None = None) -> OptionGroup: ...
     def check_values(self, values: Values, args: list[str]) -> tuple[Values, list[str]]:
-        """check_values(values : Values, args : [string])
+        """
+        check_values(values : Values, args : [string])
         -> (values : Values, args : [string])
 
         Check that the supplied option values and leftover arguments are
@@ -558,7 +574,8 @@ class OptionParser(OptionContainer):
     def get_usage(self) -> str: ...
     def get_version(self) -> str: ...
     def parse_args(self, args: list[str] | None = None, values: Values | None = None) -> tuple[Values, list[str]]:
-        """parse_args(args : [string] = sys.argv[1:],
+        """
+        parse_args(args : [string] = sys.argv[1:],
                    values : Values = None)
         -> (values : Values, args : [string])
 

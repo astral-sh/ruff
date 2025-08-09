@@ -162,13 +162,13 @@ impl Ranged for DictItem {
 impl ExprDict {
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's keys.
-    pub fn iter_keys(&self) -> DictKeyIterator {
+    pub fn iter_keys(&self) -> DictKeyIterator<'_> {
         DictKeyIterator::new(&self.items)
     }
 
     /// Returns an `Iterator` over the AST nodes representing the
     /// dictionary's values.
-    pub fn iter_values(&self) -> DictValueIterator {
+    pub fn iter_values(&self) -> DictValueIterator<'_> {
         DictValueIterator::new(&self.items)
     }
 
@@ -462,13 +462,13 @@ impl FStringValue {
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<FStringPart> {
+    pub fn iter(&self) -> Iter<'_, FStringPart> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<FStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, FStringPart> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -597,8 +597,8 @@ impl ExprTString {
     /// otherwise.
     pub const fn as_single_part_tstring(&self) -> Option<&TString> {
         match &self.value.inner {
-            TStringValueInner::Single(TStringPart::TString(tstring)) => Some(tstring),
-            _ => None,
+            TStringValueInner::Single(tstring) => Some(tstring),
+            TStringValueInner::Concatenated(_) => None,
         }
     }
 }
@@ -614,7 +614,7 @@ impl TStringValue {
     /// Creates a new t-string literal with a single [`TString`] part.
     pub fn single(value: TString) -> Self {
         Self {
-            inner: TStringValueInner::Single(TStringPart::TString(value)),
+            inner: TStringValueInner::Single(value),
         }
     }
 
@@ -625,7 +625,7 @@ impl TStringValue {
     ///
     /// Panics if `values` has less than 2 elements.
     /// Use [`TStringValue::single`] instead.
-    pub fn concatenated(values: Vec<TStringPart>) -> Self {
+    pub fn concatenated(values: Vec<TString>) -> Self {
         assert!(
             values.len() > 1,
             "Use `TStringValue::single` to create single-part t-strings"
@@ -640,78 +640,52 @@ impl TStringValue {
         matches!(self.inner, TStringValueInner::Concatenated(_))
     }
 
-    /// Returns a slice of all the [`TStringPart`]s contained in this value.
-    pub fn as_slice(&self) -> &[TStringPart] {
+    /// Returns a slice of all the [`TString`]s contained in this value.
+    pub fn as_slice(&self) -> &[TString] {
         match &self.inner {
             TStringValueInner::Single(part) => std::slice::from_ref(part),
             TStringValueInner::Concatenated(parts) => parts,
         }
     }
 
-    /// Returns a mutable slice of all the [`TStringPart`]s contained in this value.
-    fn as_mut_slice(&mut self) -> &mut [TStringPart] {
+    /// Returns a mutable slice of all the [`TString`]s contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [TString] {
         match &mut self.inner {
             TStringValueInner::Single(part) => std::slice::from_mut(part),
             TStringValueInner::Concatenated(parts) => parts,
         }
     }
 
-    /// Returns an iterator over all the [`TStringPart`]s contained in this value.
-    pub fn iter(&self) -> Iter<TStringPart> {
+    /// Returns an iterator over all the [`TString`]s contained in this value.
+    pub fn iter(&self) -> Iter<'_, TString> {
         self.as_slice().iter()
     }
 
-    /// Returns an iterator over all the [`TStringPart`]s contained in this value
+    /// Returns an iterator over all the [`TString`]s contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<TStringPart> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, TString> {
         self.as_mut_slice().iter_mut()
-    }
-
-    /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
-    ///
-    /// Note that this doesn't recurse into the t-string parts. For example,
-    ///
-    /// ```python
-    /// "foo" t"bar {x}" "baz" t"qux"
-    /// ```
-    ///
-    /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
-    pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
-        self.iter().filter_map(|part| part.as_literal())
-    }
-
-    /// Returns an iterator over the [`TString`] parts contained in this value.
-    ///
-    /// Note that this doesn't recurse into the t-string parts. For example,
-    ///
-    /// ```python
-    /// "foo" t"bar {x}" "baz" t"qux"
-    /// ```
-    ///
-    /// Here, the t-string parts returned would be `f"bar {x}"` and `f"qux"`.
-    pub fn t_strings(&self) -> impl Iterator<Item = &TString> {
-        self.iter().filter_map(|part| part.as_t_string())
     }
 
     /// Returns an iterator over all the [`InterpolatedStringElement`] contained in this value.
     ///
-    /// An t-string element is what makes up an [`TString`] i.e., it is either a
+    /// An interpolated string element is what makes up an [`TString`] i.e., it is either a
     /// string literal or an interpolation. In the following example,
     ///
     /// ```python
-    /// "foo" t"bar {x}" "baz" t"qux"
+    /// t"foo" t"bar {x}" t"baz" t"qux"
     /// ```
     ///
-    /// The t-string elements returned would be string literal (`"bar "`),
+    /// The interpolated string elements returned would be string literal (`"bar "`),
     /// interpolation (`x`) and string literal (`"qux"`).
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
-        self.t_strings().flat_map(|fstring| fstring.elements.iter())
+        self.iter().flat_map(|tstring| tstring.elements.iter())
     }
 }
 
 impl<'a> IntoIterator for &'a TStringValue {
-    type Item = &'a TStringPart;
-    type IntoIter = Iter<'a, TStringPart>;
+    type Item = &'a TString;
+    type IntoIter = Iter<'a, TString>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -719,8 +693,8 @@ impl<'a> IntoIterator for &'a TStringValue {
 }
 
 impl<'a> IntoIterator for &'a mut TStringValue {
-    type Item = &'a mut TStringPart;
-    type IntoIter = IterMut<'a, TStringPart>;
+    type Item = &'a mut TString;
+    type IntoIter = IterMut<'a, TString>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
     }
@@ -731,43 +705,10 @@ impl<'a> IntoIterator for &'a mut TStringValue {
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 enum TStringValueInner {
     /// A single t-string i.e., `t"foo"`.
-    ///
-    /// This is always going to be `TStringPart::TString` variant which is
-    /// maintained by the `TStringValue::single` constructor.
-    Single(TStringPart),
+    Single(TString),
 
-    /// An implicitly concatenated t-string i.e., `"foo" t"bar {x}"`.
-    Concatenated(Vec<TStringPart>),
-}
-
-/// An t-string part which is either a string literal, an f-string,
-/// or a t-string.
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub enum TStringPart {
-    Literal(StringLiteral),
-    FString(FString),
-    TString(TString),
-}
-
-impl TStringPart {
-    pub fn quote_style(&self) -> Quote {
-        match self {
-            Self::Literal(string_literal) => string_literal.flags.quote_style(),
-            Self::FString(f_string) => f_string.flags.quote_style(),
-            Self::TString(t_string) => t_string.flags.quote_style(),
-        }
-    }
-}
-
-impl Ranged for TStringPart {
-    fn range(&self) -> TextRange {
-        match self {
-            TStringPart::Literal(string_literal) => string_literal.range(),
-            TStringPart::FString(f_string) => f_string.range(),
-            TStringPart::TString(t_string) => t_string.range(),
-        }
-    }
+    /// An implicitly concatenated t-string i.e., `t"foo" t"bar {x}"`.
+    Concatenated(Vec<TString>),
 }
 
 pub trait StringFlags: Copy {
@@ -824,7 +765,7 @@ pub trait StringFlags: Copy {
         AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
     }
 
-    fn display_contents(self, contents: &str) -> DisplayFlags {
+    fn display_contents(self, contents: &str) -> DisplayFlags<'_> {
         DisplayFlags {
             flags: self.as_any_string_flags(),
             contents,
@@ -1237,6 +1178,12 @@ pub struct TString {
     pub flags: TStringFlags,
 }
 
+impl TString {
+    pub fn quote_style(&self) -> Quote {
+        self.flags.quote_style()
+    }
+}
+
 impl From<TString> for Expr {
     fn from(payload: TString) -> Self {
         ExprTString {
@@ -1342,13 +1289,13 @@ impl StringLiteralValue {
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<StringLiteral> {
+    pub fn iter(&self) -> Iter<'_, StringLiteral> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, StringLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -1770,13 +1717,13 @@ impl BytesLiteralValue {
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn iter(&self) -> Iter<BytesLiteral> {
+    pub fn iter(&self) -> Iter<'_, BytesLiteral> {
         self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, BytesLiteral> {
         self.as_mut_slice().iter_mut()
     }
 
@@ -3064,7 +3011,7 @@ impl Parameters {
     }
 
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
-    pub fn iter(&self) -> ParametersIterator {
+    pub fn iter(&self) -> ParametersIterator<'_> {
         ParametersIterator::new(self)
     }
 
@@ -3381,7 +3328,7 @@ impl Arguments {
     /// Return the argument with the given name or at the given position, or `None` if no such
     /// argument exists. Used to retrieve arguments that can be provided _either_ as keyword or
     /// positional arguments.
-    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword> {
+    pub fn find_argument(&self, name: &str, position: usize) -> Option<ArgOrKeyword<'_>> {
         self.find_keyword(name)
             .map(ArgOrKeyword::from)
             .or_else(|| self.find_positional(position).map(ArgOrKeyword::from))

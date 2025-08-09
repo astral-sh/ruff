@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC002.py:5:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002 [*] Move third-party import `pandas` into a type-checking block
+ --> TC002.py:5:22
   |
 4 | def f():
 5 |     import pandas as pd  # TC002
-  |                      ^^ TC002
+  |                      ^^
 6 |
 7 |     x: pd.DataFrame
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1 1 | """Tests to determine accurate detection of typing-only imports."""
@@ -25,15 +26,16 @@ TC002.py:5:22: TC002 [*] Move third-party import `pandas` into a type-checking b
 7 10 |     x: pd.DataFrame
 8 11 | 
 
-TC002.py:11:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+  --> TC002.py:11:24
    |
 10 | def f():
 11 |     from pandas import DataFrame  # TC002
-   |                        ^^^^^^^^^ TC002
+   |                        ^^^^^^^^^
 12 |
 13 |     x: DataFrame
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -53,15 +55,16 @@ TC002.py:11:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 13 16 |     x: DataFrame
 14 17 | 
 
-TC002.py:17:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+  --> TC002.py:17:37
    |
 16 | def f():
 17 |     from pandas import DataFrame as df  # TC002
-   |                                     ^^ TC002
+   |                                     ^^
 18 |
 19 |     x: df
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -81,15 +84,16 @@ TC002.py:17:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 19 22 |     x: df
 20 23 | 
 
-TC002.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002 [*] Move third-party import `pandas` into a type-checking block
+  --> TC002.py:23:22
    |
 22 | def f():
 23 |     import pandas as pd  # TC002
-   |                      ^^ TC002
+   |                      ^^
 24 |
 25 |     x: pd.DataFrame = 1
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -109,15 +113,16 @@ TC002.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 25 28 |     x: pd.DataFrame = 1
 26 29 | 
 
-TC002.py:29:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+  --> TC002.py:29:24
    |
 28 | def f():
 29 |     from pandas import DataFrame  # TC002
-   |                        ^^^^^^^^^ TC002
+   |                        ^^^^^^^^^
 30 |
 31 |     x: DataFrame = 2
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -137,15 +142,16 @@ TC002.py:29:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 31 34 |     x: DataFrame = 2
 32 35 | 
 
-TC002.py:35:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+  --> TC002.py:35:37
    |
 34 | def f():
 35 |     from pandas import DataFrame as df  # TC002
-   |                                     ^^ TC002
+   |                                     ^^
 36 |
 37 |     x: df = 3
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -165,15 +171,16 @@ TC002.py:35:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type
 37 40 |     x: df = 3
 38 41 | 
 
-TC002.py:41:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002 [*] Move third-party import `pandas` into a type-checking block
+  --> TC002.py:41:22
    |
 40 | def f():
 41 |     import pandas as pd  # TC002
-   |                      ^^ TC002
+   |                      ^^
 42 |
 43 |     x: "pd.DataFrame" = 1
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -193,15 +200,16 @@ TC002.py:41:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 43 46 |     x: "pd.DataFrame" = 1
 44 47 | 
 
-TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002 [*] Move third-party import `pandas` into a type-checking block
+  --> TC002.py:47:22
    |
 46 | def f():
 47 |     import pandas as pd  # TC002
-   |                      ^^ TC002
+   |                      ^^
 48 |
 49 |     x = dict["pd.DataFrame", "pd.DataFrame"]
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1  1  | """Tests to determine accurate detection of typing-only imports."""
@@ -221,16 +229,17 @@ TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking 
 49 52 |     x = dict["pd.DataFrame", "pd.DataFrame"]
 50 53 | 
 
-TC002.py:172:24: TC002 [*] Move third-party import `module.Member` into a type-checking block
+TC002 [*] Move third-party import `module.Member` into a type-checking block
+   --> TC002.py:172:24
     |
 170 |     global Member
 171 |
 172 |     from module import Member
-    |                        ^^^^^^ TC002
+    |                        ^^^^^^
 173 |
 174 |     x: Member = 1
     |
-    = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1   1   | """Tests to determine accurate detection of typing-only imports."""

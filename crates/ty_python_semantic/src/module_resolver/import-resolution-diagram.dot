@@ -1,0 +1,209 @@
+// This is a Dot representation of a flow diagram meant to describe Python's
+// import resolution rules. This particular diagram starts with one particular
+// search path and one particular module name. (Typical import resolution
+// implementation will try multiple search paths.)
+//
+// This diagram also assumes that stubs are allowed. The ty implementation
+// of import resolution makes this a configurable parameter, but it should
+// be straight-forward to adapt this flow diagram to one where no stubs
+// are allowed. (i.e., Remove `.pyi` checks and remove the `package-stubs`
+// handling.)
+//
+// This flow diagram exists to act as a sort of specification. At the time
+// of writing (2025-07-29), it was written to capture the implementation of
+// resolving a *particular* module name. We wanted to add another code path for
+// *listing* available module names. Since code reuse is somewhat difficult
+// between these two access patterns, I wrote this flow diagram as a way of 1)
+// learning how module resolution works and 2) to provide a "source of truth"
+// that we can compare implementations to.
+//
+// To convert this file into an actual image, you'll need the `dot` program
+// (which is typically part of a `graphviz` package in a Linux distro):
+//
+//     dot -Tsvg import-resolution-diagram.dot > import-resolution-diagram.svg
+//
+// And then view it in a web browser (or some other svg viewer):
+//
+//     firefox ./import-resolution-diagram.svg
+//
+// [Dot]: https://graphviz.org/doc/info/lang.html
+
+digraph python_import_resolution {
+    labelloc="t";
+    label=<
+        <b>Python import resolution flow diagram for a single module name in a single "search path"</b>
+        <br/>(assumes that the module name is valid and that stubs are allowed)
+    >;
+
+    // These are the final affirmative states we can end up in. A
+    // module is a regular `foo.py` file module. A package is a
+    // directory containing an `__init__.py`. A namespace package is a
+    // directory that does *not* contain an `__init__.py`.
+    module [label="Single-file Module",peripheries=2];
+    package [label="Package",peripheries=2];
+    namespace_package [label="Namespace Package",peripheries=2];
+    not_found [label="Module Not Found",peripheries=2];
+
+    // The final states are wrapped in a subgraph with invisible edges
+    // to convince GraphViz to give a more human digestible rendering.
+    // Without this, the nodes are scattered every which way and the
+    // flow diagram is pretty hard to follow. This encourages (but does
+    // not guarantee) GraphViz to put these nodes "close" together, and
+    // this generally gets us something grokable.
+    subgraph final {
+        rank = same;
+        module -> package -> namespace_package -> not_found [style=invis];
+    }
+
+    START [label=<<b>START</b>>];
+    START -> non_shadowable;
+
+    non_shadowable [label=<
+        Is the search path not the standard library and<br/>
+        the module name is `types` or some other built-in?
+    >];
+    non_shadowable -> not_found [label="Yes"];
+    non_shadowable -> stub_package_check [label="No"];
+
+    stub_package_check [label=<
+        Is the search path in the standard library?
+    >];
+    stub_package_check -> stub_package_set [label="No"];
+    stub_package_check -> determine_parent_kind [label="Yes"];
+
+    stub_package_set [label=<
+        Set `module_name` to `{top-package}-stubs.{rest}`
+    >];
+    stub_package_set -> determine_parent_kind;
+
+    determine_parent_kind [label=<
+        Does every parent package of `module_name`<br/>
+        correspond to a directory that contains an<br/>
+        `__init__.py` or an `__init__.pyi`?
+    >];
+    determine_parent_kind -> regular_parent_std [label="Yes"];
+    determine_parent_kind -> namespace_parent_regular_check [label="No"];
+
+    regular_parent_std [label=<
+        Does the search path correspond to the standard library?
+    >];
+    regular_parent_std -> resolved_parent_package [label="No"];
+    regular_parent_std -> regular_parent_typeshed_check [label="Yes"];
+
+    regular_parent_typeshed_check [label=<
+        Does every parent package of<br/>
+        `module_name` exist on the configured<br/>
+        Python version according to <br/>
+        typeshed's VERSIONS file?
+    >];
+    regular_parent_typeshed_check -> resolved_parent_package [label="Yes"];
+    regular_parent_typeshed_check -> bail [label="No"];
+
+    namespace_parent_regular_check [label=<
+        Is the direct parent package<br/>
+        a directory that contains<br/>
+        an `__init__.py` or `__init__.pyi`?
+    >];
+    namespace_parent_regular_check -> bail [label="Yes"];
+    namespace_parent_regular_check -> namespace_parent_std [label="No"];
+
+    namespace_parent_std [label=<
+        Does the search path correspond to the standard library?
+    >];
+    namespace_parent_std -> namespace_parent_module_check [label="No"];
+    namespace_parent_std -> namespace_parent_typeshed_check [label="Yes"];
+
+    namespace_parent_typeshed_check [label=<
+        Does the direct parent package of<br/>
+        `module_name` exist on the configured<br/>
+        Python version according to <br/>
+        typeshed's VERSIONS file?
+    >];
+    namespace_parent_typeshed_check -> namespace_parent_module_check [label="Yes"];
+    namespace_parent_typeshed_check -> bail [label="No"];
+
+    namespace_parent_module_check [label=<
+        Does the direct parent package<br/>
+        have a sibling file with the same<br/>
+        basename and a `py` or `pyi` extension?<br/>
+    >];
+    namespace_parent_module_check -> bail [label="Yes"];
+    namespace_parent_module_check -> namespace_parent_above [label="No"];
+
+    namespace_parent_above [label=<
+        Is every parent above the direct<br/>
+        parent package a normal package or<br/>
+        otherwise satisfy the previous two<br/>
+        namespace package requirements?
+    >];
+    namespace_parent_above -> bail [label="No"];
+    namespace_parent_above -> resolved_parent_package [label="Yes"];
+
+    resolved_parent_package [label=<
+        After replacing `.` with `/` in module name,<br/>
+        does `{path}/__init__.py` or `{path}/__init__.pyi` exist?
+    >];
+    resolved_parent_package -> package [label="Yes"];
+    resolved_parent_package -> maybe_module [label="No"];
+
+    maybe_module [label=<
+        Does `{path}.py` or `{path}.pyi` exist?
+    >];
+    maybe_module -> maybe_module_std [label="Yes"];
+    maybe_module -> maybe_namespace [label="No"];
+
+    maybe_module_std [label=<
+        Does the search path correspond to the standard library?
+    >];
+    maybe_module_std -> module [label="No"];
+    maybe_module_std -> maybe_module_typeshed_check [label="Yes"];
+
+    maybe_module_typeshed_check [label=<
+        Does the module corresponding to `{path}`<br/>
+        exist on the configured<br/>
+        Python version according to <br/>
+        typeshed's VERSIONS file?
+    >];
+    maybe_module_typeshed_check -> module [label="Yes"];
+    maybe_module_typeshed_check -> maybe_namespace [label="No"];
+
+    // N.B. In the actual implementation, this check is
+    // only done when the search path *isn't* the standard
+    // library. That's because typeshed doesn't use namespace
+    // packages, so this (and the typeshed VERSIONS check)
+    // can all be skipped as an optimization. But the flow
+    // diagram still represents this because this could in
+    // theory change and optimizations really should be the
+    // domain of the implementation, not the spec.
+    maybe_namespace [label=<
+        Is `{path}` a directory?
+    >];
+    maybe_namespace -> maybe_namespace_std [label="Yes"];
+    maybe_namespace -> bail [label="No"];
+
+    maybe_namespace_std [label=<
+        Does the search path correspond to the standard library?
+    >];
+    maybe_namespace_std -> namespace_package [label="No"];
+    maybe_namespace_std -> maybe_namespace_typeshed_check [label="Yes"];
+
+    maybe_namespace_typeshed_check [label=<
+        Does the module corresponding to `{path}`<br/>
+        exist on the configured<br/>
+        Python version according to <br/>
+        typeshed's VERSIONS file?
+    >];
+    maybe_namespace_typeshed_check -> namespace_package [label="Yes"];
+    maybe_namespace_typeshed_check -> bail [label="No"];
+
+    bail [label=<
+        Is `module_name` set to a stub package candidate?
+    >];
+    bail -> not_found [label="No"];
+    bail -> retry [label="Yes"];
+
+    retry [label=<
+        Reset `module_name` to original
+    >];
+    retry -> determine_parent_kind;
+}

@@ -7,60 +7,80 @@ accomplished using an intersection with a synthesized protocol:
 from typing import final
 from typing_extensions import LiteralString
 
-class Foo: ...
+class NonFinalClass: ...
 
-@final
-class Bar: ...
-
-def f(x: Foo):
-    if hasattr(x, "spam"):
-        reveal_type(x)  # revealed: Foo & <Protocol with members 'spam'>
-        reveal_type(x.spam)  # revealed: object
+def _(obj: NonFinalClass):
+    if hasattr(obj, "spam"):
+        reveal_type(obj)  # revealed: NonFinalClass & <Protocol with members 'spam'>
+        reveal_type(obj.spam)  # revealed: object
     else:
-        reveal_type(x)  # revealed: Foo & ~<Protocol with members 'spam'>
-
-        # TODO: should error and reveal `Unknown`
-        reveal_type(x.spam)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
-
-    if hasattr(x, "not-an-identifier"):
-        reveal_type(x)  # revealed: Foo
-    else:
-        reveal_type(x)  # revealed: Foo
-
-def g(x: Bar):
-    if hasattr(x, "spam"):
-        reveal_type(x)  # revealed: Never
-        reveal_type(x.spam)  # revealed: Never
-    else:
-        reveal_type(x)  # revealed: Bar
+        reveal_type(obj)  # revealed: NonFinalClass & ~<Protocol with members 'spam'>
 
         # error: [unresolved-attribute]
-        reveal_type(x.spam)  # revealed: Unknown
+        reveal_type(obj.spam)  # revealed: Unknown
 
+    if hasattr(obj, "not-an-identifier"):
+        reveal_type(obj)  # revealed: NonFinalClass
+    else:
+        reveal_type(obj)  # revealed: NonFinalClass
+```
+
+For a final class, we recognize that there is no way that an object of `FinalClass` could ever have
+a `spam` attribute, so the type is narrowed to `Never`:
+
+```py
+@final
+class FinalClass: ...
+
+def _(obj: FinalClass):
+    if hasattr(obj, "spam"):
+        reveal_type(obj)  # revealed: Never
+        reveal_type(obj.spam)  # revealed: Never
+    else:
+        reveal_type(obj)  # revealed: FinalClass
+
+        # error: [unresolved-attribute]
+        reveal_type(obj.spam)  # revealed: Unknown
+```
+
+When the corresponding attribute is already defined on the class, `hasattr` narrowing does not
+change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
+`WithSpam & <Protocol …>` simplifies to `WithSpam`:
+
+```py
+class WithSpam:
+    spam: int = 42
+
+def _(obj: WithSpam):
+    if hasattr(obj, "spam"):
+        reveal_type(obj)  # revealed: WithSpam
+        reveal_type(obj.spam)  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Never
+```
+
+When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
+the attribute exists. Here, no `possibly-unbound-attribute` error is emitted in the `if` branch:
+
+```py
 def returns_bool() -> bool:
     return False
 
-class Baz:
+class MaybeWithSpam:
     if returns_bool():
-        x: int = 42
+        spam: int = 42
 
-def h(obj: Baz):
-    reveal_type(obj)  # revealed: Baz
+def _(obj: MaybeWithSpam):
     # error: [possibly-unbound-attribute]
-    reveal_type(obj.x)  # revealed: int
+    reveal_type(obj.spam)  # revealed: int
 
-    if hasattr(obj, "x"):
-        reveal_type(obj)  #  revealed: Baz & <Protocol with members 'x'>
-        reveal_type(obj.x)  # revealed: int
+    if hasattr(obj, "spam"):
+        reveal_type(obj)  #  revealed: MaybeWithSpam & <Protocol with members 'spam'>
+        reveal_type(obj.spam)  # revealed: int
     else:
-        reveal_type(obj)  # revealed: Baz & ~<Protocol with members 'x'>
+        reveal_type(obj)  # revealed: MaybeWithSpam & ~<Protocol with members 'spam'>
 
-        # TODO: should emit `[unresolved-attribute]` and reveal `Unknown`
-        reveal_type(obj.x)  # revealed: @Todo(map_with_boundness: intersections with negative contributions)
-
-def i(x: int | LiteralString):
-    if hasattr(x, "capitalize"):
-        reveal_type(x)  # revealed: (int & <Protocol with members 'capitalize'>) | LiteralString
-    else:
-        reveal_type(x)  # revealed: int & ~<Protocol with members 'capitalize'>
+        # TODO: Ideally, we would emit `[unresolved-attribute]` and reveal `Unknown` here:
+        # error: [possibly-unbound-attribute]
+        reveal_type(obj.spam)  # revealed: int
 ```

@@ -163,6 +163,7 @@ if sys.version_info >= (3, 13):
         In addition, if proxy settings are detected (for example, when a *_proxy
         environment variable like http_proxy is set), ProxyHandler is default
         installed and makes sure the requests are handled through the proxy.
+
         """
 
 else:
@@ -223,6 +224,7 @@ else:
         In addition, if proxy settings are detected (for example, when a *_proxy
         environment variable like http_proxy is set), ProxyHandler is default
         installed and makes sure the requests are handled through the proxy.
+
         """
 
 def install_opener(opener: OpenerDirector) -> None: ...
@@ -301,6 +303,7 @@ if sys.platform == "win32" or sys.platform == "darwin":
 
         Checks proxy settings gathered from the environment, if specified,
         or the registry.
+
         """
 
 else:
@@ -309,6 +312,7 @@ else:
 
         Checks the proxy dict for the value of no_proxy, which should
         be a list of comma separated DNS suffixes, or '*' for all hosts.
+
         """
 
 class Request:
@@ -570,7 +574,8 @@ def urlretrieve(
     reporthook: Callable[[int, int, int], object] | None = None,
     data: _DataType = None,
 ) -> tuple[str, HTTPMessage]:
-    """Retrieve a URL into a temporary location on disk.
+    """
+    Retrieve a URL into a temporary location on disk.
 
     Requires a URL argument. If a filename is passed, it is used as
     the temporary file location. The reporthook argument should be

@@ -53,7 +53,7 @@ from types import (
     TracebackType,
     WrapperDescriptorType,
 )
-from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload
+from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs
 
 if sys.version_info >= (3, 14):
@@ -286,7 +286,9 @@ def isfunction(object: object) -> TypeIs[FunctionType]:
 
 if sys.version_info >= (3, 12):
     def markcoroutinefunction(func: _F) -> _F:
-        """Decorator to ensure callable is recognised as a coroutine function."""
+        """
+        Decorator to ensure callable is recognised as a coroutine function.
+        """
 
 @overload
 def isgeneratorfunction(obj: Callable[..., Generator[Any, Any, Any]]) -> bool:
@@ -350,10 +352,11 @@ def isasyncgenfunction(obj: Callable[..., AsyncGenerator[Any, Any]]) -> bool:
 def isasyncgenfunction(obj: Callable[_P, Any]) -> TypeGuard[Callable[_P, AsyncGeneratorType[Any, Any]]]: ...
 @overload
 def isasyncgenfunction(obj: object) -> TypeGuard[Callable[..., AsyncGeneratorType[Any, Any]]]: ...
-
+@type_check_only
 class _SupportsSet(Protocol[_T_contra, _V_contra]):
     def __set__(self, instance: _T_contra, value: _V_contra, /) -> None: ...
 
+@type_check_only
 class _SupportsDelete(Protocol[_T_contra]):
     def __delete__(self, instance: _T_contra, /) -> None: ...
 
@@ -809,7 +812,8 @@ if sys.version_info >= (3, 12):
         """
 
     def getasyncgenlocals(agen: AsyncGeneratorType[Any, Any]) -> dict[str, Any]:
-        """Get the mapping of asynchronous generator local variables to their current
+        """
+        Get the mapping of asynchronous generator local variables to their current
         values.
 
         A dict is returned, with the keys the local variable names and values the
@@ -1092,7 +1096,8 @@ class ClosureVars(NamedTuple):
     unbound: AbstractSet[str]
 
 def getclosurevars(func: _IntrospectableCallable) -> ClosureVars:
-    """Get the mapping of free variables to their current values.
+    """
+    Get the mapping of free variables to their current values.
 
     Returns a named tuple of dicts mapping the current nonlocal, global
     and builtin references as seen by the body of the function. A final
@@ -1278,14 +1283,16 @@ def getcoroutinestate(
     """
 
 def getgeneratorlocals(generator: Generator[Any, Any, Any]) -> dict[str, Any]:
-    """Get the mapping of generator local variables to their current values.
+    """
+    Get the mapping of generator local variables to their current values.
 
     A dict is returned, with the keys the local variable names and values the
     bound values.
     """
 
 def getcoroutinelocals(coroutine: Coroutine[Any, Any, Any]) -> dict[str, Any]:
-    """Get the mapping of coroutine local variables to their current values.
+    """
+    Get the mapping of coroutine local variables to their current values.
 
     A dict is returned, with the keys the local variable names and values the
     bound values.

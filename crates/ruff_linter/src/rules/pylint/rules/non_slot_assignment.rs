@@ -100,7 +100,7 @@ impl Ranged for AttributeAssignment<'_> {
 /// Return a list of attributes that are assigned to but not included in `__slots__`.
 ///
 /// If the `__slots__` attribute cannot be statically determined, returns an empty vector.
-fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment> {
+fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     // First, collect all the attributes that are assigned to `__slots__`.
     let mut slots = FxHashSet::default();
     for statement in body {

@@ -1,8 +1,7 @@
 ---
 source: crates/ruff_linter/src/message/grouped.rs
 expression: content
-snapshot_kind: text
 ---
 syntax_errors.py:
-  1:15 SyntaxError: Expected one or more symbol names after import
-  3:12 SyntaxError: Expected ')', found newline
+  1:15 invalid-syntax: Expected one or more symbol names after import
+  3:12 invalid-syntax: Expected ')', found newline

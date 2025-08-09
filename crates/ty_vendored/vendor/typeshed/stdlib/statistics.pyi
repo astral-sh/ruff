@@ -158,6 +158,7 @@ if sys.version_info >= (3, 11):
 
         >>> fmean([3.5, 4.0, 5.25])
         4.25
+
         """
 
 else:
@@ -184,6 +185,7 @@ def geometric_mean(data: Iterable[SupportsFloat]) -> float:
 
     >>> round(geometric_mean([54, 24, 36]), 9)
     36.0
+
     """
 
 def mean(data: Iterable[_NumberT]) -> _NumberT:
@@ -201,6 +203,7 @@ def mean(data: Iterable[_NumberT]) -> _NumberT:
     Decimal('0.5625')
 
     If ``data`` is empty, StatisticsError will be raised.
+
     """
 
 if sys.version_info >= (3, 10):
@@ -226,6 +229,7 @@ if sys.version_info >= (3, 10):
 
         If ``data`` is empty, or any element is less than zero,
         ``harmonic_mean`` will raise ``StatisticsError``.
+
         """
 
 else:
@@ -262,6 +266,7 @@ def median(data: Iterable[_NumberT]) -> _NumberT:
     3
     >>> median([1, 3, 5, 7])
     4.0
+
     """
 
 def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
@@ -274,6 +279,7 @@ def median_low(data: Iterable[SupportsRichComparisonT]) -> SupportsRichCompariso
     3
     >>> median_low([1, 3, 5, 7])
     3
+
     """
 
 def median_high(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparisonT:
@@ -286,6 +292,7 @@ def median_high(data: Iterable[SupportsRichComparisonT]) -> SupportsRichComparis
     3
     >>> median_high([1, 3, 5, 7])
     5
+
     """
 
 if sys.version_info >= (3, 11):
@@ -330,6 +337,7 @@ if sys.version_info >= (3, 11):
 
         Inputs may be any numeric type that can be coerced to a float during
         the interpolation step.
+
         """
 
 else:
@@ -381,6 +389,7 @@ def mode(data: Iterable[_HashableT]) -> _HashableT:
         'red'
 
     If *data* is empty, ``mode``, raises StatisticsError.
+
     """
 
 def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
@@ -395,6 +404,7 @@ def multimode(data: Iterable[_HashableT]) -> list[_HashableT]:
     ['b', 'd', 'f']
     >>> multimode('')
     []
+
     """
 
 def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
@@ -404,6 +414,7 @@ def pstdev(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
 
     >>> pstdev([1.5, 2.5, 2.5, 2.75, 3.25, 4.75])
     0.986893273527251
+
     """
 
 def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
@@ -439,6 +450,7 @@ def pvariance(data: Iterable[_NumberT], mu: _NumberT | None = None) -> _NumberT:
     >>> from fractions import Fraction as F
     >>> pvariance([F(1, 4), F(5, 4), F(1, 2)])
     Fraction(13, 72)
+
     """
 
 def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusive", "exclusive"] = "exclusive") -> list[_NumberT]:
@@ -456,6 +468,7 @@ def quantiles(data: Iterable[_NumberT], *, n: int = 4, method: Literal["inclusiv
     If *method* is set to *inclusive*, *data* is treated as population
     data.  The minimum value is treated as the 0th percentile and the
     maximum value is treated as the 100th percentile.
+
     """
 
 def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
@@ -465,6 +478,7 @@ def stdev(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
 
     >>> stdev([1.5, 2.5, 2.5, 2.75, 3.25, 4.75])
     1.0810874155219827
+
     """
 
 def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT:
@@ -503,6 +517,7 @@ def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT
     >>> from fractions import Fraction as F
     >>> variance([F(1, 6), F(1, 2), F(5, 3)])
     Fraction(67, 108)
+
     """
 
 class NormalDist:
@@ -663,6 +678,7 @@ if sys.version_info >= (3, 12):
         Spearman's rank correlation coefficient is appropriate for ordinal
         data or for continuous data that doesn't meet the linear proportion
         requirement for Pearson's correlation coefficient.
+
         """
 
 elif sys.version_info >= (3, 10):
@@ -681,6 +697,7 @@ elif sys.version_info >= (3, 10):
         1.0
         >>> correlation(x, y)
         -1.0
+
         """
 
 if sys.version_info >= (3, 10):
@@ -699,6 +716,7 @@ if sys.version_info >= (3, 10):
         -7.5
         >>> covariance(z, x)
         -7.5
+
         """
 
     class LinearRegression(NamedTuple):
@@ -746,6 +764,7 @@ if sys.version_info >= (3, 11):
         >>> y = [3 * x[i] + noise[i] for i in range(5)]
         >>> linear_regression(x, y, proportional=True)  #doctest: +ELLIPSIS
         LinearRegression(slope=2.90475..., intercept=0.0)
+
         """
 
 elif sys.version_info >= (3, 10):
@@ -772,6 +791,7 @@ elif sys.version_info >= (3, 10):
         >>> y = [3 * x[i] + 2 + noise[i] for i in range(5)]
         >>> linear_regression(x, y)  #doctest: +ELLIPSIS
         LinearRegression(slope=3.09078914170..., intercept=1.75684970486...)
+
         """
 
 if sys.version_info >= (3, 13):
@@ -887,6 +907,7 @@ if sys.version_info >= (3, 13):
 
         Kernel estimation of cumulative distribution function of a random variable with bounded support
         https://www.econstor.eu/bitstream/10419/207829/1/10.21307_stattrans-2016-037.pdf
+
         """
 
     def kde_random(
@@ -907,4 +928,5 @@ if sys.version_info >= (3, 13):
         >>> new_selections = [rand() for i in range(10)]
         >>> [round(x, 1) for x in new_selections]
         [0.7, 6.2, 1.2, 6.9, 7.0, 1.8, 2.5, -0.5, -1.8, 5.6]
+
         """

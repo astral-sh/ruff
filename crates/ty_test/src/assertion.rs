@@ -514,7 +514,7 @@ mod tests {
         InlineFileAssertions::from_file(&db, file)
     }
 
-    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions> {
+    fn as_vec(assertions: &InlineFileAssertions) -> Vec<LineAssertions<'_>> {
         assertions.into_iter().collect()
     }
 

@@ -111,24 +111,27 @@ pub(crate) trait PySlice<'db> {
     type Item: 'db;
 
     fn py_slice(
-        &'db self,
+        &self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError>;
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError>;
 }
 
-impl<'db, T: 'db> PySlice<'db> for [T] {
+impl<'db, T> PySlice<'db> for [T]
+where
+    T: Copy + 'db,
+{
     type Item = T;
 
     fn py_slice(
-        &'db self,
+        &self,
         _db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step_int: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         let step_int = step_int.unwrap_or(1);
         if step_int == 0 {
             return Err(StepSizeZeroError);
@@ -139,12 +142,12 @@ impl<'db, T: 'db> PySlice<'db> for [T] {
             // The iterator needs to have the same type as the step>0 case below,
             // so we need to use `.skip(0)`.
             #[expect(clippy::iter_skip_zero)]
-            return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)));
+            return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)).copied());
         }
 
         let to_position = |index| Nth::from_index(index).to_position(len);
 
-        if step_int.is_positive() {
+        let iter = if step_int.is_positive() {
             let step = from_nonnegative_i32(step_int);
 
             let start = start.map(to_position).unwrap_or(Position::BeforeStart);
@@ -168,9 +171,7 @@ impl<'db, T: 'db> PySlice<'db> for [T] {
                 (0, 0, step)
             };
 
-            Ok(Either::Left(
-                self.iter().skip(skip).take(take).step_by(step),
-            ))
+            Either::Left(self.iter().skip(skip).take(take).step_by(step))
         } else {
             let step = from_negative_i32(step_int);
 
@@ -195,10 +196,10 @@ impl<'db, T: 'db> PySlice<'db> for [T] {
                 (skip, take, step)
             };
 
-            Ok(Either::Right(
-                self.iter().rev().skip(skip).take(take).step_by(step),
-            ))
-        }
+            Either::Right(self.iter().rev().skip(skip).take(take).step_by(step))
+        };
+
+        Ok(iter.copied())
     }
 }
 
@@ -210,7 +211,7 @@ mod tests {
     use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
 
     use super::{PyIndex, PySlice};
-    use itertools::assert_equal;
+    use itertools::{Itertools, assert_equal};
 
     #[test]
     fn py_index_empty() {
@@ -276,8 +277,8 @@ mod tests {
         expected: &[char; M],
     ) {
         assert_equal(
-            input.py_slice(db, start, stop, step).unwrap(),
-            expected.iter(),
+            input.py_slice(db, start, stop, step).unwrap().collect_vec(),
+            expected.iter().copied().collect_vec(),
         );
     }
 

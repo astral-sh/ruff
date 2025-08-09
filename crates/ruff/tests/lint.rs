@@ -2422,7 +2422,7 @@ requires-python = ">= 3.11"
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -2734,7 +2734,7 @@ requires-python = ">= 3.11"
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3098,7 +3098,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3478,7 +3478,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.11
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -3806,7 +3806,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4134,7 +4134,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.9
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4419,7 +4419,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.9
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4757,7 +4757,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.exclude = []
         analyze.preview = disabled
         analyze.target_version = 3.10
-        analyze.detect_string_imports = false
+        analyze.string_imports = disabled
         analyze.extension = ExtensionMapping({})
         analyze.include_dependencies = {}
 
@@ -4993,6 +4993,37 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
           | ^^^^^^^^^^^^^^^^^
         invalid value: string "module..invalid", expected a sequence of Python identifiers delimited by periods
         "#);});
+    Ok(())
+}
+
+#[test]
+fn flake8_import_convention_nfkc_normalization() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+        ");});
     Ok(())
 }
 
@@ -5389,7 +5420,7 @@ fn walrus_before_py38() {
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:1:2: SyntaxError: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
+    test.py:1:2: invalid-syntax: Cannot use named assignment expression (`:=`) on Python 3.7 (syntax was added in Python 3.8)
     Found 1 error.
 
     ----- stderr -----
@@ -5435,15 +5466,15 @@ match 2:
         print("it's one")
 "#
         ),
-        @r###"
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
-    "###
+    "
     );
 
     // syntax error on 3.9 with preview
@@ -5464,7 +5495,7 @@ match 2:
     success: false
     exit_code: 1
     ----- stdout -----
-    test.py:2:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    test.py:2:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
     Found 1 error.
 
     ----- stderr -----
@@ -5492,7 +5523,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5505,7 +5536,7 @@ fn cache_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:1: SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+    main.py:1:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
     ----- stderr -----
     "
@@ -5618,7 +5649,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5632,7 +5663,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     main.py:1:20: F821 Undefined name `foo`
 
     ----- stderr -----
@@ -5651,7 +5682,7 @@ fn semantic_syntax_errors() -> Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    -:1:3: invalid-syntax: assignment expression cannot rebind comprehension variable
     Found 1 error.
 
     ----- stderr -----

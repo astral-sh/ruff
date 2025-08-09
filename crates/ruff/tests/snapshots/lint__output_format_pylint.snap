@@ -18,6 +18,6 @@ exit_code: 1
 ----- stdout -----
 input.py:1: [F401] `os` imported but unused
 input.py:2: [F821] Undefined name `y`
-input.py:3: [invalid-syntax] SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+input.py:3: [invalid-syntax] Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
 
 ----- stderr -----

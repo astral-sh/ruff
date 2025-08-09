@@ -56,6 +56,7 @@ def getopt(
     string if the option has no argument.  The options occur in the
     list in the same order in which they were found, thus allowing
     multiple occurrences.  Long and short options may be mixed.
+
     """
 
 def gnu_getopt(
@@ -72,6 +73,7 @@ def gnu_getopt(
     If the first character of the option string is '+', or if the
     environment variable POSIXLY_CORRECT is set, then option
     processing stops as soon as a non-option argument is encountered.
+
     """
 
 class GetoptError(Exception):

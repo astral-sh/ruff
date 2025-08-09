@@ -269,7 +269,10 @@ impl<'db> Mro<'db> {
                             continue;
                         }
                         match base {
-                            ClassBase::Class(_) | ClassBase::Generic | ClassBase::Protocol => {
+                            ClassBase::Class(_)
+                            | ClassBase::Generic
+                            | ClassBase::Protocol
+                            | ClassBase::TypedDict => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
                                     first_index: *first_index,

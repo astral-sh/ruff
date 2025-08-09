@@ -720,8 +720,6 @@ def color_name(color: Color) -> str:
         case _:
             assert_never(color)
 
-# TODO: this should not be an error, see https://github.com/astral-sh/ty/issues/99#issuecomment-2983054488
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `str`"
 def color_name_without_assertion(color: Color) -> str:
     match color:
         case Color.RED:

@@ -217,8 +217,9 @@ mod stable {
 mod flaky {
     use itertools::Itertools;
 
-    use super::{intersection, union};
     use crate::types::{KnownClass, Type};
+
+    use super::{intersection, union};
 
     // Negating `T` twice is equivalent to `T`.
     type_property_test!(
@@ -318,6 +319,8 @@ mod flaky {
     // Note that the inverse is not true, due to the fact that we recognize the old-style
     // iteration protocol as well as the new-style iteration protocol: not all objects that
     // we consider iterable are assignable to `Iterable[object]`.
+    //
+    // Currently flaky due to <https://github.com/astral-sh/ty/issues/889>
     type_property_test!(
         all_type_assignable_to_iterable_are_iterable, db,
         forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object(db)])) => t.try_iterate(db).is_ok()

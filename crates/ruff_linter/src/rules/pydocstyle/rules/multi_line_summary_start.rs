@@ -177,7 +177,6 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         // "\
         // "
         // ```
-        return;
     } else {
         if checker.is_rule_enabled(Rule::MultiLineSummarySecondLine) {
             let mut diagnostic =

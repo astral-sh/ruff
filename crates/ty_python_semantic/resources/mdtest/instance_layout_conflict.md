@@ -122,15 +122,14 @@ class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
-reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
+reveal_type(A.__slots__)  # revealed: tuple[Literal["a", "b"], ...]
 
 class B:
     __slots__ = ("c", "d")
 
-class C(  # error: [instance-layout-conflict]
-    A,
-    B,
-): ...
+# TODO: ideally this would trigger `[instance-layout-conflict]`
+# (but it's also not high-priority)
+class C(A, B): ...
 ```
 
 ## Explicitly annotated `__slots__`

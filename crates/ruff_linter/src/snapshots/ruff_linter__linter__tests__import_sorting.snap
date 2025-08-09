@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> isort.ipynb:cell 1:1:1
   |
 1 | / from pathlib import Path
 2 | | import random
 3 | | import math
-  | |___________^ I001
+  | |___________^
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
   1 |+import math
@@ -20,15 +21,16 @@ isort.ipynb:cell 1:1:1: I001 [*] Import block is un-sorted or un-formatted
 5 5 | import collections
 6 6 | # Newline should be added here
 
-isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> isort.ipynb:cell 2:1:1
   |
 1 | / from typing import Any
 2 | | import collections
-  | |__________________^ I001
+  | |__________________^
 3 |   # Newline should be added here
 4 |   def foo():
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 1 1 | from pathlib import Path
@@ -43,15 +45,16 @@ isort.ipynb:cell 2:1:1: I001 [*] Import block is un-sorted or un-formatted
 7 9 | def foo():
 8 10 |     pass
 
-isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> isort.ipynb:cell 3:1:1
   |
 1 | / from pathlib import Path
 2 | | import sys
-  | |__________^ I001
+  | |__________^
 3 |
 4 |   %matplotlib \
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 6  6  | # Newline should be added here
@@ -64,15 +67,16 @@ isort.ipynb:cell 3:1:1: I001 [*] Import block is un-sorted or un-formatted
 12 12 | %matplotlib \
 13 13 |     --inline
 
-isort.ipynb:cell 3:7:1: I001 [*] Import block is un-sorted or un-formatted
+I001 [*] Import block is un-sorted or un-formatted
+ --> isort.ipynb:cell 3:7:1
   |
 5 |       --inline
 6 |
 7 | / import math
 8 | | import abc
-  | |__________^ I001
+  | |__________^
   |
-  = help: Organize imports
+help: Organize imports
 
 ℹ Safe fix
 12 12 | %matplotlib \

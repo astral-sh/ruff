@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
+PLE0241 [*] Duplicate base `A` for class `F1`
+  --> duplicate_bases.py:13:13
    |
 12 | # Duplicate base class is last.
 13 | class F1(A, A):
-   |             ^ PLE0241
+   |             ^
 14 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 10 10 | 
@@ -20,13 +21,14 @@ duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
 15 15 | 
 16 16 | 
 
-duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
+PLE0241 [*] Duplicate base `A` for class `F2`
+  --> duplicate_bases.py:17:13
    |
 17 | class F2(A, A,):
-   |             ^ PLE0241
+   |             ^
 18 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 14 14 |     ...
@@ -38,16 +40,17 @@ duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
 19 19 | 
 20 20 | 
 
-duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
+PLE0241 [*] Duplicate base `A` for class `F3`
+  --> duplicate_bases.py:23:5
    |
 21 | class F3(
 22 |     A,
 23 |     A
-   |     ^ PLE0241
+   |     ^
 24 | ):
 25 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 19 19 | 
@@ -58,16 +61,17 @@ duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
 24 23 | ):
 25 24 |     ...
 
-duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
+PLE0241 [*] Duplicate base `A` for class `F4`
+  --> duplicate_bases.py:30:5
    |
 28 | class F4(
 29 |     A,
 30 |     A,
-   |     ^ PLE0241
+   |     ^
 31 | ):
 32 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 27 27 | 
@@ -78,14 +82,15 @@ duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
 32 31 |     ...
 33 32 | 
 
-duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
+PLE0241 [*] Duplicate base `A` for class `G1`
+  --> duplicate_bases.py:36:13
    |
 35 | # Duplicate base class is not last.
 36 | class G1(A, A, B):
-   |             ^ PLE0241
+   |             ^
 37 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 33 33 | 
@@ -97,13 +102,14 @@ duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
 38 38 | 
 39 39 | 
 
-duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
+PLE0241 [*] Duplicate base `A` for class `G2`
+  --> duplicate_bases.py:40:13
    |
 40 | class G2(A, A, B,):
-   |             ^ PLE0241
+   |             ^
 41 |     ...
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 37 37 |     ...
@@ -115,16 +121,17 @@ duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
 42 42 | 
 43 43 | 
 
-duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
+PLE0241 [*] Duplicate base `A` for class `G3`
+  --> duplicate_bases.py:46:5
    |
 44 | class G3(
 45 |     A,
 46 |     A,
-   |     ^ PLE0241
+   |     ^
 47 |     B
 48 | ):
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 43 43 | 
@@ -135,16 +142,17 @@ duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
 48 47 | ):
 49 48 |     ...
 
-duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
+PLE0241 [*] Duplicate base `A` for class `G4`
+  --> duplicate_bases.py:54:5
    |
 52 | class G4(
 53 |     A,
 54 |     A,
-   |     ^ PLE0241
+   |     ^
 55 |     B,
 56 | ):
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Safe fix
 51 51 | 
@@ -155,16 +163,17 @@ duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
 56 55 | ):
 57 56 |     ...
 
-duplicate_bases.py:76:5: PLE0241 [*] Duplicate base `Foo` for class `Bar`
+PLE0241 [*] Duplicate base `Foo` for class `Bar`
+  --> duplicate_bases.py:76:5
    |
 74 | # https://github.com/astral-sh/ruff/issues/18814
 75 | class Bar(Foo,  # 1
 76 |     Foo  # 2
-   |     ^^^ PLE0241
+   |     ^^^
 77 | ):
 78 |     pass
    |
-   = help: Remove duplicate base
+help: Remove duplicate base
 
 ℹ Unsafe fix
 72 72 |     ...

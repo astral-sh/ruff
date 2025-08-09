@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:2:13: SyntaxError: yield expression cannot be used within a generic definition
+invalid-syntax: yield expression cannot be used within a generic definition
+ --> <filename>:2:13
   |
 2 | class C[T]((yield from [object])):
   |             ^^^^^^^^^^^^^^^^^^^

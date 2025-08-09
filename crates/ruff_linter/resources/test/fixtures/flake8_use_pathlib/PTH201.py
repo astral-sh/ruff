@@ -1,4 +1,4 @@
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PosixPath, PurePosixPath, WindowsPath, PureWindowsPath
 from pathlib import Path as pth
 
 
@@ -68,3 +68,11 @@ Path(".", "folder")
 PurePath(".", "folder")
 
 Path()
+
+from importlib.metadata import PackagePath
+
+_ = PosixPath(".")
+_ = PurePosixPath(".")
+_ = WindowsPath(".")
+_ = PureWindowsPath(".")
+_ = PackagePath(".")

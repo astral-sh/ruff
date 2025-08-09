@@ -33,10 +33,8 @@ impl Emitter for GithubEmitter {
 
             write!(
                 writer,
-                "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                code = diagnostic
-                    .secondary_code()
-                    .map_or_else(String::new, |code| format!(" ({code})")),
+                "::error title=Ruff ({code}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
+                code = diagnostic.secondary_code_or_id(),
                 file = filename,
                 row = source_location.line,
                 column = source_location.column,
@@ -54,6 +52,8 @@ impl Emitter for GithubEmitter {
 
             if let Some(code) = diagnostic.secondary_code() {
                 write!(writer, " {code}")?;
+            } else {
+                write!(writer, " {id}:", id = diagnostic.id())?;
             }
 
             writeln!(writer, " {}", diagnostic.body())?;

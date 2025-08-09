@@ -2,40 +2,32 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
-use bitflags::bitflags;
 use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
-use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, SecondaryCode, ceil_char_boundary,
+};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::Locator;
-use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext};
 use crate::settings::types::UnsafeFixes;
 
-bitflags! {
-    #[derive(Default)]
-    struct EmitterFlags: u8 {
-        /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF     = 1 << 1;
-        /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE       = 1 << 2;
-    }
-}
-
 pub struct TextEmitter {
-    flags: EmitterFlags,
+    /// Whether to show the diff of a fix, for diagnostics that have a fix.
+    ///
+    /// Note that this is not currently exposed in the CLI (#7352) and is only used in tests.
+    show_fix_diff: bool,
     config: DisplayDiagnosticConfig,
 }
 
 impl Default for TextEmitter {
     fn default() -> Self {
         Self {
-            flags: EmitterFlags::default(),
+            show_fix_diff: false,
             config: DisplayDiagnosticConfig::default()
                 .format(DiagnosticFormat::Concise)
                 .hide_severity(true)
@@ -53,13 +45,17 @@ impl TextEmitter {
 
     #[must_use]
     pub fn with_show_fix_diff(mut self, show_fix_diff: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_FIX_DIFF, show_fix_diff);
+        self.show_fix_diff = show_fix_diff;
         self
     }
 
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
-        self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        self.config = self.config.format(if show_source {
+            DiagnosticFormat::Full
+        } else {
+            DiagnosticFormat::Concise
+        });
         self
     }
 
@@ -76,6 +72,12 @@ impl TextEmitter {
         self.config = self.config.preview(preview);
         self
     }
+
+    #[must_use]
+    pub fn with_color(mut self, color: bool) -> Self {
+        self.config = self.config.color(color);
+        self
+    }
 }
 
 impl Emitter for TextEmitter {
@@ -88,23 +90,7 @@ impl Emitter for TextEmitter {
         for message in diagnostics {
             write!(writer, "{}", message.display(context, &self.config))?;
 
-            let filename = message.expect_ruff_filename();
-            let notebook_index = context.notebook_index(&filename);
-            if self.flags.intersects(EmitterFlags::SHOW_SOURCE) {
-                // The `0..0` range is used to highlight file-level diagnostics.
-                if message.expect_range() != TextRange::default() {
-                    writeln!(
-                        writer,
-                        "{}",
-                        MessageCodeFrame {
-                            message,
-                            notebook_index
-                        }
-                    )?;
-                }
-            }
-
-            if self.flags.intersects(EmitterFlags::SHOW_FIX_DIFF) {
+            if self.show_fix_diff {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
@@ -148,7 +134,12 @@ impl Display for RuleCodeAndBody<'_> {
                 body = self.message.body(),
             )
         } else {
-            f.write_str(self.message.body())
+            write!(
+                f,
+                "{code}: {body}",
+                code = self.message.id().as_str().red().bold(),
+                body = self.message.body(),
+            )
         }
     }
 }
@@ -222,7 +213,7 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source = replace_whitespace_and_unprintable(
+        let source = replace_unprintable(
             source_code.slice(TextRange::new(start_offset, end_offset)),
             self.message.expect_range() - start_offset,
         )
@@ -265,16 +256,20 @@ impl Display for MessageCodeFrame<'_> {
 }
 
 /// Given some source code and an annotation range, this routine replaces
-/// tabs with ASCII whitespace, and unprintable characters with printable
-/// representations of them.
+///  unprintable characters with printable representations of them.
 ///
 /// The source code returned has an annotation that is updated to reflect
 /// changes made to the source code (if any).
-fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange) -> SourceCode {
+///
+/// We don't need to normalize whitespace, such as converting tabs to spaces,
+/// because `annotate-snippets` handles that internally. Similarly, it's safe to
+/// modify the annotation ranges by inserting 3-byte Unicode replacements
+/// because `annotate-snippets` will account for their actual width when
+/// rendering and displaying the column to the user.
+fn replace_unprintable(source: &str, annotation_range: TextRange) -> SourceCode<'_> {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
 
     // Updates the range given by the caller whenever a single byte (at
     // `index` in `source`) is replaced with `len` bytes.
@@ -303,19 +298,7 @@ fn replace_whitespace_and_unprintable(source: &str, annotation_range: TextRange)
     };
 
     for (index, c) in source.char_indices() {
-        let old_width = line_width.get();
-        line_width = line_width.add_char(c);
-
-        if matches!(c, '\t') {
-            let tab_width = u32::try_from(line_width.get() - old_width)
-                .expect("small width because of tab size");
-            result.push_str(&source[last_end..index]);
-            for _ in 0..tab_width {
-                result.push(' ');
-            }
-            last_end = index + 1;
-            update_range(index, tab_width);
-        } else if let Some(printable) = unprintable_replacement(c) {
+        if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
             result.push(printable);
             last_end = index + 1;
@@ -370,9 +353,8 @@ impl<'a> SourceCode<'a> {
         if self.text.as_bytes()[self.annotation_range.start().to_usize() - 1] != b'\n' {
             return self;
         }
-        let locator = Locator::new(&self.text);
         let start = self.annotation_range.start();
-        let end = locator.ceil_char_boundary(start + TextSize::from(1));
+        let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
         SourceCode {
             annotation_range: TextRange::new(start, end),
             ..self

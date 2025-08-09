@@ -254,6 +254,8 @@ _SqliteData: TypeAlias = str | ReadableBuffer | int | float | None
 _AdaptedInputData: TypeAlias = _SqliteData | Any
 # The Mapping must really be a dict, but making it invariant is too annoying.
 _Parameters: TypeAlias = SupportsLenAndGetItem[_AdaptedInputData] | Mapping[str, _AdaptedInputData]
+# Controls the legacy transaction handling mode of sqlite3.
+_IsolationLevel: TypeAlias = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
 
 class _AnyParamWindowAggregateClass(Protocol):
     def step(self, *args: Any) -> object: ...
@@ -321,7 +323,7 @@ class Connection:
     def Warning(self) -> type[Warning]: ...
     @property
     def in_transaction(self) -> bool: ...
-    isolation_level: str | None  # one of '', 'DEFERRED', 'IMMEDIATE' or 'EXCLUSIVE'
+    isolation_level: _IsolationLevel
     @property
     def total_changes(self) -> int: ...
     if sys.version_info >= (3, 12):
@@ -335,26 +337,26 @@ class Connection:
         def __init__(
             self,
             database: StrOrBytesPath,
-            timeout: float = ...,
-            detect_types: int = ...,
-            isolation_level: str | None = ...,
-            check_same_thread: bool = ...,
+            timeout: float = 5.0,
+            detect_types: int = 0,
+            isolation_level: _IsolationLevel = "DEFERRED",
+            check_same_thread: bool = True,
             factory: type[Connection] | None = ...,
-            cached_statements: int = ...,
-            uri: bool = ...,
+            cached_statements: int = 128,
+            uri: bool = False,
             autocommit: bool = ...,
         ) -> None: ...
     else:
         def __init__(
             self,
             database: StrOrBytesPath,
-            timeout: float = ...,
-            detect_types: int = ...,
-            isolation_level: str | None = ...,
-            check_same_thread: bool = ...,
+            timeout: float = 5.0,
+            detect_types: int = 0,
+            isolation_level: _IsolationLevel = "DEFERRED",
+            check_same_thread: bool = True,
             factory: type[Connection] | None = ...,
-            cached_statements: int = ...,
-            uri: bool = ...,
+            cached_statements: int = 128,
+            uri: bool = False,
         ) -> None: ...
 
     def close(self) -> None:

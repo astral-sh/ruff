@@ -30,14 +30,11 @@ if sys.version_info < (3, 14):
 # Keep asyncio.__all__ updated with any changes to __all__ here
 if sys.version_info >= (3, 14):
     __all__ = (
-        "_AbstractEventLoopPolicy",
         "AbstractEventLoop",
         "AbstractServer",
         "Handle",
         "TimerHandle",
-        "_get_event_loop_policy",
         "get_event_loop_policy",
-        "_set_event_loop_policy",
         "set_event_loop_policy",
         "get_event_loop",
         "set_event_loop",

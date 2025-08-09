@@ -55,6 +55,7 @@ def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLit
     runs of whitespace characters are replaced by a single space
     and leading and trailing whitespace are removed, otherwise
     sep is used to split and join the words.
+
     """
 
 class Template:

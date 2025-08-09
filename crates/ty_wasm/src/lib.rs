@@ -3,20 +3,21 @@ use std::any::Any;
 use js_sys::{Error, JsString};
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
-use ruff_db::files::{File, FileRange, system_path_to_file};
+use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_path_to_file};
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
+use ruff_db::vendored::VendoredPath;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, RangedValue, goto_declaration, goto_definition, goto_type_definition, hover,
-    inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
 };
 use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -159,28 +160,35 @@ impl Workspace {
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle { path, file })
+        Ok(FileHandle {
+            path: path.into(),
+            file,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
     pub fn update_file(&mut self, file_id: &FileHandle, contents: &str) -> Result<(), Error> {
-        if !self.system.fs.exists(&file_id.path) {
+        let system_path = file_id.path.as_system_path().ok_or_else(|| {
+            Error::new("Cannot update non-system files (vendored files are read-only)")
+        })?;
+
+        if !self.system.fs.exists(system_path) {
             return Err(Error::new("File does not exist"));
         }
 
         self.system
             .fs
-            .write_file(&file_id.path, contents)
+            .write_file(system_path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileContent,
                 },
                 ChangeEvent::Changed {
-                    path: file_id.path.to_path_buf(),
+                    path: system_path.to_path_buf(),
                     kind: ChangedKind::FileMetadata,
                 },
             ],
@@ -199,18 +207,22 @@ impl Workspace {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
-        self.system
-            .fs
-            .remove_file(&file_id.path)
-            .map_err(into_error)?;
 
-        self.db.apply_changes(
-            vec![ChangeEvent::Deleted {
-                path: file_id.path.to_path_buf(),
-                kind: DeletedKind::File,
-            }],
-            None,
-        );
+        // Only close system files (vendored files can't be closed/deleted)
+        if let Some(system_path) = file_id.path.as_system_path() {
+            self.system
+                .fs
+                .remove_file(system_path)
+                .map_err(into_error)?;
+
+            self.db.apply_changes(
+                vec![ChangeEvent::Deleted {
+                    path: system_path.to_path_buf(),
+                    kind: DeletedKind::File,
+                }],
+                None,
+            );
+        }
 
         Ok(())
     }
@@ -327,6 +339,45 @@ impl Workspace {
         ))
     }
 
+    #[wasm_bindgen(js_name = "gotoReferences")]
+    pub fn goto_references(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| LocationLink {
+                path: target.file().path(&self.db).to_string(),
+                full_range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                selection_range: Some(Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                )),
+                origin_selection_range: Some(Range::from_text_range(
+                    ruff_text_size::TextRange::new(offset, offset),
+                    &index,
+                    &source,
+                    self.position_encoding,
+                )),
+            })
+            .collect())
+    }
+
     #[wasm_bindgen]
     pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
         let source = source_text(&self.db, file_id.file);
@@ -384,6 +435,10 @@ impl Workspace {
             &self.db,
             file_id.file,
             range.to_text_range(&index, &source, self.position_encoding)?,
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+            },
         );
 
         Ok(result
@@ -490,6 +545,50 @@ impl Workspace {
                 .and_then(|s| u32::try_from(s).ok()),
         }))
     }
+
+    #[wasm_bindgen(js_name = "documentHighlights")]
+    pub fn document_highlights(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<DocumentHighlight>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
+
+        let Some(targets) = document_highlights(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        Ok(targets
+            .into_iter()
+            .map(|target| DocumentHighlight {
+                range: Range::from_file_range(
+                    &self.db,
+                    target.file_range(),
+                    self.position_encoding,
+                ),
+                kind: target.kind().into(),
+            })
+            .collect())
+    }
+
+    /// Gets a file handle for a vendored file by its path.
+    /// This allows vendored files to participate in LSP features like hover, completions, etc.
+    #[wasm_bindgen(js_name = "getVendoredFile")]
+    pub fn get_vendored_file(&self, path: &str) -> Result<FileHandle, Error> {
+        let vendored_path = VendoredPath::new(path);
+
+        // Try to get the vendored file as a File
+        let file = vendored_path_to_file(&self.db, vendored_path)
+            .map_err(|err| Error::new(&format!("Vendored file not found: {path}: {err}")))?;
+
+        Ok(FileHandle {
+            file,
+            path: vendored_path.to_path_buf().into(),
+        })
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -532,7 +631,7 @@ fn map_targets_to_links(
 #[derive(Debug, Eq, PartialEq)]
 #[wasm_bindgen(inspectable)]
 pub struct FileHandle {
-    path: SystemPathBuf,
+    path: FilePath,
     file: File,
 }
 
@@ -914,6 +1013,33 @@ pub struct ParameterInformation {
     pub label: String,
     #[wasm_bindgen(getter_with_clone)]
     pub documentation: Option<String>,
+}
+
+#[wasm_bindgen]
+pub struct DocumentHighlight {
+    #[wasm_bindgen(readonly)]
+    pub range: Range,
+
+    #[wasm_bindgen(readonly)]
+    pub kind: DocumentHighlightKind,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum DocumentHighlightKind {
+    Text = 1,
+    Read = 2,
+    Write = 3,
+}
+
+impl From<ty_ide::ReferenceKind> for DocumentHighlightKind {
+    fn from(kind: ty_ide::ReferenceKind) -> Self {
+        match kind {
+            ty_ide::ReferenceKind::Read => DocumentHighlightKind::Read,
+            ty_ide::ReferenceKind::Write => DocumentHighlightKind::Write,
+            ty_ide::ReferenceKind::Other => DocumentHighlightKind::Text,
+        }
+    }
 }
 
 #[wasm_bindgen]

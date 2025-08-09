@@ -1,8 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
-snapshot_kind: text
 ---
-comments_and_newlines.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+I002 [*] Missing required import: `from __future__ import annotations`
+--> comments_and_newlines.py:1:1
+help: Insert required import: `from __future__ import annotations`
+
 ℹ Safe fix
 2 2 | # A copyright notice could go here
 3 3 | 

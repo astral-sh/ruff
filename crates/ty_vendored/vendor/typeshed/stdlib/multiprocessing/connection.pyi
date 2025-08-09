@@ -42,10 +42,13 @@ class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
         """Send a (picklable) object"""
 
     def recv_bytes(self, maxlength: int | None = None) -> bytes:
-        """Receive bytes data as a bytes object."""
+        """
+        Receive bytes data as a bytes object.
+        """
 
     def recv_bytes_into(self, buf: Any, offset: int = 0) -> int:
-        """Receive bytes data into a writeable bytes-like object.
+        """
+        Receive bytes data into a writeable bytes-like object.
         Return the number of bytes read.
         """
 
@@ -62,19 +65,22 @@ class _ConnectionBase(Generic[_SendT_contra, _RecvT_co]):
     def __del__(self) -> None: ...
 
 class Connection(_ConnectionBase[_SendT_contra, _RecvT_co]):
-    """Connection class based on an arbitrary file descriptor (Unix only), or
+    """
+    Connection class based on an arbitrary file descriptor (Unix only), or
     a socket handle (Windows).
     """
 
 if sys.platform == "win32":
     class PipeConnection(_ConnectionBase[_SendT_contra, _RecvT_co]):
-        """Connection class based on a Windows named pipe.
+        """
+        Connection class based on a Windows named pipe.
         Overlapped I/O is used, so the handles must have been created
         with FILE_FLAG_OVERLAPPED.
         """
 
 class Listener:
-    """Returns a listener object.
+    """
+    Returns a listener object.
 
     This is a wrapper for a bound socket which is 'listening' for
     connections, or for a Windows named pipe.
@@ -84,13 +90,16 @@ class Listener:
         self, address: _Address | None = None, family: str | None = None, backlog: int = 1, authkey: bytes | None = None
     ) -> None: ...
     def accept(self) -> Connection[Incomplete, Incomplete]:
-        """Accept a connection on the bound socket or named pipe of `self`.
+        """
+        Accept a connection on the bound socket or named pipe of `self`.
 
         Returns a `Connection` object.
         """
 
     def close(self) -> None:
-        """Close the bound socket or named pipe of `self`."""
+        """
+        Close the bound socket or named pipe of `self`.
+        """
 
     @property
     def address(self) -> _Address: ...
@@ -112,13 +121,16 @@ def answer_challenge(connection: Connection[Any, Any], authkey: bytes) -> None: 
 def wait(
     object_list: Iterable[Connection[_SendT_contra, _RecvT_co] | socket.socket | int], timeout: float | None = None
 ) -> list[Connection[_SendT_contra, _RecvT_co] | socket.socket | int]:
-    """Wait till an object in object_list is ready/readable.
+    """
+    Wait till an object in object_list is ready/readable.
 
     Returns list of those objects in object_list which are ready/readable.
     """
 
 def Client(address: _Address, family: str | None = None, authkey: bytes | None = None) -> Connection[Any, Any]:
-    """Returns a connection to the address of a `Listener`"""
+    """
+    Returns a connection to the address of a `Listener`
+    """
 
 # N.B. Keep this in sync with multiprocessing.context.BaseContext.Pipe.
 # _ConnectionBase is the common base class of Connection and PipeConnection
@@ -128,8 +140,12 @@ def Client(address: _Address, family: str | None = None, authkey: bytes | None =
 # However, TypeVars scoped entirely within a return annotation is unspecified in the spec.
 if sys.platform != "win32":
     def Pipe(duplex: bool = True) -> tuple[Connection[Any, Any], Connection[Any, Any]]:
-        """Returns pair of connection objects at either end of a pipe"""
+        """
+        Returns pair of connection objects at either end of a pipe
+        """
 
 else:
     def Pipe(duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
-        """Returns pair of connection objects at either end of a pipe"""
+        """
+        Returns pair of connection objects at either end of a pipe
+        """

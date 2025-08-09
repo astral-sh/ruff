@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
+D406 [*] Section name should end with a newline ("Returns")
+  --> sections.py:32:5
    |
 30 |     """Toggle the gizmo.
 31 |
 32 |     Returns:
-   |     ^^^^^^^ D406
+   |     ^^^^^^^
 33 |     -------
 34 |     A value of some sort.
    |
-   = help: Add newline after "Returns"
+help: Add newline after "Returns"
 
 ℹ Safe fix
 29 29 | def superfluous_suffix():  # noqa: D416
@@ -22,15 +23,16 @@ sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
 34 34 |     A value of some sort.
 35 35 | 
 
-sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
+D406 [*] Section name should end with a newline ("Raises")
+   --> sections.py:227:5
     |
 225 |     ------
 226 |     Many many wonderful things.
 227 |     Raises:
-    |     ^^^^^^ D406
+    |     ^^^^^^
 228 |     My attention.
     |
-    = help: Add newline after "Raises"
+help: Add newline after "Raises"
 
 ℹ Safe fix
 224 224 |     Returns
@@ -42,16 +44,17 @@ sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
 229 229 | 
 230 230 |     """
 
-sections.py:601:5: D406 [*] Section name should end with a newline ("Parameters")
+D406 [*] Section name should end with a newline ("Parameters")
+   --> sections.py:601:5
     |
 599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
 600 |
 601 |     Parameters:
-    |     ^^^^^^^^^^ D406
+    |     ^^^^^^^^^^
 602 |     ----------
 603 |     parameters:
     |
-    = help: Add newline after "Parameters"
+help: Add newline after "Parameters"
 
 ℹ Safe fix
 598 598 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213

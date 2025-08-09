@@ -65,7 +65,7 @@ import sys
 from _typeshed import SupportsWrite, sentinel
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
-from typing import IO, Any, ClassVar, Final, Generic, NoReturn, Protocol, TypeVar, overload
+from typing import IO, Any, ClassVar, Final, Generic, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = [
@@ -168,7 +168,8 @@ class _ActionsContainer:
         version: str = ...,
         **kwargs: Any,
     ) -> Action:
-        """add_argument(dest, ..., name=value, ...)
+        """
+        add_argument(dest, ..., name=value, ...)
         add_argument(option_string, option_string, ..., name=value, ...)
         """
 
@@ -193,6 +194,7 @@ class _ActionsContainer:
     def _handle_conflict_error(self, action: Action, conflicting_actions: Iterable[tuple[str, Action]]) -> NoReturn: ...
     def _handle_conflict_resolve(self, action: Action, conflicting_actions: Iterable[tuple[str, Action]]) -> None: ...
 
+@type_check_only
 class _FormatterClass(Protocol):
     def __call__(self, *, prog: str) -> HelpFormatter: ...
 
@@ -401,7 +403,7 @@ class HelpFormatter:
 
     if sys.version_info >= (3, 14):
         def __init__(
-            self, prog: str, indent_increment: int = 2, max_help_position: int = 24, width: int | None = None, color: bool = False
+            self, prog: str, indent_increment: int = 2, max_help_position: int = 24, width: int | None = None, color: bool = True
         ) -> None: ...
     else:
         def __init__(

@@ -225,6 +225,7 @@ class SMTP:
         port) for the socket to bind to as its source address before
         connecting. If the host is '' and port is 0, the OS default behavior
         will be used.
+
         """
 
     def __enter__(self) -> Self: ...
@@ -236,6 +237,7 @@ class SMTP:
 
         A non-false value results in debug messages for connection and for all
         messages sent to and received from the server.
+
         """
 
     def connect(self, host: str = "localhost", port: int = 0, source_address: _SourceAddress | None = None) -> _Reply:
@@ -247,6 +249,7 @@ class SMTP:
 
         Note: This method is automatically invoked by __init__, if a host is
         specified during instantiation.
+
         """
 
     def send(self, s: ReadableBuffer | str) -> None:
@@ -511,6 +514,7 @@ In the above example, the message was accepted for delivery to three
 of the four addresses, and one was rejected, with the error code
 550.  If all addresses are accepted, then the method will return an
 empty dictionary.
+
 """
 
     def send_message(
@@ -538,6 +542,7 @@ empty dictionary.
         If the server does not support SMTPUTF8, an SMTPNotSupported error is
         raised.  Otherwise the generator is called without modifying the
         policy.
+
         """
 
     def close(self) -> None:
@@ -554,6 +559,7 @@ class SMTP_SSL(SMTP):
     (465) is used.  local_hostname and source_address have the same meaning
     as they do in the SMTP class.  context also optional, can contain a
     SSLContext.
+
     """
 
     keyfile: str | None

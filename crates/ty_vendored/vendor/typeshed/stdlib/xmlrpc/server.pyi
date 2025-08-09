@@ -196,6 +196,7 @@ class SimpleXMLRPCDispatcher:  # undocumented
             to access your module's global variables and may allow
             intruders to execute arbitrary code on your machine.  Only
             use this option on a secure, closed network.
+
         """
 
     def register_function(self, function: _DispatchProtocol | None = None, name: str | None = None) -> Callable[..., Any]:

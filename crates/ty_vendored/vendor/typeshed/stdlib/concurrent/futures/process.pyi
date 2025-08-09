@@ -151,6 +151,7 @@ def _process_chunk(fn: Callable[..., _T], chunk: Iterable[tuple[Any, ...]]) -> l
     iterable passed to map.
 
     This function is run in a separate process.
+
     """
 
 if sys.version_info >= (3, 11):
@@ -247,13 +248,15 @@ _system_limited: bool | None
 
 def _check_system_limits() -> None: ...
 def _chain_from_iterable_of_lists(iterable: Iterable[MutableSequence[Any]]) -> Any:
-    """Specialized implementation of itertools.chain.from_iterable.
+    """
+    Specialized implementation of itertools.chain.from_iterable.
     Each item in *iterable* should be a list.  This function is
     careful not to keep references to yielded objects.
     """
 
 class BrokenProcessPool(BrokenExecutor):
-    """Raised when a process in a ProcessPoolExecutor terminated abruptly
+    """
+    Raised when a process in a ProcessPoolExecutor terminated abruptly
     while a future was in the running state.
     """
 

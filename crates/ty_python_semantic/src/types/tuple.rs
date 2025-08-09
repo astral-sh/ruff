@@ -22,8 +22,8 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
-use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
@@ -68,6 +68,33 @@ impl TupleLength {
         match self {
             TupleLength::Fixed(len) => Some(len),
             TupleLength::Variable(_, _) => None,
+        }
+    }
+
+    /// Given two [`TupleLength`]s, return the more precise instance,
+    /// if it makes sense to consider one more precise than the other.
+    pub(crate) fn most_precise(self, other: Self) -> Option<Self> {
+        match (self, other) {
+            // A fixed-length tuple is equally as precise as another fixed-length tuple if they
+            // have the same length. For two differently sized fixed-length tuples, however,
+            // neither tuple length is more precise than the other: the two tuple lengths are
+            // entirely disjoint.
+            (TupleLength::Fixed(left), TupleLength::Fixed(right)) => {
+                (left == right).then_some(self)
+            }
+
+            // A fixed-length tuple is more precise than a variable-length one.
+            (fixed @ TupleLength::Fixed(_), TupleLength::Variable(..))
+            | (TupleLength::Variable(..), fixed @ TupleLength::Fixed(_)) => Some(fixed),
+
+            // For two variable-length tuples, the tuple with the larger number
+            // of required items is more precise.
+            (TupleLength::Variable(..), TupleLength::Variable(..)) => {
+                Some(match self.minimum().cmp(&other.minimum()) {
+                    Ordering::Less => other,
+                    Ordering::Equal | Ordering::Greater => self,
+                })
+            }
         }
     }
 
@@ -124,8 +151,28 @@ impl<'db> Type<'db> {
         };
         Self::Tuple(tuple)
     }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::tuple(TupleType::homogeneous(db, element))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::from_elements(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::Tuple(TupleType::empty(db))
+    }
 }
 
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -153,18 +200,16 @@ impl<'db> TupleType<'db> {
         Some(TupleType::new_internal(db, tuple_key))
     }
 
-    pub(crate) fn empty(db: &'db dyn Db) -> Type<'db> {
-        Type::tuple(TupleType::new(
-            db,
-            TupleSpec::from(FixedLengthTuple::empty()),
-        ))
+    pub(crate) fn empty(db: &'db dyn Db) -> Self {
+        TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty()))
+            .expect("TupleType::new() should always return `Some` for an empty `TupleSpec`")
     }
 
     pub(crate) fn from_elements(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::from_elements(types)))
+    ) -> Option<Self> {
+        TupleType::new(db, TupleSpec::from_elements(types))
     }
 
     #[cfg(test)]
@@ -173,17 +218,15 @@ impl<'db> TupleType<'db> {
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
-    ) -> Type<'db> {
-        Type::tuple(TupleType::new(
-            db,
-            VariableLengthTuple::mixed(prefix, variable, suffix),
-        ))
+    ) -> Option<Self> {
+        TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix))
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Type<'db> {
-        Type::tuple(TupleType::new(db, TupleSpec::homogeneous(element)))
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Option<Self> {
+        TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
+    #[salsa::tracked]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)
@@ -195,6 +238,11 @@ impl<'db> TupleType<'db> {
                         .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
                 ),
             })
+    }
+
+    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.to_class_type(db)
+            .map(|class| SubclassOfType::from(db, class))
     }
 
     /// Return a normalized version of `self`.
@@ -473,12 +521,12 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_slice(
-        &'db self,
+        &self,
         db: &'db dyn Db,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
-    ) -> Result<impl Iterator<Item = &'db Self::Item>, StepSizeZeroError> {
+    ) -> Result<impl Iterator<Item = Self::Item>, StepSizeZeroError> {
         self.0.py_slice(db, start, stop, step)
     }
 }
@@ -1014,6 +1062,10 @@ impl<T> Tuple<T> {
 }
 
 impl<'db> Tuple<Type<'db>> {
+    pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.all_elements())
+    }
+
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
         match self {

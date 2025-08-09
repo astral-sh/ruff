@@ -1,11 +1,12 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode,
 };
+use crate::semantic_index::scope::ScopeId;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
@@ -71,7 +72,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -84,7 +85,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -99,7 +100,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -110,7 +111,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -255,7 +256,8 @@ impl ClassInfoConstraintFunction {
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_) => None,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => None,
         }
     }
 }
@@ -312,11 +314,8 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
 
 fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
-        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
-        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
-        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
-        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
-        _ => None,
+        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
+        _ => PlaceExpr::try_from_expr(expr),
     }
 }
 
@@ -412,6 +411,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }
@@ -447,7 +449,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_expr(place_expr)
+            .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
     }
 

@@ -348,7 +348,7 @@ fn format_dev_multi_project(
         debug!(parent: None, "Starting {}", project_path.display());
 
         match format_dev_project(
-            &[project_path.clone()],
+            std::slice::from_ref(&project_path),
             args.stability_check,
             args.write,
             args.preview,
@@ -628,7 +628,7 @@ struct CheckRepoResult {
 }
 
 impl CheckRepoResult {
-    fn display(&self, format: Format) -> DisplayCheckRepoResult {
+    fn display(&self, format: Format) -> DisplayCheckRepoResult<'_> {
         DisplayCheckRepoResult {
             result: self,
             format,
@@ -665,7 +665,7 @@ struct Diagnostic {
 }
 
 impl Diagnostic {
-    fn display(&self, format: Format) -> DisplayDiagnostic {
+    fn display(&self, format: Format) -> DisplayDiagnostic<'_> {
         DisplayDiagnostic {
             diagnostic: self,
             format,

@@ -121,7 +121,7 @@ impl FormatContext for PyFormatContext<'_> {
         &self.options
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         SourceCode::new(self.contents)
     }
 }

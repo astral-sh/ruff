@@ -127,6 +127,7 @@ class catch_warnings(Generic[_W_co]):
         ) -> None:
             """Specify whether to record warnings and if an alternative module
             should be used other than sys.modules['warnings'].
+
             """
 
         @overload
@@ -159,6 +160,7 @@ class catch_warnings(Generic[_W_co]):
 
             For compatibility with Python 3.0, please consider all arguments to be
             keyword-only.
+
             """
 
         @overload
@@ -214,6 +216,7 @@ if sys.version_info >= (3, 13):
         exist on the overload as returned by ``get_overloads()``.
 
         See PEP 702 for details.
+
         """
 
         message: LiteralString

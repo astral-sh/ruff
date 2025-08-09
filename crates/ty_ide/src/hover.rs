@@ -371,10 +371,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        T
+        T@Alias
         ---------------------------------------------
         ```python
-        T
+        T@Alias
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

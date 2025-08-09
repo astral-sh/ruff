@@ -193,9 +193,14 @@ impl DisplaySet<'_> {
         stylesheet: &Stylesheet,
         buffer: &mut StyledBuffer,
     ) -> fmt::Result {
+        let hide_severity = annotation.annotation_type.is_none();
         let color = get_annotation_style(&annotation.annotation_type, stylesheet);
         let formatted_len = if let Some(id) = &annotation.id {
-            2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            if hide_severity {
+                id.len()
+            } else {
+                2 + id.len() + annotation_type_len(&annotation.annotation_type)
+            }
         } else {
             annotation_type_len(&annotation.annotation_type)
         };
@@ -209,18 +214,66 @@ impl DisplaySet<'_> {
         if formatted_len == 0 {
             self.format_label(line_offset, &annotation.label, stylesheet, buffer)
         } else {
-            let id = match &annotation.id {
-                Some(id) => format!("[{id}]"),
-                None => String::new(),
-            };
-            buffer.append(
-                line_offset,
-                &format!("{}{}", annotation_type_str(&annotation.annotation_type), id),
-                *color,
-            );
+            // TODO(brent) All of this complicated checking of `hide_severity` should be reverted
+            // once we have real severities in Ruff. This code is trying to account for two
+            // different cases:
+            //
+            // - main diagnostic message
+            // - subdiagnostic message
+            //
+            // In the first case, signaled by `hide_severity = true`, we want to print the ID (the
+            // noqa code for a ruff lint diagnostic, e.g. `F401`, or `invalid-syntax` for a syntax
+            // error) without brackets. Instead, for subdiagnostics, we actually want to print the
+            // severity (usually `help`) regardless of the `hide_severity` setting. This is signaled
+            // by an ID of `None`.
+            //
+            // With real severities these should be reported more like in ty:
+            //
+            // ```
+            // error[F401]: `math` imported but unused
+            // error[invalid-syntax]: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // instead of the current versions intended to mimic the old Ruff output format:
+            //
+            // ```
+            // F401 `math` imported but unused
+            // invalid-syntax: Cannot use `match` statement on Python 3.9...
+            // ```
+            //
+            // Note that the `invalid-syntax` colon is added manually in `ruff_db`, not here. We
+            // could eventually add a colon to Ruff lint diagnostics (`F401:`) and then make the
+            // colon below unconditional again.
+            //
+            // This also applies to the hard-coded `stylesheet.error()` styling of the
+            // hidden-severity `id`. This should just be `*color` again later, but for now we don't
+            // want an unformatted `id`, which is what `get_annotation_style` returns for
+            // `DisplayAnnotationType::None`.
+            let annotation_type = annotation_type_str(&annotation.annotation_type);
+            if let Some(id) = annotation.id {
+                if hide_severity {
+                    buffer.append(line_offset, &format!("{id} "), *stylesheet.error());
+                } else {
+                    buffer.append(line_offset, &format!("{annotation_type}[{id}]"), *color);
+                }
+            } else {
+                buffer.append(line_offset, annotation_type, *color);
+            }
+
+            if annotation.is_fixable {
+                buffer.append(line_offset, "[", stylesheet.none);
+                buffer.append(line_offset, "*", stylesheet.help);
+                buffer.append(line_offset, "]", stylesheet.none);
+                // In the hide-severity case, we need a space instead of the colon and space below.
+                if hide_severity {
+                    buffer.append(line_offset, " ", stylesheet.none);
+                }
+            }
 
             if !is_annotation_empty(annotation) {
-                buffer.append(line_offset, ": ", stylesheet.none);
+                if annotation.id.is_none() || !hide_severity {
+                    buffer.append(line_offset, ": ", stylesheet.none);
+                }
                 self.format_label(line_offset, &annotation.label, stylesheet, buffer)?;
             }
             Ok(())
@@ -249,11 +302,15 @@ impl DisplaySet<'_> {
                 let lineno_color = stylesheet.line_no();
                 buffer.puts(line_offset, lineno_width, header_sigil, *lineno_color);
                 buffer.puts(line_offset, lineno_width + 4, path, stylesheet.none);
-                if let Some((col, row)) = pos {
-                    buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
+                if let Some(Position { row, col, cell }) = pos {
+                    if let Some(cell) = cell {
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
+                    }
                     buffer.append(line_offset, ":", stylesheet.none);
                     buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    buffer.append(line_offset, ":", stylesheet.none);
+                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                 }
                 Ok(())
             }
@@ -768,6 +825,7 @@ pub(crate) struct Annotation<'a> {
     pub(crate) annotation_type: DisplayAnnotationType,
     pub(crate) id: Option<&'a str>,
     pub(crate) label: Vec<DisplayTextFragment<'a>>,
+    pub(crate) is_fixable: bool,
 }
 
 /// A single line used in `DisplayList`.
@@ -833,6 +891,13 @@ impl DisplaySourceAnnotation<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct Position {
+    row: usize,
+    col: usize,
+    cell: Option<usize>,
+}
+
 /// Raw line - a line which does not have the `lineno` part and is not considered
 /// a part of the snippet.
 #[derive(Debug, PartialEq)]
@@ -841,7 +906,7 @@ pub(crate) enum DisplayRawLine<'a> {
     /// slice in the project structure.
     Origin {
         path: &'a str,
-        pos: Option<(usize, usize)>,
+        pos: Option<Position>,
         header_type: DisplayHeaderType,
     },
 
@@ -918,6 +983,13 @@ pub(crate) enum DisplayAnnotationType {
     Info,
     Note,
     Help,
+}
+
+impl DisplayAnnotationType {
+    #[inline]
+    const fn is_none(&self) -> bool {
+        matches!(self, Self::None)
+    }
 }
 
 impl From<snippet::Level> for DisplayAnnotationType {
@@ -1015,11 +1087,12 @@ fn format_message<'m>(
         title,
         footer,
         snippets,
+        is_fixable,
     } = message;
 
     let mut sets = vec![];
     let body = if !snippets.is_empty() || primary {
-        vec![format_title(level, id, title)]
+        vec![format_title(level, id, title, is_fixable)]
     } else {
         format_footer(level, id, title)
     };
@@ -1060,12 +1133,18 @@ fn format_message<'m>(
     sets
 }
 
-fn format_title<'a>(level: crate::Level, id: Option<&'a str>, label: &'a str) -> DisplayLine<'a> {
+fn format_title<'a>(
+    level: crate::Level,
+    id: Option<&'a str>,
+    label: &'a str,
+    is_fixable: bool,
+) -> DisplayLine<'a> {
     DisplayLine::Raw(DisplayRawLine::Annotation {
         annotation: Annotation {
             annotation_type: DisplayAnnotationType::from(level),
             id,
             label: format_label(Some(label), Some(DisplayTextStyle::Emphasis)),
+            is_fixable,
         },
         source_aligned: false,
         continuation: false,
@@ -1084,6 +1163,7 @@ fn format_footer<'a>(
                 annotation_type: DisplayAnnotationType::from(level),
                 id,
                 label: format_label(Some(line), None),
+                is_fixable: false,
             },
             source_aligned: true,
             continuation: i != 0,
@@ -1118,6 +1198,28 @@ fn format_snippet<'m>(
     let main_range = snippet.annotations.first().map(|x| x.range.start);
     let origin = snippet.origin;
     let need_empty_header = origin.is_some() || is_first;
+
+    let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
+    if is_file_level {
+        // TODO(brent) enable this assertion again once we set `is_file_level` for individual rules.
+        // It's causing too many false positives currently when the default is to make any
+        // annotation with a default range file-level. See
+        // https://github.com/astral-sh/ruff/issues/19688.
+        //
+        // assert!(
+        //     snippet.source.is_empty(),
+        //     "Non-empty file-level snippet that won't be rendered: {:?}",
+        //     snippet.source
+        // );
+        let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
+        return DisplaySet {
+            display_lines: header.map_or_else(Vec::new, |header| vec![header]),
+            margin: Margin::new(0, 0, 0, 0, term_width, 0),
+        };
+    }
+
+    let cell_index = snippet.cell_index;
+
     let mut body = format_body(
         snippet,
         need_empty_header,
@@ -1126,7 +1228,13 @@ fn format_snippet<'m>(
         anonymized_line_numbers,
         cut_indicator,
     );
-    let header = format_header(origin, main_range, &body.display_lines, is_first);
+    let header = format_header(
+        origin,
+        main_range,
+        &body.display_lines,
+        is_first,
+        cell_index,
+    );
 
     if let Some(header) = header {
         body.display_lines.insert(0, header);
@@ -1146,6 +1254,7 @@ fn format_header<'a>(
     main_range: Option<usize>,
     body: &[DisplayLine<'_>],
     is_first: bool,
+    cell_index: Option<usize>,
 ) -> Option<DisplayLine<'a>> {
     let display_header = if is_first {
         DisplayHeaderType::Initial
@@ -1169,12 +1278,19 @@ fn format_header<'a>(
                 ..
             } = item
             {
-                if main_range >= range.0 && main_range < range.1 + max(*end_line as usize, 1) {
+                // At the very end of the `main_range`, report the location as the first character
+                // in the next line instead of falling back to the default location of `1:1`. This
+                // is another divergence from upstream.
+                let end_of_range = range.1 + max(*end_line as usize, 1);
+                if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
                         .chars()
                         .count();
                     col = char_column + 1;
                     line_offset = lineno.unwrap_or(1);
+                    break;
+                } else if main_range == end_of_range {
+                    line_offset = lineno.map_or(1, |line| line + 1);
                     break;
                 }
             }
@@ -1182,7 +1298,11 @@ fn format_header<'a>(
 
         return Some(DisplayLine::Raw(DisplayRawLine::Origin {
             path,
-            pos: Some((line_offset, col)),
+            pos: Some(Position {
+                row: line_offset,
+                col,
+                cell: cell_index,
+            }),
             header_type: display_header,
         }));
     }
@@ -1472,6 +1592,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1511,6 +1632,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: vec![],
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),
@@ -1580,6 +1702,7 @@ fn format_body<'m>(
                                 annotation_type,
                                 id: None,
                                 label: format_label(annotation.label, None),
+                                is_fixable: false,
                             },
                             range,
                             annotation_type: DisplayAnnotationType::from(annotation.level),

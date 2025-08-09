@@ -59,6 +59,7 @@ from typing import (  # noqa: Y022,Y037,Y038,Y039,UP035
     TypeVar as _TypeVar,
     Union as Union,
     _Alias,
+    _SpecialForm,
     cast as cast,
     no_type_check as no_type_check,
     no_type_check_decorator as no_type_check_decorator,
@@ -203,15 +204,6 @@ _F = _TypeVar("_F", bound=Callable[..., Any])
 _TC = _TypeVar("_TC", bound=type[object])
 _T_co = _TypeVar("_T_co", covariant=True)  # Any type covariant containers.
 _T_contra = _TypeVar("_T_contra", contravariant=True)
-
-class _Final: ...  # This should be imported from typing but that breaks pytype
-
-# unfortunately we have to duplicate this class definition from typing.pyi or we break pytype
-class _SpecialForm(_Final):
-    def __getitem__(self, parameters: Any) -> object: ...
-    if sys.version_info >= (3, 10):
-        def __or__(self, other: Any) -> _SpecialForm: ...
-        def __ror__(self, other: Any) -> _SpecialForm: ...
 
 # Do not import (and re-export) Protocol or runtime_checkable from
 # typing module because type checkers need to be able to distinguish
@@ -517,6 +509,7 @@ else:
 
         At runtime, the function prints the runtime type of the
         argument and returns it unchanged.
+
         """
 
     def assert_never(arg: Never, /) -> Never:
@@ -537,6 +530,7 @@ else:
         reachable, it will emit an error.
 
         At runtime, this throws an exception when called.
+
         """
 
     def assert_type(val: _T, typ: AnnotationForm, /) -> _T:
@@ -631,6 +625,7 @@ else:
         ``__dataclass_transform__`` attribute on the decorated object.
 
         See PEP 681 for details.
+
         """
 
     class NamedTuple(tuple[Any, ...]):
@@ -725,6 +720,7 @@ else:
         to allow runtime introspection.
 
         See PEP 698 for details.
+
         """
 
     def get_original_bases(cls: type, /) -> tuple[Any, ...]:
@@ -769,6 +765,7 @@ else:
         or use ABC registration. This ABC provides no methods, because
         there is no Python-accessible methods shared by pre-3.12 buffer
         classes. It is useful primarily for static checks.
+
         """
 
         # Not actually a Protocol at runtime; see
@@ -810,14 +807,18 @@ else:
 
     @runtime_checkable
     class SupportsAbs(Protocol[_T_co]):
-        """An ABC with one abstract method __abs__ that is covariant in its return type."""
+        """
+        An ABC with one abstract method __abs__ that is covariant in its return type.
+        """
 
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
 
     @runtime_checkable
     class SupportsRound(Protocol[_T_co]):
-        """An ABC with one abstract method __round__ that is covariant in its return type."""
+        """
+        An ABC with one abstract method __round__ that is covariant in its return type.
+        """
 
         @overload
         @abc.abstractmethod
@@ -955,6 +956,7 @@ else:
         exist on the overload as returned by ``get_overloads()``.
 
         See PEP 702 for details.
+
         """
 
         message: LiteralString
@@ -1086,6 +1088,7 @@ else:
         - The TypeAliasType instance must be immediately assigned to a variable
           of the same name. (For example, 'X = TypeAliasType("Y", int)' is invalid,
           as is 'X, Y = TypeAliasType("X", int), TypeAliasType("Y", int)').
+
         """
 
         def __init__(
@@ -1210,6 +1213,7 @@ else:
         want to support earlier Python versions, to simply write:
 
             typing_extensions.get_annotations(obj, format=Format.FORWARDREF)
+
         """
 
     @overload
@@ -1261,6 +1265,7 @@ else:
         it may be an empty tuple) if *owner* is not given and the forward reference
         does not already have an owner set. *format* specifies the format of the
         annotation and is a member of the annotationlib.Format enum.
+
         """
 
     @overload

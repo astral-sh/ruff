@@ -104,6 +104,13 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
         return;
     }
 
+    // Skip decorated functions
+    if let FunctionLike::Function(func) = target {
+        if !func.decorator_list.is_empty() {
+            return;
+        }
+    }
+
     let Some(params) = target.parameters() else {
         return;
     };

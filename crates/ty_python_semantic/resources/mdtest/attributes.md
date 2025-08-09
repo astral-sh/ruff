@@ -1451,6 +1451,21 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
+### Negation types
+
+Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
+which is equivalent to `object & ~P`:
+
+```py
+class P: ...
+
+def _(obj: object):
+    if not isinstance(obj, P):
+        reveal_type(obj)  # revealed: ~P
+
+        reveal_type(obj.__dict__)  # revealed: dict[str, Any]
+```
+
 ### Possible unboundness
 
 ```py
@@ -1901,7 +1916,7 @@ d = True
 reveal_type(d.__class__)  # revealed: <class 'bool'>
 
 e = (42, 42)
-reveal_type(e.__class__)  # revealed: <class 'tuple[Literal[42], Literal[42]]'>
+reveal_type(e.__class__)  # revealed: type[tuple[Literal[42], Literal[42]]]
 
 def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(a.__class__)  # revealed: type[int]

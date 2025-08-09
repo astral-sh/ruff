@@ -182,7 +182,7 @@ from typing import Callable, TypeVar
 T = TypeVar("T", bound=Callable[[], int])
 
 def bound(f: T):
-    reveal_type(f)  # revealed: T
+    reveal_type(f)  # revealed: T@bound
     reveal_type(f())  # revealed: int
 ```
 
@@ -192,7 +192,7 @@ Same with a constrained typevar, as long as all constraints are callable:
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
-    reveal_type(f)  # revealed: T
+    reveal_type(f)  # revealed: T@constrained
     reveal_type(f())  # revealed: int | str
 ```
 

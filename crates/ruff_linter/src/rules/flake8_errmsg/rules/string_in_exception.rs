@@ -182,60 +182,27 @@ impl Violation for DotFormatInException {
 
 /// EM101, EM102, EM103
 pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
-    if let Expr::Call(ast::ExprCall {
+    let Expr::Call(ast::ExprCall {
+        func,
         arguments: Arguments { args, .. },
         ..
     }) = exc
-    {
-        if let Some(first) = args.first() {
-            match first {
-                // Check for string literals.
-                Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
-                    if checker.is_rule_enabled(Rule::RawStringInException) {
-                        if string.len() >= checker.settings().flake8_errmsg.max_string_length {
-                            let mut diagnostic =
-                                checker.report_diagnostic(RawStringInException, first.range());
-                            if let Some(indentation) =
-                                whitespace::indentation(checker.source(), stmt)
-                            {
-                                diagnostic.set_fix(generate_fix(
-                                    stmt,
-                                    first,
-                                    indentation,
-                                    checker.stylist(),
-                                    checker.locator(),
-                                ));
-                            }
-                        }
-                    }
-                }
-                // Check for byte string literals.
-                Expr::BytesLiteral(ast::ExprBytesLiteral { value: bytes, .. }) => {
-                    if checker.settings().rules.enabled(Rule::RawStringInException) {
-                        if bytes.len() >= checker.settings().flake8_errmsg.max_string_length
-                            && is_raise_exception_byte_string_enabled(checker.settings())
-                        {
-                            let mut diagnostic =
-                                checker.report_diagnostic(RawStringInException, first.range());
-                            if let Some(indentation) =
-                                whitespace::indentation(checker.source(), stmt)
-                            {
-                                diagnostic.set_fix(generate_fix(
-                                    stmt,
-                                    first,
-                                    indentation,
-                                    checker.stylist(),
-                                    checker.locator(),
-                                ));
-                            }
-                        }
-                    }
-                }
-                // Check for f-strings.
-                Expr::FString(_) => {
-                    if checker.is_rule_enabled(Rule::FStringInException) {
+    else {
+        return;
+    };
+
+    if checker.semantic().match_typing_expr(func, "cast") {
+        return;
+    }
+
+    if let Some(first) = args.first() {
+        match first {
+            // Check for string literals.
+            Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
+                if checker.is_rule_enabled(Rule::RawStringInException) {
+                    if string.len() >= checker.settings().flake8_errmsg.max_string_length {
                         let mut diagnostic =
-                            checker.report_diagnostic(FStringInException, first.range());
+                            checker.report_diagnostic(RawStringInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
                             diagnostic.set_fix(generate_fix(
                                 stmt,
@@ -247,32 +214,66 @@ pub(crate) fn string_in_exception(checker: &Checker, stmt: &Stmt, exc: &Expr) {
                         }
                     }
                 }
-                // Check for .format() calls.
-                Expr::Call(ast::ExprCall { func, .. }) => {
-                    if checker.is_rule_enabled(Rule::DotFormatInException) {
-                        if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
-                            func.as_ref()
-                        {
-                            if attr == "format" && value.is_literal_expr() {
-                                let mut diagnostic =
-                                    checker.report_diagnostic(DotFormatInException, first.range());
-                                if let Some(indentation) =
-                                    whitespace::indentation(checker.source(), stmt)
-                                {
-                                    diagnostic.set_fix(generate_fix(
-                                        stmt,
-                                        first,
-                                        indentation,
-                                        checker.stylist(),
-                                        checker.locator(),
-                                    ));
-                                }
+            }
+            // Check for byte string literals.
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value: bytes, .. }) => {
+                if checker.settings().rules.enabled(Rule::RawStringInException) {
+                    if bytes.len() >= checker.settings().flake8_errmsg.max_string_length
+                        && is_raise_exception_byte_string_enabled(checker.settings())
+                    {
+                        let mut diagnostic =
+                            checker.report_diagnostic(RawStringInException, first.range());
+                        if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
+                            diagnostic.set_fix(generate_fix(
+                                stmt,
+                                first,
+                                indentation,
+                                checker.stylist(),
+                                checker.locator(),
+                            ));
+                        }
+                    }
+                }
+            }
+            // Check for f-strings.
+            Expr::FString(_) => {
+                if checker.is_rule_enabled(Rule::FStringInException) {
+                    let mut diagnostic =
+                        checker.report_diagnostic(FStringInException, first.range());
+                    if let Some(indentation) = whitespace::indentation(checker.source(), stmt) {
+                        diagnostic.set_fix(generate_fix(
+                            stmt,
+                            first,
+                            indentation,
+                            checker.stylist(),
+                            checker.locator(),
+                        ));
+                    }
+                }
+            }
+            // Check for .format() calls.
+            Expr::Call(ast::ExprCall { func, .. }) => {
+                if checker.is_rule_enabled(Rule::DotFormatInException) {
+                    if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+                        if attr == "format" && value.is_literal_expr() {
+                            let mut diagnostic =
+                                checker.report_diagnostic(DotFormatInException, first.range());
+                            if let Some(indentation) =
+                                whitespace::indentation(checker.source(), stmt)
+                            {
+                                diagnostic.set_fix(generate_fix(
+                                    stmt,
+                                    first,
+                                    indentation,
+                                    checker.stylist(),
+                                    checker.locator(),
+                                ));
                             }
                         }
                     }
                 }
-                _ => {}
             }
+            _ => {}
         }
     }
 }

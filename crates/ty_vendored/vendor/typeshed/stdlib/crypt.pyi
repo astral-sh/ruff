@@ -26,6 +26,7 @@ if sys.platform != "win32":
         """Generate a salt for the specified method.
 
         If not specified, the strongest available method will be used.
+
         """
 
     def crypt(word: str, salt: str | _Method | None = None) -> str:
@@ -36,4 +37,5 @@ if sys.platform != "win32":
         available method will be selected and a salt generated.  Otherwise,
         ``salt`` may be one of the ``crypt.METHOD_*`` values, or a string as
         returned by ``crypt.mksalt()``.
+
         """

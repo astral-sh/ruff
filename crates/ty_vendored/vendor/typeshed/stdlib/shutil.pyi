@@ -79,6 +79,7 @@ def copyfile(src: StrOrBytesPath, dst: _StrOrBytesPathT, *, follow_symlinks: boo
 
     If follow_symlinks is not set and src is a symbolic link, a new
     symlink will be created instead of copying the file it points to.
+
     """
 
 def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
@@ -87,6 +88,7 @@ def copymode(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool 
     If follow_symlinks is not set, symlinks aren't followed if and only
     if both `src` and `dst` are symlinks.  If `lchmod` isn't available
     (e.g. Linux) this method does nothing.
+
     """
 
 def copystat(src: StrOrBytesPath, dst: StrOrBytesPath, *, follow_symlinks: bool = True) -> None:
@@ -113,6 +115,7 @@ def copy(src: StrPath, dst: _StrPathT, *, follow_symlinks: bool = True) -> _StrP
 
     If source and destination are the same file, a SameFileError will be
     raised.
+
     """
 
 @overload
@@ -270,6 +273,7 @@ def move(src: StrPath, dst: _StrPathT, copy_function: _CopyFn = ...) -> _StrPath
 
     A lot more could be done here...  A look at a mv.c shows a lot of
     the issues this implementation glosses over.
+
     """
 
 class _ntuple_diskusage(NamedTuple):
@@ -357,6 +361,7 @@ if sys.platform == "win32" and sys.version_info < (3, 12):
         `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
         of os.environ.get("PATH"), or can be overridden with a custom search
         path.
+
         """
 
 @overload
@@ -368,6 +373,7 @@ def which(cmd: StrPath, mode: int = 1, path: StrPath | None = None) -> str | Non
     `mode` defaults to os.F_OK | os.X_OK. `path` defaults to the result
     of os.environ.get("PATH"), or can be overridden with a custom search
     path.
+
     """
 
 @overload

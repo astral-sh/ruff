@@ -108,7 +108,8 @@ class TokenError(Exception): ...
 class StopTokenizing(Exception): ...
 
 def tokenize(readline: Callable[[], str], tokeneater: _TokenEater = ...) -> None:
-    """The tokenize() function accepts two parameters: one representing the
+    """
+    The tokenize() function accepts two parameters: one representing the
     input stream, and one providing an output mechanism for tokenize().
 
     The first parameter, readline, must be a callable object which provides
@@ -148,7 +149,8 @@ def untokenize(iterable: Iterable[_TokenInfo]) -> str:
     """
 
 def generate_tokens(readline: Callable[[], str]) -> Iterator[_TokenInfo]:
-    """The generate_tokens() generator requires one argument, readline, which
+    """
+    The generate_tokens() generator requires one argument, readline, which
     must be a callable object which provides the same interface as the
     readline() method of built-in file objects. Each call to the function
     should return one line of input as a string.  Alternately, readline

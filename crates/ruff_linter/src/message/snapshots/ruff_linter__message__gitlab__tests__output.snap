@@ -8,11 +8,17 @@ expression: redact_fingerprint(&content)
     "description": "`os` imported but unused",
     "fingerprint": "<redacted>",
     "location": {
-      "lines": {
-        "begin": 1,
-        "end": 1
-      },
-      "path": "fib.py"
+      "path": "fib.py",
+      "positions": {
+        "begin": {
+          "column": 8,
+          "line": 1
+        },
+        "end": {
+          "column": 10,
+          "line": 1
+        }
+      }
     },
     "severity": "major"
   },
@@ -21,11 +27,17 @@ expression: redact_fingerprint(&content)
     "description": "Local variable `x` is assigned to but never used",
     "fingerprint": "<redacted>",
     "location": {
-      "lines": {
-        "begin": 6,
-        "end": 6
-      },
-      "path": "fib.py"
+      "path": "fib.py",
+      "positions": {
+        "begin": {
+          "column": 5,
+          "line": 6
+        },
+        "end": {
+          "column": 6,
+          "line": 6
+        }
+      }
     },
     "severity": "major"
   },
@@ -34,11 +46,17 @@ expression: redact_fingerprint(&content)
     "description": "Undefined name `a`",
     "fingerprint": "<redacted>",
     "location": {
-      "lines": {
-        "begin": 1,
-        "end": 1
-      },
-      "path": "undef.py"
+      "path": "undef.py",
+      "positions": {
+        "begin": {
+          "column": 4,
+          "line": 1
+        },
+        "end": {
+          "column": 5,
+          "line": 1
+        }
+      }
     },
     "severity": "major"
   }

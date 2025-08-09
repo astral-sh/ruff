@@ -279,6 +279,7 @@ mod test {
 
         TextEmitter::default()
             .with_show_fix_status(true)
+            .with_color(false)
             .emit(
                 &mut output,
                 &diagnostics.inner,

@@ -50,10 +50,8 @@ impl AzureRenderer<'_> {
             }
             writeln!(
                 f,
-                "{code}]{body}",
-                code = diag
-                    .secondary_code()
-                    .map_or_else(String::new, |code| format!("code={code};")),
+                "code={code};]{body}",
+                code = diag.secondary_code_or_id(),
                 body = diag.body(),
             )?;
         }

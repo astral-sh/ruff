@@ -101,7 +101,8 @@ class FileList:
     ) -> bool: ...
 
 def findall(dir: str = ".") -> list[str]:
-    """Find all files under 'dir' and return the list of full filenames.
+    """
+    Find all files under 'dir' and return the list of full filenames.
     Unless dir is '.', return full filenames with dir prepended.
     """
 

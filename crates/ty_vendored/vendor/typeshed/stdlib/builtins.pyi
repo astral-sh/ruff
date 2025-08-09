@@ -881,9 +881,11 @@ class complex:
         def from_number(cls, number: complex | SupportsComplex | SupportsFloat | SupportsIndex, /) -> Self:
             """Convert number to a complex floating-point number."""
 
+@type_check_only
 class _FormatMapMapping(Protocol):
     def __getitem__(self, key: str, /) -> Any: ...
 
+@type_check_only
 class _TranslateTable(Protocol):
     def __getitem__(self, key: int, /) -> str | int | None: ...
 
@@ -3380,6 +3382,7 @@ if sys.version_info >= (3, 10):
     def aiter(async_iterable: SupportsAiter[_SupportsAnextT_co], /) -> _SupportsAnextT_co:
         """Return an AsyncIterator for an AsyncIterable object."""
 
+    @type_check_only
     class _SupportsSynchronousAnext(Protocol[_AwaitableT_co]):
         def __anext__(self) -> _AwaitableT_co: ...
 
@@ -3700,7 +3703,6 @@ def iter(object: Callable[[], _T | None], sentinel: None, /) -> Iterator[_T]: ..
 @overload
 def iter(object: Callable[[], _T], sentinel: object, /) -> Iterator[_T]: ...
 
-# Keep this alias in sync with unittest.case._ClassInfo
 if sys.version_info >= (3, 10):
     _ClassInfo: TypeAlias = type | types.UnionType | tuple[_ClassInfo, ...]
 else:

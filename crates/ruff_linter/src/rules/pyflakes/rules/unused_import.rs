@@ -103,7 +103,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
@@ -255,7 +255,7 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     }
 }
 
-/// Find the `Expr` for top level `__all__` bindings.
+/// Find the `Expr` for top-level `__all__` bindings.
 fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
     semantic
         .global_scope()
@@ -541,7 +541,7 @@ fn fix_by_removing_imports<'a>(
         checker.indexer(),
     )?;
 
-    // It's unsafe to remove things from `__init__.py` because it can break public interfaces
+    // It's unsafe to remove things from `__init__.py` because it can break public interfaces.
     let applicability = if in_init {
         Applicability::Unsafe
     } else {
@@ -556,7 +556,7 @@ fn fix_by_removing_imports<'a>(
 }
 
 /// Generate a [`Fix`] to make bindings in a statement explicit, either by adding them to `__all__`
-/// or changing them from `import a` to `import a as a`.
+/// or by changing them from `import a` to `import a as a`.
 fn fix_by_reexporting<'a>(
     checker: &Checker,
     node_id: NodeId,
@@ -585,7 +585,7 @@ fn fix_by_reexporting<'a>(
         _ => bail!("Cannot offer a fix when there are multiple __all__ definitions"),
     };
 
-    // Only emit a fix if there are edits
+    // Only emit a fix if there are edits.
     let mut tail = edits.into_iter();
     let head = tail.next().ok_or(anyhow!("No edits to make"))?;
 

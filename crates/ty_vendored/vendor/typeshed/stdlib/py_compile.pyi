@@ -34,6 +34,7 @@ class PyCompileError(Exception):
                     given, consistent with 'standard' py_compile output.
                     message (or default) can be accesses as class variable
                     'msg'
+
     """
 
     exc_type_name: str
@@ -116,4 +117,5 @@ else:
         structure to locate source files; it only compiles files named
         explicitly.  If '-' is the only parameter in args, the list of
         files is taken from standard input.
+
         """

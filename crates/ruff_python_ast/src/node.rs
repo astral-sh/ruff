@@ -171,18 +171,8 @@ impl ast::ExprTString {
             node_index: _,
         } = self;
 
-        for t_string_part in value {
-            match t_string_part {
-                ast::TStringPart::Literal(string_literal) => {
-                    visitor.visit_string_literal(string_literal);
-                }
-                ast::TStringPart::FString(f_string) => {
-                    visitor.visit_f_string(f_string);
-                }
-                ast::TStringPart::TString(t_string) => {
-                    visitor.visit_t_string(t_string);
-                }
-            }
+        for t_string in value {
+            visitor.visit_t_string(t_string);
         }
     }
 }

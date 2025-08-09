@@ -41,6 +41,7 @@ def normalize_encoding(encoding: str | bytes) -> str:
     becomes '_'. Leading and trailing underscores are removed.
 
     Note that encoding names should be ASCII only.
+
     """
 
 def search_function(encoding: str) -> CodecInfo | None: ...

@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
+D407 [*] Missing dashed underline after section ("Returns")
+  --> sections.py:44:5
    |
 42 |     """Toggle the gizmo.
 43 |
 44 |     Returns
-   |     ^^^^^^^ D407
+   |     ^^^^^^^
 45 |     A value of some sort.
    |
-   = help: Add dashed line under "Returns"
+help: Add dashed line under "Returns"
 
 ℹ Safe fix
 42 42 |     """Toggle the gizmo.
@@ -20,16 +21,17 @@ sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
 46 47 | 
 47 48 |     """
 
-sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
+D407 [*] Missing dashed underline after section ("Returns")
+  --> sections.py:56:5
    |
 54 |     """Toggle the gizmo.
 55 |
 56 |     Returns
-   |     ^^^^^^^ D407
+   |     ^^^^^^^
 57 |
 58 |     """
    |
-   = help: Add dashed line under "Returns"
+help: Add dashed line under "Returns"
 
 ℹ Safe fix
 54 54 |     """Toggle the gizmo.
@@ -40,14 +42,15 @@ sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
 58 59 |     """
 59 60 | 
 
-sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
+D407 [*] Missing dashed underline after section ("Returns")
+  --> sections.py:67:5
    |
 65 |     """Toggle the gizmo.
 66 |
 67 |     Returns"""
-   |     ^^^^^^^ D407
+   |     ^^^^^^^
    |
-   = help: Add dashed line under "Returns"
+help: Add dashed line under "Returns"
 
 ℹ Safe fix
 64 64 | def no_underline_and_no_newline():  # noqa: D416
@@ -60,15 +63,16 @@ sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
 69 70 | 
 70 71 | @expect(_D213)
 
-sections.py:227:5: D407 [*] Missing dashed underline after section ("Raises")
+D407 [*] Missing dashed underline after section ("Raises")
+   --> sections.py:227:5
     |
 225 |     ------
 226 |     Many many wonderful things.
 227 |     Raises:
-    |     ^^^^^^ D407
+    |     ^^^^^^
 228 |     My attention.
     |
-    = help: Add dashed line under "Raises"
+help: Add dashed line under "Raises"
 
 ℹ Safe fix
 225 225 |     ------
@@ -79,14 +83,15 @@ sections.py:227:5: D407 [*] Missing dashed underline after section ("Raises")
 229 230 | 
 230 231 |     """
 
-sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters")
+D407 [*] Missing dashed underline after section ("Parameters")
+   --> sections.py:522:5
     |
 521 |     Parameters
 522 |     ==========
-    |     ^^^^^^^^^^ D407
+    |     ^^^^^^^^^^
 523 |     """
     |
-    = help: Add dashed line under "Parameters"
+help: Add dashed line under "Parameters"
 
 ℹ Safe fix
 519 519 |     """Equal length equals should be replaced with dashes.
@@ -98,14 +103,15 @@ sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters"
 524 524 | 
 525 525 | 
 
-sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters")
+D407 [*] Missing dashed underline after section ("Parameters")
+   --> sections.py:530:5
     |
 529 |     Parameters
 530 |     ===========
-    |     ^^^^^^^^^^^ D407
+    |     ^^^^^^^^^^^
 531 |     """
     |
-    = help: Add dashed line under "Parameters"
+help: Add dashed line under "Parameters"
 
 ℹ Safe fix
 527 527 |     """Here, the length of equals is not the same.
@@ -117,16 +123,17 @@ sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters"
 532 532 | 
 533 533 | 
 
-sections.py:613:4: D407 [*] Missing dashed underline after section ("Parameters")
+D407 [*] Missing dashed underline after section ("Parameters")
+   --> sections.py:613:4
     |
 611 |    """Test that lower case subsection header is valid even if it is of a different kind.
 612 |
 613 |    Parameters
-    |    ^^^^^^^^^^ D407
+    |    ^^^^^^^^^^
 614 |    -‐-----------------
 615 |    returns:
     |
-    = help: Add dashed line under "Parameters"
+help: Add dashed line under "Parameters"
 
 ℹ Safe fix
 611 611 |    """Test that lower case subsection header is valid even if it is of a different kind.

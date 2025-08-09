@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG004_0.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:13:1
    |
 11 | ### Errors
 12 |
 13 | logging.exception("")
-   | ^^^^^^^^^^^^^^^^^^^^^ LOG004
+   | ^^^^^^^^^^^^^^^^^^^^^
 14 | logger.exception("")
 15 | exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 10 10 | 
@@ -22,14 +23,15 @@ LOG004_0.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
 15 15 | exc("")
 16 16 | 
 
-LOG004_0.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:14:1
    |
 13 | logging.exception("")
 14 | logger.exception("")
-   | ^^^^^^^^^^^^^^^^^^^^ LOG004
+   | ^^^^^^^^^^^^^^^^^^^^
 15 | exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 11 11 | ### Errors
@@ -41,24 +43,26 @@ LOG004_0.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
 16 16 | 
 17 17 | 
 
-LOG004_0.py:15:1: LOG004 `.exception()` call outside exception handlers
+LOG004 `.exception()` call outside exception handlers
+  --> LOG004_0.py:15:1
    |
 13 | logging.exception("")
 14 | logger.exception("")
 15 | exc("")
-   | ^^^^^^^ LOG004
+   | ^^^^^^^
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
-LOG004_0.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:19:5
    |
 18 | def _():
 19 |     logging.exception("")
-   |     ^^^^^^^^^^^^^^^^^^^^^ LOG004
+   |     ^^^^^^^^^^^^^^^^^^^^^
 20 |     logger.exception("")
 21 |     exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 16 16 | 
@@ -70,15 +74,16 @@ LOG004_0.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
 21 21 |     exc("")
 22 22 | 
 
-LOG004_0.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:20:5
    |
 18 | def _():
 19 |     logging.exception("")
 20 |     logger.exception("")
-   |     ^^^^^^^^^^^^^^^^^^^^ LOG004
+   |     ^^^^^^^^^^^^^^^^^^^^
 21 |     exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 17 17 | 
@@ -90,25 +95,27 @@ LOG004_0.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
 22 22 | 
 23 23 | 
 
-LOG004_0.py:21:5: LOG004 `.exception()` call outside exception handlers
+LOG004 `.exception()` call outside exception handlers
+  --> LOG004_0.py:21:5
    |
 19 |     logging.exception("")
 20 |     logger.exception("")
 21 |     exc("")
-   |     ^^^^^^^ LOG004
+   |     ^^^^^^^
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
-LOG004_0.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:28:9
    |
 26 | except ...:
 27 |     def _():
 28 |         logging.exception("")
-   |         ^^^^^^^^^^^^^^^^^^^^^ LOG004
+   |         ^^^^^^^^^^^^^^^^^^^^^
 29 |         logger.exception("")
 30 |         exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 25 25 |     ...
@@ -120,15 +127,16 @@ LOG004_0.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
 30 30 |         exc("")
 31 31 | 
 
-LOG004_0.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004 [*] `.exception()` call outside exception handlers
+  --> LOG004_0.py:29:9
    |
 27 |     def _():
 28 |         logging.exception("")
 29 |         logger.exception("")
-   |         ^^^^^^^^^^^^^^^^^^^^ LOG004
+   |         ^^^^^^^^^^^^^^^^^^^^
 30 |         exc("")
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`
 
 ℹ Unsafe fix
 26 26 | except ...:
@@ -140,11 +148,12 @@ LOG004_0.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
 31 31 | 
 32 32 | 
 
-LOG004_0.py:30:9: LOG004 `.exception()` call outside exception handlers
+LOG004 `.exception()` call outside exception handlers
+  --> LOG004_0.py:30:9
    |
 28 |         logging.exception("")
 29 |         logger.exception("")
 30 |         exc("")
-   |         ^^^^^^^ LOG004
+   |         ^^^^^^^
    |
-   = help: Replace with `.error()`
+help: Replace with `.error()`

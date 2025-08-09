@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+ --> SIM910.py:2:1
   |
 1 | # SIM910
 2 | {}.get(key, None)
-  | ^^^^^^^^^^^^^^^^^ SIM910
+  | ^^^^^^^^^^^^^^^^^
 3 |
 4 | # SIM910
   |
-  = help: Replace `{}.get(key, None)` with `{}.get(key)`
+help: Replace `{}.get(key, None)` with `{}.get(key)`
 
 ℹ Safe fix
 1 1 | # SIM910
@@ -19,15 +20,16 @@ SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 4 4 | # SIM910
 5 5 | {}.get("key", None)
 
-SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+ --> SIM910.py:5:1
   |
 4 | # SIM910
 5 | {}.get("key", None)
-  | ^^^^^^^^^^^^^^^^^^^ SIM910
+  | ^^^^^^^^^^^^^^^^^^^
 6 |
 7 | # OK
   |
-  = help: Replace `{}.get("key", None)` with `{}.get("key")`
+help: Replace `{}.get("key", None)` with `{}.get("key")`
 
 ℹ Safe fix
 2 2 | {}.get(key, None)
@@ -39,14 +41,15 @@ SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
 7 7 | # OK
 8 8 | {}.get(key)
 
-SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+  --> SIM910.py:20:9
    |
 19 | # SIM910
 20 | if a := {}.get(key, None):
-   |         ^^^^^^^^^^^^^^^^^ SIM910
+   |         ^^^^^^^^^^^^^^^^^
 21 |     pass
    |
-   = help: Replace `{}.get(key, None)` with `{}.get(key)`
+help: Replace `{}.get(key, None)` with `{}.get(key)`
 
 ℹ Safe fix
 17 17 | {}.get("key", False)
@@ -58,15 +61,16 @@ SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 22 22 | 
 23 23 | # SIM910
 
-SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+  --> SIM910.py:24:5
    |
 23 | # SIM910
 24 | a = {}.get(key, None)
-   |     ^^^^^^^^^^^^^^^^^ SIM910
+   |     ^^^^^^^^^^^^^^^^^
 25 |
 26 | # SIM910
    |
-   = help: Replace `{}.get(key, None)` with `{}.get(key)`
+help: Replace `{}.get(key, None)` with `{}.get(key)`
 
 ℹ Safe fix
 21 21 |     pass
@@ -78,15 +82,16 @@ SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
 26 26 | # SIM910
 27 27 | ({}).get(key, None)
 
-SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+  --> SIM910.py:27:1
    |
 26 | # SIM910
 27 | ({}).get(key, None)
-   | ^^^^^^^^^^^^^^^^^^^ SIM910
+   | ^^^^^^^^^^^^^^^^^^^
 28 |
 29 | # SIM910
    |
-   = help: Replace `({}).get(key, None)` with `({}).get(key)`
+help: Replace `({}).get(key, None)` with `({}).get(key)`
 
 ℹ Safe fix
 24 24 | a = {}.get(key, None)
@@ -98,16 +103,17 @@ SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
 29 29 | # SIM910
 30 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 
-SIM910.py:31:7: SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", None)`
+SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", None)`
+  --> SIM910.py:31:7
    |
 29 | # SIM910
 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 31 | age = ages.get("Cat", None)
-   |       ^^^^^^^^^^^^^^^^^^^^^ SIM910
+   |       ^^^^^^^^^^^^^^^^^^^^^
 32 |
 33 | # OK
    |
-   = help: Replace `ages.get("Cat", None)` with `ages.get("Cat")`
+help: Replace `ages.get("Cat", None)` with `ages.get("Cat")`
 
 ℹ Safe fix
 28 28 | 
@@ -119,16 +125,17 @@ SIM910.py:31:7: SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", Non
 33 33 | # OK
 34 34 | ages = ["Tom", "Maria", "Dog"]
 
-SIM910.py:39:9: SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', None)`
+SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', None)`
+  --> SIM910.py:39:9
    |
 37 | # SIM910
 38 | def foo(**kwargs):
 39 |     a = kwargs.get('a', None)
-   |         ^^^^^^^^^^^^^^^^^^^^^ SIM910
+   |         ^^^^^^^^^^^^^^^^^^^^^
 40 |
 41 | # SIM910
    |
-   = help: Replace `kwargs.get('a', None)` with `kwargs.get('a')`
+help: Replace `kwargs.get('a', None)` with `kwargs.get('a')`
 
 ℹ Safe fix
 36 36 | 
@@ -140,16 +147,17 @@ SIM910.py:39:9: SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', Non
 41 41 | # SIM910
 42 42 | def foo(some_dict: dict):
 
-SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a', None)`
+SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a', None)`
+  --> SIM910.py:43:9
    |
 41 | # SIM910
 42 | def foo(some_dict: dict):
 43 |     a = some_dict.get('a', None)
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^ SIM910
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^
 44 |
 45 | # OK
    |
-   = help: Replace `some_dict.get('a', None)` with `some_dict.get('a')`
+help: Replace `some_dict.get('a', None)` with `some_dict.get('a')`
 
 ℹ Safe fix
 40 40 | 
@@ -161,14 +169,15 @@ SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a
 45 45 | # OK
 46 46 | def foo(some_other: object):
 
-SIM910.py:57:11: SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`
+SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`
+  --> SIM910.py:57:11
    |
 55 | def foo():
 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
 57 |     age = dict.get("Cat", None)
-   |           ^^^^^^^^^^^^^^^^^^^^^ SIM910
+   |           ^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
+help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 
 ℹ Safe fix
 54 54 | # https://github.com/astral-sh/ruff/issues/18777

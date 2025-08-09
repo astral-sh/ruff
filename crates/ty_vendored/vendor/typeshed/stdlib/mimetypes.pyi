@@ -197,7 +197,8 @@ class MimeTypes:
         """
 
     def read(self, filename: str, strict: bool = True) -> None:
-        """Read a single mime.types-format file, specified by pathname.
+        """
+        Read a single mime.types-format file, specified by pathname.
 
         If strict is true, information will be added to
         list of standard types, else to the list of non-standard
@@ -205,7 +206,8 @@ class MimeTypes:
         """
 
     def readfp(self, fp: IO[str], strict: bool = True) -> None:
-        """Read a single mime.types-format file.
+        """
+        Read a single mime.types-format file.
 
         If strict is true, information will be added to
         list of standard types, else to the list of non-standard
@@ -213,7 +215,8 @@ class MimeTypes:
         """
 
     def read_windows_registry(self, strict: bool = True) -> None:
-        """Load the MIME types database from Windows registry.
+        """
+        Load the MIME types database from Windows registry.
 
         If strict is true, information will be added to
         list of standard types, else to the list of non-standard

@@ -69,7 +69,7 @@ exit_code: 1
   },
   {
     "cell": null,
-    "code": null,
+    "code": "invalid-syntax",
     "end_location": {
       "column": 6,
       "row": 3
@@ -80,7 +80,7 @@ exit_code: 1
       "column": 1,
       "row": 3
     },
-    "message": "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
+    "message": "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)",
     "noqa_row": null,
     "url": null
   }

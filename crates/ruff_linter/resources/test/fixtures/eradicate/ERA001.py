@@ -89,3 +89,14 @@ print(1)
 # ///
 #
 # Foobar
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19713
+
+# mypy: ignore-errors
+# pyright: ignore-errors
+# pyrefly: ignore-errors
+# ty: ignore[unresolved-import]
+# pyrefly: ignore[unused-import]
+
+print(1)

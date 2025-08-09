@@ -26,7 +26,7 @@ fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
-#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial, heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
     let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 

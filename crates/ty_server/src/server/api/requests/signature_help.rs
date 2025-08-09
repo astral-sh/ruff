@@ -22,17 +22,20 @@ impl RequestHandler for SignatureHelpRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
-    fn document_url(params: &SignatureHelpParams) -> Cow<Url> {
+    fn document_url(params: &SignatureHelpParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: SignatureHelpParams,
     ) -> crate::server::Result<Option<SignatureHelp>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

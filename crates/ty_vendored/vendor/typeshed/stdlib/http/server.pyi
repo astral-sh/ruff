@@ -196,6 +196,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
     where <type> and <subtype> should be registered MIME types,
     e.g. "text/html" or "text/plain".
+
     """
 
     client_address: tuple[str, int]
@@ -221,6 +222,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         You normally don't need to override this method; see the class
         __doc__ string for information on how to handle specific HTTP
         commands such as GET and POST.
+
         """
 
     def handle_expect_100(self) -> bool:
@@ -235,6 +237,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         This method should either return True (possibly after sending
         a 100 Continue response) or send an error response and return
         False.
+
         """
 
     def send_error(self, code: int, message: str | None = None, explain: str | None = None) -> None:
@@ -252,6 +255,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         This sends an error response (so it must be called before any
         output has been generated), logs the error, and finally sends
         a piece of HTML explaining the error to the user.
+
         """
 
     def send_response(self, code: int, message: str | None = None) -> None:
@@ -260,6 +264,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         Also send two standard headers with the server software
         version and the current date.
+
         """
 
     def send_header(self, keyword: str, value: str) -> None:
@@ -276,6 +281,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         """Log an accepted request.
 
         This is called by send_response().
+
         """
 
     def log_error(self, format: str, *args: Any) -> None:
@@ -287,6 +293,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
         Arguments are the same as for log_message().
 
         XXX This should go to the separate error log.
+
         """
 
     def log_message(self, format: str, *args: Any) -> None:
@@ -306,6 +313,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         Unicode control characters are replaced with escaped hex
         before writing the output to stderr.
+
         """
 
     def version_string(self) -> str:
@@ -329,6 +337,7 @@ class BaseHTTPRequestHandler(socketserver.StreamRequestHandler):
 
         Return True for success, False for failure; on failure, any relevant
         error response has already been sent back.
+
         """
 
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -340,6 +349,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 
     The GET and HEAD requests are identical except that the HEAD
     request omits the actual contents of the file.
+
     """
 
     extensions_map: dict[str, str]
@@ -369,6 +379,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         to the outputfile by the caller unless the command was HEAD,
         and must be closed by the caller under all circumstances), or
         None, in which case the caller has nothing further to do.
+
         """
 
     def list_directory(self, path: StrPath) -> io.BytesIO | None:  # undocumented
@@ -377,6 +388,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         Return value is either a file object, or None (indicating an
         error).  In either case, the headers are sent, making the
         interface the same as for send_head().
+
         """
 
     def translate_path(self, path: str) -> str:  # undocumented
@@ -385,6 +397,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         Components that mean special things to the local file system
         (e.g. drive or directory names) are ignored.  (XXX They should
         probably be diagnosed.)
+
         """
 
     def copyfile(self, source: SupportsRead[AnyStr], outputfile: SupportsWrite[AnyStr]) -> None:  # undocumented
@@ -399,6 +412,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         the block size or perhaps to replace newlines by CRLF
         -- note however that this the default server uses this
         to copy binary data as well.
+
         """
 
     def guess_type(self, path: StrPath) -> str:  # undocumented
@@ -413,6 +427,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         up in the table self.extensions_map, using application/octet-stream
         as a default; however it would be permissible (if
         slow) to look inside the data to make a better guess.
+
         """
 
 def executable(path: StrPath) -> bool:  # undocumented
@@ -425,6 +440,7 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
     GET and HEAD also support running CGI scripts.
 
     The POST command is *only* implemented for CGI scripts.
+
     """
 
     cgi_directories: list[str]
@@ -433,6 +449,7 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
         """Serve a POST request.
 
         This is only implemented for CGI scripts.
+
         """
 
     def is_cgi(self) -> bool:  # undocumented
@@ -448,6 +465,7 @@ class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
         The default implementation tests whether the normalized url
         path begins with one of the strings in self.cgi_directories
         (and the next character is a '/' or the end of the string).
+
         """
 
     def is_executable(self, path: StrPath) -> bool:  # undocumented

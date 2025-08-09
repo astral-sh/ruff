@@ -96,7 +96,7 @@ enum EncodingArg<'a> {
 
 /// Return the encoding argument to an `encode` call, if it can be determined to be a
 /// UTF-8-equivalent encoding.
-fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg> {
+fn match_encoding_arg(arguments: &Arguments) -> Option<EncodingArg<'_>> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex `"".encode()`
         ([], []) => return Some(EncodingArg::Empty),

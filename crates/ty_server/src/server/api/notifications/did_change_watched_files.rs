@@ -83,33 +83,27 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
-        let mut project_changed = false;
-
         for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
 
-            let result = session.apply_changes(&AnySystemPath::System(root.clone()), changes);
+            session.apply_changes(&AnySystemPath::System(root.clone()), changes);
             publish_settings_diagnostics(session, client, root);
-
-            project_changed |= result.project_changed();
         }
 
         let client_capabilities = session.client_capabilities();
 
-        if project_changed {
-            if client_capabilities.supports_workspace_diagnostic_refresh() {
-                client.send_request::<types::request::WorkspaceDiagnosticRefresh>(
-                    session,
-                    (),
-                    |_, ()| {},
-                );
-            } else {
-                for key in session.text_document_keys() {
-                    publish_diagnostics(session, &key, client);
-                }
+        if client_capabilities.supports_workspace_diagnostic_refresh() {
+            client.send_request::<types::request::WorkspaceDiagnosticRefresh>(
+                session,
+                (),
+                |_, ()| {},
+            );
+        } else {
+            for key in session.text_document_keys() {
+                publish_diagnostics(session, &key, client);
             }
-            // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
         }
+        // TODO: always publish diagnostics for notebook files (since they don't use pull diagnostics)
 
         if client_capabilities.supports_inlay_hint_refresh() {
             client.send_request::<types::request::InlayHintRefreshRequest>(session, (), |_, ()| {});

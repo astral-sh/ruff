@@ -39,6 +39,7 @@ if sys.version_info >= (3, 11):
         unittest runners, console tools, -- everywhere when async code
         is called from existing sync framework and where the preferred single
         asyncio.run() call doesn't work.
+
         """
 
         def __init__(self, *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None) -> None: ...

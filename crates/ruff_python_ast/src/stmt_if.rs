@@ -33,7 +33,7 @@ impl Ranged for IfElifBranch<'_> {
     }
 }
 
-pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch> {
+pub fn if_elif_branches(stmt_if: &StmtIf) -> impl Iterator<Item = IfElifBranch<'_>> {
     iter::once(IfElifBranch {
         kind: BranchKind::If,
         test: stmt_if.test.as_ref(),

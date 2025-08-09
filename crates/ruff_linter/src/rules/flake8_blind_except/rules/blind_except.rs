@@ -47,9 +47,10 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or `logging.error()`
-/// with `exc_info` enabled will _not_ be flagged, as this is a common pattern
-/// for propagating exception traces:
+/// Exceptions that are logged via `logging.exception()` or are logged via
+/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// _not_ be flagged, as this is a common pattern for propagating exception
+/// traces:
 /// ```python
 /// try:
 ///     foo()
@@ -74,6 +75,22 @@ impl Violation for BlindExcept {
     }
 }
 
+fn contains_blind_exception<'a>(
+    semantic: &'a SemanticModel,
+    expr: &'a Expr,
+) -> Option<(&'a str, ruff_text_size::TextRange)> {
+    match expr {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+            .iter()
+            .find_map(|elt| contains_blind_exception(semantic, elt)),
+        _ => {
+            let builtin_exception_type = semantic.resolve_builtin_symbol(expr)?;
+            matches!(builtin_exception_type, "BaseException" | "Exception")
+                .then(|| (builtin_exception_type, expr.range()))
+        }
+    }
+}
+
 /// BLE001
 pub(crate) fn blind_except(
     checker: &Checker,
@@ -86,12 +103,9 @@ pub(crate) fn blind_except(
     };
 
     let semantic = checker.semantic();
-    let Some(builtin_exception_type) = semantic.resolve_builtin_symbol(type_) else {
+    let Some((builtin_exception_type, range)) = contains_blind_exception(semantic, type_) else {
         return;
     };
-    if !matches!(builtin_exception_type, "BaseException" | "Exception") {
-        return;
-    }
 
     // If the exception is re-raised, don't flag an error.
     let mut visitor = ReraiseVisitor::new(name);
@@ -109,9 +123,9 @@ pub(crate) fn blind_except(
 
     checker.report_diagnostic(
         BlindExcept {
-            name: builtin_exception_type.to_string(),
+            name: builtin_exception_type.into(),
         },
-        type_.range(),
+        range,
     );
 }
 
@@ -201,7 +215,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             ) {
                                 if match attr.as_str() {
                                     "exception" => true,
-                                    "error" => arguments
+                                    "error" | "critical" => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,
@@ -214,7 +228,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error"] => arguments
+                                    ["logging", "error" | "critical"] => arguments
                                         .find_keyword("exc_info")
                                         .is_some_and(|keyword| is_const_true(&keyword.value)),
                                     _ => false,

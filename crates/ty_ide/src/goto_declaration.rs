@@ -3,6 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_semantic::ImportAliasResolution;
 
 /// Navigate to the declaration of a symbol.
 ///
@@ -17,7 +18,12 @@ pub fn goto_declaration(
     let module = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&module, offset)?;
 
-    let declaration_targets = goto_target.get_definition_targets(file, db, None)?;
+    let declaration_targets = goto_target.get_definition_targets(
+        file,
+        db,
+        None,
+        ImportAliasResolution::ResolveAliases,
+    )?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),

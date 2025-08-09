@@ -93,6 +93,7 @@ impl<'db> SubclassOfType<'db> {
                         db,
                         Name::new_static("T_all"),
                         None,
+                        None,
                         Some(TypeVarBoundOrConstraints::UpperBound(
                             KnownClass::Type.to_instance(db),
                         )),
@@ -194,6 +195,12 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => Type::instance(db, class),
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
         }
+    }
+
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.subclass_of
+            .into_class()
+            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
     }
 }
 

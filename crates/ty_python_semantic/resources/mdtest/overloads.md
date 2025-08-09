@@ -299,7 +299,7 @@ def func[T](x: T) -> T: ...
 def func[T](x: T | None = None) -> T | None:
     return x
 
-reveal_type(func)  # revealed: Overload[() -> None, (x: T) -> T]
+reveal_type(func)  # revealed: Overload[() -> None, (x: T@func) -> T@func]
 reveal_type(func())  # revealed: None
 reveal_type(func(1))  # revealed: Literal[1]
 reveal_type(func(""))  # revealed: Literal[""]

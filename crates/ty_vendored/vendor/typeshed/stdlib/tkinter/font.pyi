@@ -56,6 +56,7 @@ class Font:
     slant -- font slant: ROMAN, ITALIC
     underline -- font underlining: false (0), true (1)
     overstrike -- font strikeout: false (0), true (1)
+
     """
 
     name: str

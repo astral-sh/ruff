@@ -97,6 +97,7 @@ class Random(_random.Random):
     methods:  random(), seed(), getstate(), and setstate().
     Optionally, implement a getrandbits() method so that randrange()
     can cover arbitrarily large ranges.
+
     """
 
     VERSION: ClassVar[int]
@@ -123,6 +124,7 @@ class Random(_random.Random):
         bytes, or bytearray.  For version 1 (provided for reproducing random
         sequences from older versions of Python), the algorithm for str and
         bytes generates a narrower range of seeds.
+
         """
 
     def getstate(self) -> tuple[Any, ...]:
@@ -136,6 +138,7 @@ class Random(_random.Random):
 
         Roughly equivalent to ``choice(range(start, stop, step))`` but
         supports arbitrarily large ranges and is optimized for common cases.
+
         """
 
     def randint(self, a: int, b: int) -> int:
@@ -159,6 +162,7 @@ class Random(_random.Random):
 
         If the relative weights or cumulative weights are not specified,
         the selections are made with equal probability.
+
         """
     if sys.version_info >= (3, 11):
         def shuffle(self, x: MutableSequence[Any]) -> None:
@@ -170,6 +174,7 @@ class Random(_random.Random):
             Optional argument random is a 0-argument function returning a
             random float in [0.0, 1.0); if it is the default None, the
             standard random.random will be used.
+
             """
     if sys.version_info >= (3, 11):
         def sample(self, population: Sequence[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
@@ -199,6 +204,7 @@ class Random(_random.Random):
             for sampling from a large population:
 
                 sample(range(10000000), 60)
+
             """
     else:
         def sample(self, population: Sequence[_T] | AbstractSet[_T], k: int, *, counts: Iterable[int] | None = None) -> list[_T]:
@@ -228,6 +234,7 @@ class Random(_random.Random):
             for sampling from a large population:
 
                 sample(range(10000000), 60)
+
             """
 
     def uniform(self, a: float, b: float) -> float:
@@ -237,6 +244,7 @@ class Random(_random.Random):
 
             E[X] = (a + b) / 2
             Var[X] = (b - a) ** 2 / 12
+
         """
 
     def triangular(self, low: float = 0.0, high: float = 1.0, mode: float | None = None) -> float:
@@ -251,6 +259,7 @@ class Random(_random.Random):
 
             E[X] = (low + high + mode) / 3
             Var[X] = (low**2 + high**2 + mode**2 - low*high - low*mode - high*mode) / 18
+
         """
     if sys.version_info >= (3, 12):
         def binomialvariate(self, n: int = 1, p: float = 0.5) -> int:
@@ -273,6 +282,7 @@ class Random(_random.Random):
 
                 E[X] = n * p
                 Var[X] = n * p * (1 - p)
+
             """
 
     def betavariate(self, alpha: float, beta: float) -> float:
@@ -285,6 +295,7 @@ class Random(_random.Random):
 
             E[X] = alpha / (alpha + beta)
             Var[X] = alpha * beta / ((alpha + beta)**2 * (alpha + beta + 1))
+
         """
     if sys.version_info >= (3, 12):
         def expovariate(self, lambd: float = 1.0) -> float:
@@ -300,6 +311,7 @@ class Random(_random.Random):
 
                 E[X] = 1 / lambd
                 Var[X] = 1 / lambd ** 2
+
             """
     else:
         def expovariate(self, lambd: float) -> float:
@@ -310,6 +322,7 @@ class Random(_random.Random):
             a reserved word in Python.)  Returned values range from 0 to
             positive infinity if lambd is positive, and from negative
             infinity to 0 if lambd is negative.
+
             """
 
     def gammavariate(self, alpha: float, beta: float) -> float:
@@ -327,6 +340,7 @@ class Random(_random.Random):
 
             E[X] = alpha * beta
             Var[X] = alpha * beta ** 2
+
         """
     if sys.version_info >= (3, 11):
         def gauss(self, mu: float = 0.0, sigma: float = 1.0) -> float:
@@ -336,12 +350,14 @@ class Random(_random.Random):
             slightly faster than the normalvariate() function.
 
             Not thread-safe without a lock around calls.
+
             """
 
         def normalvariate(self, mu: float = 0.0, sigma: float = 1.0) -> float:
             """Normal distribution.
 
             mu is the mean, and sigma is the standard deviation.
+
             """
     else:
         def gauss(self, mu: float, sigma: float) -> float:
@@ -351,12 +367,14 @@ class Random(_random.Random):
             slightly faster than the normalvariate() function.
 
             Not thread-safe without a lock around calls.
+
             """
 
         def normalvariate(self, mu: float, sigma: float) -> float:
             """Normal distribution.
 
             mu is the mean, and sigma is the standard deviation.
+
             """
 
     def lognormvariate(self, mu: float, sigma: float) -> float:
@@ -365,6 +383,7 @@ class Random(_random.Random):
         If you take the natural logarithm of this distribution, you'll get a
         normal distribution with mean mu and standard deviation sigma.
         mu can have any value, and sigma must be greater than zero.
+
         """
 
     def vonmisesvariate(self, mu: float, kappa: float) -> float:
@@ -374,6 +393,7 @@ class Random(_random.Random):
         kappa is the concentration parameter, which must be greater than or
         equal to zero.  If kappa is equal to zero, this distribution reduces
         to a uniform random angle over the range 0 to 2*pi.
+
         """
 
     def paretovariate(self, alpha: float) -> float:
@@ -383,6 +403,7 @@ class Random(_random.Random):
         """Weibull distribution.
 
         alpha is the scale parameter and beta is the shape parameter.
+
         """
 
 # SystemRandom is not implemented for all OS's; good on Windows & Linux
@@ -392,6 +413,7 @@ class SystemRandom(Random):
     CryptGenRandom on Windows).
 
      Not available on all systems (see os.urandom() for details).
+
     """
 
     def getrandbits(self, k: int) -> int:  # k can be passed by keyword

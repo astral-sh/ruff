@@ -65,7 +65,7 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -117,7 +117,7 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -155,7 +155,7 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba # v6.3.1
+      - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
       - name: Setup git
         run: |
           git config --global user.name typeshedbot

@@ -22,13 +22,19 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Example
 /// ```python
-/// class C(metaclass=ABCMeta):
+/// import abc
+///
+///
+/// class C(metaclass=abc.ABCMeta):
 ///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// class C(ABC):
+/// import abc
+///
+///
+/// class C(abc.ABC):
 ///     pass
 /// ```
 ///

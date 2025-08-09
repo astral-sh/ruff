@@ -5,7 +5,7 @@ use crate::place::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
-use crate::semantic_index::place::ScopeId;
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
     attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
@@ -20,7 +20,7 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
+pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -31,35 +31,33 @@ pub(crate) fn all_declarations_and_bindings<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_end_of_scope_declarations()
+        .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
                 .ok()
                 .and_then(|result| {
-                    result.place.ignore_possibly_unbound().and_then(|ty| {
-                        table
-                            .place_expr(symbol_id)
-                            .as_name()
-                            .cloned()
-                            .map(|name| Member { name, ty })
+                    result.place.ignore_possibly_unbound().map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
                     })
                 })
         })
-        .chain(
-            use_def_map
-                .all_end_of_scope_bindings()
-                .filter_map(move |(symbol_id, bindings)| {
-                    place_from_bindings(db, bindings)
-                        .ignore_possibly_unbound()
-                        .and_then(|ty| {
-                            table
-                                .place_expr(symbol_id)
-                                .as_name()
-                                .cloned()
-                                .map(|name| Member { name, ty })
-                        })
-                }),
-        )
+        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+            move |(symbol_id, bindings)| {
+                place_from_bindings(db, bindings)
+                    .ignore_possibly_unbound()
+                    .map(|ty| {
+                        let symbol = table.symbol(symbol_id);
+                        Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        }
+                    })
+            },
+        ))
 }
 
 struct AllMembers<'db> {
@@ -97,7 +95,19 @@ impl<'db> AllMembers<'db> {
 
             Type::NominalInstance(instance) => {
                 let (class_literal, _specialization) = instance.class.class_literal(db);
-                self.extend_with_instance_members(db, class_literal);
+                self.extend_with_instance_members(db, ty, class_literal);
+            }
+
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
             Type::ClassLiteral(class_literal) => {
@@ -145,12 +155,29 @@ impl<'db> AllMembers<'db> {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
+                Type::SubclassOf(subclass_of) => {
+                    if let Some(class) = subclass_of.subclass_of().into_class() {
+                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                    }
+                }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, class_literal);
                 }
                 _ => {}
             },
+
+            Type::TypedDict(_) => {
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                    self.extend_with_class_members(db, ty, class_literal);
+                }
+
+                if let Type::ClassLiteral(class) =
+                    KnownClass::TypedDictFallback.to_class_literal(db)
+                {
+                    self.extend_with_instance_members(db, ty, class);
+                }
+            }
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
@@ -164,10 +191,8 @@ impl<'db> AllMembers<'db> {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_end_of_scope_declarations() {
-                    let Some(symbol_name) = place_table.place_expr(symbol_id).as_name() else {
-                        continue;
-                    };
+                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
+                    let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Type(ty, _) = imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
@@ -204,7 +229,7 @@ impl<'db> AllMembers<'db> {
                     }
 
                     self.members.insert(Member {
-                        name: place_table.place_expr(symbol_id).expect_name().clone(),
+                        name: symbol_name.clone(),
                         ty,
                     });
                 }
@@ -264,28 +289,32 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    fn extend_with_instance_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
+    fn extend_with_instance_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
-            let parent_instance = Type::instance(db, parent.default_specialization(db));
             let class_body_scope = parent.body_scope(db);
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
                 let place_table = index.place_table(function_scope_id);
-                for place_expr in place_table.places() {
+                for place_expr in place_table.members() {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
-                    let result = parent_instance.member(db, name.as_str());
+                    let result = ty.member(db, name);
                     let Some(ty) = result.place.ignore_possibly_unbound() else {
                         continue;
                     };
                     self.members.insert(Member {
-                        name: name.clone(),
+                        name: Name::new(name),
                         ty,
                     });
                 }
@@ -297,7 +326,7 @@ impl<'db> AllMembers<'db> {
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
             for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = parent_instance.member(db, name.as_str());
+                let result = ty.member(db, name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
@@ -376,11 +405,11 @@ pub fn definition_kind_for_name<'db>(
     let place_table = index.place_table(file_scope);
 
     // Look up the place by name
-    let place_id = place_table.place_id_by_name(name_str)?;
+    let symbol_id = place_table.symbol_id(name_str)?;
 
     // Get the use-def map and look up definitions for this place
     let use_def_map = index.use_def_map(file_scope);
-    let declarations = use_def_map.all_reachable_declarations(place_id);
+    let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
     // Find the first valid definition and return its kind
     for declaration in declarations {
@@ -412,14 +441,14 @@ pub fn definitions_for_name<'db>(
     for (scope_id, _scope) in index.visible_ancestor_scopes(file_scope) {
         let place_table = index.place_table(scope_id);
 
-        let Some(place_id) = place_table.place_id_by_name(name_str) else {
+        let Some(symbol_id) = place_table.symbol_id(name_str) else {
             continue; // Name not found in this scope, try parent scope
         };
 
         // Check if this place is marked as global or nonlocal
-        let place_expr = place_table.place_expr(place_id);
-        let is_global = place_expr.is_marked_global();
-        let is_nonlocal = place_expr.is_marked_nonlocal();
+        let place_expr = place_table.symbol(symbol_id);
+        let is_global = place_expr.is_global();
+        let is_nonlocal = place_expr.is_nonlocal();
 
         // TODO: The current algorithm doesn't return definintions or bindings
         // for other scopes that are outside of this scope hierarchy that target
@@ -432,11 +461,12 @@ pub fn definitions_for_name<'db>(
             let global_scope_id = global_scope(db, file);
             let global_place_table = crate::semantic_index::place_table(db, global_scope_id);
 
-            if let Some(global_place_id) = global_place_table.place_id_by_name(name_str) {
+            if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
-                let global_bindings = global_use_def_map.all_reachable_bindings(global_place_id);
+                let global_bindings =
+                    global_use_def_map.all_reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.all_reachable_declarations(global_place_id);
+                    global_use_def_map.all_reachable_symbol_declarations(global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
@@ -462,8 +492,8 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -487,7 +517,12 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(db, *definition, Some(name_str));
+        let resolved = resolve_definition(
+            db,
+            *definition,
+            Some(name_str),
+            ImportAliasResolution::ResolveAliases,
+        );
         resolved_definitions.extend(resolved);
     }
 
@@ -498,7 +533,14 @@ pub fn definitions_for_name<'db>(
         };
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
-            .flat_map(|def| resolve_definition(db, def, Some(name_str)))
+            .flat_map(|def| {
+                resolve_definition(
+                    db,
+                    def,
+                    Some(name_str),
+                    ImportAliasResolution::ResolveAliases,
+                )
+            })
             .collect()
     } else {
         resolved_definitions
@@ -547,7 +589,12 @@ pub fn definitions_for_attribute<'db>(
             if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
-                    resolved.extend(resolve_definition(db, def, Some(name_str)));
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(name_str),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
                 }
             }
             continue;
@@ -577,21 +624,31 @@ pub fn definitions_for_attribute<'db>(
             let class_place_table = crate::semantic_index::place_table(db, class_scope);
 
             // Look for class-level declarations and bindings
-            if let Some(place_id) = class_place_table.place_id_by_name(name_str) {
+            if let Some(place_id) = class_place_table.symbol_id(name_str) {
                 let use_def = use_def_map(db, class_scope);
 
                 // Check declarations first
-                for decl in use_def.all_reachable_declarations(place_id) {
+                for decl in use_def.all_reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.all_reachable_bindings(place_id) {
+                for binding in use_def.all_reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
@@ -604,21 +661,31 @@ pub fn definitions_for_attribute<'db>(
             for function_scope_id in attribute_scopes(db, class_scope) {
                 let place_table = index.place_table(function_scope_id);
 
-                if let Some(place_id) = place_table.place_id_by_instance_attribute_name(name_str) {
+                if let Some(place_id) = place_table.member_id_by_instance_attribute_name(name_str) {
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
-                    for decl in use_def.all_reachable_declarations(place_id) {
+                    for decl in use_def.all_reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
 
                     // If no declarations found, check bindings
-                    for binding in use_def.all_reachable_bindings(place_id) {
+                    for binding in use_def.all_reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
@@ -685,11 +752,15 @@ pub fn definitions_for_keyword_argument<'db>(
 /// Find the definitions for a symbol imported via `from x import y as z` statement.
 /// This function handles the case where the cursor is on the original symbol name `y`.
 /// Returns the same definitions as would be found for the alias `z`.
+/// The `alias_resolution` parameter controls whether symbols imported with local import
+/// aliases (like "x" in "from a import b as x") are resolved to their targets or kept
+/// as aliases.
 pub fn definitions_for_imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     import_node: &ast::StmtImportFrom,
     symbol_name: &str,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
@@ -698,6 +769,7 @@ pub fn definitions_for_imported_symbol<'db>(
         import_node,
         symbol_name,
         &mut visited,
+        alias_resolution,
     )
 }
 
@@ -791,6 +863,15 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
+    /// Controls whether local import aliases should be resolved to their targets or returned as-is.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ImportAliasResolution {
+        /// Resolve import aliases to their original definitions
+        ResolveAliases,
+        /// Keep import aliases as-is, don't resolve to original definitions  
+        PreserveAliases,
+    }
+
     use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -801,7 +882,7 @@ mod resolve_definition {
 
     use crate::module_resolver::file_to_module;
     use crate::semantic_index::definition::{Definition, DefinitionKind};
-    use crate::semantic_index::place::{NodeWithScopeKind, ScopeId};
+    use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
     use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
@@ -835,9 +916,16 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         let mut visited = FxHashSet::default();
-        let resolved = resolve_definition_recursive(db, definition, &mut visited, symbol_name);
+        let resolved = resolve_definition_recursive(
+            db,
+            definition,
+            &mut visited,
+            symbol_name,
+            alias_resolution,
+        );
 
         // If resolution failed, return the original definition as fallback
         if resolved.is_empty() {
@@ -853,6 +941,7 @@ mod resolve_definition {
         definition: Definition<'db>,
         visited: &mut FxHashSet<Definition<'db>>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         // Prevent infinite recursion if there are circular imports
         if visited.contains(&definition) {
@@ -898,7 +987,14 @@ mod resolve_definition {
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
-                resolve_from_import_definitions(db, file, import_node, &alias.name, visited)
+                resolve_from_import_definitions(
+                    db,
+                    file,
+                    import_node,
+                    &alias.name,
+                    visited,
+                    alias_resolution,
+                )
             }
 
             // For star imports, try to resolve to the specific symbol being accessed
@@ -909,7 +1005,14 @@ mod resolve_definition {
 
                 // If we have a symbol name, use the helper to resolve it in the target module
                 if let Some(symbol_name) = symbol_name {
-                    resolve_from_import_definitions(db, file, import_node, symbol_name, visited)
+                    resolve_from_import_definitions(
+                        db,
+                        file,
+                        import_node,
+                        symbol_name,
+                        visited,
+                        alias_resolution,
+                    )
                 } else {
                     // No symbol context provided, can't resolve star import
                     Vec::new()
@@ -928,7 +1031,21 @@ mod resolve_definition {
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
+        if alias_resolution == ImportAliasResolution::PreserveAliases {
+            for alias in &import_node.names {
+                if let Some(asname) = &alias.asname {
+                    if asname.as_str() == symbol_name {
+                        return vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                            file,
+                            asname.range,
+                        ))];
+                    }
+                }
+            }
+        }
+
         // Resolve the target module file
         let module_file = {
             // Resolve the module being imported from (handles both relative and absolute imports)
@@ -957,7 +1074,13 @@ mod resolve_definition {
         } else {
             let mut resolved_definitions = Vec::new();
             for def in definitions_in_module {
-                let resolved = resolve_definition_recursive(db, def, visited, Some(symbol_name));
+                let resolved = resolve_definition_recursive(
+                    db,
+                    def,
+                    visited,
+                    Some(symbol_name),
+                    alias_resolution,
+                );
                 resolved_definitions.extend(resolved);
             }
             resolved_definitions
@@ -971,7 +1094,7 @@ mod resolve_definition {
         symbol_name: &str,
     ) -> IndexSet<Definition<'db>> {
         let place_table = place_table(db, scope);
-        let Some(place_id) = place_table.place_id_by_name(symbol_name) else {
+        let Some(symbol_id) = place_table.symbol_id(symbol_name) else {
             return IndexSet::new();
         };
 
@@ -979,8 +1102,8 @@ mod resolve_definition {
         let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_bindings(place_id);
-        let declarations = use_def_map.all_reachable_declarations(place_id);
+        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {

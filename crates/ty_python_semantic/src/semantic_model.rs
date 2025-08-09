@@ -7,7 +7,7 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
-use crate::semantic_index::place::FileScopeId;
+use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
 use crate::types::{Type, binding_type, infer_scope_types};
@@ -36,7 +36,7 @@ impl<'db> SemanticModel<'db> {
         line_index(self.db, self.file)
     }
 
-    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module> {
+    pub fn resolve_module(&self, module_name: &ModuleName) -> Option<Module<'_>> {
         resolve_module(self.db, module_name)
     }
 
@@ -223,7 +223,8 @@ impl<'db> Completion<'db> {
                 Type::NominalInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Tuple(_)
-                | Type::BoundSuper(_) => CompletionKind::Struct,
+                | Type::BoundSuper(_)
+                | Type::TypedDict(_) => CompletionKind::Struct,
                 Type::IntLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::TypeIs(_)

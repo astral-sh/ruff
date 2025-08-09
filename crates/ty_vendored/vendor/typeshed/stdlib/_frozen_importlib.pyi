@@ -32,6 +32,7 @@ def __import__(
     being imported (e.g. ``from module import <fromlist>``).  The 'level'
     argument represents the package location to import from in a relative
     import (e.g. ``from ..pkg import mod`` would have a 'level' of 2).
+
     """
 
 def spec_from_loader(
@@ -80,6 +81,7 @@ class ModuleSpec:
 
     Only finders (see importlib.abc.MetaPathFinder and
     importlib.abc.PathEntryFinder) should modify ModuleSpec instances.
+
     """
 
     def __init__(
@@ -109,6 +111,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
@@ -120,6 +123,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
             If 'path' is ever specified then the search is considered a failure.
 
             This method is deprecated.  Use find_spec() instead.
+
             """
 
     @classmethod
@@ -136,6 +140,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
         """Load the specified module into sys.modules and return it.
 
         This method is deprecated.  Use loader.exec_module() instead.
+
         """
 
     @classmethod
@@ -152,6 +157,7 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
             """Return repr for the module.
 
             The method is deprecated.  The import machinery does the job itself.
+
             """
     if sys.version_info >= (3, 10):
         @staticmethod
@@ -175,6 +181,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
 
     All methods are either class or static methods to avoid the need to
     instantiate the class.
+
     """
 
     # MetaPathFinder
@@ -184,6 +191,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
             """Find a frozen module.
 
             This method is deprecated.  Use find_spec() instead.
+
             """
 
     @classmethod
@@ -200,6 +208,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
         """Load a frozen module.
 
         This method is deprecated.  Use exec_module() instead.
+
         """
 
     @classmethod
@@ -216,6 +225,7 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
             """Return repr for the module.
 
             The method is deprecated.  The import machinery does the job itself.
+
             """
     if sys.version_info >= (3, 10):
         @staticmethod

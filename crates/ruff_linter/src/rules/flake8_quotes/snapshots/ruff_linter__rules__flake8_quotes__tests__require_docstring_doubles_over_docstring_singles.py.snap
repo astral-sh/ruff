@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+Q002 [*] Single quote docstring found but double quotes preferred
+ --> docstring_singles.py:1:1
   |
 1 | / '''
 2 | | Single quotes multiline module docstring
 3 | | '''
-  | |___^ Q002
+  | |___^
 4 |
 5 |   '''
   |
-  = help: Replace single quotes docstring with double quotes
+help: Replace single quotes docstring with double quotes
 
 ℹ Safe fix
 1   |-'''
@@ -22,18 +23,19 @@ docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quote
 5 5 | '''
 6 6 | this is not a docstring
 
-docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quotes preferred
+Q002 [*] Single quote docstring found but double quotes preferred
+  --> docstring_singles.py:14:5
    |
 12 |       class params \t not a docstring
 13 |   ''')):
 14 | /     '''
 15 | |     Single quotes multiline class docstring
 16 | |     '''
-   | |_______^ Q002
+   | |_______^
 17 |
 18 |       '''
    |
-   = help: Replace single quotes docstring with double quotes
+help: Replace single quotes docstring with double quotes
 
 ℹ Safe fix
 11 11 | class Cls(MakeKlass('''
@@ -48,18 +50,19 @@ docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quot
 18 18 |     '''
 19 19 |     this is not a docstring
 
-docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quotes preferred
+Q002 [*] Single quote docstring found but double quotes preferred
+  --> docstring_singles.py:26:9
    |
 24 |           definitely not a docstring''',
 25 |           val=l[Cls():3]):
 26 | /         '''
 27 | |         Single quotes multiline function docstring
 28 | |         '''
-   | |___________^ Q002
+   | |___________^
 29 |
 30 |           some_expression = 'hello world'
    |
-   = help: Replace single quotes docstring with double quotes
+help: Replace single quotes docstring with double quotes
 
 ℹ Safe fix
 23 23 |     def f(self, bar='''

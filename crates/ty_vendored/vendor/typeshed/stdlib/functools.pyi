@@ -135,6 +135,7 @@ def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Calla
     Access the underlying function with f.__wrapped__.
 
     See:  https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)
+
     """
 
 @overload
@@ -434,6 +435,7 @@ def _make_key(
     If there is only a single argument and its data type is known to cache
     its hash value, then that argument is returned without a wrapper.  This
     saves space and improves lookup speed.
+
     """
 
 if sys.version_info >= (3, 14):

@@ -806,11 +806,7 @@ def top_level_return(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        # TODO We could potentially eliminate `Unknown` from the union here,
-        # because `x` resolves to an enclosing function-like scope and there
-        # are no nested `nonlocal` declarations of that symbol that might
-        # modify it.
-        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
@@ -822,7 +818,7 @@ def return_from_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2
@@ -834,7 +830,7 @@ def return_from_nested_if(cond1: bool, cond2: bool):
     x = 1
 
     def g():
-        reveal_type(x)  # revealed: Unknown | Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     if cond1:
         if cond2:
             x = 2

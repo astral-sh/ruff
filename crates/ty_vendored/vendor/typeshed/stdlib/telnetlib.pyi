@@ -170,6 +170,7 @@ class Telnet:
         callback(telnet socket, command, option)
             option will be chr(0) when there is no option.
         No other action is done afterwards by telnetlib.
+
     """
 
     host: str | None  # undocumented
@@ -196,12 +197,14 @@ class Telnet:
 
         If extra arguments are present, they are substituted in the
         message using the standard string formatting operator.
+
         """
 
     def set_debuglevel(self, debuglevel: int) -> None:
         """Set the debug level.
 
         The higher it is, the more debug output you get (on sys.stdout).
+
         """
 
     def close(self) -> None:
@@ -218,6 +221,7 @@ class Telnet:
 
         Can block if the connection is blocked.  May raise
         OSError if the connection is closed.
+
         """
 
     def read_until(self, match: bytes, timeout: float | None = None) -> bytes:
@@ -226,6 +230,7 @@ class Telnet:
         When no match is found, return whatever is available instead,
         possibly the empty string.  Raise EOFError if the connection
         is closed and no cooked data is available.
+
         """
 
     def read_all(self) -> bytes:
@@ -236,6 +241,7 @@ class Telnet:
 
         Return b'' if EOF is hit.  Block if no data is immediately
         available.
+
         """
 
     def read_very_eager(self) -> bytes:
@@ -244,6 +250,7 @@ class Telnet:
         Raise EOFError if connection closed and no cooked data
         available.  Return b'' if no cooked data available otherwise.
         Don't block unless in the midst of an IAC sequence.
+
         """
 
     def read_eager(self) -> bytes:
@@ -252,6 +259,7 @@ class Telnet:
         Raise EOFError if connection closed and no cooked data
         available.  Return b'' if no cooked data available otherwise.
         Don't block unless in the midst of an IAC sequence.
+
         """
 
     def read_lazy(self) -> bytes:
@@ -260,6 +268,7 @@ class Telnet:
         Raise EOFError if connection closed and no data available.
         Return b'' if no cooked data available otherwise.  Don't block
         unless in the midst of an IAC sequence.
+
         """
 
     def read_very_lazy(self) -> bytes:
@@ -267,6 +276,7 @@ class Telnet:
 
         Raise EOFError if connection closed and no data available.
         Return b'' if no cooked data available otherwise.  Don't block.
+
         """
 
     def read_sb_data(self) -> bytes:
@@ -275,6 +285,7 @@ class Telnet:
         Return b'' if no SB ... SE available. Should only be called
         after seeing a SB or SE command. When a new SB command is
         found, old unread SB data will be discarded. Don't block.
+
         """
 
     def set_option_negotiation_callback(self, callback: Callable[[socket.socket, bytes, bytes], object] | None) -> None:
@@ -285,6 +296,7 @@ class Telnet:
 
         Set self.eof when connection is closed.  Don't block unless in
         the midst of an IAC sequence.
+
         """
 
     def rawq_getchar(self) -> bytes:
@@ -292,6 +304,7 @@ class Telnet:
 
         Block if no data is immediately available.  Raise EOFError
         when connection is closed.
+
         """
 
     def fill_rawq(self) -> None:
@@ -299,6 +312,7 @@ class Telnet:
 
         Block if no data is immediately available.  Set self.eof when
         connection is closed.
+
         """
 
     def sock_avail(self) -> bool:
@@ -335,6 +349,7 @@ class Telnet:
         If a regular expression ends with a greedy match (e.g. '.*')
         or if more than one expression can match the same input, the
         results are undeterministic, and may depend on the I/O timing.
+
         """
 
     def __enter__(self) -> Self: ...

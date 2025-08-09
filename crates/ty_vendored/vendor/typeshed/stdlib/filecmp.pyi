@@ -41,6 +41,7 @@ def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = 
     This function uses a cache for past comparisons and the results,
     with cache entries invalidated if their stat information
     changes.  The cache may be cleared by calling clear_cache().
+
     """
 
 def cmpfiles(
@@ -56,6 +57,7 @@ def cmpfiles(
       files that compare equal
       files that are different
       filenames that aren't regular files.
+
     """
 
 class dircmp(Generic[AnyStr]):

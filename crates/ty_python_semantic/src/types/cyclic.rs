@@ -47,16 +47,19 @@ impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
     }
 
     pub(crate) fn visit(&mut self, item: T, func: impl FnOnce(&mut Self) -> R) -> R {
+        if let Some(ty) = self.cache.get(&item) {
+            return *ty;
+        }
+
+        // We hit a cycle
         if !self.seen.insert(item) {
             return self.fallback;
         }
-        if let Some(ty) = self.cache.get(&item) {
-            self.seen.pop();
-            return *ty;
-        }
+
         let ret = func(self);
-        self.cache.insert(item, ret);
         self.seen.pop();
+        self.cache.insert(item, ret);
+
         ret
     }
 }

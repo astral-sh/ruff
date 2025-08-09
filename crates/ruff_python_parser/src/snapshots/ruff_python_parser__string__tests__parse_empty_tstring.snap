@@ -13,18 +13,16 @@ expression: suite
                     range: 0..3,
                     value: TStringValue {
                         inner: Single(
-                            TString(
-                                TString {
-                                    range: 0..3,
-                                    node_index: AtomicNodeIndex(..),
-                                    elements: [],
-                                    flags: TStringFlags {
-                                        quote_style: Double,
-                                        prefix: Regular,
-                                        triple_quoted: false,
-                                    },
+                            TString {
+                                range: 0..3,
+                                node_index: AtomicNodeIndex(..),
+                                elements: [],
+                                flags: TStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

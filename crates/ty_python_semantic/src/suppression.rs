@@ -86,7 +86,7 @@ declare_lint! {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
@@ -402,7 +402,7 @@ impl Suppressions {
             })
     }
 
-    fn iter(&self) -> SuppressionsIter {
+    fn iter(&self) -> SuppressionsIter<'_> {
         self.file.iter().chain(&self.line)
     }
 }

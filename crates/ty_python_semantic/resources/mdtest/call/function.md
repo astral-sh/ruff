@@ -15,8 +15,7 @@ reveal_type(get_int())  # revealed: int
 async def get_int_async() -> int:
     return 42
 
-# TODO: we don't yet support `types.CoroutineType`, should be generic `Coroutine[Any, Any, int]`
-reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
+reveal_type(get_int_async())  # revealed: CoroutineType[Any, Any, int]
 ```
 
 ## Generic
@@ -165,6 +164,101 @@ def _(args: tuple[int, str]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### Subclass of fixed-length tuple argument
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class SingleElementTuple(tuple[int]): ...
+
+def _(args: SingleElementTuple) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` here
+    takes_zero(*args)
+
+    takes_one(*args)
+
+    # TODO: we should emit `[missing-argument]` on both of these
+    takes_two(*args)
+    takes_two_positional_only(*args)
+
+    # TODO: these should both be `[missing-argument]`, not `[invalid-argument-type]`
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+
+    # TODO: we should emit `[missing-argument]` on both of these
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class TwoElementIntTuple(tuple[int, int]): ...
+
+def _(args: TwoElementIntTuple) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` on both of these
+    takes_zero(*args)
+    takes_one(*args)
+
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStrTuple(tuple[int, str]): ...
+
+def _(args: IntStrTuple) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` here
+    takes_zero(*args)
+
+    # TODO: this should be `[too-many-positional-arguments]`, not `[invalid-argument-type]`
+    takes_one(*args)  # error: [invalid-argument-type]
+
+    # TODO: we should have one diagnostic for each of these, not two
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    # TODO: these are all false positives
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    # TODO: false positive
+    # error: [invalid-argument-type]
+    takes_at_least_one(*args)
+
+    # TODO: we should only emit one diagnostic for each of these, not two
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+```
+
 ### Mixed tuple argument
 
 ```toml
@@ -257,6 +351,272 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_at_least_one(*args)
     takes_at_least_two(*args)  # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+```
+
+### Subclass of mixed tuple argument
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class IntStarInt(tuple[int, *tuple[int, ...]]): ...
+
+def _(args: IntStarInt) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` here
+    takes_zero(*args)
+
+    takes_one(*args)
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStr(tuple[int, *tuple[str, ...]]): ...
+
+def _(args: IntStarStr) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` here
+    takes_zero(*args)
+
+    # TODO: false positive
+    # error: [invalid-argument-type]
+    takes_one(*args)
+
+    # TODO: we should only emit one diagnostic for each of these, not two
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    # TODO: false positives
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    # TODO: false positive
+    # error: [invalid-argument-type]
+    takes_at_least_one(*args)
+
+    # TODO: we should only have one diagnostic for each of these, not two
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarInt(tuple[int, int, *tuple[int, ...]]): ...
+
+def _(args: IntIntStarInt) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` on both of these
+    takes_zero(*args)
+    takes_one(*args)
+
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarStr(tuple[int, int, *tuple[str, ...]]): ...
+
+def _(args: IntIntStarStr) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` here
+    takes_zero(*args)
+
+    # TODO: this should be `[too-many-positional-arguments]`, not `invalid-argument-type`
+    takes_one(*args)  # error: [invalid-argument-type]
+
+    # TODO: these are all false positives
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    # TODO: each of these should only have one diagnostic, not two
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    # TODO: false positive
+    # error: [invalid-argument-type]
+    takes_at_least_one(*args)
+
+    # TODO: these are both false positives
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+    # TODO: these are both false positives
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+
+class IntStarIntInt(tuple[int, *tuple[int, ...], int]): ...
+
+def _(args: IntStarIntInt) -> None:
+    # TODO: we should emit `[too-many-positional-arguments]` on both of these
+    takes_zero(*args)
+    takes_one(*args)
+
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStrInt(tuple[int, *tuple[str, ...], int]): ...
+
+def _(args: IntStarStrInt) -> None:
+    # TODO: we should emit `too-many-positional-arguments` here
+    takes_zero(*args)
+
+    # TODO: this should be `too-many-positional-arguments`, not `invalid-argument-type`
+    takes_one(*args)  # error: [invalid-argument-type]
+
+    # TODO: we should only emit one diagnostic for each of these
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    # TODO: we should not emit diagnostics for these
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    # TODO: false positive
+    takes_at_least_one(*args)  # error: [invalid-argument-type]
+
+    # TODO: should only have one diagnostic here
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+    # TODO: should only have one diagnostic here
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+```
+
+### String argument
+
+```py
+from typing import Literal
+
+def takes_zero() -> None: ...
+def takes_one(x: str) -> None: ...
+def takes_two(x: str, y: str) -> None: ...
+def takes_two_positional_only(x: str, y: str, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: str, *args) -> None: ...
+def takes_at_least_two(x: str, y: str, *args) -> None: ...
+def takes_at_least_two_positional_only(x: str, y: str, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+def _(args: Literal["a"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)  # error: [missing-argument]
+    takes_two_positional_only(*args)  # error: [missing-argument]
+    # error: [invalid-argument-type]
+    # error: [missing-argument]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [missing-argument]
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)  # error: [missing-argument]
+    takes_at_least_two_positional_only(*args)  # error: [missing-argument]
+
+def _(args: Literal["ab"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+def _(args: Literal["abc"]) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)  # error: [too-many-positional-arguments]
+    takes_two_positional_only(*args)  # error: [too-many-positional-arguments]
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    # error: [too-many-positional-arguments]
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+def _(args: str) -> None:
+    takes_zero(*args)
+    takes_one(*args)
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
 ```
 
 ### Argument expansion regression
@@ -550,7 +910,7 @@ len()
 len([], 1)
 ```
 
-### Type API predicates
+### Type property predicates
 
 ```py
 from ty_extensions import is_subtype_of

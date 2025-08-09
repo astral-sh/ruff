@@ -66,6 +66,7 @@ if sys.version_info >= (3, 11):
         The optional mode argument is the UNIX mode of the file, used only when
         the database has to be created.  It defaults to octal code 0o666 (and
         will be modified by the prevailing umask).
+
         """
 
 else:
@@ -81,4 +82,5 @@ else:
         The optional mode argument is the UNIX mode of the file, used only when
         the database has to be created.  It defaults to octal code 0o666 (and
         will be modified by the prevailing umask).
+
         """

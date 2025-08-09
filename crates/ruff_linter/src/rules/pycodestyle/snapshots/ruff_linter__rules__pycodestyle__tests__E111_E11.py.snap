@@ -1,27 +1,30 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E11.py:3:1: E111 Indentation is not a multiple of 4
+E111 Indentation is not a multiple of 4
+ --> E11.py:3:1
   |
 1 | #: E111
 2 | if x > 2:
 3 |   print(x)
-  | ^^ E111
+  | ^^
 4 | #: E111 E117
 5 | if True:
   |
 
-E11.py:6:1: E111 Indentation is not a multiple of 4
+E111 Indentation is not a multiple of 4
+ --> E11.py:6:1
   |
 4 | #: E111 E117
 5 | if True:
 6 |      print()
-  | ^^^^^ E111
+  | ^^^^^
 7 | #: E112
 8 | if False:
   |
 
-E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
+invalid-syntax: Expected an indented block after `if` statement
+  --> E11.py:9:1
    |
  7 | #: E112
  8 | if False:
@@ -31,7 +34,8 @@ E11.py:9:1: SyntaxError: Expected an indented block after `if` statement
 11 | print()
    |
 
-E11.py:12:1: SyntaxError: Unexpected indentation
+invalid-syntax: Unexpected indentation
+  --> E11.py:12:1
    |
 10 | #: E113
 11 | print()
@@ -41,7 +45,8 @@ E11.py:12:1: SyntaxError: Unexpected indentation
 14 | mimetype = 'application/x-directory'
    |
 
-E11.py:14:1: SyntaxError: Expected a statement
+invalid-syntax: Expected a statement
+  --> E11.py:14:1
    |
 12 |     print()
 13 | #: E114 E116
@@ -51,7 +56,8 @@ E11.py:14:1: SyntaxError: Expected a statement
 16 | create_date = False
    |
 
-E11.py:45:1: SyntaxError: Expected an indented block after `if` statement
+invalid-syntax: Expected an indented block after `if` statement
+  --> E11.py:45:1
    |
 43 | #: E112
 44 | if False:  #

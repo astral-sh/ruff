@@ -75,7 +75,8 @@ ref = ReferenceType
 # everything below here is implemented in weakref.py
 
 class WeakMethod(ref[_CallableT]):
-    """A custom `weakref.ref` subclass which simulates a weak reference to
+    """
+    A custom `weakref.ref` subclass which simulates a weak reference to
     a bound method, working around the lifetime problem of bound methods.
     """
 
@@ -134,6 +135,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the values around longer than needed.
+
         """
 
     def valuerefs(self) -> list[KeyedRef[_KT, _VT]]:
@@ -144,6 +146,7 @@ class WeakValueDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the values around longer than needed.
+
         """
 
     def setdefault(self, key: _KT, default: _VT) -> _VT: ...
@@ -174,6 +177,7 @@ class KeyedRef(ref[_T], Generic[_KT, _T]):
     a function object for each key stored in the mapping.  A shared
     callback object can use the 'key' attribute of a KeyedRef instead
     of getting a reference to the key from an enclosing scope.
+
     """
 
     key: _KT
@@ -222,6 +226,7 @@ class WeakKeyDictionary(MutableMapping[_KT, _VT]):
         to be checked before being used.  This can be used to avoid
         creating references that will cause the garbage collector to
         keep the keys around longer than needed.
+
         """
     # Keep WeakKeyDictionary.setdefault in line with MutableMapping.setdefault, modulo positional-only differences
     @overload

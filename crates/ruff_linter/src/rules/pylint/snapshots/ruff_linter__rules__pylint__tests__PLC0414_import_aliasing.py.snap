@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-import_aliasing.py:6:8: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+ --> import_aliasing.py:6:8
   |
 4 | # 2. consider-using-from-import
 5 |
 6 | import collections as collections  # [useless-import-alias]
-  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0414
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
 8 | from collections import OrderedDict as o_dict
   |
-  = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 3 3 | # 1. useless-import-alias
@@ -22,15 +23,16 @@ import_aliasing.py:6:8: PLC0414 [*] Import alias does not rename original packag
 8 8 | from collections import OrderedDict as o_dict
 9 9 | import os.path as path  # [consider-using-from-import]
 
-import_aliasing.py:7:25: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+ --> import_aliasing.py:7:25
   |
 6 | import collections as collections  # [useless-import-alias]
 7 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
-  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0414
+  |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
 8 | from collections import OrderedDict as o_dict
 9 | import os.path as path  # [consider-using-from-import]
   |
-  = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 4 4 | # 2. consider-using-from-import
@@ -42,16 +44,17 @@ import_aliasing.py:7:25: PLC0414 [*] Import alias does not rename original packa
 9 9 | import os.path as path  # [consider-using-from-import]
 10 10 | import os.path as p
 
-import_aliasing.py:16:15: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:16:15
    |
 14 | import os as OS
 15 | from sys import version
 16 | from . import bar as bar  # [useless-import-alias]
-   |               ^^^^^^^^^^ PLC0414
+   |               ^^^^^^^^^^
 17 | from . import bar as Bar
 18 | from . import bar
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 13 13 | import os
@@ -63,16 +66,17 @@ import_aliasing.py:16:15: PLC0414 [*] Import alias does not rename original pack
 18 18 | from . import bar
 19 19 | from ..foo import bar as bar  # [useless-import-alias]
 
-import_aliasing.py:19:19: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:19:19
    |
 17 | from . import bar as Bar
 18 | from . import bar
 19 | from ..foo import bar as bar  # [useless-import-alias]
-   |                   ^^^^^^^^^^ PLC0414
+   |                   ^^^^^^^^^^
 20 | from ..foo.bar import foobar as foobar  # [useless-import-alias]
 21 | from ..foo.bar import foobar as anotherfoobar
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 16 16 | from . import bar as bar  # [useless-import-alias]
@@ -84,16 +88,17 @@ import_aliasing.py:19:19: PLC0414 [*] Import alias does not rename original pack
 21 21 | from ..foo.bar import foobar as anotherfoobar
 22 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
 
-import_aliasing.py:20:23: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:20:23
    |
 18 | from . import bar
 19 | from ..foo import bar as bar  # [useless-import-alias]
 20 | from ..foo.bar import foobar as foobar  # [useless-import-alias]
-   |                       ^^^^^^^^^^^^^^^^ PLC0414
+   |                       ^^^^^^^^^^^^^^^^
 21 | from ..foo.bar import foobar as anotherfoobar
 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 17 17 | from . import bar as Bar
@@ -105,16 +110,17 @@ import_aliasing.py:20:23: PLC0414 [*] Import alias does not rename original pack
 22 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
 23 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
 
-import_aliasing.py:22:15: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:22:15
    |
 20 | from ..foo.bar import foobar as foobar  # [useless-import-alias]
 21 | from ..foo.bar import foobar as anotherfoobar
 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
-   |               ^^^^^^^^^^ PLC0414
+   |               ^^^^^^^^^^
 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
 24 | from . import foo as bar, foo2 as bar2
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 19 19 | from ..foo import bar as bar  # [useless-import-alias]
@@ -126,16 +132,17 @@ import_aliasing.py:22:15: PLC0414 [*] Import alias does not rename original pack
 24 24 | from . import foo as bar, foo2 as bar2
 25 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
 
-import_aliasing.py:23:27: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:23:27
    |
 21 | from ..foo.bar import foobar as anotherfoobar
 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]
 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
-   |                           ^^^^^^^^^^^^ PLC0414
+   |                           ^^^^^^^^^^^^
 24 | from . import foo as bar, foo2 as bar2
 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 20 20 | from ..foo.bar import foobar as foobar  # [useless-import-alias]
@@ -147,16 +154,17 @@ import_aliasing.py:23:27: PLC0414 [*] Import alias does not rename original pack
 25 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
 26 26 | from foo.bar import foobar as foo
 
-import_aliasing.py:25:21: PLC0414 [*] Import alias does not rename original package
+PLC0414 [*] Import alias does not rename original package
+  --> import_aliasing.py:25:21
    |
 23 | from . import foo as bar, foo2 as foo2  # [useless-import-alias]
 24 | from . import foo as bar, foo2 as bar2
 25 | from foo.bar import foobar as foobar  # [useless-import-alias]
-   |                     ^^^^^^^^^^^^^^^^ PLC0414
+   |                     ^^^^^^^^^^^^^^^^
 26 | from foo.bar import foobar as foo
 27 | from .foo.bar import f as foobar
    |
-   = help: Remove import alias
+help: Remove import alias
 
 ℹ Unsafe fix
 22 22 | from . import foo as foo, foo2 as bar2  # [useless-import-alias]

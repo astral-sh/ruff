@@ -382,6 +382,31 @@ class Foo(Protocol):
 reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["method_member", "x", "y", "z"]]
 ```
 
+To see the kinds and types of the protocol members, you can use the debugging aid
+`ty_extensions.reveal_protocol_interface`, meanwhile:
+
+```py
+from ty_extensions import reveal_protocol_interface
+from typing import SupportsIndex, SupportsAbs
+
+# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
+reveal_protocol_interface(Foo)
+# error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(SupportsIndex)
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co@SupportsAbs`)}`"
+reveal_protocol_interface(SupportsAbs)
+
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(int)
+# error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type`, found `Literal["foo"]`"
+reveal_protocol_interface("foo")
+
+# TODO: this should be a `revealed-type` diagnostic rather than `invalid-argument-type`, and it should reveal `{"__abs__": MethodMember(`(self) -> int`)}` for the protocol interface
+#
+# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+reveal_protocol_interface(SupportsAbs[int])
+```
+
 Certain special attributes and methods are not considered protocol members at runtime, and should
 not be considered protocol members by type checkers either:
 
@@ -1460,6 +1485,68 @@ static_assert(is_subtype_of(NominalSubtype, P))
 static_assert(not is_subtype_of(NotSubtype, P))  # error: [static-assert-error]
 ```
 
+A callable instance attribute is not sufficient for a type to satisfy a protocol with a method
+member: a method member specified by a protocol `P` must exist on the *meta-type* of `T` for `T` to
+be a subtype of `P`:
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import static_assert, is_assignable_to
+
+class SupportsFooMethod(Protocol):
+    def foo(self): ...
+
+class SupportsFooAttr(Protocol):
+    foo: Callable[..., object]
+
+class Foo:
+    def __init__(self):
+        self.foo: Callable[..., object] = lambda *args, **kwargs: None
+
+static_assert(not is_assignable_to(Foo, SupportsFooMethod))
+static_assert(is_assignable_to(Foo, SupportsFooAttr))
+```
+
+The reason for this is that some methods, such as dunder methods, are always looked up on the class
+directly. If a class with an `__iter__` instance attribute satisfied the `Iterable` protocol, for
+example, the `Iterable` protocol would not accurately describe the requirements Python has for a
+class to be iterable at runtime. Allowing callable instance attributes to satisfy method members of
+protocols would also make `issubclass()` narrowing of runtime-checkable protocols unsound, as the
+`issubclass()` mechanism at runtime for protocols only checks whether a method is accessible on the
+class object, not the instance. (Protocols with non-method members cannot be passed to
+`issubclass()` at all at runtime.)
+
+```py
+from typing import Iterable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+class Foo:
+    def __init__(self):
+        self.__iter__: Callable[..., object] = lambda *args, **kwargs: None
+
+static_assert(not is_assignable_to(Foo, Iterable[Any]))
+```
+
+Because method members must always be available on the class, it is safe to access a method on
+`type[P]`, where `P` is a protocol class, just like it is generally safe to access a method on
+`type[C]` where `C` is a nominal class:
+
+```py
+from typing import Protocol
+
+class Foo(Protocol):
+    def method(self) -> str: ...
+
+def f(x: Foo):
+    reveal_type(type(x).method)  # revealed: def method(self) -> str
+
+class Bar:
+    def __init__(self):
+        self.method = lambda: "foo"
+
+f(Bar())  # error: [invalid-argument-type]
+```
+
 ## Equivalence of protocols with method members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
@@ -1832,8 +1919,7 @@ def _(r: Recursive):
     reveal_type(r.direct)  # revealed: Recursive
     reveal_type(r.union)  # revealed: None | Recursive
     reveal_type(r.intersection1)  # revealed: C & Recursive
-    # revealed: @Todo(map_with_boundness: intersections with negative contributions) | (C & ~Recursive)
-    reveal_type(r.intersection2)
+    reveal_type(r.intersection2)  # revealed: C
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
