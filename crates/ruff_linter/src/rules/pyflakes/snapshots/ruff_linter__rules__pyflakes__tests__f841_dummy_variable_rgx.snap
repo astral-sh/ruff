@@ -289,3 +289,5 @@ help: Remove assignment to unused variable `_`
 152     |-    except Exception as _:
     152 |+    except Exception:
 153 153 |         pass
+154 154 | 
+155 155 | # OK
