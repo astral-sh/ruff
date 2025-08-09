@@ -121,10 +121,19 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             // Convert `tuple([1, 2])` to `(1, 2)`
             diagnostic.set_fix({
+                // Check if the original call had a trailing comma after the argument
+                let has_trailing_comma = {
+                    // Look for a comma after the argument in the call
+                    let after_argument = checker
+                        .locator()
+                        .slice(TextRange::new(argument.end(), call.end()));
+                    after_argument.trim_start().starts_with(',')
+                };
+
                 let needs_trailing_comma = if let [item] = elts.as_slice() {
                     SimpleTokenizer::new(
                         checker.locator().contents(),
-                        TextRange::new(item.end(), call.end()),
+                        TextRange::new(item.end(), argument.end()),
                     )
                     .all(|token| token.kind != SimpleTokenKind::Comma)
                 } else {
@@ -139,7 +148,7 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
                 );
                 // Replace `]` with `)` or `,)`.
                 let elt_end = Edit::replacement(
-                    if needs_trailing_comma {
+                    if has_trailing_comma || needs_trailing_comma {
                         ",)".into()
                     } else {
                         ")".into()
