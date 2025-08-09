@@ -10,7 +10,7 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.
@@ -105,25 +105,24 @@ pub(crate) fn lambda_assignment(
             }
         }
 
-        // If the lambda is shadowing a variable in the current scope (annotation shadowing),
+        // If the lambda is shadowing a variable in the current scope,
         // rewriting it as a function declaration may break type-checking.
         // See: https://github.com/astral-sh/ruff/issues/5421
-        if checker
+        let applicability = if checker
             .semantic()
             .current_scope()
             .get_all(id)
             .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
         {
-            diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
-                indented,
-                stmt.range(),
-            )));
+            Applicability::DisplayOnly
         } else {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                indented,
-                stmt.range(),
-            )));
-        }
+            Applicability::Unsafe
+        };
+
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(indented, stmt.range()),
+            applicability,
+        ));
     }
 }
 
