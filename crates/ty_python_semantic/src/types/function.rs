@@ -351,6 +351,7 @@ impl<'db> OverloadLiteral<'db> {
             definition,
             function_stmt_node,
             is_generator,
+            scope,
         )
     }
 

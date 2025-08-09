@@ -10,6 +10,7 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::borrow::Cow;
 use std::{collections::HashMap, slice::Iter};
 
 use itertools::EitherOrBoth;
@@ -17,7 +18,8 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::semantic_index::scope::ScopeId;
+use crate::types::generics::{GenericContext, SpecializationBuilder, walk_generic_context};
 use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -148,7 +150,9 @@ impl<'db> CallableSignature<'db> {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
-                self_signature.has_relation_to(db, other_signature, relation)
+                self_signature
+                    .with_specialized_generic_context(db, other_signature)
+                    .has_relation_to(db, other_signature, relation)
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
@@ -321,6 +325,7 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
+        containing_scope: ScopeId,
     ) -> Self {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
@@ -335,7 +340,7 @@ impl<'db> Signature<'db> {
             }
         });
         let legacy_generic_context =
-            GenericContext::from_function_params(db, definition, &parameters, return_ty);
+            GenericContext::from_function_params(db, containing_scope, &parameters, return_ty);
 
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!
@@ -463,6 +468,52 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Creates a new version of this signature with its generic context specialized to match
+    /// another signature's generic context. This is used for assignability/subtyping checks
+    /// between two generic function signatures where the type variable identity shouldn't matter.
+    fn with_specialized_generic_context<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        other: &'a Signature<'db>,
+    ) -> Cow<'a, Signature<'db>> {
+        let (Some(self_gc), Some(other_gc)) = (self.generic_context, other.generic_context) else {
+            return Cow::Borrowed(self);
+        };
+
+        // If the generic contexts are the same, the TypeVars are already aligned.
+        // No specialization is needed.
+        if self_gc == other_gc {
+            return Cow::Borrowed(self);
+        }
+        let mut builder = SpecializationBuilder::new(db);
+
+        // If we get an error, return the original signature without specialization. All
+        // subsequent comparisons will fail.
+        let mut signature_check_mode = SignatureCheckMode::InferSpecialization {
+            builder: &mut builder,
+            has_failed: false,
+        };
+
+        self.compare_with(db, other, &mut signature_check_mode);
+
+        if signature_check_mode.result() {
+            return Cow::Borrowed(self);
+        }
+
+        if let (Some(self_return), Some(other_return)) = (self.return_ty, other.return_ty) {
+            // If we get an error, return the original signature without specialization. All
+            // subsequent comparisons will fail.
+            if builder.infer(self_return, other_return).is_err() {
+                return Cow::Borrowed(self);
+            }
+        }
+
+        let specialization = builder.build(self_gc);
+        let signature = self.apply_type_mapping(db, &TypeMapping::Specialization(specialization));
+
+        Cow::Owned(signature)
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
@@ -472,20 +523,23 @@ impl<'db> Signature<'db> {
                 .unwrap_or(Type::unknown())
                 .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
         };
+        let current_signature = self.with_specialized_generic_context(db, other);
 
-        if self.parameters.is_gradual() != other.parameters.is_gradual() {
+        if current_signature.parameters.is_gradual() != other.parameters.is_gradual() {
             return false;
         }
 
-        if self.parameters.len() != other.parameters.len() {
+        if current_signature.parameters.len() != other.parameters.len() {
             return false;
         }
 
-        if !check_types(self.return_ty, other.return_ty) {
+        if !check_types(current_signature.return_ty, other.return_ty) {
             return false;
         }
 
-        for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
+        for (self_parameter, other_parameter) in
+            current_signature.parameters.iter().zip(&other.parameters)
+        {
             match (self_parameter.kind(), other_parameter.kind()) {
                 (
                     ParameterKind::PositionalOnly {
@@ -547,68 +601,23 @@ impl<'db> Signature<'db> {
         other: &Signature<'db>,
         relation: TypeRelation,
     ) -> bool {
-        /// A helper struct to zip two slices of parameters together that provides control over the
-        /// two iterators individually. It also keeps track of the current parameter in each
-        /// iterator.
-        struct ParametersZip<'a, 'db> {
-            current_self: Option<&'a Parameter<'db>>,
-            current_other: Option<&'a Parameter<'db>>,
-            iter_self: Iter<'a, Parameter<'db>>,
-            iter_other: Iter<'a, Parameter<'db>>,
-        }
+        let mut signature_check_mode = SignatureCheckMode::Relation {
+            relation,
+            result: false,
+        };
+        self.compare_with(db, other, &mut signature_check_mode);
+        signature_check_mode.result()
+    }
 
-        impl<'a, 'db> ParametersZip<'a, 'db> {
-            /// Move to the next parameter in both the `self` and `other` parameter iterators,
-            /// [`None`] if both iterators are exhausted.
-            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
-                match (self.next_self(), self.next_other()) {
-                    (Some(self_param), Some(other_param)) => {
-                        Some(EitherOrBoth::Both(self_param, other_param))
-                    }
-                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
-                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
-                    (None, None) => None,
-                }
-            }
-
-            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_self = self.iter_self.next();
-                self.current_self
-            }
-
-            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
-            /// iterator is exhausted.
-            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.current_other = self.iter_other.next();
-                self.current_other
-            }
-
-            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
-            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
-                self.iter_other.clone().next()
-            }
-
-            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
-            /// remaining parameters in the `self` and `other` iterators respectively.
-            ///
-            /// The returned iterators starts with the current parameter, if any, followed by the
-            /// remaining parameters in the respective iterators.
-            fn into_remaining(
-                self,
-            ) -> (
-                impl Iterator<Item = &'a Parameter<'db>>,
-                impl Iterator<Item = &'a Parameter<'db>>,
-            ) {
-                (
-                    self.current_self.into_iter().chain(self.iter_self),
-                    self.current_other.into_iter().chain(self.iter_other),
-                )
-            }
-        }
-
-        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+    /// This function is the implementation for both `has_relation_to` and
+    /// `infer_generic_specialization`. The behavior is controlled by the `mode` parameter.
+    fn compare_with<'a>(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+        mode: &mut SignatureCheckMode<'a, 'db>,
+    ) {
+        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>, relation| {
             type1.unwrap_or(Type::unknown()).has_relation_to(
                 db,
                 type2.unwrap_or(Type::unknown()),
@@ -616,38 +625,40 @@ impl<'db> Signature<'db> {
             )
         };
 
-        // Return types are covariant.
-        if !check_types(self.return_ty, other.return_ty) {
-            return false;
+        if mode.perform_check(self.return_ty, other.return_ty, check_types) {
+            return;
         }
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
-        if other.parameters.is_gradual()
-            && self
-                .parameters
-                .variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
-            && self
-                .parameters
-                .keyword_variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
-        {
-            return true;
+        if let SignatureCheckMode::Relation { result, .. } = mode {
+            if other.parameters.is_gradual()
+                && self.parameters.variadic().is_some_and(|(_, param)| {
+                    param.annotated_type().is_some_and(|ty| ty.is_object(db))
+                })
+                && self
+                    .parameters
+                    .keyword_variadic()
+                    .is_some_and(|(_, param)| {
+                        param.annotated_type().is_some_and(|ty| ty.is_object(db))
+                    })
+            {
+                *result = true;
+                return;
+            }
         }
 
-        // If either of the parameter lists is gradual (`...`), then it is assignable to and from
-        // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return relation.is_assignability();
+            // If either of the parameter lists is gradual (`...`), then it is assignable to and from
+            // any other parameter list, but not a subtype or supertype of any other parameter list.
+            mode.set_result(
+                mode.as_relation()
+                    .is_some_and(|relation| relation.is_assignability()),
+            );
+            return;
         }
 
-        let mut parameters = ParametersZip {
-            current_self: None,
-            current_other: None,
-            iter_self: self.parameters.iter(),
-            iter_other: other.parameters.iter(),
-        };
+        let mut parameters = ParametersZip::new(self.parameters.iter(), other.parameters.iter());
 
         // Collect all the standard parameters that have only been matched against a variadic
         // parameter which means that the keyword variant is still unmatched.
@@ -655,9 +666,15 @@ impl<'db> Signature<'db> {
 
         loop {
             let Some(next_parameter) = parameters.next() else {
-                // All parameters have been checked or both the parameter lists were empty. In
-                // either case, `self` is a subtype of `other`.
-                return true;
+                match mode {
+                    SignatureCheckMode::Relation { result, .. } => {
+                        // All parameters have been checked or both the parameter lists were empty. In
+                        // either case, `self` is a subtype of `other`.
+                        *result = true;
+                        return;
+                    }
+                    SignatureCheckMode::InferSpecialization { .. } => break,
+                }
             };
 
             match next_parameter {
@@ -673,11 +690,12 @@ impl<'db> Signature<'db> {
                     ParameterKind::PositionalOnly { default_type, .. }
                     | ParameterKind::PositionalOrKeyword { default_type, .. }
                     | ParameterKind::KeywordOnly { default_type, .. } => {
-                        // For `self <: other` to be valid, if there are no more parameters in
-                        // `other`, then the non-variadic parameters in `self` must have a default
-                        // value.
                         if default_type.is_none() {
-                            return false;
+                            // For `self <: other` to be valid, if there are no more parameters in
+                            // `other`, then the non-variadic parameters in `self` must have a default
+                            // value.
+                            mode.set_result(false);
+                            return;
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -689,7 +707,8 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return false;
+                    mode.set_result(false);
+                    return;
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -707,17 +726,34 @@ impl<'db> Signature<'db> {
                                 default_type: other_default,
                                 ..
                             },
-                        ) => {
-                            if self_default.is_none() && other_default.is_some() {
-                                return false;
+                        ) => match mode {
+                            SignatureCheckMode::Relation { relation, result } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    *result = false;
+                                    return;
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                    *relation,
+                                ) {
+                                    *result = false;
+                                    return;
+                                }
                             }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            SignatureCheckMode::InferSpecialization {
+                                builder,
+                                has_failed: result,
+                            } => {
+                                if let (Some(self_type), Some(other_type)) = (
+                                    self_parameter.annotated_type(),
+                                    other_parameter.annotated_type(),
+                                ) {
+                                    *result = builder.infer(self_type, other_type).is_err();
+                                    return;
+                                }
                             }
-                        }
+                        },
 
                         (
                             ParameterKind::PositionalOrKeyword {
@@ -729,18 +765,38 @@ impl<'db> Signature<'db> {
                                 default_type: other_default,
                             },
                         ) => {
-                            if self_name != other_name {
-                                return false;
-                            }
-                            // The following checks are the same as positional-only parameters.
-                            if self_default.is_none() && other_default.is_some() {
-                                return false;
-                            }
-                            if !check_types(
-                                other_parameter.annotated_type(),
-                                self_parameter.annotated_type(),
-                            ) {
-                                return false;
+                            match mode {
+                                SignatureCheckMode::Relation { relation, result } => {
+                                    if self_name != other_name {
+                                        *result = false;
+                                        return;
+                                    }
+                                    // The following checks are the same as positional-only parameters.
+                                    if self_default.is_none() && other_default.is_some() {
+                                        *result = false;
+                                        return;
+                                    }
+                                    if !check_types(
+                                        other_parameter.annotated_type(),
+                                        self_parameter.annotated_type(),
+                                        *relation,
+                                    ) {
+                                        *result = false;
+                                        return;
+                                    }
+                                }
+                                SignatureCheckMode::InferSpecialization {
+                                    builder,
+                                    has_failed: result,
+                                } => {
+                                    if let (Some(self_type), Some(other_type)) = (
+                                        self_parameter.annotated_type(),
+                                        other_parameter.annotated_type(),
+                                    ) {
+                                        *result = builder.infer(self_type, other_type).is_err();
+                                        return;
+                                    }
+                                }
                             }
                         }
 
@@ -749,11 +805,12 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if !check_types(
+                            if mode.perform_check(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
+                                check_types,
                             ) {
-                                return false;
+                                return;
                             }
 
                             if matches!(
@@ -774,7 +831,7 @@ impl<'db> Signature<'db> {
                             // checked against the variadic parameter in `self`. This loop does
                             // that by only moving the `other` iterator forward.
                             loop {
-                                let Some(other_parameter) = parameters.peek_other() else {
+                                let Some(other_parameter) = parameters.peek_right() else {
                                     break;
                                 };
                                 match other_parameter.kind() {
@@ -789,22 +846,24 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if !check_types(
+                                if mode.perform_check(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
+                                    check_types,
                                 ) {
-                                    return false;
+                                    return;
                                 }
-                                parameters.next_other();
+                                parameters.next_right();
                             }
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !check_types(
+                            if mode.perform_check(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
+                                check_types,
                             ) {
-                                return false;
+                                return;
                             }
                         }
 
@@ -819,7 +878,10 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return false,
+                        _ => {
+                            mode.set_result(false);
+                            return;
+                        }
                     }
                 }
             }
@@ -853,7 +915,8 @@ impl<'db> Signature<'db> {
                     // previous loop. They cannot be matched against any parameter in `other` which
                     // only contains keyword-only and keyword-variadic parameters so the subtype
                     // relation is invalid.
-                    return false;
+                    mode.set_result(false);
+                    return;
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -880,13 +943,16 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return false;
+                                    mode.set_result(false);
+                                    return;
                                 }
-                                if !check_types(
+
+                                if mode.perform_check(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
+                                    check_types,
                                 ) {
-                                    return false;
+                                    return;
                                 }
                             }
                             _ => unreachable!(
@@ -894,29 +960,56 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !check_types(
-                            other_parameter.annotated_type(),
-                            self_keyword_variadic_type,
-                        ) {
-                            return false;
+                        match mode {
+                            SignatureCheckMode::Relation { relation, result } => {
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_keyword_variadic_type,
+                                    *relation,
+                                ) {
+                                    *result = false;
+                                    return;
+                                }
+                            }
+                            SignatureCheckMode::InferSpecialization {
+                                builder,
+                                has_failed: result,
+                            } => {
+                                if let Some(other_type) = other_parameter.annotated_type() {
+                                    *result = builder
+                                        .infer(
+                                            self_keyword_variadic_type.unwrap_or(Type::unknown()),
+                                            other_type,
+                                        )
+                                        .is_err();
+                                    return;
+                                }
+                            }
                         }
                     } else {
-                        return false;
+                        mode.set_result(false);
+                        return;
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return false;
+                        mode.set_result(false);
+                        return;
                     };
-                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
-                        return false;
+                    if mode.perform_check(
+                        other_parameter.annotated_type(),
+                        self_keyword_variadic_type,
+                        check_types,
+                    ) {
+                        return;
                     }
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return false;
+                    mode.set_result(false);
+                    return;
                 }
             }
         }
@@ -925,11 +1018,12 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return false;
+                mode.set_result(false);
+                return;
             }
         }
 
-        true
+        mode.set_result(true);
     }
 
     /// Create a new signature with the given definition.
@@ -1588,6 +1682,152 @@ impl<'db> ParameterKind<'db> {
 pub(crate) enum ParameterForm {
     Value,
     Type,
+}
+
+/// The mode for checking a signature against another.
+enum SignatureCheckMode<'a, 'db> {
+    /// Perform type relation check between two signatures.
+    Relation {
+        relation: TypeRelation,
+        result: bool,
+    },
+    /// Perform type inference between two annotated parameter types of the signatures.
+    InferSpecialization {
+        builder: &'a mut SpecializationBuilder<'db>,
+        has_failed: bool,
+    },
+}
+
+impl<'db> SignatureCheckMode<'_, 'db> {
+    fn as_relation(&self) -> Option<&TypeRelation> {
+        match self {
+            Self::Relation { relation, .. } => Some(relation),
+            Self::InferSpecialization { .. } => None,
+        }
+    }
+
+    /// Performs a signature check based on the current mode.
+    ///
+    /// When `SignatureCheckMode` is `Relation`, `check_func` is used to validate
+    /// the relationship between `type1` and `type2`. When `SignatureCheckMode` is
+    /// `InferSpecialization`, the `SpecializationBuilder` is used to infer the
+    /// types relationship. The return value indicates whether the caller should return
+    /// early from further processing.
+    fn perform_check<F>(
+        &mut self,
+        type1: Option<Type<'db>>,
+        type2: Option<Type<'db>>,
+        check_func: F,
+    ) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>, TypeRelation) -> bool,
+    {
+        match self {
+            Self::Relation { relation, result } => {
+                if check_func(type1, type2, *relation) {
+                    false
+                } else {
+                    *result = false;
+                    true
+                }
+            }
+            Self::InferSpecialization {
+                builder,
+                has_failed: result,
+            } => {
+                if let (Some(type1), Some(type2)) = (type1, type2) {
+                    *result = builder.infer(type1, type2).is_err();
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn set_result(&mut self, value: bool) {
+        match self {
+            Self::Relation { result, .. } => *result = value,
+            Self::InferSpecialization { has_failed, .. } => *has_failed = value,
+        }
+    }
+
+    fn result(&self) -> bool {
+        match self {
+            Self::Relation { result, .. } => *result,
+            Self::InferSpecialization { has_failed, .. } => *has_failed,
+        }
+    }
+}
+
+/// A helper struct to zip two slices of parameters together that provides control over the
+/// two iterators individually. It also keeps track of the current parameter in each
+/// iterator.
+struct ParametersZip<'a, 'db> {
+    current_left: Option<&'a Parameter<'db>>,
+    current_right: Option<&'a Parameter<'db>>,
+    iter_left: Iter<'a, Parameter<'db>>,
+    iter_right: Iter<'a, Parameter<'db>>,
+}
+
+impl<'a, 'db> ParametersZip<'a, 'db> {
+    fn new(iter_left: Iter<'a, Parameter<'db>>, iter_right: Iter<'a, Parameter<'db>>) -> Self {
+        Self {
+            current_left: None,
+            current_right: None,
+            iter_left,
+            iter_right,
+        }
+    }
+
+    /// Move to the next parameter in both the `left` and `right` parameter iterators,
+    /// [`None`] if both iterators are exhausted.
+    fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+        match (self.next_left(), self.next_right()) {
+            (Some(left_param), Some(right_param)) => {
+                Some(EitherOrBoth::Both(left_param, right_param))
+            }
+            (Some(left_param), None) => Some(EitherOrBoth::Left(left_param)),
+            (None, Some(right_param)) => Some(EitherOrBoth::Right(right_param)),
+            (None, None) => None,
+        }
+    }
+
+    /// Move to the next parameter in the `left` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_left(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_left = self.iter_left.next();
+        self.current_left
+    }
+
+    /// Move to the next parameter in the `right` parameter iterator, [`None`] if the
+    /// iterator is exhausted.
+    fn next_right(&mut self) -> Option<&'a Parameter<'db>> {
+        self.current_right = self.iter_right.next();
+        self.current_right
+    }
+
+    /// Peek at the next parameter in the `right` parameter iterator without consuming it.
+    fn peek_right(&mut self) -> Option<&'a Parameter<'db>> {
+        self.iter_right.clone().next()
+    }
+
+    /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+    /// remaining parameters in the `left` and `right` iterators respectively.
+    ///
+    /// The returned iterators starts with the current parameter, if any, followed by the
+    /// remaining parameters in the respective iterators.
+    fn into_remaining(
+        self,
+    ) -> (
+        impl Iterator<Item = &'a Parameter<'db>>,
+        impl Iterator<Item = &'a Parameter<'db>>,
+    ) {
+        (
+            self.current_left.into_iter().chain(self.iter_left),
+            self.current_right.into_iter().chain(self.iter_right),
+        )
+    }
 }
 
 #[cfg(test)]
