@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Options",
   "type": "object",
   "properties": {
@@ -7,7 +7,7 @@
       "description": "Configures the type checking environment.",
       "anyOf": [
         {
-          "$ref": "#/definitions/EnvironmentOptions"
+          "$ref": "#/$defs/EnvironmentOptions"
         },
         {
           "type": "null"
@@ -15,20 +15,21 @@
       ]
     },
     "overrides": {
-      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations that apply to matching files. Multiple overrides can match the same file, with later overrides taking precedence.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/OverrideOptions"
-      }
-    },
-    "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule. * `warn`: Enable the rule and create a warning diagnostic. * `error`: Enable the rule and create an error diagnostic. ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "description": "Override configurations for specific file patterns.\n\nEach override specifies include/exclude patterns and rule configurations\nthat apply to matching files. Multiple overrides can match the same file,\nwith later overrides taking precedence.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Rules"
+          "$ref": "#/$defs/OverridesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rules": {
+      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Rules"
         },
         {
           "type": "null"
@@ -38,7 +39,7 @@
     "src": {
       "anyOf": [
         {
-          "$ref": "#/definitions/SrcOptions"
+          "$ref": "#/$defs/SrcOptions"
         },
         {
           "type": "null"
@@ -48,7 +49,7 @@
     "terminal": {
       "anyOf": [
         {
-          "$ref": "#/definitions/TerminalOptions"
+          "$ref": "#/$defs/TerminalOptions"
         },
         {
           "type": "null"
@@ -57,32 +58,36 @@
     }
   },
   "additionalProperties": false,
-  "definitions": {
+  "$defs": {
     "EnvironmentOptions": {
       "type": "object",
       "properties": {
         "extra-paths": {
-          "description": "List of user-provided paths that should take first priority in the module resolution. Examples in other type checkers are mypy's `MYPYPATH` environment variable, or pyright's `stubPath` configuration setting.",
+          "description": "List of user-provided paths that should take first priority in the module resolution.\nExamples in other type checkers are mypy's `MYPYPATH` environment variable,\nor pyright's `stubPath` configuration setting.",
           "type": [
             "array",
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/RelativePathBuf"
           }
         },
         "python": {
-          "description": "Path to the Python installation from which ty resolves type information and third-party dependencies.\n\nty will search in the path's `site-packages` directories for type information and third-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
-          "type": [
-            "string",
-            "null"
+          "description": "Path to the Python installation from which ty resolves type information and third-party dependencies.\n\nty will search in the path's `site-packages` directories for type information and\nthird-party imports.\n\nThis option is commonly used to specify the path to a virtual environment.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to analyze the source code. If specified, ty will understand conditions based on comparisons with `sys.platform`, such as are commonly found in typeshed to reflect the differing contents of the standard library across platforms. If `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
+          "description": "Specifies the target platform that will be used to analyze the source code.\nIf specified, ty will understand conditions based on comparisons with `sys.platform`, such\nas are commonly found in typeshed to reflect the differing contents of the standard library across platforms.\nIf `all` is specified, ty will assume that the source code can run on any platform.\n\nIf no platform is specified, ty will use the current platform:\n- `win32` for Windows\n- `darwin` for macOS\n- `android` for Android\n- `ios` for iOS\n- `linux` for everything else",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonPlatform"
+              "$ref": "#/$defs/RangedValue3"
             },
             {
               "type": "null"
@@ -90,10 +95,10 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`). If a version is provided, ty will generate errors if the source code makes use of language features that are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference to determine a value: 1. Check for the `project.requires-python` setting in a `pyproject.toml` file and use the minimum version from the specified range 2. Check for an activated or configured Python environment and attempt to infer the Python version of that environment 3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons with `sys.version_info`. These are commonly found in typeshed, for example, to reflect the differing contents of the standard library across Python versions.",
+          "description": "Specifies the version of Python that will be used to analyze the source code.\nThe version should be specified as a string in the format `M.m` where `M` is the major version\nand `m` is the minor (e.g. `\"3.0\"` or `\"3.6\"`).\nIf a version is provided, ty will generate errors if the source code makes use of language features\nthat are not supported in that version.\n\nIf a version is not specified, ty will try the following techniques in order of preference\nto determine a value:\n1. Check for the `project.requires-python` setting in a `pyproject.toml` file\n   and use the minimum version from the specified range\n2. Check for an activated or configured Python environment\n   and attempt to infer the Python version of that environment\n3. Fall back to the default value (see below)\n\nFor some language features, ty can also understand conditionals based on comparisons\nwith `sys.version_info`. These are commonly found in typeshed, for example,\nto reflect the differing contents of the standard library across Python versions.",
           "anyOf": [
             {
-              "$ref": "#/definitions/PythonVersion"
+              "$ref": "#/$defs/RangedValue2"
             },
             {
               "type": "null"
@@ -101,20 +106,24 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
           "type": [
             "array",
             "null"
           ],
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/RelativePathBuf"
           }
         },
         "typeshed": {
-          "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types. If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib, bundled as a zip file in the binary",
-          "type": [
-            "string",
-            "null"
+          "description": "Optional path to a \"typeshed\" directory on disk for us to use for standard-library types.\nIf this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,\nbundled as a zip file in the binary",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       },
@@ -126,25 +135,19 @@
           "title": "Ignore",
           "description": "The lint is disabled and should not run.",
           "type": "string",
-          "enum": [
-            "ignore"
-          ]
+          "const": "ignore"
         },
         {
           "title": "Warn",
           "description": "The lint is enabled and diagnostic should have a warning severity.",
           "type": "string",
-          "enum": [
-            "warn"
-          ]
+          "const": "warn"
         },
         {
           "title": "Error",
           "description": "The lint is enabled and diagnostics have an error severity.",
           "type": "string",
-          "enum": [
-            "error"
-          ]
+          "const": "error"
         }
       ]
     },
@@ -152,18 +155,14 @@
       "description": "The diagnostic output format.",
       "oneOf": [
         {
-          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`. Moreover, diagnostic messages may include additional context and annotations on the input to help understand the message.",
+          "description": "The default full mode will print \"pretty\" diagnostics.\n\nThat is, color will be used when printing to a `tty`.\nMoreover, diagnostic messages may include additional\ncontext and annotations on the input to help understand\nthe message.",
           "type": "string",
-          "enum": [
-            "full"
-          ]
+          "const": "full"
         },
         {
-          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on a single line. Only the most important or primary aspects of the diagnostic are included. Contextual information is dropped.\n\nThis may use color when printing to a `tty`.",
+          "description": "Print diagnostics in a concise mode.\n\nThis will guarantee that each diagnostic is printed on\na single line. Only the most important or primary aspects\nof the diagnostic are included. Contextual information is\ndropped.\n\nThis may use color when printing to a `tty`.",
           "type": "string",
-          "enum": [
-            "concise"
-          ]
+          "const": "concise"
         }
       ]
     },
@@ -171,30 +170,32 @@
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`. Exclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "include": {
-          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
-        },
-        "rules": {
-          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules taking precedence for matching files. You can set rules to different severity levels or disable them entirely.",
+          "description": "A list of file and directory patterns to exclude from this override.\n\nPatterns follow a syntax similar to `.gitignore`.\nExclude patterns take precedence over include patterns within the same override.\n\nIf not specified, defaults to `[]` (excludes no files).",
           "anyOf": [
             {
-              "$ref": "#/definitions/Rules"
+              "$ref": "#/$defs/RangedValue4"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "include": {
+          "description": "A list of file and directory patterns to include for this override.\n\nThe `include` option follows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare affected by this override.\n\nIf not specified, defaults to `[\"**\"]` (matches all files).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RangedValue4"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rules": {
+          "description": "Rule overrides for files matching the include/exclude patterns.\n\nThese rules will be merged with the global rules, with override rules\ntaking precedence for matching files. You can set rules to different\nseverity levels or disable them entirely.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Rules"
             },
             {
               "type": "null"
@@ -204,8 +205,15 @@
       },
       "additionalProperties": false
     },
+    "OverridesOptions": {
+      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence.\n\n### Precedence\n\n- Later overrides in the array take precedence over earlier ones\n- Override rules take precedence over global rules for matching files\n\n### Examples\n\n```toml\n# Relax rules for test files\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RangedValue7"
+      }
+    },
     "PythonPlatform": {
-      "description": "The target platform to assume when resolving types.\n",
+      "description": "Do not make any assumptions about the target platform.\n\nAssume a specific target platform like `linux`, `darwin` or `win32`.\n\nWe use a string (instead of individual enum variants), as the set of possible platforms may change over time. See <https://docs.python.org/3/library/sys.html#sys.platform> for some known platform identifiers.",
       "anyOf": [
         {
           "type": "string"
@@ -268,16 +276,55 @@
         }
       ]
     },
+    "RangedValue": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "$ref": "#/$defs/SystemPathBuf"
+    },
+    "RangedValue2": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "$ref": "#/$defs/PythonVersion"
+    },
+    "RangedValue3": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "$ref": "#/$defs/PythonPlatform"
+    },
+    "RangedValue4": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/RangedValue5"
+      }
+    },
+    "RangedValue5": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "type": "string"
+    },
+    "RangedValue6": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "$ref": "#/$defs/OutputFormat"
+    },
+    "RangedValue7": {
+      "description": "A value that \"remembers\" where it comes from (source) and its range in source.\n\n## Equality, Hash, and Ordering\nThe equality, hash, and ordering are solely based on the value. They disregard the value's range\nor source.\n\nThis ensures that two resolved configurations are identical even if the position of a value has changed\nor if the values were loaded from different sources.",
+      "$ref": "#/$defs/OverrideOptions"
+    },
+    "RelativePathBuf": {
+      "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.",
+      "$ref": "#/$defs/RangedValue"
+    },
     "Rules": {
+      "$ref": "#/$defs/Rules2"
+    },
+    "Rules2": {
       "type": "object",
       "properties": {
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
           "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -285,9 +332,10 @@
           "title": "detects calls to non-callable objects",
           "description": "## What it does\nChecks for calls to non-callable objects.\n\n## Why is this bad?\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4()  # TypeError: 'int' object is not callable\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -295,9 +343,10 @@
           "title": "detects when an argument is used as both a value and a type form in a call",
           "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -305,9 +354,10 @@
           "title": "detects conflicting declarations",
           "description": "## What it does\nChecks whether a variable has been declared as two conflicting types.\n\n## Why is this bad\nA variable with two conflicting declarations likely indicates a mistake.\nMoreover, it could lead to incorrect or ill-defined type inference for\nother code that relies on these variables.\n\n## Examples\n```python\nif b:\n    a: int\nelse:\n    a: str\n\na = 1\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -315,9 +365,10 @@
           "title": "detects conflicting metaclasses",
           "description": "## What it does\nChecks for class definitions where the metaclass of the class\nbeing created would not be a subclass of the metaclasses of\nall the class's bases.\n\n## Why is it bad?\nSuch a class definition raises a `TypeError` at runtime.\n\n## Examples\n```python\nclass M1(type): ...\nclass M2(type): ...\nclass A(metaclass=M1): ...\nclass B(metaclass=M2): ...\n\n# TypeError: metaclass conflict\nclass C(A, B): ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -325,9 +376,10 @@
           "title": "detects cyclic class definitions",
           "description": "## What it does\nChecks for class definitions in stub files that inherit\n(directly or indirectly) from themselves.\n\n## Why is it bad?\nAlthough forward references are natively supported in stub files,\ninheritance cycles are still disallowed, as it is impossible to\nresolve a consistent [method resolution order] for a class that\ninherits from itself.\n\n## Examples\n```python\n# foo.pyi\nclass A(B): ...\nclass B(A): ...\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -335,9 +387,10 @@
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -345,9 +398,10 @@
           "title": "detects division by zero",
           "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
           "default": "ignore",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -355,9 +409,10 @@
           "title": "detects class definitions with duplicate bases",
           "description": "## What it does\nChecks for class definitions with duplicate bases.\n\n## Why is this bad?\nClass definitions with duplicate bases raise `TypeError` at runtime.\n\n## Examples\n```python\nclass A: ...\n\n# TypeError: duplicate base class\nclass B(A, A): ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -365,9 +420,10 @@
           "title": "detects dataclass definitions with more than one usage of `KW_ONLY`",
           "description": "## What it does\nChecks for dataclass definitions with more than one field\nannotated with `KW_ONLY`.\n\n## Why is this bad?\n`dataclasses.KW_ONLY` is a special marker used to\nemulate the `*` syntax in normal signatures.\nIt can only be used once per dataclass.\n\nAttempting to annotate two different fields with\nit will lead to a runtime error.\n\n## Examples\n```python\nfrom dataclasses import dataclass, KW_ONLY\n\n@dataclass\nclass A:  # Crash at runtime\n    b: int\n    _1: KW_ONLY\n    c: str\n    _2: KW_ONLY\n    d: bytes\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -375,9 +431,10 @@
           "title": "detects forward type annotations with escape characters",
           "description": "TODO #14889",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -385,9 +442,10 @@
           "title": "detects F-strings in type annotation positions",
           "description": "## What it does\nChecks for f-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use f-string notation.\n\n## Examples\n```python\ndef test(): -> f\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -395,9 +453,10 @@
           "title": "detects implicit concatenated strings in type annotations",
           "description": "## What it does\nChecks for implicit concatenated strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use implicit concatenated strings.\n\n## Examples\n```python\ndef test(): -> \"Literal[\" \"5\" \"]\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"Literal[5]\":\n    ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -405,9 +464,10 @@
           "title": "detects class definitions with an inconsistent MRO",
           "description": "## What it does\nChecks for classes with an inconsistent [method resolution order] (MRO).\n\n## Why is this bad?\nClasses with an inconsistent MRO will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass A: ...\nclass B(A): ...\n\n# TypeError: Cannot create a consistent method resolution order\nclass C(A, B): ...\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -415,9 +475,10 @@
           "title": "detects index out of bounds errors",
           "description": "## What it does\nChecks for attempts to use an out of bounds index to get an item from\na container.\n\n## Why is this bad?\nUsing an out of bounds index will raise an `IndexError` at runtime.\n\n## Examples\n```python\nt = (0, 1, 2)\nt[3]  # IndexError: tuple index out of range\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -425,9 +486,10 @@
           "title": "detects class definitions that raise `TypeError` due to instance layout conflict",
           "description": "## What it does\nChecks for classes definitions which will fail at runtime due to\n\"instance memory layout conflicts\".\n\nThis error is usually caused by attempting to combine multiple classes\nthat define non-empty `__slots__` in a class's [Method Resolution Order]\n(MRO), or by attempting to combine multiple builtin classes in a class's\nMRO.\n\n## Why is this bad?\nInheriting from bases with conflicting instance memory layouts\nwill lead to a `TypeError` at runtime.\n\nAn instance memory layout conflict occurs when CPython cannot determine\nthe memory layout instances of a class should have, because the instance\nmemory layout of one of its bases conflicts with the instance memory layout\nof one or more of its other bases.\n\nFor example, if a Python class defines non-empty `__slots__`, this will\nimpact the memory layout of instances of that class. Multiple inheritance\nfrom more than one different class defining non-empty `__slots__` is not\nallowed:\n\n```python\nclass A:\n    __slots__ = (\"a\", \"b\")\n\nclass B:\n    __slots__ = (\"a\", \"b\")  # Even if the values are the same\n\n# TypeError: multiple bases have instance lay-out conflict\nclass C(A, B): ...\n```\n\nAn instance layout conflict can also be caused by attempting to use\nmultiple inheritance with two builtin classes, due to the way that these\nclasses are implemented in a CPython C extension:\n\n```python\nclass A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict\n```\n\nNote that pure-Python classes with no `__slots__`, or pure-Python classes\nwith empty `__slots__`, are always compatible:\n\n```python\nclass A: ...\nclass B:\n    __slots__ = ()\nclass C:\n    __slots__ = (\"a\", \"b\")\n\n# fine\nclass D(A, B, C): ...\n```\n\n## Known problems\nClasses that have \"dynamic\" definitions of `__slots__` (definitions do not consist\nof string literals, or tuples of string literals) are not currently considered solid\nbases by ty.\n\nAdditionally, this check is not exhaustive: many C extensions (including several in\nthe standard library) define classes that use extended memory layouts and thus cannot\ncoexist in a single MRO. Since it is currently not possible to represent this fact in\nstub files, having a full knowledge of these classes is also impossible. When it comes\nto classes that do not define `__slots__` at the Python level, therefore, ty, currently\nonly hard-codes a number of cases where it knows that a class will produce instances with\nan atypical memory layout.\n\n## Further reading\n- [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)\n- [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)\n\n[Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -435,9 +497,10 @@
           "title": "detects call arguments whose type is not assignable to the corresponding typed parameter",
           "description": "## What it does\nDetects call arguments whose type is not assignable to the corresponding typed parameter.\n\n## Why is this bad?\nPassing an argument of a type the function (or callable object) does not accept violates\nthe expectations of the function author and may cause unexpected runtime errors within the\nbody of the function.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc(\"foo\")  # error: [invalid-argument-type]\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -445,9 +508,10 @@
           "title": "detects invalid assignments",
           "description": "## What it does\nChecks for assignments where the type of the value\nis not [assignable to] the type of the assignee.\n\n## Why is this bad?\nSuch assignments break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\na: int = ''\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -455,9 +519,10 @@
           "title": "Invalid attribute access",
           "description": "## What it does\nChecks for assignments to class variables from instances\nand assignments to instance variables from its class.\n\n## Why is this bad?\nIncorrect assignments break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\nclass C:\n    class_var: ClassVar[int] = 1\n    instance_var: int\n\nC.class_var = 3  # okay\nC().class_var = 3  # error: Cannot assign to class variable\n\nC().instance_var = 3  # okay\nC.instance_var = 3  # error: Cannot assign to instance variable\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -465,9 +530,10 @@
           "title": "detects class bases that will cause the class definition to raise an exception at runtime",
           "description": "## What it does\nChecks for class definitions that have bases which are not instances of `type`.\n\n## Why is this bad?\nClass definitions with bases like this will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nclass A(42): ...  # error: [invalid-base]\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -475,9 +541,10 @@
           "title": "detects expressions used in with statements that don't implement the context manager protocol",
           "description": "## What it does\nChecks for expressions used in `with` statements\nthat do not implement the context manager protocol.\n\n## Why is this bad?\nSuch a statement will raise `TypeError` at runtime.\n\n## Examples\n```python\n# TypeError: 'int' object does not support the context manager protocol\nwith 1:\n    print(2)\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -485,9 +552,10 @@
           "title": "detects invalid declarations",
           "description": "## What it does\nChecks for declarations where the inferred type of an existing symbol\nis not [assignable to] its post-hoc declared type.\n\n## Why is this bad?\nSuch declarations break the rules of the type system and\nweaken a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\na = 1\na: str\n```\n\n[assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -495,9 +563,10 @@
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
           "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a TypeError at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -505,9 +574,10 @@
           "title": "detects invalid generic classes",
           "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -515,9 +585,10 @@
           "title": "detects ignore comments that use invalid syntax",
           "description": "## What it does\nChecks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.\n\n## Why is this bad?\nA syntactically incorrect ignore comment is probably a mistake and is useless.\n\n## Examples\n```py\na = 20 / 0  # type: ignoree\n```\n\nUse instead:\n\n```py\na = 20 / 0  # type: ignore\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -525,9 +596,10 @@
           "title": "detects invalid legacy type variables",
           "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -535,9 +607,10 @@
           "title": "detects invalid `metaclass=` arguments",
           "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\n## Example\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -545,9 +618,10 @@
           "title": "detects invalid `@overload` usages",
           "description": "## What it does\nChecks for various invalid `@overload` usages.\n\n## Why is this bad?\nThe `@overload` decorator is used to define functions and methods that accepts different\ncombinations of arguments and return different types based on the arguments passed. This is\nmainly beneficial for type checkers. But, if the `@overload` usage is invalid, the type\nchecker may not be able to provide correct type information.\n\n## Example\n\nDefining only one overload:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo(x: int) -> int: ...\ndef foo(x: int | None) -> int | None:\n    return x\n```\n\nOr, not providing an implementation for the overloaded definition:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo() -> None: ...\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -555,9 +629,10 @@
           "title": "detects default values that can't be assigned to the parameter's annotated type",
           "description": "## What it does\nChecks for default values that can't be\nassigned to the parameter's annotated type.\n\n## Why is this bad?\nThis breaks the rules of the type system and\nweakens a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\ndef f(a: int = ''): ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -565,9 +640,10 @@
           "title": "detects invalid protocol class definitions",
           "description": "## What it does\nChecks for invalidly defined protocol classes.\n\n## Why is this bad?\nAn invalidly defined protocol class may lead to the type checker inferring\nunexpected things. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA `Protocol` class cannot inherit from a non-`Protocol` class;\nthis raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\n...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -575,9 +651,10 @@
           "title": "detects `raise` statements that raise invalid exceptions or use invalid causes",
           "description": "Checks for `raise` statements that raise non-exceptions or use invalid\ncauses for their raised exceptions.\n\n## Why is this bad?\nOnly subclasses or instances of `BaseException` can be raised.\nFor an exception's cause, the same rules apply, except that `None` is also\npermitted. Violating these rules results in a `TypeError` at runtime.\n\n## Examples\n```python\ndef f():\n    try:\n        something()\n    except NameError:\n        raise \"oops!\" from f\n\ndef g():\n    raise NotImplemented from 42\n```\n\nUse instead:\n```python\ndef f():\n    try:\n        something()\n    except NameError as e:\n        raise RuntimeError(\"oops!\") from e\n\ndef g():\n    raise NotImplementedError from None\n```\n\n## References\n- [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#raise)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -585,9 +662,10 @@
           "title": "detects returned values that can't be assigned to the function's annotated return type",
           "description": "## What it does\nDetects returned values that can't be assigned to the function's annotated return type.\n\n## Why is this bad?\nReturning an object of a type incompatible with the annotated return type may cause confusion to the user calling the function.\n\n## Examples\n```python\ndef func() -> int:\n    return \"a\"  # error: [invalid-return-type]\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -595,9 +673,10 @@
           "title": "detects invalid arguments for `super()`",
           "description": "## What it does\nDetects `super()` calls where:\n- the first argument is not a valid class literal, or\n- the second argument is not an instance or subclass of the first argument.\n\n## Why is this bad?\n`super(type, obj)` expects:\n- the first argument to be a class,\n- and the second argument to satisfy one of the following:\n  - `isinstance(obj, type)` is `True`\n  - `issubclass(obj, type)` is `True`\n\nViolating this relationship will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass A:\n    ...\nclass B(A):\n    ...\n\nsuper(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`\n\nsuper(A(), B()) # error: `A()` is not a class\n\nsuper(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`\nsuper(B, A)  # error: `A` does not satisfy `issubclass(A, B)`\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -605,9 +684,10 @@
           "title": "detects invalid syntax in forward annotations",
           "description": "TODO #14889",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -615,9 +695,10 @@
           "title": "detects invalid TypeAliasType definitions",
           "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -625,9 +706,10 @@
           "title": "detects invalid `TYPE_CHECKING` constant assignments",
           "description": "## What it does\nChecks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an\nannotation not assignable from `bool`.\n\n## Why is this bad?\nThe name `TYPE_CHECKING` is reserved for a flag that can be used to provide conditional\ncode seen only by the type checker, and not at runtime. Normally this flag is imported from\n`typing` or `typing_extensions`, but it can also be defined locally. If defined locally, it\nmust be assigned the value `False` at runtime; the type checker will consider its value to\nbe `True`. If annotated, it must be annotated as a type that can accept `bool` values.\n\n## Examples\n```python\nTYPE_CHECKING: str\nTYPE_CHECKING = ''\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -635,9 +717,10 @@
           "title": "detects invalid type forms",
           "description": "## What it does\nChecks for expressions that are used as [type expressions]\nbut cannot validly be interpreted as such.\n\n## Why is this bad?\nSuch expressions cannot be understood by ty.\nIn some cases, they might raise errors at runtime.\n\n## Examples\n```python\nfrom typing import Annotated\n\na: type[1]  # `1` is not a type\nb: Annotated[int]  # `Annotated` expects at least two arguments\n```\n[type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -645,9 +728,10 @@
           "title": "detects type guard function calls that has no narrowing effect",
           "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -655,9 +739,10 @@
           "title": "detects malformed type guard functions",
           "description": "## What it does\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f() -> TypeIs[int]: ...  # Error, no parameter\ndef f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed\ndef f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments\nclass C:\n    def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -665,9 +750,10 @@
           "title": "detects invalid type variable constraints",
           "description": "## What it does\nChecks for constrained [type variables] with only one constraint.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -675,9 +761,10 @@
           "title": "detects missing required arguments in a call",
           "description": "## What it does\nChecks for missing required arguments in a call.\n\n## Why is this bad?\nFailing to provide a required argument will raise a `TypeError` at runtime.\n\n## Examples\n```python\ndef func(x: int): ...\nfunc()  # TypeError: func() missing 1 required positional argument: 'x'\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -685,9 +772,10 @@
           "title": "detects calls that do not match any overload",
           "description": "## What it does\nChecks for calls to an overloaded function that do not match any of the overloads.\n\n## Why is this bad?\nFailing to provide the correct arguments to one of the overloads will raise a `TypeError`\nat runtime.\n\n## Examples\n```python\n@overload\ndef func(x: int): ...\n@overload\ndef func(x: bool): ...\nfunc(\"string\")  # error: [no-matching-overload]\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -695,9 +783,10 @@
           "title": "detects subscripting objects that do not support subscripting",
           "description": "## What it does\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1]  # TypeError: 'int' object is not subscriptable\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -705,9 +794,10 @@
           "title": "detects iteration over an object that is not iterable",
           "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -715,9 +805,10 @@
           "title": "detects multiple arguments for the same parameter",
           "description": "## What it does\nChecks for calls which provide more than one argument for a single parameter.\n\n## Why is this bad?\nProviding multiple values for a single parameter will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef f(x: int) -> int: ...\n\nf(1, x=2)  # Error raised here\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -725,9 +816,10 @@
           "title": "detects references to possibly unbound attributes",
           "description": "## What it does\nChecks for possibly unbound attributes.\n\n## Why is this bad?\nAttempting to access an unbound attribute will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nclass A:\n    if b:\n        c = 0\n\nA.c  # AttributeError: type object 'A' has no attribute 'c'\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -735,9 +827,10 @@
           "title": "detects implicit calls to possibly unbound methods",
           "description": "## What it does\nChecks for implicit calls to possibly unbound methods.\n\n## Why is this bad?\nExpressions such as `x[y]` and `x * y` call methods\nunder the hood (`__getitem__` and `__mul__` respectively).\nCalling an unbound method will raise an `AttributeError` at runtime.\n\n## Examples\n```python\nimport datetime\n\nclass A:\n    if datetime.date.today().weekday() != 6:\n        def __getitem__(self, v): ...\n\nA()[0]  # TypeError: 'A' object is not subscriptable\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -745,9 +838,10 @@
           "title": "detects possibly unbound imports",
           "description": "## What it does\nChecks for imports of symbols that may be unbound.\n\n## Why is this bad?\nImporting an unbound module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -755,9 +849,10 @@
           "title": "detects references to possibly undefined names",
           "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
           "default": "ignore",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -765,9 +860,10 @@
           "title": "detects raw strings in type annotation positions",
           "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -775,9 +871,10 @@
           "title": "detects redundant `cast` calls",
           "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ndef f() -> int:\n    return 10\n\ncast(int, f())  # Redundant\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -785,9 +882,10 @@
           "title": "Failed static assertion",
           "description": "## What it does\nMakes sure that the argument of `static_assert` is statically known to be true.\n\n## Why is this bad?\nA `static_assert` call represents an explicit request from the user\nfor the type checker to emit an error if the argument cannot be verified\nto evaluate to `True` in a boolean context.\n\n## Examples\n```python\nfrom ty_extensions import static_assert\n\nstatic_assert(1 + 1 == 3)  # error: evaluates to `False`\n\nstatic_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -795,9 +893,10 @@
           "title": "detects subclasses of final classes",
           "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -805,9 +904,10 @@
           "title": "detects calls passing too many positional arguments",
           "description": "## What it does\nChecks for calls that pass more positional arguments than the callable can accept.\n\n## Why is this bad?\nPassing too many positional arguments will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(): ...\n\nf(\"foo\")  # Error raised here\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -815,9 +915,10 @@
           "title": "detects failed type assertions",
           "description": "## What it does\nChecks for `assert_type()` and `assert_never()` calls where the actual type\nis not the same as the asserted type.\n\n## Why is this bad?\n`assert_type()` allows confirming the inferred type of a certain value.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    assert_type(x, str)  # error: Actual type does not match asserted type\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -825,9 +926,10 @@
           "title": "detects invalid `super()` calls where implicit arguments are unavailable.",
           "description": "## What it does\nDetects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.\n\n## Why is this bad?\nWhen `super()` is used without arguments, Python tries to find two things:\nthe nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).\nIf either of these is missing, the call will fail at runtime with a `RuntimeError`.\n\n## Examples\n```python\nsuper()  # error: no enclosing class or function found\n\ndef func():\n    super()  # error: no enclosing class or first argument exists\n\nclass A:\n    f = super()  # error: no enclosing function to provide the first argument\n\n    def method(self):\n        def nested():\n            super()  # error: first argument does not exist in this nested function\n\n        lambda: super()  # error: first argument does not exist in this lambda\n\n        (super() for _ in range(10))  # error: argument is not available in generator expression\n\n        super()  # okay! both enclosing class and first argument are available\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -835,9 +937,10 @@
           "title": "detects usages of `reveal_type` without importing it",
           "description": "## What it does\nChecks for calls to `reveal_type` without importing it.\n\n## Why is this bad?\nUsing `reveal_type` without importing it will raise a `NameError` at runtime.\n\n## Examples\n```python\nreveal_type(1)  # NameError: name 'reveal_type' is not defined\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -845,9 +948,10 @@
           "title": "detects unknown keyword arguments in calls",
           "description": "## What it does\nChecks for keyword arguments in calls that don't match any parameter of the callable.\n\n## Why is this bad?\nProviding an unknown keyword argument will raise `TypeError` at runtime.\n\n## Example\n\n```python\ndef f(x: int) -> int: ...\n\nf(x=1, y=2)  # Error raised here\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -855,9 +959,10 @@
           "title": "detects `ty: ignore` comments that reference unknown rules",
           "description": "## What it does\nChecks for `ty: ignore[code]` where `code` isn't a known lint rule.\n\n## Why is this bad?\nA `ty: ignore[code]` directive with a `code` that doesn't match\nany known rule will not suppress any type errors, and is probably a mistake.\n\n## Examples\n```py\na = 20 / 0  # ty: ignore[division-by-zer]\n```\n\nUse instead:\n\n```py\na = 20 / 0  # ty: ignore[division-by-zero]\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -865,9 +970,10 @@
           "title": "detects references to unresolved attributes",
           "description": "## What it does\nChecks for unresolved attributes.\n\n## Why is this bad?\nAccessing an unbound attribute will raise an `AttributeError` at runtime.\nAn unresolved attribute is not guaranteed to exist from the type alone,\nso this could also indicate that the object is not of the type that the user expects.\n\n## Examples\n```python\nclass A: ...\n\nA().foo  # AttributeError: 'A' object has no attribute 'foo'\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -875,9 +981,10 @@
           "title": "detects `global` statements with no definition in the global scope",
           "description": "## What it does\nDetects variables declared as `global` in an inner scope that have no explicit\nbindings or declarations in the global scope.\n\n## Why is this bad?\nFunction bodies with `global` statements can run in any order (or not at all), which makes\nit hard for static analysis tools to infer the types of globals without\nexplicit definitions or declarations.\n\n## Example\n```python\ndef f():\n    global x  # unresolved global\n    x = 42\n\ndef g():\n    print(x)  # unresolved reference\n```\n\nUse instead:\n```python\nx: int\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```\n\nOr:\n```python\nx: int | None = None\n\ndef f():\n    global x\n    x = 42\n\ndef g():\n    print(x)\n```",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -885,9 +992,10 @@
           "title": "detects unresolved imports",
           "description": "## What it does\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError`\nat runtime.\n\n## Examples\n```python\nimport foo  # ModuleNotFoundError: No module named 'foo'\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -895,9 +1003,10 @@
           "title": "detects references to names that are not defined",
           "description": "## What it does\nChecks for references to names that are not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nprint(x)  # NameError: name 'x' is not defined\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -905,9 +1014,10 @@
           "title": "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
           "description": "## What it does\nChecks for class definitions that have bases which are unsupported by ty.\n\n## Why is this bad?\nIf a class has a base that is an instance of a complex type such as a union type,\nty will not be able to resolve the [method resolution order] (MRO) for the class.\nThis will lead to an inferior understanding of your codebase and unpredictable\ntype-checking behavior.\n\n## Examples\n```python\nimport datetime\n\nclass A: ...\nclass B: ...\n\nif datetime.date.today().weekday() != 6:\n    C = A\nelse:\n    C = B\n\nclass D(C): ...  # error: [unsupported-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",
           "default": "warn",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -915,9 +1025,10 @@
           "title": "detects boolean conversion where the object incorrectly implements `__bool__`",
           "description": "## What it does\nChecks for bool conversions where the object doesn't correctly implement `__bool__`.\n\n## Why is this bad?\nIf an exception is raised when you attempt to evaluate the truthiness of an object,\nusing the object in a boolean context will fail at runtime.\n\n## Examples\n\n```python\nclass NotBoolable:\n    __bool__ = None\n\nb1 = NotBoolable()\nb2 = NotBoolable()\n\nif b1:  # exception raised here\n    pass\n\nb1 and b2  # exception raised here\nnot b1  # exception raised here\nb1 < b2 < b1  # exception raised here\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -925,9 +1036,10 @@
           "title": "detects binary, unary, or comparison expressions where the operands don't support the operator",
           "description": "## What it does\nChecks for binary expressions, comparisons, and unary expressions where\nthe operands don't support the operator.\n\n## Why is this bad?\nAttempting to use an unsupported operator will raise a `TypeError` at\nruntime.\n\n## Examples\n```python\nclass A: ...\n\nA() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -935,9 +1047,10 @@
           "title": "detects unused `type: ignore` comments",
           "description": "## What it does\nChecks for `type: ignore` or `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\nA `type: ignore` directive that no longer matches any diagnostic violations is likely\nincluded by mistake, and should be removed to avoid confusion.\n\n## Examples\n```py\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
           "default": "ignore",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
@@ -945,57 +1058,68 @@
           "title": "detects a slice step size of zero",
           "description": "## What it does\nChecks for step size 0 in slices.\n\n## Why is this bad?\nA slice with a step size of zero will raise a `ValueError` at runtime.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         }
       },
       "additionalProperties": {
-        "$ref": "#/definitions/Level"
+        "$ref": "#/$defs/Level"
       }
     },
     "SrcOptions": {
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`:\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches files or directories named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid. - `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`). To exclude any directory or file named `src`, use `**/src` instead.\n\nBy default, ty excludes commonly ignored directories:\n\n- `**/.bzr/` - `**/.direnv/` - `**/.eggs/` - `**/.git/` - `**/.git-rewrite/` - `**/.hg/` - `**/.mypy_cache/` - `**/.nox/` - `**/.pants.d/` - `**/.pytype/` - `**/.ruff_cache/` - `**/.svn/` - `**/.tox/` - `**/.venv/` - `**/__pypackages__/` - `**/_build/` - `**/buck-out/` - `**/dist/` - `**/node_modules/` - `**/venv/`\n\nYou can override any default exclude by using a negated pattern. For example, to re-include `dist` use `exclude = [\"!dist\"]`",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of file and directory patterns to exclude from type checking.\n\nPatterns follow a syntax similar to `.gitignore`:\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches files or directories named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n- `!pattern` negates a pattern (undoes the exclusion of files that would otherwise be excluded)\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\nTo exclude any directory or file named `src`, use `**/src` instead.\n\nBy default, ty excludes commonly ignored directories:\n\n- `**/.bzr/`\n- `**/.direnv/`\n- `**/.eggs/`\n- `**/.git/`\n- `**/.git-rewrite/`\n- `**/.hg/`\n- `**/.mypy_cache/`\n- `**/.nox/`\n- `**/.pants.d/`\n- `**/.pytype/`\n- `**/.ruff_cache/`\n- `**/.svn/`\n- `**/.tox/`\n- `**/.venv/`\n- `**/__pypackages__/`\n- `**/_build/`\n- `**/buck-out/`\n- `**/dist/`\n- `**/node_modules/`\n- `**/venv/`\n\nYou can override any default exclude by using a negated pattern. For example,\nto re-include `dist` use `exclude = [\"!dist\"]`",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RangedValue4"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "include": {
-          "description": "A list of files and directories to check. The `include` option follows a similar syntax to `.gitignore` but reversed: Including a file or directory will make it so that it (and its contents) are type checked.\n\n- `./src/` matches only a directory - `./src` matches both files and directories - `src` matches a file or directory named `src` - `*` matches any (possibly empty) sequence of characters (except `/`). - `**` matches zero or more path components. This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error. A sequence of more than two consecutive `*` characters is also invalid. - `?` matches any single character except `/` - `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode, so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only matches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "A list of files and directories to check. The `include` option\nfollows a similar syntax to `.gitignore` but reversed:\nIncluding a file or directory will make it so that it (and its contents)\nare type checked.\n\n- `./src/` matches only a directory\n- `./src` matches both files and directories\n- `src` matches a file or directory named `src`\n- `*` matches any (possibly empty) sequence of characters (except `/`).\n- `**` matches zero or more path components.\n  This sequence **must** form a single path component, so both `**a` and `b**` are invalid and will result in an error.\n  A sequence of more than two consecutive `*` characters is also invalid.\n- `?` matches any single character except `/`\n- `[abc]` matches any character inside the brackets. Character sequences can also specify ranges of characters, as ordered by Unicode,\n  so e.g. `[0-9]` specifies any character between `0` and `9` inclusive. An unclosed bracket is invalid.\n\nAll paths are anchored relative to the project root (`src` only\nmatches `<project_root>/src` and not `<project_root>/test/src`).\n\n`exclude` takes precedence over `include`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RangedValue4"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "respect-ignore-files": {
-          "description": "Whether to automatically exclude files that are ignored by `.ignore`, `.gitignore`, `.git/info/exclude`, and global `gitignore` files. Enabled by default.",
+          "description": "Whether to automatically exclude files that are ignored by `.ignore`,\n`.gitignore`, `.git/info/exclude`, and global `gitignore` files.\nEnabled by default.",
           "type": [
             "boolean",
             "null"
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat) * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path * otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file), it will also be included in the first party search path.",
-          "deprecated": true,
-          "type": [
-            "string",
-            "null"
-          ]
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelativePathBuf"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "deprecated": true
         }
       },
       "additionalProperties": false
+    },
+    "SystemPathBuf": {
+      "description": "An owned, mutable path on [`System`](`super::System`) (akin to [`String`]).\n\nThe path is guaranteed to be valid UTF-8.",
+      "type": "string"
     },
     "TerminalOptions": {
       "type": "object",
@@ -1011,7 +1135,7 @@
           "description": "The format to use for printing diagnostic messages.\n\nDefaults to `full`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/OutputFormat"
+              "$ref": "#/$defs/RangedValue6"
             },
             {
               "type": "null"
