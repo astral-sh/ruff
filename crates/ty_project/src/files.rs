@@ -61,7 +61,7 @@ impl IndexedFiles {
         // Calling `zalsa_mut` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set.
         // TODO: Use a non-internal API instead https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = db.as_dyn_database_mut().zalsa_mut();
+        // let _ = db.as_dyn_database_mut().zalsa_mut();
 
         // Replace the state with lazy. The `IndexedMut` guard restores the state
         // to `State::Indexed`  or sets a new `PackageFiles` when it gets dropped to ensure the state

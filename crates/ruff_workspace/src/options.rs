@@ -1,5 +1,6 @@
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
+use schemars::JsonSchema;
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -564,8 +565,8 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> String {
-        "DeprecatedTopLevelLintOptions".to_owned()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "DeprecatedTopLevelLintOptions".into()
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed(concat!(
@@ -574,28 +575,19 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::Schema;
-
-        let common_schema = LintCommonOptions::json_schema(generator);
-        let mut schema_obj = common_schema.into_object();
-
-        if let Some(object) = schema_obj.object.as_mut() {
-            for property in object.properties.values_mut() {
-                if let Schema::Object(property_object) = property {
-                    if let Some(metadata) = &mut property_object.metadata {
-                        metadata.deprecated = true;
-                    } else {
-                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
-                            deprecated: true,
-                            ..schemars::schema::Metadata::default()
-                        }));
-                    }
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let mut common_schema = LintCommonOptions::json_schema(generator);
+        
+        // Mark all properties as deprecated
+        if let Some(properties) = common_schema.get_mut("properties").and_then(|p| p.as_object_mut()) {
+            for property_value in properties.values_mut() {
+                if let Some(property_obj) = property_value.as_object_mut() {
+                    property_obj.insert("deprecated".to_string(), true.into());
                 }
             }
         }
-
-        Schema::Object(schema_obj)
+        
+        common_schema
     }
 }
 
@@ -3859,7 +3851,7 @@ pub struct AnalyzeOptions {
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,
 /// far better error messages when deserializing.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub struct LintOptionsWire {
     // common: LintCommonOptions

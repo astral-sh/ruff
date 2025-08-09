@@ -188,11 +188,7 @@ impl PartialEq<Name> for &String {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for Name {
-    fn is_referenceable() -> bool {
-        String::is_referenceable()
-    }
-
-    fn schema_name() -> String {
+    fn schema_name() -> Cow<'static, str> {
         String::schema_name()
     }
 
@@ -200,13 +196,13 @@ impl schemars::JsonSchema for Name {
         String::schema_id()
     }
 
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         String::json_schema(generator)
     }
 
     fn _schemars_private_non_optional_json_schema(
-        generator: &mut schemars::r#gen::SchemaGenerator,
-    ) -> schemars::schema::Schema {
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
         String::_schemars_private_non_optional_json_schema(generator)
     }
 

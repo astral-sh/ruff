@@ -189,16 +189,15 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use serde_json::Value;
-    use schemars::{JsonSchema, Schema, json_schema};
+    use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
     use std::borrow::Cow;
 
     impl JsonSchema for PythonVersion {
-        fn schema_name() -> Cow<'static str> {
+        fn schema_name() -> Cow<'static, str> {
             Cow::Borrowed("PythonVersion")
         }
 
-        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+        fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
             let string_pattern_schema = json_schema!({
                 "type": "string",
                 "pattern": r"^\d+\.\d+$"

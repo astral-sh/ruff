@@ -1,6 +1,7 @@
 use ruff_macros::CacheKey;
 use ruff_python_ast::helpers::collect_import_from_member;
 use ruff_python_ast::name::QualifiedName;
+use std::borrow::Cow;
 
 use crate::{AnyImport, Imported};
 
@@ -274,15 +275,14 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for NameImports {
-    fn schema_name() -> String {
-        "NameImports".to_string()
+    fn schema_name() -> Cow<'static, str> {
+        Cow::Borrowed("NameImports")
     }
 
-    fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        schemars::schema::SchemaObject {
-            instance_type: Some(schemars::schema::InstanceType::String.into()),
-            ..Default::default()
-        }
+    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "type": "String"
+        })
         .into()
     }
 }

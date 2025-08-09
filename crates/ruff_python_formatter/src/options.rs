@@ -398,14 +398,12 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::r#gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SubschemaValidation};
+    use schemars::{json_schema, Schema, SchemaGenerator};
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
     pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {
-        Schema::Object(schemars::schema::SchemaObject {
-            const_value: Some("dynamic".to_string().into()),
-            ..Default::default()
+        json_schema!({
+            "const": "dynamic"
         })
     }
 
@@ -417,18 +415,9 @@ mod schema {
     // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
     pub(super) fn fixed(generator: &mut SchemaGenerator) -> Schema {
         let schema = generator.subschema_for::<LineWidth>();
-        Schema::Object(schemars::schema::SchemaObject {
-            metadata: Some(Box::new(Metadata {
-                description: Some(
-                    "Wrap docstring code examples at a fixed line width.".to_string(),
-                ),
-                ..Metadata::default()
-            })),
-            subschemas: Some(Box::new(SubschemaValidation {
-                one_of: Some(vec![schema]),
-                ..SubschemaValidation::default()
-            })),
-            ..Default::default()
+        json_schema!({
+            "description": "Wrap docstring code examples at a fixed line width.",
+            "oneOf": [schema]
         })
     }
 }
