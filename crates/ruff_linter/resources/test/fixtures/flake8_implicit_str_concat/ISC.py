@@ -187,3 +187,25 @@ _ = (
 		# leading comment
     "end"
 )
+
+_ = "Line1\n" + (
+        "Line2\n"
+        + "Line3"
+)
+
+_ = "Line1\n" + (
+        "start"
+        + " middle "
+        + " end"
+) + "\nLine5"
+
+_ = [
+    "start " +
+    " middle "
+    " end"
+]
+
+_ = {
+    "start " +
+    " middle "
+}
