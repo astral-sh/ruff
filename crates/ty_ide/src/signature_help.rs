@@ -14,8 +14,11 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
+use ty_python_semantic::SemanticModel;
 use ty_python_semantic::semantic_index::definition::Definition;
-use ty_python_semantic::types::{CallSignatureDetails, call_signature_details};
+use ty_python_semantic::types::{
+    CallSignatureDetails, call_signature_details, find_active_signature_from_details,
+};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -66,9 +69,11 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
 
+    let model = SemanticModel::new(db, file);
+
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
-        call_signature_details(db, file, call_expr);
+        call_signature_details(db, &model, call_expr);
 
     if signature_details.is_empty() {
         return None;
@@ -256,45 +261,6 @@ fn create_parameters_from_offsets(
             }
         })
         .collect()
-}
-
-/// Find the active signature index from `CallSignatureDetails`.
-/// The active signature is the first signature where all arguments present in the call
-/// have valid mappings to parameters (i.e., none of the mappings are None).
-fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]) -> Option<usize> {
-    let first = signature_details.first()?;
-
-    // If there are no arguments in the mapping, just return the first signature.
-    if first.argument_to_parameter_mapping.is_empty() {
-        return Some(0);
-    }
-
-    // First, try to find a signature where all arguments have valid parameter mappings.
-    let perfect_match = signature_details.iter().position(|details| {
-        // Check if all arguments have valid parameter mappings.
-        details
-            .argument_to_parameter_mapping
-            .iter()
-            .all(|mapping| mapping.matched)
-    });
-
-    if let Some(index) = perfect_match {
-        return Some(index);
-    }
-
-    // If no perfect match, find the signature with the most valid argument mappings.
-    let (best_index, _) = signature_details
-        .iter()
-        .enumerate()
-        .max_by_key(|(_, details)| {
-            details
-                .argument_to_parameter_mapping
-                .iter()
-                .filter(|mapping| mapping.matched)
-                .count()
-        })?;
-
-    Some(best_index)
 }
 
 #[cfg(test)]
