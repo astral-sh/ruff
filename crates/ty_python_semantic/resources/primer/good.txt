@@ -109,7 +109,6 @@ stone
 strawberry
 streamlit
 svcs
-sympy
 tornado
 trio
 twine

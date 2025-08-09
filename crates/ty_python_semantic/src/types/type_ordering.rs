@@ -267,6 +267,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoTypeAlias, _) => Ordering::Less,
         (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+
+        (DynamicType::Divergent, _) => Ordering::Less,
+        (_, DynamicType::Divergent) => Ordering::Greater,
     }
 }
 
