@@ -124,7 +124,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project_metadata.apply_configuration_files(&system)?;
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    let project_options_overrides =
+        ProjectOptionsOverrides::new(config_file, args.into_options(&project_path));
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;

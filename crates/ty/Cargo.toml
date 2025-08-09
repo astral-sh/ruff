@@ -30,6 +30,7 @@ clearscreen = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
+dunce = { workspace = true }
 indicatif = { workspace = true }
 jiff = { workspace = true }
 rayon = { workspace = true }
