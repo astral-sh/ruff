@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::enum_member_literals;
-use crate::types::tuple::{TupleLength, TupleSpec};
+use crate::types::tuple::{Tuple, TupleLength, TupleType};
 
 use super::Type;
 
@@ -221,6 +221,34 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 ]);
             }
 
+            // If the class is a fixed-length tuple subtype, we expand it to its elements.
+            if let Some(spec) = instance.class.tuple_spec(db) {
+                return match &*spec {
+                    Tuple::Fixed(fixed_length_tuple) => {
+                        let expanded = fixed_length_tuple
+                            .all_elements()
+                            .map(|element| {
+                                if let Some(expanded) = expand_type(db, *element) {
+                                    Either::Left(expanded.into_iter())
+                                } else {
+                                    Either::Right(std::iter::once(*element))
+                                }
+                            })
+                            .multi_cartesian_product()
+                            .map(|types| Type::tuple(db, TupleType::from_elements(db, types)))
+                            .collect::<Vec<_>>();
+
+                        if expanded.len() == 1 {
+                            // There are no elements in the tuple type that can be expanded.
+                            None
+                        } else {
+                            Some(expanded)
+                        }
+                    }
+                    Tuple::Variable(_) => None,
+                };
+            }
+
             let class_literal = instance.class.class_literal(db).0;
 
             if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
@@ -228,32 +256,6 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             }
 
             None
-        }
-        Type::Tuple(tuple_type) => {
-            // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
-            // should not be expanded here.
-            let tuple = tuple_type.tuple(db);
-            if !matches!(tuple, TupleSpec::Fixed(_)) {
-                return None;
-            }
-            let expanded = tuple
-                .all_elements()
-                .map(|element| {
-                    if let Some(expanded) = expand_type(db, *element) {
-                        Either::Left(expanded.into_iter())
-                    } else {
-                        Either::Right(std::iter::once(*element))
-                    }
-                })
-                .multi_cartesian_product()
-                .map(|types| Type::heterogeneous_tuple(db, types))
-                .collect::<Vec<_>>();
-            if expanded.len() == 1 {
-                // There are no elements in the tuple type that can be expanded.
-                None
-            } else {
-                Some(expanded)
-            }
         }
         Type::Union(union) => Some(union.iter(db).copied().collect()),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
@@ -354,12 +356,15 @@ mod tests {
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
-        let variable_length_tuple = Type::tuple(TupleType::mixed(
+        let variable_length_tuple = Type::tuple(
             &db,
-            [bool_ty],
-            int_ty,
-            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
-        ));
+            TupleType::mixed(
+                &db,
+                [bool_ty],
+                int_ty,
+                [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
+            ),
+        );
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());
     }
