@@ -3022,7 +3022,6 @@ dependencies = [
  "pep440_rs",
  "pyproject-toml",
  "regex",
- "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
