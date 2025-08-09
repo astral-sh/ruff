@@ -598,14 +598,9 @@ impl FormatString {
                 result_string.push_str("\\N");
                 let rest = &cur_text[2..];
                 let mut chars = rest.chars();
-                if let Some('{') = chars.next() {
-                    result_string.push('{');
-                } else {
-                    result_string.truncate(result_string.len() - 2);
-                    result_string.push_str(cur_text);
-                    cur_text = "";
-                    continue;
-                }
+                let next = chars.next();
+                debug_assert!(next == Some('{'));
+                result_string.push('{');
 
                 loop {
                     match chars.next() {
@@ -622,7 +617,6 @@ impl FormatString {
                             result_string.push(ch);
                         }
                         None => {
-                            result_string.push_str(chars.as_str());
                             cur_text = "";
                             break;
                         }
