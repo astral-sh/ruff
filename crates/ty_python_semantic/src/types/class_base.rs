@@ -245,10 +245,17 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn into_class(self) -> Option<ClassType<'db>> {
+    pub(super) const fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => None,
+        }
+    }
+
+    pub(super) const fn into_dynamic(self) -> Option<DynamicType> {
+        match self {
+            Self::Dynamic(dynamic) => Some(dynamic),
+            Self::Class(_) | Self::Generic | Self::Protocol => None,
         }
     }
 
