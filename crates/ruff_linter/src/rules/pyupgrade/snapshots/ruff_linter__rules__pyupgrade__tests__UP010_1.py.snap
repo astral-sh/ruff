@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP010_1.py:1:24: UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python version
+UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python version
+ --> UP010_1.py:1:24
   |
 1 | from __future__ import nested_scopes, generators
-  |                        ^^^^^^^^^^^^^ UP010
+  |                        ^^^^^^^^^^^^^
 2 | from __future__ import with_statement, unicode_literals
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 1   |-from __future__ import nested_scopes, generators
@@ -16,13 +17,14 @@ UP010_1.py:1:24: UP010 [*] Unnecessary `__future__` import `nested_scopes` for t
 3 3 | 
 4 4 | from __future__ import absolute_import, division
 
-UP010_1.py:1:39: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+ --> UP010_1.py:1:39
   |
 1 | from __future__ import nested_scopes, generators
-  |                                       ^^^^^^^^^^ UP010
+  |                                       ^^^^^^^^^^
 2 | from __future__ import with_statement, unicode_literals
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 1   |-from __future__ import nested_scopes, generators
@@ -31,15 +33,16 @@ UP010_1.py:1:39: UP010 [*] Unnecessary `__future__` import `generators` for targ
 3 3 | 
 4 4 | from __future__ import absolute_import, division
 
-UP010_1.py:2:40: UP010 [*] Unnecessary `__future__` import `unicode_literals` for target Python version
+UP010 [*] Unnecessary `__future__` import `unicode_literals` for target Python version
+ --> UP010_1.py:2:40
   |
 1 | from __future__ import nested_scopes, generators
 2 | from __future__ import with_statement, unicode_literals
-  |                                        ^^^^^^^^^^^^^^^^ UP010
+  |                                        ^^^^^^^^^^^^^^^^
 3 |
 4 | from __future__ import absolute_import, division
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 1 1 | from __future__ import nested_scopes, generators
@@ -49,16 +52,17 @@ UP010_1.py:2:40: UP010 [*] Unnecessary `__future__` import `unicode_literals` fo
 4 4 | from __future__ import absolute_import, division
 5 5 | from __future__ import generator_stop
 
-UP010_1.py:4:24: UP010 [*] Unnecessary `__future__` import `absolute_import` for target Python version
+UP010 [*] Unnecessary `__future__` import `absolute_import` for target Python version
+ --> UP010_1.py:4:24
   |
 2 | from __future__ import with_statement, unicode_literals
 3 |
 4 | from __future__ import absolute_import, division
-  |                        ^^^^^^^^^^^^^^^ UP010
+  |                        ^^^^^^^^^^^^^^^
 5 | from __future__ import generator_stop
 6 | from __future__ import print_function, nested_scopes, generator_stop
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 1 1 | from __future__ import nested_scopes, generators
@@ -70,14 +74,15 @@ UP010_1.py:4:24: UP010 [*] Unnecessary `__future__` import `absolute_import` for
 6 6 | from __future__ import print_function, nested_scopes, generator_stop
 7 7 | 
 
-UP010_1.py:5:24: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
+UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
+ --> UP010_1.py:5:24
   |
 4 | from __future__ import absolute_import, division
 5 | from __future__ import generator_stop
-  |                        ^^^^^^^^^^^^^^ UP010
+  |                        ^^^^^^^^^^^^^^
 6 | from __future__ import print_function, nested_scopes, generator_stop
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 2 2 | from __future__ import with_statement, unicode_literals
@@ -88,16 +93,17 @@ UP010_1.py:5:24: UP010 [*] Unnecessary `__future__` import `generator_stop` for 
 7 6 | 
 8 7 | print(with_statement)
 
-UP010_1.py:6:40: UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python version
+UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python version
+ --> UP010_1.py:6:40
   |
 4 | from __future__ import absolute_import, division
 5 | from __future__ import generator_stop
 6 | from __future__ import print_function, nested_scopes, generator_stop
-  |                                        ^^^^^^^^^^^^^ UP010
+  |                                        ^^^^^^^^^^^^^
 7 |
 8 | print(with_statement)
   |
-  = help: Remove unnecessary `__future__` import
+help: Remove unnecessary `__future__` import
 
 ℹ Safe fix
 3 3 | 
