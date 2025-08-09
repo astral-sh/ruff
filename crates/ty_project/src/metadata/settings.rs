@@ -20,7 +20,7 @@ use crate::{Db, glob::IncludeExcludeFilter};
 /// This can be achieved by adding a salsa query for the type checking specific settings.
 ///
 /// Settings that are part of [`ty_python_semantic::ProgramSettings`] are not included here.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
@@ -56,20 +56,20 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, get_size2::GetSize)]
 pub struct TerminalSettings {
     pub output_format: OutputFormat,
     pub error_on_warning: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SrcSettings {
     pub respect_ignore_files: bool,
     pub files: IncludeExcludeFilter,
 }
 
 /// A single configuration override that applies to files matching specific patterns.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct Override {
     /// File pattern filter to determine which files this override applies to.
     pub(super) files: IncludeExcludeFilter,

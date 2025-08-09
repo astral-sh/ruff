@@ -310,7 +310,7 @@ impl<'a> ProjectFilesWalker<'a> {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 pub(crate) enum WalkError {
     #[error("`{path}`: {error}")]
     IOPathError { path: SystemPathBuf, error: String },

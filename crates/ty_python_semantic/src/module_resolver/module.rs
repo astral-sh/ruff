@@ -211,7 +211,7 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
     name: ModuleName,
@@ -226,7 +226,7 @@ pub struct FileModule<'db> {
 ///
 /// Namespace packages are special because there are
 /// multiple possible paths and they have no corresponding code file.
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
     name: ModuleName,

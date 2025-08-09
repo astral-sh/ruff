@@ -10,7 +10,7 @@ use salsa;
 /// a type expression. For example, in `self.x: <annotation> = <value>`, the
 /// `<annotation>` is inferred as a type expression, while `<value>` is inferred
 /// as a normal expression.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(crate) enum ExpressionKind {
     Normal,
     TypeExpression,
@@ -31,7 +31,7 @@ pub(crate) enum ExpressionKind {
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct Expression<'db> {
     /// The file in which the expression occurs.
     pub(crate) file: File,
