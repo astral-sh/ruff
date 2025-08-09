@@ -836,7 +836,15 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            && matches!(state.class_status, Status::Inside(_))
+            // Only apply to functions that are "immediately within" a class (not nested within other functions/blocks).
+            // This change aligns with flake8's behavior and avoids false positives for functions nested within
+            // conditional blocks, loops, or other control structures within classes. E301 is primarily concerned
+            // with the spacing between direct class methods, not deeply nested implementation details.
+            && if let Status::Inside(class_indent) = state.class_status {
+                line.indent_length == class_indent + self.context.settings().tab_size.as_usize()
+            } else {
+                false
+            }
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
@@ -1044,8 +1052,16 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
         }
 
         if line.preceding_blank_lines == 0
-            // Only apply to nested functions.
-            && matches!(state.fn_status, Status::Inside(_))
+            // Apply to nested definitions: either within a function body, or deeper-than-immediate inside a class
+            && (
+                matches!(state.fn_status, Status::Inside(_))
+                || if let Status::Inside(class_indent) = state.class_status {
+                    line.indent_length
+                        > class_indent + self.context.settings().tab_size.as_usize()
+                } else {
+                    false
+                }
+            )
             && line.kind.is_class_function_or_decorator()
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Decorator)
