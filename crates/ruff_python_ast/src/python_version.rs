@@ -189,41 +189,34 @@ mod serde {
 #[cfg(feature = "schemars")]
 mod schemars {
     use super::PythonVersion;
-    use schemars::_serde_json::Value;
-    use schemars::JsonSchema;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
+    use serde_json::Value;
+    use schemars::{JsonSchema, Schema, json_schema};
+    use std::borrow::Cow;
 
     impl JsonSchema for PythonVersion {
-        fn schema_name() -> String {
-            "PythonVersion".to_string()
+        fn schema_name() -> Cow<'static str> {
+            Cow::Borrowed("PythonVersion")
         }
 
-        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-            let sub_schemas = std::iter::once(Schema::Object(SchemaObject {
-                instance_type: Some(schemars::schema::InstanceType::String.into()),
-                string: Some(Box::new(schemars::schema::StringValidation {
-                    pattern: Some(r"^\d+\.\d+$".to_string()),
-                    ..Default::default()
-                })),
-                ..Default::default()
-            }))
-            .chain(Self::iter().map(|v| {
-                Schema::Object(SchemaObject {
-                    const_value: Some(Value::String(v.to_string())),
-                    metadata: Some(Box::new(Metadata {
-                        description: Some(format!("Python {v}")),
-                        ..Metadata::default()
-                    })),
-                    ..SchemaObject::default()
-                })
-            }));
+        fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
+            let string_pattern_schema = json_schema!({
+                "type": "string",
+                "pattern": r"^\d+\.\d+$"
+            });
 
-            Schema::Object(SchemaObject {
-                subschemas: Some(Box::new(SubschemaValidation {
-                    any_of: Some(sub_schemas.collect()),
-                    ..Default::default()
-                })),
-                ..SchemaObject::default()
+            // Additional subschemas: one per Python version enum value
+            let const_schemas = Self::iter().map(|v| {
+                json_schema!({
+                    "const": v.to_string(),
+                    "description": format!("Python {v}")
+                })
+            });
+
+            // Combine all subschemas under anyOf
+            json_schema!({
+                "anyOf": std::iter::once(string_pattern_schema)
+                    .chain(const_schemas)
+                    .collect::<Vec<_>>()
             })
         }
     }
