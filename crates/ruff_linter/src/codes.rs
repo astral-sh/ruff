@@ -1106,7 +1106,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "001") => (RuleGroup::Stable, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
         (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
         (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
-        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "302") => (RuleGroup::Stable, rules::airflow::rules::Airflow3MovedToProvider),
         (Airflow, "311") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedUpdate),
         (Airflow, "312") => (RuleGroup::Preview, rules::airflow::rules::Airflow3SuggestedToMoveToProvider),
 
