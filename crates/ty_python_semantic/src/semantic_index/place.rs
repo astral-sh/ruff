@@ -80,13 +80,6 @@ impl<'a> PlaceExprRef<'a> {
         matches!(self, PlaceExprRef::Symbol(_))
     }
 
-    pub(crate) fn is_declared(self) -> bool {
-        match self {
-            Self::Symbol(symbol) => symbol.is_declared(),
-            Self::Member(member) => member.is_declared(),
-        }
-    }
-
     pub(crate) const fn is_bound(self) -> bool {
         match self {
             PlaceExprRef::Symbol(symbol) => symbol.is_bound(),
@@ -233,6 +226,14 @@ impl PlaceTable {
     ) -> Option<ScopedMemberId> {
         self.members.place_id_by_instance_attribute_name(name)
     }
+
+    pub(crate) fn nested_scopes_with_bindings(&self, symbol_id: ScopedSymbolId) -> &[FileScopeId] {
+        if let Some(scopes) = self.symbols.nested_scopes_with_bindings.get(&symbol_id) {
+            scopes
+        } else {
+            &[]
+        }
+    }
 }
 
 #[derive(Default)]
@@ -373,6 +374,15 @@ impl PlaceTableBuilder {
                 self.member_mut(member_id).mark_declared();
             }
         }
+    }
+
+    pub(super) fn add_nested_scope_with_binding(
+        &mut self,
+        this_scope_symbol_id: ScopedSymbolId,
+        nested_scope: FileScopeId,
+    ) {
+        self.symbols
+            .add_nested_scope_with_binding(this_scope_symbol_id, nested_scope);
     }
 
     pub(crate) fn finish(self) -> PlaceTable {

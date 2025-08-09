@@ -312,8 +312,7 @@ def outer() -> None:
     set_x()
 
     def inner() -> None:
-        # TODO: this should ideally be `None | Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: None
+        reveal_type(x)  # revealed: None | Literal[1]
     inner()
 ```
 
