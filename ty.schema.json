@@ -331,6 +331,16 @@
             }
           ]
         },
+        "dataclass-field-order": {
+          "title": "detects dataclass definitions with required fields after fields with default values",
+          "description": "## What it does\nChecks for dataclass definitions where required fields are defined after\nfields with default values.\n\n## Why is this bad?\nIn dataclasses, all required fields (fields without default values) must be\ndefined before fields with default values. This is a Python requirement that\nwill raise a `TypeError` at runtime if violated.\n\n## Example\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Example:\n    x: int = 1    # Field with default value\n    y: str        # Error: Required field after field with default\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
