@@ -76,6 +76,7 @@ mod tests {
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_3.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
