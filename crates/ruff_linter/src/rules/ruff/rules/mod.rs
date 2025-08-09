@@ -1,3 +1,4 @@
+pub(crate) use abstract_method_in_normal_class::*;
 pub(crate) use access_annotations_from_class_dict::*;
 pub(crate) use ambiguous_unicode_character::*;
 pub(crate) use assert_with_print_message::*;
@@ -60,6 +61,7 @@ pub(crate) use used_dummy_variable::*;
 pub(crate) use useless_if_else::*;
 pub(crate) use zip_instead_of_pairwise::*;
 
+mod abstract_method_in_normal_class;
 mod access_annotations_from_class_dict;
 mod ambiguous_unicode_character;
 mod assert_with_print_message;
