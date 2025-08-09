@@ -36,6 +36,15 @@ bitflags! {
     }
 }
 
+/// Represents the different types of write operations
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum WriteMode {
+    /// Single write operation for diagnostics
+    Once,
+    /// Continuous write operation for watch mode
+    Continuous,
+}
+
 #[derive(Serialize)]
 struct ExpandedStatistics<'a> {
     code: Option<&'a SecondaryCode>,
@@ -229,93 +238,14 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        match self.format {
-            OutputFormat::Json => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Json)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Rdjson => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Rdjson)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::JsonLines => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::JsonLines)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Junit => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Junit)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Concise | OutputFormat::Full => {
-                TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
-                    .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .with_preview(preview)
-                    .emit(writer, &diagnostics.inner, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-
-                self.write_summary_text(writer, diagnostics)?;
-            }
-            OutputFormat::Grouped => {
-                GroupedEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_unsafe_fixes(self.unsafe_fixes)
-                    .emit(writer, &diagnostics.inner, &context)?;
-
-                if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
-                    if !diagnostics.fixed.is_empty() {
-                        writeln!(writer)?;
-                        print_fix_summary(writer, &diagnostics.fixed)?;
-                        writeln!(writer)?;
-                    }
-                }
-                self.write_summary_text(writer, diagnostics)?;
-            }
-            OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.inner, &context)?;
-            }
-            OutputFormat::Gitlab => {
-                GitlabEmitter::default().emit(writer, &diagnostics.inner, &context)?;
-            }
-            OutputFormat::Pylint => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Pylint)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Azure => {
-                let config = DisplayDiagnosticConfig::default()
-                    .format(DiagnosticFormat::Azure)
-                    .preview(preview);
-                let value = DisplayDiagnostics::new(&context, &config, &diagnostics.inner);
-                write!(writer, "{value}")?;
-            }
-            OutputFormat::Sarif => {
-                SarifEmitter.emit(writer, &diagnostics.inner, &context)?;
-            }
-        }
+        self.format_diagnostics(
+            writer,
+            diagnostics,
+            &context,
+            fixables.as_ref(),
+            preview,
+            WriteMode::Once,
+        )?;
 
         writer.flush()?;
 
@@ -437,6 +367,7 @@ impl Printer {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
+        writeln!(writer)?;
 
         if self.log_level >= LogLevel::Default {
             let s = if diagnostics.inner.len() == 1 {
@@ -458,13 +389,128 @@ impl Printer {
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
-                .emit(writer, &diagnostics.inner, &context)?;
+            self.format_diagnostics(
+                writer,
+                diagnostics,
+                &context,
+                fixables.as_ref(),
+                preview,
+                WriteMode::Continuous,
+            )?;
         }
         writer.flush()?;
+
+        Ok(())
+    }
+
+    fn format_diagnostics(
+        &self,
+        writer: &mut dyn Write,
+        diagnostics: &Diagnostics,
+        context: &EmitterContext,
+        fixables: Option<&FixableStatistics>,
+        preview: bool,
+        write_mode: WriteMode,
+    ) -> Result<()> {
+        match self.format {
+            OutputFormat::Json => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Json)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::Rdjson => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Rdjson)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::JsonLines => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::JsonLines)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::Junit => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Junit)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::Concise | OutputFormat::Full => match write_mode {
+                WriteMode::Once => {
+                    TextEmitter::default()
+                        .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                        .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                        .with_show_source(self.format == OutputFormat::Full)
+                        .with_unsafe_fixes(self.unsafe_fixes)
+                        .with_preview(preview)
+                        .emit(writer, &diagnostics.inner, context)?;
+
+                    if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                        if !diagnostics.fixed.is_empty() {
+                            writeln!(writer)?;
+                            print_fix_summary(writer, &diagnostics.fixed)?;
+                            writeln!(writer)?;
+                        }
+                    }
+
+                    self.write_summary_text(writer, diagnostics)?;
+                }
+                WriteMode::Continuous => {
+                    TextEmitter::default()
+                        .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                        .with_show_source(self.format == OutputFormat::Full)
+                        .with_unsafe_fixes(self.unsafe_fixes)
+                        .with_preview(preview)
+                        .emit(writer, &diagnostics.inner, context)?;
+                }
+            },
+            OutputFormat::Grouped => {
+                GroupedEmitter::default()
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables))
+                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .emit(writer, &diagnostics.inner, context)?;
+
+                if matches!(write_mode, WriteMode::Once) {
+                    if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
+                        if !diagnostics.fixed.is_empty() {
+                            writeln!(writer)?;
+                            print_fix_summary(writer, &diagnostics.fixed)?;
+                            writeln!(writer)?;
+                        }
+                    }
+                    self.write_summary_text(writer, diagnostics)?;
+                }
+            }
+            OutputFormat::Github => {
+                GithubEmitter.emit(writer, &diagnostics.inner, context)?;
+            }
+            OutputFormat::Gitlab => {
+                GitlabEmitter::default().emit(writer, &diagnostics.inner, context)?;
+            }
+            OutputFormat::Pylint => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Pylint)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::Azure => {
+                let config = DisplayDiagnosticConfig::default()
+                    .format(DiagnosticFormat::Azure)
+                    .preview(preview);
+                let value = DisplayDiagnostics::new(context, &config, &diagnostics.inner);
+                write!(writer, "{value}")?;
+            }
+            OutputFormat::Sarif => {
+                SarifEmitter.emit(writer, &diagnostics.inner, context)?;
+            }
+        }
 
         Ok(())
     }
