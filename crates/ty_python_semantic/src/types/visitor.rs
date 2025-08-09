@@ -134,6 +134,7 @@ enum NonAtomicType<'db> {
     TypeVar(TypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
+    TypeAlias(TypeAliasType<'db>),
 }
 
 enum TypeKind<'db> {
@@ -199,6 +200,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
+            Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
         }
     }
 }
@@ -236,6 +238,9 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_protocol_instance_type(db, protocol);
         }
         NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
+        NonAtomicType::TypeAlias(alias) => {
+            visitor.visit_type(db, alias.value_type(db));
+        }
     }
 }
 

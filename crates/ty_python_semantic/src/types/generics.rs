@@ -321,9 +321,9 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn specialize_tuple(
         self,
         db: &'db dyn Db,
+        element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = tuple.tuple(db).homogeneous_element_type(db);
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 
@@ -484,14 +484,24 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
+        let mut visitor = TypeTransformer::default();
+        self.apply_type_mapping_impl(db, type_mapping, &mut visitor)
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
             .collect();
         let tuple_inner = self
             .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
+            .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
