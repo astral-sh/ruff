@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::MakoTemplates, Path::new("S702.py"))]
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"))]
     #[test_case(Rule::ParamikoCall, Path::new("S601.py"))]
+    #[test_case(Rule::ParamikoCall, Path::new("S613.py"))]
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"))]
     #[test_case(Rule::SSHNoHostKeyVerification, Path::new("S507.py"))]
