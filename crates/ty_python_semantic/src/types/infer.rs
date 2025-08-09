@@ -121,7 +121,7 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -837,6 +837,95 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum TypedDictAssignmentKind {
+    /// For subscript assignments like `d["key"] = value`
+    Subscript,
+    /// For constructor arguments like `Dict(key=value)`
+    Constructor,
+}
+
+impl TypedDictAssignmentKind {
+    fn diagnostic_name(self) -> &'static str {
+        match self {
+            Self::Subscript => "assignment",
+            Self::Constructor => "argument",
+        }
+    }
+
+    fn diagnostic_type(self) -> &'static crate::lint::LintMetadata {
+        match self {
+            Self::Subscript => &INVALID_ASSIGNMENT,
+            Self::Constructor => &INVALID_ARGUMENT_TYPE,
+        }
+    }
+}
+
+/// Validates assignment of a value to a specific key on a `TypedDict`.
+/// Returns true if the assignment is valid, false otherwise.
+#[allow(clippy::too_many_arguments)]
+fn validate_typed_dict_key_assignment<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    key: &str,
+    value_ty: Type<'db>,
+    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
+    key_node: impl Into<AnyNodeRef<'ast>>,
+    value_node: impl Into<AnyNodeRef<'ast>>,
+    assignment_kind: TypedDictAssignmentKind,
+) -> bool {
+    let db = context.db();
+    let items = typed_dict.items(db);
+
+    // Check if key exists in `TypedDict`
+    let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
+        report_invalid_key_on_typed_dict(
+            context,
+            typed_dict_node.into(),
+            key_node.into(),
+            Type::TypedDict(typed_dict),
+            Type::string_literal(db, key),
+            &items,
+        );
+        return false;
+    };
+
+    // Key exists, check if value type is assignable to declared type
+    if value_ty.is_assignable_to(db, item.declared_ty) {
+        return true;
+    }
+
+    // Invalid assignment - emit diagnostic
+    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
+    {
+        let typed_dict_ty = Type::TypedDict(typed_dict);
+        let typed_dict_d = typed_dict_ty.display(db);
+        let value_d = value_ty.display(db);
+        let item_type_d = item.declared_ty.display(db);
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Invalid {} to key \"{key}\" with declared type `{item_type_d}` on TypedDict `{typed_dict_d}`",
+            assignment_kind.diagnostic_name(),
+        ));
+
+        diagnostic.set_primary_message(format_args!("value of type `{value_d}`"));
+
+        diagnostic.annotate(
+            context
+                .secondary(typed_dict_node.into())
+                .message(format_args!("TypedDict `{typed_dict_d}`")),
+        );
+
+        diagnostic.annotate(
+            context
+                .secondary(key_node.into())
+                .message(format_args!("key has declared type `{item_type_d}`")),
+        );
+    }
+
+    false
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -3764,47 +3853,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if let Some(typed_dict) = value_ty.into_typed_dict() {
                                 if let Some(key) = slice_ty.into_string_literal() {
                                     let key = key.value(self.db());
-                                    let items = typed_dict.items(self.db());
-                                    if let Some((_, item)) =
-                                        items.iter().find(|(name, _)| *name == key)
-                                    {
-                                        if let Some(builder) =
-                                            context.report_lint(&INVALID_ASSIGNMENT, rhs)
-                                        {
-                                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                                "Invalid assignment to key \"{key}\" with declared type `{}` on TypedDict `{value_d}`",
-                                                item.declared_ty.display(db),
-                                            ));
-
-                                            diagnostic.set_primary_message(format_args!(
-                                                "value of type `{assigned_d}`"
-                                            ));
-
-                                            diagnostic.annotate(
-                                                self.context
-                                                    .secondary(value.as_ref())
-                                                    .message(format_args!("TypedDict `{value_d}`")),
-                                            );
-
-                                            diagnostic.annotate(
-                                                self.context.secondary(slice.as_ref()).message(
-                                                    format_args!(
-                                                        "key has declared type `{}`",
-                                                        item.declared_ty.display(db),
-                                                    ),
-                                                ),
-                                            );
-                                        }
-                                    } else {
-                                        report_invalid_key_on_typed_dict(
-                                            &self.context,
-                                            value.as_ref().into(),
-                                            slice.as_ref().into(),
-                                            value_ty,
-                                            slice_ty,
-                                            &items,
-                                        );
-                                    }
+                                    validate_typed_dict_key_assignment(
+                                        &self.context,
+                                        typed_dict,
+                                        key,
+                                        assigned_ty,
+                                        value.as_ref(),
+                                        slice.as_ref(),
+                                        rhs,
+                                        TypedDictAssignmentKind::Subscript,
+                                    );
                                 } else {
                                     // Check if the key has a valid type. We only allow string literals, a union of string literals,
                                     // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
@@ -4649,7 +4707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(value) = value {
             let inferred_ty = self.infer_maybe_standalone_expression(value);
-            let inferred_ty = if target
+            let mut inferred_ty = if target
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
@@ -4659,6 +4717,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
+
+            // Validate `TypedDict` dictionary literal assignments
+            if let Some(typed_dict) = declared.inner_type().into_typed_dict() {
+                if let Some(dict_expr) = value.as_dict_expr() {
+                    // Validate each key-value pair in the dictionary literal
+                    for item in &dict_expr.items {
+                        if let Some(key_expr) = &item.key {
+                            if let ast::Expr::StringLiteral(key_literal) = key_expr {
+                                let key_str = key_literal.value.to_str();
+                                let value_type = self.expression_type(&item.value);
+                                validate_typed_dict_key_assignment(
+                                    &self.context,
+                                    typed_dict,
+                                    key_str,
+                                    value_type,
+                                    target,
+                                    key_expr,
+                                    &item.value,
+                                    TypedDictAssignmentKind::Constructor,
+                                );
+                            }
+                        }
+                    }
+
+                    // Override the inferred type of the dict literal to be the `TypedDict` type
+                    // This ensures that the dict literal gets the correct type for key access
+                    let typed_dict_type = Type::TypedDict(typed_dict);
+                    inferred_ty = typed_dict_type;
+                }
+            }
+
             self.add_declaration_with_binding(
                 target.into(),
                 definition,
@@ -6232,6 +6321,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .bindings(self.db())
             .match_parameters(&call_arguments);
         self.infer_argument_types(arguments, &mut call_arguments, &bindings.argument_forms);
+
+        // Validate `TypedDict` constructor calls after argument type inference
+        if let Some(class_literal) = callable_type.into_class_literal() {
+            if class_literal.is_typed_dict(self.db()) {
+                let typed_dict_type =
+                    TypedDictType::from(self.db(), ClassType::NonGeneric(class_literal));
+                if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
+                    // Validate keyword arguments for `TypedDict` constructor
+                    for keyword in &arguments.keywords {
+                        if let Some(arg_name) = &keyword.arg {
+                            // Get the already-inferred argument type
+                            let arg_type = self.expression_type(&keyword.value);
+                            validate_typed_dict_key_assignment(
+                                &self.context,
+                                typed_dict,
+                                arg_name.as_str(),
+                                arg_type,
+                                call_expression,
+                                call_expression,
+                                &keyword.value,
+                                TypedDictAssignmentKind::Constructor,
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         let mut bindings = match bindings.check_types(self.db(), &call_arguments) {
             Ok(bindings) => bindings,

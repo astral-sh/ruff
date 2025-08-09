@@ -2573,18 +2573,18 @@ fn report_invalid_base<'ctx, 'db>(
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    value_node: AnyNodeRef,
-    slice_node: AnyNodeRef,
-    value_ty: Type<'db>,
-    slice_ty: Type<'db>,
+    typed_dict_node: AnyNodeRef,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
-        match slice_ty {
+    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        match key_ty {
             Type::StringLiteral(key) => {
                 let key = key.value(db);
-                let typed_dict_name = value_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid key access on TypedDict `{typed_dict_name}`",
@@ -2592,7 +2592,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 diagnostic.annotate(
                     context
-                        .secondary(value_node)
+                        .secondary(typed_dict_node)
                         .message(format_args!("TypedDict `{typed_dict_name}`")),
                 );
 
@@ -2611,8 +2611,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
             }
             _ => builder.into_diagnostic(format_args!(
                 "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                value_ty.display(db),
-                slice_ty.display(db),
+                typed_dict_ty.display(db),
+                key_ty.display(db),
             )),
         };
     }

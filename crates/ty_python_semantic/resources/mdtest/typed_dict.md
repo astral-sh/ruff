@@ -21,12 +21,10 @@ inferred based on the `TypedDict` definition:
 ```py
 alice: Person = {"name": "Alice", "age": 30}
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
-# TODO: this should be `int | None`
-reveal_type(alice["age"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
+reveal_type(alice["age"])  # revealed: int | None
 
-# TODO: this should reveal `Unknown`, and it should emit an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "non_existing""
 reveal_type(alice["non_existing"])  # revealed: Unknown
 ```
 
@@ -51,23 +49,25 @@ bob.update(age=26)
 The construction of a `TypedDict` is checked for type correctness:
 
 ```py
-# TODO: these should be errors (invalid argument type)
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1a: Person = {"name": b"Eve", "age": None}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
 # TODO: these should be errors (missing required key)
 eve2a: Person = {"age": 22}
 eve2b = Person(age=22)
 
-# TODO: these should be errors (additional key)
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3a: Person = {"name": "Eve", "age": 25, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 eve3b = Person(name="Eve", age=25, extra=True)
 ```
 
 Assignments to keys are also validated:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
 alice["name"] = None
 
 # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
@@ -77,7 +77,7 @@ bob["name"] = None
 Assignments to non-existing keys are disallowed:
 
 ```py
-# TODO: this should be an error
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
 alice["extra"] = True
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
@@ -134,8 +134,7 @@ alice: Person = {"name": "Alice"}
 # TODO: this should be an invalid-assignment error
 dangerous(alice)
 
-# TODO: this should be `str`
-reveal_type(alice["name"])  # revealed: Unknown
+reveal_type(alice["name"])  # revealed: str
 ```
 
 ## Key-based access
@@ -362,7 +361,7 @@ class TaggedData(TypedDict, Generic[T]):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 
@@ -383,7 +382,7 @@ class TaggedData[T](TypedDict):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# TODO: this should be an error (type mismatch)
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 ```
 
