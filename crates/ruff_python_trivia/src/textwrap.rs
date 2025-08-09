@@ -71,6 +71,68 @@ pub fn indent<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
     Cow::Owned(result)
 }
 
+/// Indent only the first line by the given prefix.
+///
+/// This function is useful when you want to indent the first line of a multi-line
+/// expression while preserving the relative indentation of subsequent lines.
+///
+/// # Examples
+///
+/// ```
+/// # use ruff_python_trivia::textwrap::indent_first_line;
+///
+/// assert_eq!(indent_first_line("First line.\nSecond line.\n", "  "),
+///            "  First line.\nSecond line.\n");
+/// ```
+///
+/// When indenting, trailing whitespace is stripped from the prefix.
+/// This means that empty lines remain empty afterwards:
+///
+/// ```
+/// # use ruff_python_trivia::textwrap::indent_first_line;
+///
+/// assert_eq!(indent_first_line("First line.\n\n\nSecond line.\n", "  "),
+///            "  First line.\n\n\nSecond line.\n");
+/// ```
+///
+/// Leading and trailing whitespace coming from the text itself is
+/// kept unchanged:
+///
+/// ```
+/// # use ruff_python_trivia::textwrap::indent_first_line;
+///
+/// assert_eq!(indent_first_line(" \t  Foo   ", "->"), "-> \t  Foo   ");
+/// ```
+pub fn indent_first_line<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
+    if prefix.is_empty() {
+        return Cow::Borrowed(text);
+    }
+
+    let mut lines = text.universal_newlines();
+    let first_line = lines.next();
+
+    if let Some(first_line) = first_line {
+        let mut result = String::with_capacity(text.len() + prefix.len());
+
+        // Indent only the first line
+        if first_line.trim_whitespace().is_empty() {
+            result.push_str(prefix.trim_whitespace_end());
+        } else {
+            result.push_str(prefix);
+        }
+        result.push_str(first_line.as_full_str());
+
+        // Add remaining lines without indentation
+        for line in lines {
+            result.push_str(line.as_full_str());
+        }
+
+        Cow::Owned(result)
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
 /// Removes common leading whitespace from each line.
 ///
 /// This function will look at each non-empty line and determine the
@@ -407,6 +469,61 @@ mod tests {
               [[-1,-1,-1],[1,1,0],[1,0,1]]
              ]";
         assert_eq!(dedent(text), text);
+    }
+
+    #[test]
+    fn indent_first_line_empty() {
+        assert_eq!(indent_first_line("\n", "  "), "\n");
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn indent_first_line_nonempty() {
+        let text = [
+            "  foo\n",
+            "bar\n",
+            "  baz\n",
+        ].join("");
+        let expected = [
+            "//   foo\n",
+            "bar\n",
+            "  baz\n",
+        ].join("");
+        assert_eq!(indent_first_line(&text, "// "), expected);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn indent_first_line_empty_line() {
+        let text = [
+            "  foo",
+            "bar",
+            "",
+            "  baz",
+        ].join("\n");
+        let expected = [
+            "//   foo",
+            "bar",
+            "",
+            "  baz",
+        ].join("\n");
+        assert_eq!(indent_first_line(&text, "// "), expected);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn indent_first_line_mixed_newlines() {
+        let text = [
+            "  foo\r\n",
+            "bar\n",
+            "  baz\r",
+        ].join("");
+        let expected = [
+            "//   foo\r\n",
+            "bar\n",
+            "  baz\r",
+        ].join("");
+        assert_eq!(indent_first_line(&text, "// "), expected);
     }
 
     #[test]
