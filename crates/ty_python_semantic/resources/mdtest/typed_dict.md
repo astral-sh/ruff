@@ -120,6 +120,59 @@ Extra fields are still not allowed, even with `total=False`:
 invalid_extra = OptionalPerson(name="George", extra=True)
 ```
 
+## `Required` and `NotRequired`
+
+You can have fine-grained control over field requirements using `Required` and `NotRequired`
+qualifiers, which override the class-level `total=` setting:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# total=False by default, but id is explicitly Required
+class Message(TypedDict, total=False):
+    id: Required[int]  # Always required, even though total=False
+    content: str  # Optional due to total=False
+    timestamp: NotRequired[str]  # Explicitly optional (redundant here)
+
+# total=True by default, but content is explicitly NotRequired
+class User(TypedDict):
+    name: str  # Required due to total=True (default)
+    email: Required[str]  # Explicitly required (redundant here)
+    bio: NotRequired[str]  # Optional despite total=True
+
+# Valid Message constructions
+msg1 = Message(id=1)  # id required, content optional
+msg2 = Message(id=2, content="Hello")  # both provided
+msg3 = Message(id=3, timestamp="2024-01-01")  # id required, timestamp optional
+
+# Valid User constructions
+user1 = User(name="Alice", email="alice@example.com")  # required fields
+user2 = User(name="Bob", email="bob@example.com", bio="Developer")  # with optional bio
+
+reveal_type(msg1["id"])  # revealed: int
+reveal_type(msg1["content"])  # revealed: str
+reveal_type(user1["name"])  # revealed: str
+reveal_type(user1["bio"])  # revealed: str
+```
+
+Constructor validation respects `Required`/`NotRequired` overrides:
+
+```py
+# error: [missing-required-field] "Missing required field 'id' in TypedDict `Message` constructor"
+invalid_msg = Message(content="Hello")  # Missing required id
+
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `User` constructor"
+# error: [missing-required-field] "Missing required field 'email' in TypedDict `User` constructor"
+invalid_user = User(bio="No name provided")  # Missing required name and email
+```
+
+Type validation still applies to all fields when provided:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "id" with declared type `int` on TypedDict `Message`"
+invalid_type = Message(id="not-an-int", content="Hello")
+```
+
 ## Structural assignability
 
 Assignability between `TypedDict` types is structural, that is, it is based on the presence of keys
