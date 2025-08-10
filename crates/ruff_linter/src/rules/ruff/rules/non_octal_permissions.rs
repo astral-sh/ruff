@@ -61,8 +61,9 @@ use crate::{FixAvailability, Violation};
 /// multiple digits:
 ///
 /// ```python
-/// os.chmod("foo", 0)
-/// os.chmod("foo", 0o000)
+/// os.chmod("foo", 0) # Ok
+/// os.chmod("foo", 0o000) # Ok
+/// os.chmod("foo", 000) # Lint emitted and fix suggested
 /// ```
 ///
 /// Ruff will suggest a safe fix for multi-digit zeros to add the `0o` prefix.
