@@ -5,7 +5,7 @@ use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{Exit, Notification};
 use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
+    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
@@ -16,8 +16,7 @@ use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use settings::GlobalSettings;
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
@@ -29,8 +28,10 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 pub(crate) use self::index::DocumentQuery;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::WorkspaceSettings;
-use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -91,8 +92,6 @@ pub(crate) struct Session {
     shutdown_requested: bool,
 
     /// Whether the server has dynamically registered the diagnostic capability with the client.
-    diagnostic_capability_registered: bool,
-
     /// Is the connected client a `TestServer` instance.
     in_test: bool,
 
@@ -107,6 +106,10 @@ pub(crate) struct Session {
     /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
+
+    /// Registrations is a set of LSP methods that have been dynamically registered with the
+    /// client.
+    registrations: HashSet<String>,
 }
 
 /// LSP State for a Project
@@ -166,10 +169,10 @@ impl Session {
             resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
-            diagnostic_capability_registered: false,
             in_test,
             suspended_workspace_diagnostics_request: None,
             revision: 0,
+            registrations: HashSet::new(),
         })
     }
 
@@ -567,7 +570,7 @@ impl Session {
             self.global_settings = Arc::new(global_settings);
         }
 
-        self.register_diagnostic_capability(client);
+        self.register_capabilities(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -583,67 +586,137 @@ impl Session {
         }
     }
 
-    /// Sends a registration notification to the client to enable / disable workspace diagnostics
-    /// as per the `diagnostic_mode`.
+    /// Registers the dynamic capabilities with the client as per the resolved global settings.
     ///
-    /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
-    /// capabilities.
-    fn register_diagnostic_capability(&mut self, client: &Client) {
+    /// ## Diagnostic capability
+    ///
+    /// This capability is used to enable / disable workspace diagnostics as per the
+    /// `ty.diagnosticMode` global setting.
+    ///
+    /// ## Rename capability
+    ///
+    /// This capability is used to enable / disable rename functionality as per the
+    /// `ty.experimental.rename` global setting.
+    fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
 
-        if !self
+        let mut registrations = vec![];
+        let mut unregistrations = vec![];
+
+        if self
             .resolved_client_capabilities
             .supports_diagnostic_dynamic_registration()
         {
+            if self
+                .registrations
+                .contains(DocumentDiagnosticRequest::METHOD)
+            {
+                unregistrations.push(Unregistration {
+                    id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                    method: DocumentDiagnosticRequest::METHOD.into(),
+                });
+            }
+
+            let diagnostic_mode = self.global_settings.diagnostic_mode;
+
+            tracing::debug!(
+                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+            );
+            registrations.push(Registration {
+                id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                method: DocumentDiagnosticRequest::METHOD.into(),
+                register_options: Some(
+                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
+                        DiagnosticRegistrationOptions {
+                            diagnostic_options: server_diagnostic_options(
+                                diagnostic_mode.is_workspace(),
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                    .unwrap(),
+                ),
+            });
+        }
+
+        if self
+            .resolved_client_capabilities
+            .supports_rename_dynamic_registration()
+        {
+            let is_rename_enabled = self.global_settings.is_rename_enabled();
+
+            if !is_rename_enabled {
+                tracing::debug!("Rename capability is disabled in the resolved global settings");
+                if self.registrations.contains(Rename::METHOD) {
+                    unregistrations.push(Unregistration {
+                        id: RENAME_REGISTRATION_ID.into(),
+                        method: Rename::METHOD.into(),
+                    });
+                }
+            }
+
+            if is_rename_enabled {
+                registrations.push(Registration {
+                    id: RENAME_REGISTRATION_ID.into(),
+                    method: Rename::METHOD.into(),
+                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+                });
+            }
+        }
+
+        // First, unregister any existing capabilities and then register or re-register them.
+        self.unregister_dynamic_capability(client, unregistrations);
+        self.register_dynamic_capability(client, registrations);
+    }
+
+    /// Registers a list of dynamic capabilities with the client.
+    fn register_dynamic_capability(&mut self, client: &Client, registrations: Vec<Registration>) {
+        if registrations.is_empty() {
             return;
         }
 
-        let diagnostic_mode = self.global_settings.diagnostic_mode;
-
-        if self.diagnostic_capability_registered {
-            client.send_request::<UnregisterCapability>(
-                self,
-                UnregistrationParams {
-                    unregisterations: vec![Unregistration {
-                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
-                        method: DocumentDiagnosticRequest::METHOD.into(),
-                    }],
-                },
-                |_: &Client, ()| {
-                    tracing::debug!("Unregistered diagnostic capability");
-                },
-            );
+        for registration in &registrations {
+            self.registrations.insert(registration.method.clone());
         }
-
-        let registration = Registration {
-            id: DIAGNOSTIC_REGISTRATION_ID.into(),
-            method: DocumentDiagnosticRequest::METHOD.into(),
-            register_options: Some(
-                serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
-                    DiagnosticRegistrationOptions {
-                        diagnostic_options: server_diagnostic_options(
-                            diagnostic_mode.is_workspace(),
-                        ),
-                        ..Default::default()
-                    },
-                ))
-                .unwrap(),
-            ),
-        };
 
         client.send_request::<RegisterCapability>(
             self,
-            RegistrationParams {
-                registrations: vec![registration],
-            },
-            move |_: &Client, ()| {
-                tracing::debug!(
-                    "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
-                );
+            RegistrationParams { registrations },
+            |_: &Client, ()| {
+                tracing::debug!("Registered dynamic capabilities");
             },
         );
+    }
 
-        self.diagnostic_capability_registered = true;
+    /// Unregisters a list of dynamic capabilities with the client.
+    fn unregister_dynamic_capability(
+        &mut self,
+        client: &Client,
+        unregistrations: Vec<Unregistration>,
+    ) {
+        if unregistrations.is_empty() {
+            return;
+        }
+
+        for unregistration in &unregistrations {
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
+        }
+
+        client.send_request::<UnregisterCapability>(
+            self,
+            UnregistrationParams {
+                unregisterations: unregistrations,
+            },
+            |_: &Client, ()| {
+                tracing::debug!("Unregistered dynamic capabilities");
+            },
+        );
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
@@ -750,7 +823,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {

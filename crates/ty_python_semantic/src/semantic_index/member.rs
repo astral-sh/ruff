@@ -243,7 +243,7 @@ impl MemberExpr {
         self.segments.len()
     }
 
-    pub(crate) fn as_ref(&self) -> MemberExprRef {
+    pub(crate) fn as_ref(&self) -> MemberExprRef<'_> {
         MemberExprRef {
             path: self.path.as_str(),
             segments: SegmentsRef::from(&self.segments),
@@ -381,7 +381,7 @@ impl MemberTable {
     }
 
     /// Returns an iterator over all members in the table.
-    pub(crate) fn iter(&self) -> std::slice::Iter<Member> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Member> {
         self.members.iter()
     }
 
@@ -507,6 +507,7 @@ enum Segments {
 }
 
 static_assertions::assert_eq_size!(SmallSegments, u64);
+#[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Segments, [u64; 2]);
 
 impl Segments {

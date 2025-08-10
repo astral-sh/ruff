@@ -6806,30 +6806,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
-        let local_is_unbound = local_scope_place.is_unbound();
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
-            let has_bindings_in_this_scope = match place_table.place_id(place_expr) {
-                Some(place_id) => place_table.place(place_id).is_bound(),
-                None => {
-                    assert!(
-                        self.deferred_state.in_string_annotation(),
-                        "Expected the place table to create a place for every Name node"
-                    );
-                    false
-                }
-            };
-
             let current_file = self.file();
-
-            let mut is_nonlocal_binding = false;
+            let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol() {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
-                    // If we try to access a variable in a class before it has been defined,
-                    // the lookup will fall back to global.
-                    let fallback_to_global = local_is_unbound
-                        && has_bindings_in_this_scope
-                        && scope.node(db).scope_kind().is_class();
+                    // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
+                    // flags. We need to read the place table to get correct flags.
+                    symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
+                    // If we try to access a variable in a class before it has been defined, the
+                    // lookup will fall back to global. See the comment on `Symbol::is_local`.
+                    let fallback_to_global =
+                        scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
                     if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
                         return global_symbol(self.db(), self.file(), symbol.name()).map_type(
                             |ty| {
@@ -6841,22 +6830,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             },
                         );
                     }
-                    is_nonlocal_binding = self
-                        .index
-                        .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
                 }
             }
 
-            // If it's a function-like scope and there is one or more binding in this scope (but
-            // none of those bindings are visible from where we are in the control flow), we cannot
-            // fallback to any bindings in enclosing scopes. As such, we can immediately short-circuit
-            // here and return `Place::Unbound`.
-            //
-            // This is because Python is very strict in its categorisation of whether a variable is
-            // a local variable or not in function-like scopes. If a variable has any bindings in a
-            // function-like scope, it is considered a local variable; it never references another
-            // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_nonlocal_binding {
+            // Symbols that are bound or declared in the local scope, and not marked `nonlocal` or
+            // `global`, never refer to an enclosing scope. (If you reference such a symbol before
+            // it's bound, you get an `UnboundLocalError`.) Short-circuit instead of walking
+            // enclosing scopes in this case. The one exception to this rule is the global fallback
+            // in class bodies, which we already handled above.
+            if symbol_resolves_locally {
                 return Place::Unbound.into();
             }
 
@@ -6900,6 +6882,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
 
+                let has_root_place_been_reassigned = || {
+                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                    enclosing_place_table
+                        .parents(place_expr)
+                        .any(|enclosing_root_place_id| {
+                            enclosing_place_table
+                                .place(enclosing_root_place_id)
+                                .is_bound()
+                        })
+                };
+
                 // If the reference is in a nested eager scope, we need to look for the place at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
@@ -6941,28 +6934,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
                         EnclosingSnapshotResult::NotFound => {
-                            let enclosing_place_table =
-                                self.index.place_table(enclosing_scope_file_id);
-                            for enclosing_root_place_id in enclosing_place_table.parents(place_expr)
-                            {
-                                let enclosing_root_place =
-                                    enclosing_place_table.place(enclosing_root_place_id);
-                                if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) = place(
-                                        db,
-                                        enclosing_scope_id,
-                                        enclosing_root_place,
-                                        ConsideredDefinitions::AllReachable,
-                                    )
-                                    .place
-                                    {
-                                        return Place::Unbound.into();
-                                    }
-                                }
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
                             }
                             continue;
                         }
-                        EnclosingSnapshotResult::NoLongerInEagerContext => {}
+                        EnclosingSnapshotResult::NoLongerInEagerContext => {
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
+                            }
+                        }
                     }
                 }
 
@@ -9773,7 +9754,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         expression: &ast::Expr,
         message: std::fmt::Arguments,
-    ) -> Option<LintDiagnosticGuard> {
+    ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
             .report_lint(&INVALID_TYPE_FORM, expression)
             .map(|builder| {
@@ -11373,7 +11354,7 @@ impl StringPartsCollector {
         self.expression = true;
     }
 
-    fn string_type(self, db: &dyn Db) -> Type {
+    fn string_type(self, db: &dyn Db) -> Type<'_> {
         if self.expression {
             KnownClass::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {

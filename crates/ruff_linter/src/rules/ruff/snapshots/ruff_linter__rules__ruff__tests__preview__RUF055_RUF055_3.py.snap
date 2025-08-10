@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF055_3.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055 [*] Plain string pattern passed to `re` function
+ --> RUF055_3.py:6:1
   |
 5 | # Should be replaced with `b_src.replace(rb"x", b"y")`
 6 | re.sub(rb"x", b"y", b_src)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 |
 8 | # Should be replaced with `b_src.startswith(rb"abc")`
   |
-  = help: Replace with `b_src.replace(rb"x", b"y")`
+help: Replace with `b_src.replace(rb"x", b"y")`
 
 ℹ Safe fix
 3 3 | b_src = b"abc"
@@ -21,14 +22,15 @@ RUF055_3.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
 8 8 | # Should be replaced with `b_src.startswith(rb"abc")`
 9 9 | if re.match(rb"abc", b_src):
 
-RUF055_3.py:9:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:9:4
    |
  8 | # Should be replaced with `b_src.startswith(rb"abc")`
  9 | if re.match(rb"abc", b_src):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
 10 |     pass
    |
-   = help: Replace with `b_src.startswith(rb"abc")`
+help: Replace with `b_src.startswith(rb"abc")`
 
 ℹ Safe fix
 6  6  | re.sub(rb"x", b"y", b_src)
@@ -40,14 +42,15 @@ RUF055_3.py:9:4: RUF055 [*] Plain string pattern passed to `re` function
 11 11 | 
 12 12 | # Should be replaced with `rb"x" in b_src`
 
-RUF055_3.py:13:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:13:4
    |
 12 | # Should be replaced with `rb"x" in b_src`
 13 | if re.search(rb"x", b_src):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   |    ^^^^^^^^^^^^^^^^^^^^^^^
 14 |     pass
    |
-   = help: Replace with `rb"x" in b_src`
+help: Replace with `rb"x" in b_src`
 
 ℹ Safe fix
 10 10 |     pass
@@ -59,15 +62,16 @@ RUF055_3.py:13:4: RUF055 [*] Plain string pattern passed to `re` function
 15 15 | 
 16 16 | # Should be replaced with `b_src.split(rb"abc")`
 
-RUF055_3.py:17:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055 [*] Plain string pattern passed to `re` function
+  --> RUF055_3.py:17:1
    |
 16 | # Should be replaced with `b_src.split(rb"abc")`
 17 | re.split(rb"abc", b_src)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ RUF055
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
 18 |
 19 | # Patterns containing metacharacters should NOT be replaced
    |
-   = help: Replace with `b_src.split(rb"abc")`
+help: Replace with `b_src.split(rb"abc")`
 
 ℹ Safe fix
 14 14 |     pass

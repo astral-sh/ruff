@@ -679,7 +679,7 @@ declare_lint! {
     /// Checks for exception handlers that catch non-exception classes.
     ///
     /// ## Why is this bad?
-    /// Catching classes that do not inherit from `BaseException` will raise a TypeError at runtime.
+    /// Catching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.
     ///
     /// ## Example
     /// ```python
@@ -1665,8 +1665,8 @@ declare_lint! {
     /// Detects missing required fields in `TypedDict` constructor calls.
     ///
     /// ## Why is this bad?
-    /// TypedDict requires all non-optional fields to be provided during construction.
-    /// Missing required fields can lead to KeyError at runtime when accessing the field.
+    /// `TypedDict` requires all non-optional fields to be provided during construction.
+    /// Missing required fields can lead to `KeyError` at runtime when accessing the field.
     pub(crate) static MISSING_REQUIRED_FIELD = {
         summary: "detects missing required fields in `TypedDict` constructors",
         status: LintStatus::preview("1.0.0"),

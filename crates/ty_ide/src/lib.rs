@@ -12,6 +12,7 @@ mod hover;
 mod inlay_hints;
 mod markup;
 mod references;
+mod rename;
 mod selection_range;
 mod semantic_tokens;
 mod signature_help;
@@ -26,9 +27,10 @@ pub use document_symbols::{document_symbols, document_symbols_with_options};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::inlay_hints;
+pub use inlay_hints::{InlayHintSettings, inlay_hints};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
+pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
 pub use semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens, semantic_tokens,

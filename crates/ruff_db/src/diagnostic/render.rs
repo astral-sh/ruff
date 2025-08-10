@@ -2,15 +2,15 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use full::FullRenderer;
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
-    Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
+    Snippet as AnnotateSnippet,
 };
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::diagnostic::stylesheet::DiagnosticStylesheet;
 use crate::{
     Db,
     files::File,
@@ -111,37 +111,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Full => {
-                let stylesheet = if self.config.color {
-                    DiagnosticStylesheet::styled()
-                } else {
-                    DiagnosticStylesheet::plain()
-                };
-
-                let mut renderer = if self.config.color {
-                    AnnotateRenderer::styled()
-                } else {
-                    AnnotateRenderer::plain()
-                }
-                .cut_indicator("…");
-
-                renderer = renderer
-                    .error(stylesheet.error)
-                    .warning(stylesheet.warning)
-                    .info(stylesheet.info)
-                    .note(stylesheet.note)
-                    .help(stylesheet.help)
-                    .line_no(stylesheet.line_no)
-                    .emphasis(stylesheet.emphasis)
-                    .none(stylesheet.none);
-
-                for diag in self.diagnostics {
-                    let resolved = Resolved::new(self.resolver, diag, self.config);
-                    let renderable = resolved.to_renderable(self.config.context);
-                    for diag in renderable.diagnostics.iter() {
-                        writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
-                    }
-                    writeln!(f)?;
-                }
+                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
                 AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
@@ -242,7 +212,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = ann.span.file.path(resolver);
+                let path = ann
+                    .span
+                    .file
+                    .relative_path(resolver)
+                    .to_str()
+                    .unwrap_or_else(|| ann.span.file.path(resolver));
                 let diagnostic_source = ann.span.file.diagnostic_source(resolver);
                 ResolvedAnnotation::new(path, &diagnostic_source, ann, resolver)
             })
@@ -655,6 +630,22 @@ impl<'r> RenderableSnippet<'r> {
             .as_source_code()
             .slice(TextRange::new(snippet_start, snippet_end));
 
+        // Strip the BOM from the beginning of the snippet, if present. Doing this here saves us the
+        // trouble of updating the annotation ranges in `replace_unprintable`, and also allows us to
+        // check that the BOM is at the very beginning of the file, not just the beginning of the
+        // snippet.
+        const BOM: char = '\u{feff}';
+        let bom_len = BOM.text_len();
+        let (snippet, snippet_start) =
+            if snippet_start == TextSize::ZERO && snippet.starts_with(BOM) {
+                (
+                    &snippet[bom_len.to_usize()..],
+                    snippet_start + TextSize::new(bom_len.to_u32()),
+                )
+            } else {
+                (snippet, snippet_start)
+            };
+
         let annotations = anns
             .iter()
             .map(|ann| RenderableAnnotation::new(snippet_start, ann))
@@ -1000,7 +991,12 @@ fn replace_unprintable<'r>(
     let mut last_end = 0;
     let mut result = String::new();
     for (index, c) in source.char_indices() {
-        if let Some(printable) = unprintable_replacement(c) {
+        // normalize `\r` line endings but don't double `\r\n`
+        if c == '\r' && !source[index + 1..].starts_with("\n") {
+            result.push_str(&source[last_end..index]);
+            result.push('\n');
+            last_end = index + 1;
+        } else if let Some(printable) = unprintable_replacement(c) {
             result.push_str(&source[last_end..index]);
 
             let len = printable.text_len().to_u32();

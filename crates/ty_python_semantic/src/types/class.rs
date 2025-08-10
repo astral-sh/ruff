@@ -89,6 +89,26 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
+fn implicit_attribute_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn implicit_attribute_initial<'db>(
+    _db: &'db dyn Db,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> PlaceAndQualifiers<'db> {
+    Place::Unbound.into()
+}
+
 fn try_mro_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<Mro<'db>, MroError<'db>>,
@@ -591,7 +611,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
-    /// or those marked as ClassVars are considered.
+    /// or those marked as `ClassVars` are considered.
     ///
     /// You must provide the `inherited_generic_context` that we should use for the `__new__` or
     /// `__init__` member. This is inherited from the containing class -­but importantly, from the
@@ -1104,7 +1124,7 @@ impl MethodDecorator {
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata (no special properties)
     NamedTuple { default_ty: Option<Type<'db>> },
-    /// `Dataclass` field metadata
+    /// dataclass field metadata
     Dataclass {
         /// The type of the default value for this field
         default_ty: Option<Type<'db>>,
@@ -1174,7 +1194,8 @@ pub struct ClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ClassLiteral<'_> {}
 
-#[expect(clippy::trivially_copy_pass_by_ref, clippy::ref_option)]
+#[expect(clippy::ref_option)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn pep695_generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
@@ -1528,11 +1549,18 @@ impl<'db> ClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
-    /// Check if `TypedDict` has `total=False` parameter
-    /// For a `TypedDict`, the `total` parameter is used to determine whether
-    /// fields are required by default.
-    /// For other classes, this is always `true`.
-    fn fields_required_by_default(self, db: &'db dyn Db) -> bool {
+    /// Returns whether fields are *type-required* by default for this class.
+    ///
+    /// This does **not** consider Python default values on parameters—only whether
+    /// the type system marks them as required keys.
+    ///
+    /// Rules:
+    /// - `NamedTuple` / dataclass: Always `true` (all fields are required in the type system).
+    /// - `TypedDict`: Defaults to `true` unless `total=False` or `NotRequired` is used.
+    ///
+    /// `false` → explicitly marked as not required via `total=False`.
+    /// `true`  → otherwise.
+    fn are_fields_type_required(self, db: &'db dyn Db) -> bool {
         if !self.is_typed_dict(db) {
             return true;
         }
@@ -1540,24 +1568,22 @@ impl<'db> ClassLiteral<'db> {
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
 
-        // Look for total=False in class arguments
+        // Look for `total=False` in class keyword arguments
         if let Some(arguments) = &class_stmt.arguments {
             for keyword in &arguments.keywords {
                 if keyword
                     .arg
                     .as_ref()
-                    .map_or(false, |name| name.as_str() == "total")
+                    .is_some_and(|name| name.as_str() == "total")
                 {
-                    // Check if the value is False
                     if let ruff_python_ast::Expr::BooleanLiteral(bool_lit) = &keyword.value {
-                        return bool_lit.value; // total=False means return false
+                        return bool_lit.value; // False => fields not required
                     }
                 }
             }
         }
 
-        // Default is total=True
-        true
+        true // Default is `total=True`
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -1838,7 +1864,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
-    /// or those marked as ClassVars are considered.
+    /// or those marked as `ClassVars` are considered.
     ///
     /// Returns [`Place::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassLiteral::class_member`] if you require a method that will
@@ -2283,7 +2309,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
-        let are_fields_required_by_default = self.fields_required_by_default(db);
+        let are_fields_type_required = self.are_fields_type_required(db);
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -2336,7 +2362,7 @@ impl<'db> ClassLiteral<'db> {
                             init,
                         },
                         CodeGeneratorKind::TypedDict => FieldKind::TypedDict {
-                            is_required: are_fields_required_by_default,
+                            is_required: are_fields_type_required,
                         },
                     };
 
@@ -2432,6 +2458,25 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> PlaceAndQualifiers<'db> {
+        Self::implicit_attribute_inner(
+            db,
+            class_body_scope,
+            name.to_string(),
+            target_method_decorator,
+        )
+    }
+
+    #[salsa::tracked(
+        cycle_fn=implicit_attribute_recover,
+        cycle_initial=implicit_attribute_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn implicit_attribute_inner(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: String,
+        target_method_decorator: MethodDecorator,
+    ) -> PlaceAndQualifiers<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -2464,7 +2509,7 @@ impl<'db> ClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
+            attribute_declarations(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {
@@ -2522,7 +2567,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         for (attribute_assignments, method_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
+            attribute_assignments(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {
@@ -3687,7 +3732,7 @@ impl KnownClass {
     /// representing all possible instances of the class.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_instance(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
@@ -3749,7 +3794,7 @@ impl KnownClass {
     fn try_to_class_literal_without_logging(
         self,
         db: &dyn Db,
-    ) -> Result<ClassLiteral, KnownClassLookupError> {
+    ) -> Result<ClassLiteral<'_>, KnownClassLookupError<'_>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
             Place::Type(Type::ClassLiteral(class_literal), Boundness::Bound) => Ok(class_literal),
@@ -3766,7 +3811,7 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral> {
+    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral<'_>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
@@ -3801,7 +3846,7 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
         self.try_to_class_literal(db)
             .map(Type::ClassLiteral)
             .unwrap_or_else(Type::unknown)
@@ -3811,7 +3856,7 @@ impl KnownClass {
     /// representing that class and all possible subclasses of the class.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type {
+    pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
         self.to_class_literal(db)
             .to_class_type(db)
             .map(|class| SubclassOfType::from(db, class))

@@ -1,68 +1,75 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:56:5: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+  --> sections.py:56:5
    |
 54 |     """Toggle the gizmo.
 55 |
 56 |     Returns
-   |     ^^^^^^^ D414
+   |     ^^^^^^^
 57 |
 58 |     """
    |
 
-sections.py:67:5: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+  --> sections.py:67:5
    |
 65 |     """Toggle the gizmo.
 66 |
 67 |     Returns"""
-   |     ^^^^^^^ D414
+   |     ^^^^^^^
    |
 
-sections.py:78:5: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+  --> sections.py:78:5
    |
 76 |     """Toggle the gizmo.
 77 |
 78 |     Returns
-   |     ^^^^^^^ D414
+   |     ^^^^^^^
 79 |     -------
 80 |     Yields
    |
 
-sections.py:80:5: D414 Section has no content ("Yields")
+D414 Section has no content ("Yields")
+  --> sections.py:80:5
    |
 78 |     Returns
 79 |     -------
 80 |     Yields
-   |     ^^^^^^ D414
+   |     ^^^^^^
 81 |     ------
    |
 
-sections.py:172:5: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+   --> sections.py:172:5
     |
 170 |     """Toggle the gizmo.
 171 |
 172 |     Returns
-    |     ^^^^^^^ D414
+    |     ^^^^^^^
 173 |         -------
 174 |     """
     |
 
-sections.py:266:5: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+   --> sections.py:266:5
     |
 264 |         note: A random string.
 265 |
 266 |     Returns:
-    |     ^^^^^^^ D414
+    |     ^^^^^^^
 267 |
 268 |     Raises:
     |
 
-sections.py:563:9: D414 Section has no content ("Returns")
+D414 Section has no content ("Returns")
+   --> sections.py:563:9
     |
 561 |         Here's a note.
 562 |
 563 |         Returns:
-    |         ^^^^^^^ D414
+    |         ^^^^^^^
 564 |     """
     |
