@@ -185,10 +185,28 @@ fn split_default(
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater => {
-            // Autofix for `maxsplit` without separator not yet implemented, as
-            // `split_whitespace().remainder()` is not stable:
-            // https://doc.rust-lang.org/std/str/struct.SplitWhitespace.html#method.remainder
-            None
+            let Ok(max_split) = usize::try_from(max_split) else {
+                return None;
+            };
+            let list_items: Vec<&str> = if direction == Direction::Left {
+                string_val
+                    .trim_start_matches(py_unicode_is_whitespace)
+                    .splitn(max_split + 1, py_unicode_is_whitespace)
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            } else {
+                let mut items: Vec<&str> = string_val
+                    .trim_end_matches(py_unicode_is_whitespace)
+                    .rsplitn(max_split + 1, py_unicode_is_whitespace)
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                items.reverse();
+                items
+            };
+            Some(construct_replacement(
+                &list_items,
+                str_value.first_literal_flags(),
+            ))
         }
         Ordering::Equal => {
             // Behavior for maxsplit = 0 when sep is None:
