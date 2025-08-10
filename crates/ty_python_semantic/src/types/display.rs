@@ -75,28 +75,70 @@ impl Display for QualifiedDisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
             Type::ClassLiteral(literal) => {
-                write!(f, "{}", get_qualified_class_name(self.db, *literal))
+                write!(f, "{}", self.get_qualified_representation(*literal))
             }
             Type::NominalInstance(instance) => match instance.class(self.db) {
                 ClassType::NonGeneric(class) => {
-                    write!(f, "{}", get_qualified_class_name(self.db, class))
+                    write!(f, "{}", self.get_qualified_representation(class))
                 }
                 ClassType::Generic(alias) => {
                     write!(
                         f,
                         "{}",
-                        get_qualified_class_name(self.db, alias.origin(self.db))
+                        self.get_qualified_representation(alias.origin(self.db))
                     )
                 }
             },
             Type::EnumLiteral(enum_literal) => {
-                let enum_class = enum_literal.enum_class(self.db);
-                let qualified_enum_name = get_qualified_class_name(self.db, enum_class);
-                let member_name = enum_literal.name(self.db);
-                write!(f, "Literal[{qualified_enum_name}.{member_name}]")
+                write!(
+                    f,
+                    "Literal[{}]",
+                    self.get_qualified_representation(enum_literal.enum_class(self.db))
+                )
             }
             _ => self.ty.display(self.db).fmt(f),
         }
+    }
+}
+
+impl QualifiedDisplayType<'_> {
+    fn get_qualified_representation(self, class: ClassLiteral) -> String {
+        let body_scope = class.body_scope(self.db);
+        let file = body_scope.file(self.db);
+        let module_ast = parsed_module(self.db, file).load(self.db);
+        let index = semantic_index(self.db, file);
+        let file_scope_id = body_scope.file_scope_id(self.db);
+
+        let mut name_parts = vec![self.ty.representation(self.db).to_string()];
+
+        // Skip itself
+        for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(1)
+        {
+            let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(self.db, file);
+            let node = ancestor_scope_id.node(self.db);
+
+            match ancestor_scope.kind() {
+                ScopeKind::Class => {
+                    if let Some(class_def) = node.as_class(&module_ast) {
+                        name_parts.push(class_def.name.as_str().to_string());
+                    }
+                }
+                ScopeKind::Function => {
+                    if let Some(function_def) = node.as_function(&module_ast) {
+                        name_parts.push(format!("<local in {}>", function_def.name.as_str()));
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(module) = file_to_module(self.db, file) {
+            let module_name = module.name(self.db);
+            name_parts.push(module_name.as_str().to_string());
+        }
+
+        name_parts.reverse();
+        name_parts.join(".")
     }
 }
 
@@ -1149,43 +1191,6 @@ impl Display for DisplayStringLiteralType<'_> {
         }
         f.write_char('"')
     }
-}
-
-fn get_qualified_class_name(db: &dyn Db, class: ClassLiteral) -> String {
-    let body_scope = class.body_scope(db);
-    let file = body_scope.file(db);
-    let module_ast = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let file_scope_id = body_scope.file_scope_id(db);
-
-    let mut name_parts = Vec::new();
-
-    for (ancestor_file_scope_id, ancestor_scope) in index.ancestor_scopes(file_scope_id) {
-        let ancestor_scope_id = ancestor_file_scope_id.to_scope_id(db, file);
-        let node = ancestor_scope_id.node(db);
-
-        match ancestor_scope.kind() {
-            ScopeKind::Class => {
-                if let Some(class_def) = node.as_class(&module_ast) {
-                    name_parts.push(class_def.name.as_str().to_string());
-                }
-            }
-            ScopeKind::Function => {
-                if let Some(function_def) = node.as_function(&module_ast) {
-                    name_parts.push(format!("<local in {}>", function_def.name.as_str()));
-                }
-            }
-            _ => {}
-        }
-    }
-
-    if let Some(module) = file_to_module(db, file) {
-        let module_name = module.name(db);
-        name_parts.push(module_name.as_str().to_string());
-    }
-
-    name_parts.reverse();
-    name_parts.join(".")
 }
 
 #[cfg(test)]
