@@ -54,8 +54,8 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
-# TODO: these should be errors (missing required key)
 eve2a: Person = {"age": 22}
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
 
 # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""

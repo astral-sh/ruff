@@ -1114,6 +1114,9 @@ pub(crate) struct Field<'db> {
 
     /// Whether or not this field should appear in the signature of `__init__`.
     pub(crate) init: bool,
+
+    /// Requiredness of this field (only for `TypedDict`)
+    pub(crate) is_required: Option<bool>,
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1865,6 +1868,7 @@ impl<'db> ClassLiteral<'db> {
                     mut default_ty,
                     init_only: _,
                     init,
+                    is_required: _,
                 },
             ) in self.fields(db, specialization, field_policy)
             {
@@ -2172,7 +2176,7 @@ impl<'db> ClassLiteral<'db> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
-            return self.own_fields(db, specialization);
+            return self.own_fields(db, specialization, field_policy);
         }
 
         let matching_classes_in_mro: Vec<_> = self
@@ -2195,7 +2199,7 @@ impl<'db> ClassLiteral<'db> {
         matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization))
+            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -2215,6 +2219,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind,
     ) -> FxOrderMap<Name, Field<'db>> {
         let mut attributes = FxOrderMap::default();
 
@@ -2272,6 +2277,8 @@ impl<'db> ClassLiteral<'db> {
                             default_ty,
                             init_only: attr.is_init_var(),
                             init,
+                            is_required: (field_policy == CodeGeneratorKind::TypedDict)
+                                .then_some(true),
                         },
                     );
                 }

@@ -37,6 +37,7 @@
 //! be considered a bug.)
 
 use itertools::{Either, Itertools};
+use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -104,7 +105,8 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
     report_invalid_assignment, report_invalid_attribute_assignment,
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    report_invalid_return_type, report_missing_required_field_on_typed_dict,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -6329,6 +6331,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     TypedDictType::from(self.db(), ClassType::NonGeneric(class_literal));
                 if let Some(typed_dict) = typed_dict_type.into_typed_dict() {
                     // Validate keyword arguments for `TypedDict` constructor
+
+                    // Validate that all required fields are provided
+                    let items = typed_dict.items(self.db());
+                    let required_fields: OrderSet<&str> = items
+                        .iter()
+                        .filter_map(|(field_name, field)| {
+                            (field.is_required == Some(true)).then_some(field_name.as_str())
+                        })
+                        .collect();
+                    let provided_fields: OrderSet<&str> = arguments
+                        .keywords
+                        .iter()
+                        .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
+                        .collect();
+                    for missing_field in required_fields.difference(&provided_fields) {
+                        report_missing_required_field_on_typed_dict(
+                            &self.context,
+                            call_expression.into(),
+                            typed_dict_type,
+                            missing_field,
+                        );
+                    }
+
+                    // Validate that each field is assigned a type that is compatible with the field's type
                     for keyword in &arguments.keywords {
                         if let Some(arg_name) = &keyword.arg {
                             // Get the already-inferred argument type
