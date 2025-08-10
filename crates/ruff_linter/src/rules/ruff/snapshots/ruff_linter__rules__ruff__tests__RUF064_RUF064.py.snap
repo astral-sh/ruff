@@ -348,6 +348,8 @@ help: Replace with octal literal
 52    |-os.fchmod(0, 256)  # 0o400
    52 |+os.fchmod(0, 0o400)  # 0o400
 53 53 | os.fchmod(0, 493)  # 0o755
+54 54 | 
+55 55 | # https://github.com/astral-sh/ruff/issues/19010
 
 RUF064 [*] Non-octal mode
   --> RUF064.py:53:14
@@ -355,6 +357,8 @@ RUF064 [*] Non-octal mode
 52 | os.fchmod(0, 256)  # 0o400
 53 | os.fchmod(0, 493)  # 0o755
    |              ^^^
+54 |
+55 | # https://github.com/astral-sh/ruff/issues/19010
    |
 help: Replace with octal literal
 
@@ -364,3 +368,68 @@ help: Replace with octal literal
 52 52 | os.fchmod(0, 256)  # 0o400
 53    |-os.fchmod(0, 493)  # 0o755
    53 |+os.fchmod(0, 0o755)  # 0o755
+54 54 | 
+55 55 | # https://github.com/astral-sh/ruff/issues/19010
+56 56 | os.chmod("foo", 000)  # Error
+
+RUF064 [*] Non-octal mode
+  --> RUF064.py:56:17
+   |
+55 | # https://github.com/astral-sh/ruff/issues/19010
+56 | os.chmod("foo", 000)  # Error
+   |                 ^^^
+57 | os.chmod("foo", 0000)  # Error
+   |
+help: Replace with octal literal
+
+ℹ Safe fix
+53 53 | os.fchmod(0, 493)  # 0o755
+54 54 | 
+55 55 | # https://github.com/astral-sh/ruff/issues/19010
+56    |-os.chmod("foo", 000)  # Error
+   56 |+os.chmod("foo", 0o000)  # Error
+57 57 | os.chmod("foo", 0000)  # Error
+58 58 | 
+59 59 | os.chmod("foo", 0b0)  # Error
+
+RUF064 [*] Non-octal mode
+  --> RUF064.py:57:17
+   |
+55 | # https://github.com/astral-sh/ruff/issues/19010
+56 | os.chmod("foo", 000)  # Error
+57 | os.chmod("foo", 0000)  # Error
+   |                 ^^^^
+58 |
+59 | os.chmod("foo", 0b0)  # Error
+   |
+help: Replace with octal literal
+
+ℹ Safe fix
+54 54 | 
+55 55 | # https://github.com/astral-sh/ruff/issues/19010
+56 56 | os.chmod("foo", 000)  # Error
+57    |-os.chmod("foo", 0000)  # Error
+   57 |+os.chmod("foo", 0o0000)  # Error
+58 58 | 
+59 59 | os.chmod("foo", 0b0)  # Error
+60 60 | os.chmod("foo", 0x0)  # Error
+
+RUF064 Non-octal mode
+  --> RUF064.py:59:17
+   |
+57 | os.chmod("foo", 0000)  # Error
+58 |
+59 | os.chmod("foo", 0b0)  # Error
+   |                 ^^^
+60 | os.chmod("foo", 0x0)  # Error
+   |
+help: Replace with octal literal
+
+RUF064 Non-octal mode
+  --> RUF064.py:60:17
+   |
+59 | os.chmod("foo", 0b0)  # Error
+60 | os.chmod("foo", 0x0)  # Error
+   |                 ^^^
+   |
+help: Replace with octal literal

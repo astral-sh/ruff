@@ -57,6 +57,16 @@ use crate::{FixAvailability, Violation};
 /// original code really intended to use `0o256` (`u=w,g=rx,o=rw`) instead of
 /// `256`, this fix should not be accepted.
 ///
+/// As a special case, zero is allowed to omit the `0o` prefix unless it has
+/// multiple digits:
+///
+/// ```python
+/// os.chmod("foo", 0)
+/// os.chmod("foo", 0o000)
+/// ```
+///
+/// Ruff will suggest a safe fix for multi-digit zeros to add the `0o` prefix.
+///
 /// ## Fix availability
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
@@ -102,7 +112,14 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
 
     // Don't suggest a fix for 0x or 0b literals.
-    if mode_literal.starts_with('0') {
+    if mode_literal.starts_with("0x") || mode_literal.starts_with("0b") {
+        return;
+    }
+
+    if mode_literal.chars().all(|c| c == '0') {
+        // Fix e.g. 000 as 0o000
+        let edit = Edit::range_replacement(format!("0o{mode_literal}"), mode_arg.range());
+        diagnostic.set_fix(Fix::safe_edit(edit));
         return;
     }
 
