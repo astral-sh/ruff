@@ -1099,24 +1099,49 @@ impl MethodDecorator {
     }
 }
 
+/// Kind-specific metadata for different types of fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FieldKind<'db> {
+    /// `NamedTuple` field metadata (no special properties)
+    NamedTuple { default_ty: Option<Type<'db>> },
+    /// `Dataclass` field metadata
+    Dataclass {
+        /// The type of the default value for this field
+        default_ty: Option<Type<'db>>,
+        /// Whether or not this field is "init-only". If this is true, it only appears in the
+        /// `__init__` signature, but is not accessible as a real field
+        init_only: bool,
+        /// Whether or not this field should appear in the signature of `__init__`.
+        init: bool,
+    },
+    /// `TypedDict` field metadata
+    TypedDict {
+        /// Whether this field is required
+        is_required: bool,
+    },
+}
+
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
+    /// Kind-specific metadata for this field
+    pub(crate) kind: FieldKind<'db>,
+}
 
-    /// The type of the default value for this field
-    pub(crate) default_ty: Option<Type<'db>>,
-
-    /// Whether or not this field is "init-only". If this is true, it only appears in the
-    /// `__init__` signature, but is not accessible as a real field
-    pub(crate) init_only: bool,
-
-    /// Whether or not this field should appear in the signature of `__init__`.
-    pub(crate) init: bool,
-
-    /// Requiredness of this field (only for `TypedDict`)
-    pub(crate) is_required: Option<bool>,
+impl Field<'_> {
+    pub(crate) const fn is_required(&self) -> bool {
+        match &self.kind {
+            FieldKind::NamedTuple { default_ty } => default_ty.is_none(),
+            // A dataclass field is NOT required if `default` (or `default_factory`) is set
+            // or if `init` has been set to `False`.
+            FieldKind::Dataclass {
+                init, default_ty, ..
+            } => default_ty.is_none() && *init,
+            FieldKind::TypedDict { is_required } => *is_required,
+        }
+    }
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1861,17 +1886,16 @@ impl<'db> ClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             let mut kw_only_field_seen = false;
-            for (
-                field_name,
-                Field {
-                    declared_ty: mut field_ty,
-                    mut default_ty,
-                    init_only: _,
-                    init,
-                    is_required: _,
-                },
-            ) in self.fields(db, specialization, field_policy)
-            {
+            for (field_name, field) in self.fields(db, specialization, field_policy) {
+                let (init, mut default_ty) = match field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, default_ty),
+                    FieldKind::Dataclass {
+                        init, default_ty, ..
+                    } => (init, default_ty),
+                    _ => continue,
+                };
+                let mut field_ty = field.declared_ty;
+
                 if name == "__init__" && !init {
                     // Skip fields with `init=False`
                     continue;
@@ -2270,15 +2294,21 @@ impl<'db> ClassLiteral<'db> {
                         init = field.init(db);
                     }
 
+                    let kind = match field_policy {
+                        CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
+                        CodeGeneratorKind::DataclassLike => FieldKind::Dataclass {
+                            default_ty,
+                            init_only: attr.is_init_var(),
+                            init,
+                        },
+                        CodeGeneratorKind::TypedDict => FieldKind::TypedDict { is_required: true },
+                    };
+
                     attributes.insert(
                         symbol.name().clone(),
                         Field {
                             declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty,
-                            init_only: attr.is_init_var(),
-                            init,
-                            is_required: (field_policy == CodeGeneratorKind::TypedDict)
-                                .then_some(true),
+                            kind,
                         },
                     );
                 }

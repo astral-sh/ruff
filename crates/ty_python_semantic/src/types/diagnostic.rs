@@ -2643,8 +2643,7 @@ pub(crate) fn report_missing_required_field_on_typed_dict<'db>(
     if let Some(builder) = context.report_lint(&MISSING_REQUIRED_FIELD, constructor_node) {
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
-            "Missing required field '{}' in TypedDict `{}` constructor",
-            missing_field, typed_dict_name
+            "Missing required field '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
         ));
     }
 }

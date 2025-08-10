@@ -6337,7 +6337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let required_fields: OrderSet<&str> = items
                         .iter()
                         .filter_map(|(field_name, field)| {
-                            (field.is_required == Some(true)).then_some(field_name.as_str())
+                            field.is_required().then_some(field_name.as_str())
                         })
                         .collect();
                     let provided_fields: OrderSet<&str> = arguments
