@@ -1816,16 +1816,45 @@ pub(super) fn report_invalid_assignment(
     target_ty: Type,
     source_ty: Type,
 ) {
-    report_invalid_assignment_with_message(
-        context,
-        node,
-        target_ty,
+    // Handles the situation where the report naming is confusing, such as class with the same Name,
+    // but from different scopes.
+    let message = if let Some(target_class) = type_to_class_literal(target_ty, context.db())
+    && let Some(source_class) = type_to_class_literal(source_ty, context.db())
+    && target_class != source_class
+    // The builtins such as 'builtins.int' and 'builtins.ellipsis' would trigger a false positive,
+    // so we do not use fully qualified names for builtins
+    && target_class.known(context.db()).is_none()
+    && source_class.known(context.db()).is_none()
+    {
+        format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            source_ty.qualified_display(context.db()),
+            target_ty.qualified_display(context.db()),
+        )
+    } else {
         format_args!(
             "Object of type `{}` is not assignable to `{}`",
             source_ty.display(context.db()),
-            target_ty.display(context.db()),
-        ),
-    );
+            target_ty.display(context.db())
+        )
+    };
+
+    report_invalid_assignment_with_message(context, node, target_ty, message);
+}
+
+fn type_to_class_literal<'db>(
+    ty: Type<'db>,
+    db: &'db dyn crate::Db,
+) -> Option<crate::types::class::ClassLiteral<'db>> {
+    match ty {
+        Type::ClassLiteral(class) => Some(class),
+        Type::NominalInstance(instance) => match instance.class(db) {
+            crate::types::class::ClassType::NonGeneric(class) => Some(class),
+            crate::types::class::ClassType::Generic(alias) => Some(alias.origin(db)),
+        },
+        Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
+        _ => None,
+    }
 }
 
 pub(super) fn report_invalid_attribute_assignment(
