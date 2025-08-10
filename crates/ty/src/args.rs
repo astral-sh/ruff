@@ -186,23 +186,16 @@ impl CheckCommand {
                 self.paths
                     .iter()
                     .filter_map(|path| {
-                        let path = path.as_std_path();
-                        if !path.is_dir() {
+                        if !path.as_std_path().is_dir() {
                             return None;
                         }
 
-                        let Ok(canonical_path) = dunce::canonicalize(path) else {
-                            return None;
-                        };
+                        let path = SystemPath::absolute(path, project_root);
+                        let path = path.strip_prefix(project_root).ok()?;
+                        let path = path.to_string().replace('\\', "/");
+                        let path = path.strip_suffix('/').unwrap_or(&path);
 
-                        let relative_path = canonical_path
-                            .strip_prefix(project_root.as_std_path())
-                            .ok()?;
-                        let path_str = relative_path.to_str()?;
-                        let path_str = path_str.replace('\\', "/");
-                        let normalized_path = path_str.strip_suffix('/').unwrap_or(&path_str);
-
-                        Some(RelativeGlobPattern::cli(format!("{normalized_path}/**/*")))
+                        Some(RelativeGlobPattern::cli(format!("{path}/**/*")))
                     })
                     .collect()
             };
