@@ -25,8 +25,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
     NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
-    infer_definition_types, todo_type,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypedDictParams,
+    declaration_type, infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -1587,41 +1587,32 @@ impl<'db> ClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
-    /// Returns whether fields are *type-required* by default for this class.
-    ///
-    /// This does **not** consider Python default values on parameters—only whether
-    /// the type system marks them as required keys.
-    ///
-    /// Rules:
-    /// - `NamedTuple` / dataclass: Always `true` (all fields are required in the type system).
-    /// - `TypedDict`: Defaults to `true` unless `total=False` or `NotRequired` is used.
-    ///
-    /// `false` → explicitly marked as not required via `total=False`.
-    /// `true`  → otherwise.
-    fn are_fields_type_required(self, db: &'db dyn Db) -> bool {
+    /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
+    fn compute_typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
         if !self.is_typed_dict(db) {
-            return true;
+            return None;
         }
 
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
 
-        // Look for `total=False` in class keyword arguments
+        let mut typed_dict_params = TypedDictParams::default();
+
+        // Check for `total` keyword argument in the class definition
         if let Some(arguments) = &class_stmt.arguments {
             for keyword in &arguments.keywords {
-                if keyword
-                    .arg
-                    .as_ref()
-                    .is_some_and(|name| name.as_str() == "total")
+                if keyword.arg.as_deref() == Some("total")
+                    && matches!(
+                        &keyword.value,
+                        ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: false, .. })
+                    )
                 {
-                    if let ruff_python_ast::Expr::BooleanLiteral(bool_lit) = &keyword.value {
-                        return bool_lit.value; // False => fields not required
-                    }
+                    typed_dict_params.remove(TypedDictParams::TOTAL);
                 }
             }
         }
 
-        true // Default is `total=True`
+        Some(typed_dict_params)
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -2374,7 +2365,8 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
-        let are_fields_type_required = self.are_fields_type_required(db);
+
+        let typed_dict_params = self.compute_typed_dict_params(db);
 
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
@@ -2436,8 +2428,10 @@ impl<'db> ClassLiteral<'db> {
                             // Explicit NotRequired[T] annotation - never required
                             false
                         } else {
-                            // No explicit qualifier - use class default (total= parameter)
-                            are_fields_type_required
+                            // No explicit qualifier - use class default (`total` parameter)
+                            typed_dict_params
+                                .expect("TypedDictParams should be computed")
+                                .contains(TypedDictParams::TOTAL)
                         };
                         FieldKind::TypedDict { is_required }
                     }
