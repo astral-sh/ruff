@@ -1821,10 +1821,7 @@ pub(super) fn report_invalid_assignment(
     let use_qualified = if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
         if let Some(source_class) = type_to_class_literal(source_ty, context.db()) {
             target_class != source_class
-                // The builtins such as 'builtins.int' and 'builtins.ellipsis' would trigger a false positive,
-                // so we do not use fully qualified names for builtins
-                && target_class.known(context.db()).is_none()
-                && source_class.known(context.db()).is_none()
+                && target_class.name(context.db()) == source_class.name(context.db())
         } else {
             false
         }
