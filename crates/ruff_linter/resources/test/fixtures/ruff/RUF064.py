@@ -58,3 +58,4 @@ os.chmod("foo", 0000)  # Error
 
 os.chmod("foo", 0b0)  # Error
 os.chmod("foo", 0x0)  # Error
+os.chmod("foo", 0)  # Ok

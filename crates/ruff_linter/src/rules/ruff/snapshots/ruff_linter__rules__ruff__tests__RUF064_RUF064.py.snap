@@ -422,6 +422,7 @@ RUF064 Non-octal mode
 59 | os.chmod("foo", 0b0)  # Error
    |                 ^^^
 60 | os.chmod("foo", 0x0)  # Error
+61 | os.chmod("foo", 0)  # Ok
    |
 help: Replace with octal literal
 
@@ -431,5 +432,6 @@ RUF064 Non-octal mode
 59 | os.chmod("foo", 0b0)  # Error
 60 | os.chmod("foo", 0x0)  # Error
    |                 ^^^
+61 | os.chmod("foo", 0)  # Ok
    |
 help: Replace with octal literal
