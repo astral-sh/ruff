@@ -469,11 +469,33 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Used for `TypedDict` class parameters.
+    /// Keeps track of the arguments that were passed in class definition.
+    /// (see https://typing.python.org/en/latest/spec/typeddict.html)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TypedDictParams: u8 {
+        /// Whether fields are required by default (`total=True`)
+        const TOTAL = 1 << 0;
+        // https://peps.python.org/pep-0728/
+        // const EXTRA_ITEMS = 1 << 1;
+        // const CLOSED = 1 << 2;
+    }
+}
+
 impl get_size2::GetSize for DataclassParams {}
+
+impl get_size2::GetSize for TypedDictParams {}
 
 impl Default for DataclassParams {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
+    }
+}
+
+impl Default for TypedDictParams {
+    fn default() -> Self {
+        Self::TOTAL
     }
 }
 
