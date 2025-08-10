@@ -58,7 +58,7 @@ pub fn run(
     for test in suite.tests() {
         if filter
             .as_ref()
-            .is_some_and(|f| !test.uncontracted_name().contains(f))
+            .is_some_and(|f| !(test.uncontracted_name().contains(f) || test.name() == *f))
         {
             continue;
         }
@@ -283,6 +283,7 @@ fn run_test(
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
+            real_stdlib_path: None,
         }
         .to_search_paths(db.system(), db.vendored())
         .expect("Failed to resolve search path settings"),

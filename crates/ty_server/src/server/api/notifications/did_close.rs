@@ -53,6 +53,20 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
                     // interned in the lookup table (`Files`).
                     tracing::warn!("Salsa file does not exists for {}", system_path);
                 }
+
+                // For non-virtual files, we clear diagnostics if:
+                //
+                // 1. The file does not belong to any workspace e.g., opening a random file from
+                //    outside the workspace because closing it acts like the file doesn't exists
+                // 2. The diagnostic mode is set to open-files only
+                if session.workspaces().for_path(system_path).is_none()
+                    || session
+                        .global_settings()
+                        .diagnostic_mode()
+                        .is_open_files_only()
+                {
+                    clear_diagnostics(&key, client);
+                }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
                 if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
@@ -61,14 +75,11 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
                 } else {
                     tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
                 }
-            }
-        }
 
-        if !session.global_settings().diagnostic_mode().is_workspace() {
-            // The server needs to clear the diagnostics regardless of whether the client supports
-            // pull diagnostics or not. This is because the client only has the capability to fetch
-            // the diagnostics but does not automatically clear them when a document is closed.
-            clear_diagnostics(&key, client);
+                // Always clear diagnostics for virtual files, as they don't really exist on disk
+                // which means closing them is like deleting the file.
+                clear_diagnostics(&key, client);
+            }
         }
 
         Ok(())

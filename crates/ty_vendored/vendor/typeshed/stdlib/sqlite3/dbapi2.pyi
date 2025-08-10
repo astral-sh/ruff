@@ -66,6 +66,7 @@ from sqlite3 import (
     Row as Row,
     Warning as Warning,
 )
+from typing import Literal
 
 if sys.version_info >= (3, 12):
     from _sqlite3 import (
@@ -223,7 +224,7 @@ if sys.version_info < (3, 10):
     from _sqlite3 import OptimizedUnicode as OptimizedUnicode
 
 paramstyle: str
-threadsafety: int
+threadsafety: Literal[0, 1, 3]
 apilevel: str
 Date = date
 Time = time

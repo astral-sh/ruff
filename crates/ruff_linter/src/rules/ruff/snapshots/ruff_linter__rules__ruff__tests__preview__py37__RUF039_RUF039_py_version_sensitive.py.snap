@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF039 First argument to `re.compile()` is not raw string
+ --> RUF039_py_version_sensitive.py:3:12
+  |
+1 | import re
+2 |
+3 | re.compile("\N{Partial Differential}")  # with unsafe fix if python target is 3.8 or higher, else without fix
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Replace with raw string

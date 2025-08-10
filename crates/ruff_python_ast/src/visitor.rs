@@ -7,8 +7,8 @@ use crate::{
     self as ast, Alias, AnyParameterRef, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension,
     Decorator, ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPart,
     InterpolatedStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TStringPart, TypeParam,
-    TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
+    PatternArguments, PatternKeyword, Stmt, StringLiteral, TString, TypeParam, TypeParamParamSpec,
+    TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -547,14 +547,8 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
         }
         Expr::TString(ast::ExprTString { value, .. }) => {
-            for part in value {
-                match part {
-                    TStringPart::Literal(string_literal) => {
-                        visitor.visit_string_literal(string_literal);
-                    }
-                    TStringPart::FString(f_string) => visitor.visit_f_string(f_string),
-                    TStringPart::TString(t_string) => visitor.visit_t_string(t_string),
-                }
+            for t_string in value {
+                visitor.visit_t_string(t_string);
             }
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {

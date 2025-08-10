@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105 [*] Unnecessary empty string passed to `print`
+ --> FURB105.py:3:1
   |
 1 | # Errors.
 2 |
 3 | print("")
-  | ^^^^^^^^^ FURB105
+  | ^^^^^^^^^
 4 | print("", sep=",")
 5 | print("", end="bar")
   |
-  = help: Remove empty string
+help: Remove empty string
 
 ℹ Safe fix
 1 1 | # Errors.
@@ -21,15 +22,16 @@ FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
 5 5 | print("", end="bar")
 6 6 | print("", sep=",", end="bar")
 
-FURB105.py:4:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+ --> FURB105.py:4:1
   |
 3 | print("")
 4 | print("", sep=",")
-  | ^^^^^^^^^^^^^^^^^^ FURB105
+  | ^^^^^^^^^^^^^^^^^^
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
   |
-  = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 1 1 | # Errors.
@@ -41,16 +43,17 @@ FURB105.py:4:1: FURB105 [*] Unnecessary empty string and separator passed to `pr
 6 6 | print("", sep=",", end="bar")
 7 7 | print(sep="")
 
-FURB105.py:5:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105 [*] Unnecessary empty string passed to `print`
+ --> FURB105.py:5:1
   |
 3 | print("")
 4 | print("", sep=",")
 5 | print("", end="bar")
-  | ^^^^^^^^^^^^^^^^^^^^ FURB105
+  | ^^^^^^^^^^^^^^^^^^^^
 6 | print("", sep=",", end="bar")
 7 | print(sep="")
   |
-  = help: Remove empty string
+help: Remove empty string
 
 ℹ Safe fix
 2 2 | 
@@ -62,16 +65,17 @@ FURB105.py:5:1: FURB105 [*] Unnecessary empty string passed to `print`
 7 7 | print(sep="")
 8 8 | print("", sep="")
 
-FURB105.py:6:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+ --> FURB105.py:6:1
   |
 4 | print("", sep=",")
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 7 | print(sep="")
 8 | print("", sep="")
   |
-  = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 3 3 | print("")
@@ -83,16 +87,17 @@ FURB105.py:6:1: FURB105 [*] Unnecessary empty string and separator passed to `pr
 8 8 | print("", sep="")
 9 9 | print("", "", sep="")
 
-FURB105.py:7:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105 [*] Unnecessary separator passed to `print`
+ --> FURB105.py:7:1
   |
 5 | print("", end="bar")
 6 | print("", sep=",", end="bar")
 7 | print(sep="")
-  | ^^^^^^^^^^^^^ FURB105
+  | ^^^^^^^^^^^^^
 8 | print("", sep="")
 9 | print("", "", sep="")
   |
-  = help: Remove separator
+help: Remove separator
 
 ℹ Safe fix
 4 4 | print("", sep=",")
@@ -104,16 +109,17 @@ FURB105.py:7:1: FURB105 [*] Unnecessary separator passed to `print`
 9 9 | print("", "", sep="")
 10 10 | print("", "", sep="", end="")
 
-FURB105.py:8:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:8:1
    |
  6 | print("", sep=",", end="bar")
  7 | print(sep="")
  8 | print("", sep="")
-   | ^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^
  9 | print("", "", sep="")
 10 | print("", "", sep="", end="")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 5 5 | print("", end="bar")
@@ -125,16 +131,17 @@ FURB105.py:8:1: FURB105 [*] Unnecessary empty string and separator passed to `pr
 10 10 | print("", "", sep="", end="")
 11 11 | print("", "", sep="", end="bar")
 
-FURB105.py:9:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:9:1
    |
  7 | print(sep="")
  8 | print("", sep="")
  9 | print("", "", sep="")
-   | ^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^
 10 | print("", "", sep="", end="")
 11 | print("", "", sep="", end="bar")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 6  6  | print("", sep=",", end="bar")
@@ -146,16 +153,17 @@ FURB105.py:9:1: FURB105 [*] Unnecessary empty string and separator passed to `pr
 11 11 | print("", "", sep="", end="bar")
 12 12 | print("", sep="", end="bar")
 
-FURB105.py:10:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:10:1
    |
  8 | print("", sep="")
  9 | print("", "", sep="")
 10 | print("", "", sep="", end="")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 11 | print("", "", sep="", end="bar")
 12 | print("", sep="", end="bar")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 7  7  | print(sep="")
@@ -167,16 +175,17 @@ FURB105.py:10:1: FURB105 [*] Unnecessary empty string and separator passed to `p
 12 12 | print("", sep="", end="bar")
 13 13 | print(sep="", end="bar")
 
-FURB105.py:11:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:11:1
    |
  9 | print("", "", sep="")
 10 | print("", "", sep="", end="")
 11 | print("", "", sep="", end="bar")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 12 | print("", sep="", end="bar")
 13 | print(sep="", end="bar")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 8  8  | print("", sep="")
@@ -188,16 +197,17 @@ FURB105.py:11:1: FURB105 [*] Unnecessary empty string and separator passed to `p
 13 13 | print(sep="", end="bar")
 14 14 | print("", "foo", sep="")
 
-FURB105.py:12:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:12:1
    |
 10 | print("", "", sep="", end="")
 11 | print("", "", sep="", end="bar")
 12 | print("", sep="", end="bar")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 13 | print(sep="", end="bar")
 14 | print("", "foo", sep="")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 9  9  | print("", "", sep="")
@@ -209,16 +219,17 @@ FURB105.py:12:1: FURB105 [*] Unnecessary empty string and separator passed to `p
 14 14 | print("", "foo", sep="")
 15 15 | print("foo", "", sep="")
 
-FURB105.py:13:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105 [*] Unnecessary separator passed to `print`
+  --> FURB105.py:13:1
    |
 11 | print("", "", sep="", end="bar")
 12 | print("", sep="", end="bar")
 13 | print(sep="", end="bar")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
    |
-   = help: Remove separator
+help: Remove separator
 
 ℹ Safe fix
 10 10 | print("", "", sep="", end="")
@@ -230,16 +241,17 @@ FURB105.py:13:1: FURB105 [*] Unnecessary separator passed to `print`
 15 15 | print("foo", "", sep="")
 16 16 | print("foo", "", "bar", sep="")
 
-FURB105.py:14:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:14:1
    |
 12 | print("", sep="", end="bar")
 13 | print(sep="", end="bar")
 14 | print("", "foo", sep="")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
 15 | print("foo", "", sep="")
 16 | print("foo", "", "bar", sep="")
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 11 11 | print("", "", sep="", end="bar")
@@ -251,16 +263,17 @@ FURB105.py:14:1: FURB105 [*] Unnecessary empty string and separator passed to `p
 16 16 | print("foo", "", "bar", sep="")
 17 17 | print("", *args)
 
-FURB105.py:15:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105 [*] Unnecessary empty string and separator passed to `print`
+  --> FURB105.py:15:1
    |
 13 | print(sep="", end="bar")
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
 16 | print("foo", "", "bar", sep="")
 17 | print("", *args)
    |
-   = help: Remove empty string and separator
+help: Remove empty string and separator
 
 ℹ Safe fix
 12 12 | print("", sep="", end="bar")
@@ -272,16 +285,17 @@ FURB105.py:15:1: FURB105 [*] Unnecessary empty string and separator passed to `p
 17 17 | print("", *args)
 18 18 | print("", *args, sep="")
 
-FURB105.py:16:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105 [*] Unnecessary empty string passed to `print`
+  --> FURB105.py:16:1
    |
 14 | print("", "foo", sep="")
 15 | print("foo", "", sep="")
 16 | print("foo", "", "bar", sep="")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 17 | print("", *args)
 18 | print("", *args, sep="")
    |
-   = help: Remove empty string
+help: Remove empty string
 
 ℹ Safe fix
 13 13 | print(sep="", end="bar")
@@ -293,16 +307,17 @@ FURB105.py:16:1: FURB105 [*] Unnecessary empty string passed to `print`
 18 18 | print("", *args, sep="")
 19 19 | print("", **kwargs)
 
-FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105 [*] Unnecessary empty string passed to `print`
+  --> FURB105.py:18:1
    |
 16 | print("foo", "", "bar", sep="")
 17 | print("", *args)
 18 | print("", *args, sep="")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^^^^^^
 19 | print("", **kwargs)
 20 | print(sep="\t")
    |
-   = help: Remove empty string
+help: Remove empty string
 
 ℹ Safe fix
 15 15 | print("foo", "", sep="")
@@ -314,16 +329,17 @@ FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
 20 20 | print(sep="\t")
 21 21 | print(sep=print(1))
 
-FURB105.py:19:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105 [*] Unnecessary empty string passed to `print`
+  --> FURB105.py:19:1
    |
 17 | print("", *args)
 18 | print("", *args, sep="")
 19 | print("", **kwargs)
-   | ^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^
 20 | print(sep="\t")
 21 | print(sep=print(1))
    |
-   = help: Remove empty string
+help: Remove empty string
 
 ℹ Safe fix
 16 16 | print("foo", "", "bar", sep="")
@@ -335,15 +351,16 @@ FURB105.py:19:1: FURB105 [*] Unnecessary empty string passed to `print`
 21 21 | print(sep=print(1))
 22 22 | 
 
-FURB105.py:20:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105 [*] Unnecessary separator passed to `print`
+  --> FURB105.py:20:1
    |
 18 | print("", *args, sep="")
 19 | print("", **kwargs)
 20 | print(sep="\t")
-   | ^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^
 21 | print(sep=print(1))
    |
-   = help: Remove separator
+help: Remove separator
 
 ℹ Safe fix
 17 17 | print("", *args)
@@ -355,16 +372,17 @@ FURB105.py:20:1: FURB105 [*] Unnecessary separator passed to `print`
 22 22 | 
 23 23 | # OK.
 
-FURB105.py:21:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105 [*] Unnecessary separator passed to `print`
+  --> FURB105.py:21:1
    |
 19 | print("", **kwargs)
 20 | print(sep="\t")
 21 | print(sep=print(1))
-   | ^^^^^^^^^^^^^^^^^^^ FURB105
+   | ^^^^^^^^^^^^^^^^^^^
 22 |
 23 | # OK.
    |
-   = help: Remove separator
+help: Remove separator
 
 ℹ Unsafe fix
 18 18 | print("", *args, sep="")

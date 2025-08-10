@@ -1,19 +1,18 @@
 use std::fmt::Formatter;
-use std::panic::{AssertUnwindSafe, RefUnwindSafe};
+use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
-use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
+use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Event, Setter};
+use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -34,7 +33,7 @@ pub struct ProjectDatabase {
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 
-    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // IMPORTANT: This field must be the last because we use `trigger_cancellation` (drops all other storage references)
     // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
     // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
     // we try to mutably borrow using `Arc::get_mut` (like `system`).
@@ -87,9 +86,9 @@ impl ProjectDatabase {
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
-        let mut reporter = DummyReporter;
-        let reporter = AssertUnwindSafe(&mut reporter as &mut dyn ProgressReporter);
-        self.project().check(self, reporter)
+        let mut collector = CollectReporter::default();
+        self.project().check(self, &mut collector);
+        collector.into_sorted(self)
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
@@ -97,9 +96,8 @@ impl ProjectDatabase {
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
-    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
-        let reporter = AssertUnwindSafe(reporter);
-        self.project().check(self, reporter)
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) {
+        self.project().check(self, reporter);
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -109,29 +107,29 @@ impl ProjectDatabase {
 
     /// Set the check mode for the project.
     pub fn set_check_mode(&mut self, mode: CheckMode) {
-        tracing::debug!("Updating project to check {mode}");
-        self.project().set_check_mode(self).to(mode);
+        if self.project().check_mode(self) != mode {
+            tracing::debug!("Updating project to check {mode}");
+            self.project().set_check_mode(self).to(mode);
+        }
     }
 
     /// Returns a mutable reference to the system.
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
     pub fn system_mut(&mut self) -> &mut dyn System {
-        // TODO: Use a more official method to cancel other queries.
-        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = self.zalsa_mut();
+        self.trigger_cancellation();
 
-        Arc::get_mut(&mut self.system)
-            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
+        Arc::get_mut(&mut self.system).expect(
+            "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
+        )
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let salsa_db = self as &dyn salsa::Database;
-
-        let mut ingredients = salsa_db.structs_info();
-        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let mut ingredients = memory_usage.structs;
+        let mut memos = memory_usage.queries.into_iter().collect::<Vec<_>>();
 
         ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
         memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
@@ -141,12 +139,14 @@ impl ProjectDatabase {
         for ingredient in &ingredients {
             total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
+            total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
         }
 
         let mut total_memo_fields = 0;
         let mut total_memo_metadata = 0;
         for (_, memo) in &memos {
             total_memo_fields += memo.size_of_fields();
+            total_memo_fields += memo.heap_size_of_fields().unwrap_or(0);
             total_memo_metadata += memo.size_of_metadata();
         }
 

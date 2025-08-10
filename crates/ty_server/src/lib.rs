@@ -4,18 +4,18 @@ use anyhow::Context;
 use lsp_server::Connection;
 use ruff_db::system::{OsSystem, SystemPathBuf};
 
-use crate::server::Server;
+pub use crate::logging::{LogLevel, init_logging};
+pub use crate::server::{PartialWorkspaceProgress, PartialWorkspaceProgressParams, Server};
+pub use crate::session::{ClientOptions, DiagnosticMode};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::{DocumentQuery, Session};
 
+mod capabilities;
 mod document;
 mod logging;
 mod server;
 mod session;
 mod system;
-
-#[cfg(test)]
-pub mod test;
 
 pub(crate) const SERVER_NAME: &str = "ty";
 pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
@@ -48,7 +48,7 @@ pub fn run_server() -> anyhow::Result<()> {
     // This is to complement the `LSPSystem` if the document is not available in the index.
     let fallback_system = Arc::new(OsSystem::new(cwd));
 
-    let server_result = Server::new(worker_threads, connection, fallback_system, true)
+    let server_result = Server::new(worker_threads, connection, fallback_system, false)
         .context("Failed to start server")?
         .run();
 

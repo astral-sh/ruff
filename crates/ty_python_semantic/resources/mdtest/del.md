@@ -123,7 +123,7 @@ def enclosing():
         nonlocal x
         def bar():
             # allowed, refers to `x` in `enclosing`
-            reveal_type(x)  # revealed: Unknown | Literal[2]
+            reveal_type(x)  # revealed: Literal[2]
         bar()
         del x  # allowed, deletes `x` in `enclosing` (though we don't track that)
 ```
@@ -181,7 +181,7 @@ def f(l: list[int]):
     # but if it was greater than that, it will not be an error.
     reveal_type(l[0])  # revealed: int
 
-    # error: [call-non-callable]
+    # error: [invalid-argument-type]
     del l["string"]
 
     l[0] = 1
