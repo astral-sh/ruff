@@ -2361,9 +2361,19 @@ impl<'db> ClassLiteral<'db> {
                             init_only: attr.is_init_var(),
                             init,
                         },
-                        CodeGeneratorKind::TypedDict => FieldKind::TypedDict {
-                            is_required: are_fields_type_required,
-                        },
+                        CodeGeneratorKind::TypedDict => {
+                            let is_required = if attr.is_required() {
+                                // Explicit Required[T] annotation - always required
+                                true
+                            } else if attr.is_not_required() {
+                                // Explicit NotRequired[T] annotation - never required
+                                false
+                            } else {
+                                // No explicit qualifier - use class default (total= parameter)
+                                are_fields_type_required
+                            };
+                            FieldKind::TypedDict { is_required }
+                        }
                     };
 
                     attributes.insert(
