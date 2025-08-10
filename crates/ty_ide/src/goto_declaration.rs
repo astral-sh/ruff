@@ -865,11 +865,11 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -899,11 +899,11 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -931,11 +931,11 @@ def another_helper(path):
         4 |                     return 42
           |
         info: Source
-         --> main.py:7:19
+         --> main.py:7:21
           |
         6 |             c = C()
         7 |             res = c.foo()
-          |                   ^^^^^
+          |                     ^^^
           |
         ");
     }
@@ -1077,11 +1077,11 @@ def function():
         5 |             class B(A):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:19
           |
         8 |             b = B()
         9 |             y = b.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -1113,11 +1113,11 @@ def function():
         8 |                     return self._value
           |
         info: Source
-          --> main.py:11:13
+          --> main.py:11:15
            |
         10 |             c = C()
         11 |             c.value = 42
-           |             ^^^^^^^
+           |               ^^^^^
            |
         ");
     }
@@ -1188,11 +1188,11 @@ def function():
         8 |             def use_drawable(obj: Drawable):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:21
           |
         8 |             def use_drawable(obj: Drawable):
         9 |                 obj.name
-          |                 ^^^^^^^^
+          |                     ^^^^
           |
         ");
     }
