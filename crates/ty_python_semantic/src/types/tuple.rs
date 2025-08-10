@@ -224,16 +224,17 @@ impl<'db> TupleType<'db> {
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        KnownClass::Tuple
+        let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
-            .map(|class_literal| match class_literal.generic_context(db) {
-                None => ClassType::NonGeneric(class_literal),
-                Some(generic_context) if generic_context.variables(db).len() != 1 => class_literal
-                    .apply_specialization(db, |_| generic_context.default_specialization(db)),
-                Some(generic_context) => class_literal
-                    .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
-            })
-            .expect("Typeshed should always have a `tuple` class in `builtins.pyi`")
+            .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
+
+        tuple_class.apply_specialization(db, |generic_context| {
+            if generic_context.variables(db).len() == 1 {
+                generic_context.specialize_tuple(db, self)
+            } else {
+                generic_context.default_specialization(db)
+            }
+        })
     }
 
     /// Return a normalized version of `self`.
