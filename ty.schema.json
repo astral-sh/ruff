@@ -596,9 +596,10 @@
           "title": "detects invalid subscript accesses",
           "description": "## What it does\nChecks for subscript accesses with invalid keys.\n\n## Why is this bad?\nUsing an invalid key will raise a `KeyError` at runtime.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n```",
           "default": "error",
+          "deprecated": false,
           "oneOf": [
             {
-              "$ref": "#/definitions/Level"
+              "$ref": "#/$defs/Level"
             }
           ]
         },
