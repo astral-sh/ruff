@@ -169,7 +169,6 @@ ty prints the fully qualified name to disambiguate objects with the same name.
 
 ### Nested class with identical names
 
-
 ```py
 class A:
     class B:
@@ -211,7 +210,8 @@ class DataFrame:
 import status_a
 import status_b
 
-s: status_a.Status = status_b.Status.ACTIVE  # error: [invalid-assignment] "Object of type `Literal[status_b.Status.ACTIVE]` is not assignable to `status_a.Status`"
+# error: [invalid-assignment] "Object of type `Literal[status_b.Status.ACTIVE]` is not assignable to `status_a.Status`"
+s: status_a.Status = status_b.Status.ACTIVE
 ```
 
 `status_a.py`:
@@ -236,7 +236,6 @@ class Status(Enum):
 
 ### Nested enum with identical names
 
-
 ```py
 from enum import Enum
 
@@ -250,5 +249,6 @@ class C:
         ACTIVE = "active"
         INACTIVE = "inactive"
 
-a: A.B = C.B.ACTIVE  # error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
+# error: [invalid-assignment] "Object of type `Literal[mdtest_snippet.C.B.ACTIVE]` is not assignable to `mdtest_snippet.A.B`"
+a: A.B = C.B.ACTIVE
 ```

@@ -1818,28 +1818,43 @@ pub(super) fn report_invalid_assignment(
 ) {
     // Handles the situation where the report naming is confusing, such as class with the same Name,
     // but from different scopes.
-    let message = if let Some(target_class) = type_to_class_literal(target_ty, context.db())
-    && let Some(source_class) = type_to_class_literal(source_ty, context.db())
-    && target_class != source_class
-    // The builtins such as 'builtins.int' and 'builtins.ellipsis' would trigger a false positive,
-    // so we do not use fully qualified names for builtins
-    && target_class.known(context.db()).is_none()
-    && source_class.known(context.db()).is_none()
-    {
-        format_args!(
-            "Object of type `{}` is not assignable to `{}`",
-            source_ty.qualified_display(context.db()),
-            target_ty.qualified_display(context.db()),
-        )
+    let use_qualified = if let Some(target_class) = type_to_class_literal(target_ty, context.db()) {
+        if let Some(source_class) = type_to_class_literal(source_ty, context.db()) {
+            target_class != source_class
+                // The builtins such as 'builtins.int' and 'builtins.ellipsis' would trigger a false positive,
+                // so we do not use fully qualified names for builtins
+                && target_class.known(context.db()).is_none()
+                && source_class.known(context.db()).is_none()
+        } else {
+            false
+        }
     } else {
-        format_args!(
-            "Object of type `{}` is not assignable to `{}`",
-            source_ty.display(context.db()),
-            target_ty.display(context.db())
-        )
+        false
     };
 
-    report_invalid_assignment_with_message(context, node, target_ty, message);
+    if use_qualified {
+        report_invalid_assignment_with_message(
+            context,
+            node,
+            target_ty,
+            format_args!(
+                "Object of type `{}` is not assignable to `{}`",
+                source_ty.qualified_display(context.db()),
+                target_ty.qualified_display(context.db()),
+            ),
+        );
+    } else {
+        report_invalid_assignment_with_message(
+            context,
+            node,
+            target_ty,
+            format_args!(
+                "Object of type `{}` is not assignable to `{}`",
+                source_ty.display(context.db()),
+                target_ty.display(context.db())
+            ),
+        );
+    }
 }
 
 fn type_to_class_literal<'db>(
