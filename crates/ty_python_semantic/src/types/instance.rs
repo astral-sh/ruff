@@ -325,9 +325,21 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// [`NominalInstanceType`] is split into two variants internally as a pure
+/// optimization to avoid having to materialize the [`ClassType`] for tuple
+/// instances where it would be unnecessary (this is somewhat expensive!).
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 enum NominalInstanceInner<'db> {
+    /// A tuple type, e.g. `tuple[int, str]`.
+    ///
+    /// Note that the type `tuple[int, str]` includes subtypes of `tuple[int, str]`,
+    /// but those subtypes would be represented using the `NonTuple` variant.
     ExactTuple(TupleType<'db>),
+    /// Any instance type that does not represent some kind of instance of the
+    /// builtin `tuple` class.
+    ///
+    /// This variant includes types that are subtypes of "exact tuple" types,
+    /// because they represent "all instances of a class that is a tuple subclass".
     NonTuple(ClassType<'db>),
 }
 
