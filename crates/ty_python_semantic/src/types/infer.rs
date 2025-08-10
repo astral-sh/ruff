@@ -9532,6 +9532,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::SpecialForm(SpecialFormType::Final) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
+                        Type::SpecialForm(SpecialFormType::Required) => {
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::REQUIRED)
+                        }
+                        Type::SpecialForm(SpecialFormType::NotRequired) => {
+                            TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::NOT_REQUIRED)
+                        }
                         Type::ClassLiteral(class)
                             if class.is_known(self.db(), KnownClass::InitVar) =>
                         {
@@ -9607,7 +9613,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                     Type::SpecialForm(
-                        type_qualifier @ (SpecialFormType::ClassVar | SpecialFormType::Final),
+                        type_qualifier @ (SpecialFormType::ClassVar
+                        | SpecialFormType::Final
+                        | SpecialFormType::Required
+                        | SpecialFormType::NotRequired),
                     ) => {
                         let arguments = if let ast::Expr::Tuple(tuple) = slice {
                             &*tuple.elts
@@ -9625,6 +9634,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 }
                                 SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
+                                }
+                                SpecialFormType::Required => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::REQUIRED);
+                                }
+                                SpecialFormType::NotRequired => {
+                                    type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
                                 }
                                 _ => unreachable!(),
                             }
@@ -10858,11 +10873,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`ReadOnly[]` type qualifier")
             }
-            SpecialFormType::NotRequired => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`NotRequired[]` type qualifier")
-            }
-            SpecialFormType::ClassVar | SpecialFormType::Final => {
+            SpecialFormType::ClassVar
+            | SpecialFormType::Final
+            | SpecialFormType::Required
+            | SpecialFormType::NotRequired => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let diag = builder.into_diagnostic(format_args!(
                         "Type qualifier `{special_form}` is not allowed in type expressions \
@@ -10871,10 +10885,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     diagnostic::add_type_expression_reference_link(diag);
                 }
                 self.infer_type_expression(arguments_slice)
-            }
-            SpecialFormType::Required => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`Required[]` type qualifier")
             }
             SpecialFormType::TypeIs => match arguments_slice {
                 ast::Expr::Tuple(_) => {
