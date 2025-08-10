@@ -51,3 +51,11 @@ dbm.ndbm.open("db", "r", 0o600)  # OK
 
 os.fchmod(0, 256)  # 0o400
 os.fchmod(0, 493)  # 0o755
+
+# https://github.com/astral-sh/ruff/issues/19010
+os.chmod("foo", 000)  # Error
+os.chmod("foo", 0000)  # Error
+
+os.chmod("foo", 0b0)  # Error
+os.chmod("foo", 0x0)  # Error
+os.chmod("foo", 0)  # Ok
