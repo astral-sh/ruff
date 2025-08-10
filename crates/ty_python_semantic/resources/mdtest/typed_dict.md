@@ -84,6 +84,42 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Optional fields with `total=False`
+
+By default, all fields in a `TypedDict` are required (`total=True`). You can make all fields
+optional by setting `total=False`:
+
+```py
+from typing import TypedDict
+
+class OptionalPerson(TypedDict, total=False):
+    name: str
+    age: int | None
+
+# All fields are optional with total=False
+charlie = OptionalPerson()
+david = OptionalPerson(name="David")
+emily = OptionalPerson(age=30)
+frank = OptionalPerson(name="Frank", age=25)
+
+reveal_type(charlie["name"])  # revealed: str
+reveal_type(david["age"])  # revealed: int | None
+```
+
+Type validation still applies to provided fields:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `OptionalPerson`"
+invalid = OptionalPerson(name=123)
+```
+
+Extra fields are still not allowed, even with `total=False`:
+
+```py
+# error: [invalid-key] "Invalid key access on TypedDict `OptionalPerson`: Unknown key "extra""
+invalid_extra = OptionalPerson(name="George", extra=True)
+```
+
 ## Structural assignability
 
 Assignability between `TypedDict` types is structural, that is, it is based on the presence of keys

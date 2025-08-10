@@ -1528,6 +1528,38 @@ impl<'db> ClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
+    /// Check if `TypedDict` has `total=False` parameter
+    /// For a `TypedDict`, the `total` parameter is used to determine whether
+    /// fields are required by default.
+    /// For other classes, this is always `true`.
+    fn fields_required_by_default(self, db: &'db dyn Db) -> bool {
+        if !self.is_typed_dict(db) {
+            return true;
+        }
+
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+
+        // Look for total=False in class arguments
+        if let Some(arguments) = &class_stmt.arguments {
+            for keyword in &arguments.keywords {
+                if keyword
+                    .arg
+                    .as_ref()
+                    .map_or(false, |name| name.as_str() == "total")
+                {
+                    // Check if the value is False
+                    if let ruff_python_ast::Expr::BooleanLiteral(bool_lit) = &keyword.value {
+                        return bool_lit.value; // total=False means return false
+                    }
+                }
+            }
+        }
+
+        // Default is total=True
+        true
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -1892,7 +1924,7 @@ impl<'db> ClassLiteral<'db> {
                     FieldKind::Dataclass {
                         init, default_ty, ..
                     } => (init, default_ty),
-                    _ => continue,
+                    FieldKind::TypedDict { .. } => continue,
                 };
                 let mut field_ty = field.declared_ty;
 
@@ -2251,6 +2283,8 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+        let are_fields_required_by_default = self.fields_required_by_default(db);
+
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2301,7 +2335,9 @@ impl<'db> ClassLiteral<'db> {
                             init_only: attr.is_init_var(),
                             init,
                         },
-                        CodeGeneratorKind::TypedDict => FieldKind::TypedDict { is_required: true },
+                        CodeGeneratorKind::TypedDict => FieldKind::TypedDict {
+                            is_required: are_fields_required_by_default,
+                        },
                     };
 
                     attributes.insert(
