@@ -875,6 +875,44 @@ def another_helper(path):
     }
 
     #[test]
+    fn goto_declaration_nested_instance_attribute() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self.x: int = 1
+
+            class D:
+                def __init__(self):
+                    self.y: C = C()
+
+            d = D()
+            y = d.y.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:4:21
+          |
+        2 |             class C:
+        3 |                 def __init__(self):
+        4 |                     self.x: int = 1
+          |                     ^^^^^^
+        5 |
+        6 |             class D:
+          |
+        info: Source
+          --> main.py:11:21
+           |
+        10 |             d = D()
+        11 |             y = d.y.x
+           |                     ^
+           |
+        ");
+    }
+
+    #[test]
     fn goto_declaration_instance_attribute_no_annotation() {
         let test = cursor_test(
             "
