@@ -180,7 +180,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn is_object(self, db: &'db dyn Db) -> bool {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => false,
-            NominalInstanceInner::NonTuple(class) => class.is_known(db, KnownClass::Object),
+            NominalInstanceInner::NonTuple(class) => class.is_object(db),
         }
     }
 
@@ -478,7 +478,7 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         visitor: &mut TypeTransformer<'db>,
     ) -> Type<'db> {
-        let object = KnownClass::Object.to_instance(db);
+        let object = Type::object(db);
         if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
             return object;
         }

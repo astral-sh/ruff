@@ -403,6 +403,11 @@ impl<'db> ClassType<'db> {
         self.known(db) == Some(known_class)
     }
 
+    /// Return `true` if this class represents the builtin class `object`
+    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Object)
+    }
+
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -471,7 +476,7 @@ impl<'db> ClassType<'db> {
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_known(db, KnownClass::Object),
+                    TypeRelation::Subtyping => other.is_object(db),
                     TypeRelation::Assignability => !other.is_final(db),
                 },
 

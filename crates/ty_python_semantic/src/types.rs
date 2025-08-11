@@ -2671,12 +2671,12 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
             Type::Callable(_) | Type::DataclassTransformer(_) => {
-                KnownClass::Object.to_instance(db).instance_member(db, name)
+                Type::object(db).instance_member(db, name)
             }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => KnownClass::Object.to_instance(db).instance_member(db, name),
+                    None => Type::object(db).instance_member(db, name),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         bound.instance_member(db, name)
                     }
@@ -3157,9 +3157,9 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
 
-            Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Object
-                .to_instance(db)
-                .member_lookup_with_policy(db, name, policy),
+            Type::Callable(_) | Type::DataclassTransformer(_) => {
+                Type::object(db).member_lookup_with_policy(db, name, policy)
+            }
 
             Type::NominalInstance(instance)
                 if matches!(name.as_str(), "major" | "minor")
@@ -4151,10 +4151,7 @@ impl<'db> Type<'db> {
                     // ```
                     Binding::single(
                         self,
-                        Signature::new(
-                            Parameters::empty(),
-                            Some(KnownClass::Object.to_instance(db)),
-                        ),
+                        Signature::new(Parameters::empty(), Some(Type::object(db))),
                     )
                     .into()
                 }

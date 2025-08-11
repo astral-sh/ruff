@@ -7,7 +7,7 @@ use rustc_hash::FxBuildHasher;
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, SpecialFormType, Type};
+use crate::types::{ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, Type};
 
 /// The inferred method resolution order of a given class.
 ///
@@ -104,7 +104,7 @@ impl<'db> Mro<'db> {
         match original_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_known(db, KnownClass::Object) => Ok(Self::from([
+            [] if class.is_object(db) => Ok(Self::from([
                 // object is not generic, so the default specialization should be a no-op
                 ClassBase::Class(class),
             ])),

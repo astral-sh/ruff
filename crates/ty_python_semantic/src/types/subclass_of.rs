@@ -160,7 +160,7 @@ impl<'db> SubclassOfType<'db> {
                 relation.is_assignability()
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                other_class.is_known(db, KnownClass::Object) || relation.is_assignability()
+                other_class.is_object(db) || relation.is_assignability()
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
 
