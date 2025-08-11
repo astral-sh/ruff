@@ -303,15 +303,11 @@ pub(crate) type TupleSpec<'db> = Tuple<Type<'db>>;
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct FixedLengthTuple<T>(Vec<T>);
+pub struct FixedLengthTuple<T>(Box<[T]>);
 
 impl<T> FixedLengthTuple<T> {
     fn empty() -> Self {
-        Self(Vec::new())
-    }
-
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
+        Self(Box::default())
     }
 
     fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
@@ -338,27 +334,9 @@ impl<T> FixedLengthTuple<T> {
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }
-
-    pub(crate) fn push(&mut self, element: T) {
-        self.0.push(element);
-    }
 }
 
 impl<'db> FixedLengthTuple<Type<'db>> {
-    fn concat(&self, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
-        match other {
-            TupleSpec::Fixed(other) => TupleSpec::Fixed(FixedLengthTuple::from_elements(
-                self.elements().chain(other.elements()).copied(),
-            )),
-
-            TupleSpec::Variable(other) => VariableLengthTuple::mixed(
-                self.elements().chain(other.prefix_elements()).copied(),
-                other.variable,
-                other.suffix_elements().copied(),
-            ),
-        }
-    }
-
     fn resize(
         &self,
         db: &'db dyn Db,
@@ -482,7 +460,7 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         unsafe {
             let old_value = &mut *old_pointer;
-            Vec::maybe_update(&raw mut old_value.0, new_value.0)
+            Box::maybe_update(&raw mut old_value.0, new_value.0)
         }
     }
 }
@@ -491,7 +469,7 @@ impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
     fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
-        self.0.as_slice().py_index(db, index).copied()
+        self.0.py_index(db, index).copied()
     }
 }
 
@@ -518,9 +496,9 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct VariableLengthTuple<T> {
-    pub(crate) prefix: Vec<T>,
+    pub(crate) prefix: Box<[T]>,
     pub(crate) variable: T,
-    pub(crate) suffix: Vec<T>,
+    pub(crate) suffix: Box<[T]>,
 }
 
 impl<T> VariableLengthTuple<T> {
@@ -568,10 +546,6 @@ impl<T> VariableLengthTuple<T> {
 
     fn len(&self) -> TupleLength {
         TupleLength::Variable(self.prefix.len(), self.suffix.len())
-    }
-
-    fn push(&mut self, element: T) {
-        self.suffix.push(element);
     }
 }
 
@@ -639,30 +613,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .copied()
     }
 
-    fn concat(&self, db: &'db dyn Db, other: &Tuple<Type<'db>>) -> Tuple<Type<'db>> {
-        match other {
-            TupleSpec::Fixed(other) => VariableLengthTuple::mixed(
-                self.prefix_elements().copied(),
-                self.variable,
-                self.suffix_elements().chain(other.elements()).copied(),
-            ),
-
-            Tuple::Variable(other) => {
-                let variable = UnionType::from_elements(
-                    db,
-                    (self.suffix_elements().copied())
-                        .chain([self.variable, other.variable])
-                        .chain(other.prefix_elements().copied()),
-                );
-                VariableLengthTuple::mixed(
-                    self.prefix_elements().copied(),
-                    variable,
-                    other.suffix_elements().copied(),
-                )
-            }
-        }
-    }
-
     fn resize(
         &self,
         db: &'db dyn Db,
@@ -711,13 +661,17 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Vec<_>>();
+            .collect::<Box<_>>();
         let suffix = self
             .prenormalized_suffix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Vec<_>>();
+            .collect::<Box<_>>();
         let variable = self.variable.normalized_impl(db, visitor);
-        Self::mixed(prefix, variable, suffix)
+        TupleSpec::Variable(Self {
+            prefix,
+            variable,
+            suffix,
+        })
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
@@ -901,9 +855,9 @@ where
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_value = unsafe { &mut *old_pointer };
         let mut changed = false;
-        changed |= unsafe { Vec::maybe_update(&raw mut old_value.prefix, new_value.prefix) };
+        changed |= unsafe { Box::maybe_update(&raw mut old_value.prefix, new_value.prefix) };
         changed |= unsafe { T::maybe_update(&raw mut old_value.variable, new_value.variable) };
-        changed |= unsafe { Vec::maybe_update(&raw mut old_value.suffix, new_value.suffix) };
+        changed |= unsafe { Box::maybe_update(&raw mut old_value.suffix, new_value.suffix) };
         changed
     }
 }
@@ -971,10 +925,6 @@ impl<T> Tuple<T> {
         FixedLengthTuple::from_elements(elements).into()
     }
 
-    pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Tuple::Fixed(FixedLengthTuple::with_capacity(capacity))
-    }
-
     /// Returns an iterator of all of the fixed-length element types of this tuple.
     pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {
@@ -1017,13 +967,6 @@ impl<T> Tuple<T> {
             _ => Truthiness::Ambiguous,
         }
     }
-
-    pub(crate) fn push(&mut self, element: T) {
-        match self {
-            Tuple::Fixed(tuple) => tuple.push(element),
-            Tuple::Variable(tuple) => tuple.push(element),
-        }
-    }
 }
 
 impl<'db> Tuple<Type<'db>> {
@@ -1033,10 +976,7 @@ impl<'db> Tuple<Type<'db>> {
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(&self, db: &'db dyn Db, other: &Self) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => tuple.concat(other),
-            Tuple::Variable(tuple) => tuple.concat(db, other),
-        }
+        TupleSpecBuilder::from(self).concat(db, other).build()
     }
 
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
@@ -1348,4 +1288,121 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
 pub(crate) enum ResizeTupleError {
     TooFewValues,
     TooManyValues,
+}
+
+/// A builder for creating a new [`TupleSpec`]
+pub(crate) enum TupleSpecBuilder<'db> {
+    Fixed(Vec<Type<'db>>),
+    Variable {
+        prefix: Vec<Type<'db>>,
+        variable: Type<'db>,
+        suffix: Vec<Type<'db>>,
+    },
+}
+
+impl<'db> TupleSpecBuilder<'db> {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        TupleSpecBuilder::Fixed(Vec::with_capacity(capacity))
+    }
+
+    pub(crate) fn push(&mut self, element: Type<'db>) {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => elements.push(element),
+            TupleSpecBuilder::Variable { suffix, .. } => suffix.push(element),
+        }
+    }
+
+    /// Concatenates another tuple to the end of this tuple, returning a new tuple.
+    pub(crate) fn concat(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(left_tuple), TupleSpec::Fixed(right_tuple)) => {
+                left_tuple.extend_from_slice(&right_tuple.0);
+                self
+            }
+
+            (
+                TupleSpecBuilder::Fixed(left_tuple),
+                TupleSpec::Variable(VariableLengthTuple {
+                    prefix,
+                    variable,
+                    suffix,
+                }),
+            ) => {
+                left_tuple.extend_from_slice(prefix);
+                TupleSpecBuilder::Variable {
+                    prefix: std::mem::take(left_tuple),
+                    variable: *variable,
+                    suffix: suffix.to_vec(),
+                }
+            }
+
+            (
+                TupleSpecBuilder::Variable {
+                    prefix: _,
+                    variable: _,
+                    suffix,
+                },
+                TupleSpec::Fixed(right),
+            ) => {
+                suffix.extend_from_slice(&right.0);
+                self
+            }
+
+            (
+                TupleSpecBuilder::Variable {
+                    prefix: left_prefix,
+                    variable: left_variable,
+                    suffix: left_suffix,
+                },
+                TupleSpec::Variable(VariableLengthTuple {
+                    prefix: right_prefix,
+                    variable: right_variable,
+                    suffix: right_suffix,
+                }),
+            ) => {
+                let variable = UnionType::from_elements(
+                    db,
+                    left_suffix
+                        .iter()
+                        .chain([left_variable, right_variable])
+                        .chain(right_prefix),
+                );
+                TupleSpecBuilder::Variable {
+                    prefix: std::mem::take(left_prefix),
+                    variable,
+                    suffix: right_suffix.to_vec(),
+                }
+            }
+        }
+    }
+
+    pub(super) fn build(self) -> TupleSpec<'db> {
+        match self {
+            TupleSpecBuilder::Fixed(elements) => {
+                TupleSpec::Fixed(FixedLengthTuple(elements.into_boxed_slice()))
+            }
+            TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix,
+            } => TupleSpec::Variable(VariableLengthTuple {
+                prefix: prefix.into_boxed_slice(),
+                variable,
+                suffix: suffix.into_boxed_slice(),
+            }),
+        }
+    }
+}
+
+impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
+    fn from(tuple: &TupleSpec<'db>) -> Self {
+        match tuple {
+            TupleSpec::Fixed(fixed) => TupleSpecBuilder::Fixed(fixed.0.to_vec()),
+            TupleSpec::Variable(variable) => TupleSpecBuilder::Variable {
+                prefix: variable.prefix.to_vec(),
+                variable: variable.variable,
+                suffix: variable.suffix.to_vec(),
+            },
+        }
+    }
 }
