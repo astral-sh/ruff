@@ -506,7 +506,6 @@ class Concrete(Abstract):
     def method(self) -> str: ...  # error: [invalid-return-type]
 ```
 
-
 ## Diagnostics for `invalid-return-type` on dynamic type
 
 ```toml
