@@ -403,11 +403,6 @@ impl<'db> ClassType<'db> {
         self.known(db) == Some(known_class)
     }
 
-    /// Return `true` if this class represents the builtin class `object`
-    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
-        self.is_known(db, KnownClass::Object)
-    }
-
     pub(super) fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -476,7 +471,7 @@ impl<'db> ClassType<'db> {
         self.iter_mro(db).any(|base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
+                    TypeRelation::Subtyping => other.is_known(db, KnownClass::Object),
                     TypeRelation::Assignability => !other.is_final(db),
                 },
 
@@ -4643,47 +4638,6 @@ impl<'db> KnownClassLookupError<'db> {
             class,
             error: *self,
         }
-    }
-}
-
-pub(crate) struct SliceLiteral {
-    pub(crate) start: Option<i32>,
-    pub(crate) stop: Option<i32>,
-    pub(crate) step: Option<i32>,
-}
-
-impl<'db> ClassType<'db> {
-    /// If this class is a specialization of `slice`, returns a [`SliceLiteral`] describing it.
-    /// Otherwise returns `None`.
-    ///
-    /// The specialization must be one in which the typevars are solved as being statically known
-    /// integers or `None`.
-    pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let (class, Some(specialization)) = self.class_literal(db) else {
-            return None;
-        };
-        if !class.is_known(db, KnownClass::Slice) {
-            return None;
-        }
-        let [start, stop, step] = specialization.types(db) else {
-            return None;
-        };
-
-        let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
-            Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::NoneType) =>
-            {
-                Some(None)
-            }
-            _ => None,
-        };
-        Some(SliceLiteral {
-            start: to_u32(start)?,
-            stop: to_u32(stop)?,
-            step: to_u32(step)?,
-        })
     }
 }
 

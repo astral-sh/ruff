@@ -654,7 +654,7 @@ impl<'db> Type<'db> {
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_nominal_instance()
-            .is_some_and(|instance| instance.class(db).is_object(db))
+            .is_some_and(|instance| instance.is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -1323,7 +1323,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(instance)) if instance.class(db).is_object(db) => true,
+            (_, Type::NominalInstance(instance)) if instance.is_object(db) => true,
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
@@ -1742,7 +1742,7 @@ impl<'db> Type<'db> {
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                n.class(db).is_object(db) && protocol.normalized(db) == nominal
+                n.is_object(db) && protocol.normalized(db) == nominal
             }
             // An instance of an enum class is equivalent to an enum literal of that class,
             // if that enum has only has one member.

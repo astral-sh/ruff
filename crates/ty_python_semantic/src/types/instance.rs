@@ -176,6 +176,14 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Return `true` if this type represents instances of the class `builtins.object`.
+    pub(super) fn is_object(self, db: &'db dyn Db) -> bool {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(_) => false,
+            NominalInstanceInner::NonTuple(class) => class.is_known(db, KnownClass::Object),
+        }
+    }
+
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
     /// tuple spec.
     ///
@@ -191,6 +199,43 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(_) => None,
         }
+    }
+
+    /// If this is a specialized instance of `slice`, returns a [`SliceLiteral`] describing it.
+    /// Otherwise returns `None`.
+    ///
+    /// The specialization must be one in which the typevars are solved as being statically known
+    /// integers or `None`.
+    pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
+        let class = match self.0 {
+            NominalInstanceInner::ExactTuple(_) => return None,
+            NominalInstanceInner::NonTuple(class) => class,
+        };
+        let (class, Some(specialization)) = class.class_literal(db) else {
+            return None;
+        };
+        if !class.is_known(db, KnownClass::Slice) {
+            return None;
+        }
+        let [start, stop, step] = specialization.types(db) else {
+            return None;
+        };
+
+        let to_u32 = |ty: &Type<'db>| match ty {
+            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
+            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::NominalInstance(instance)
+                if instance.class(db).is_known(db, KnownClass::NoneType) =>
+            {
+                Some(None)
+            }
+            _ => None,
+        };
+        Some(SliceLiteral {
+            start: to_u32(start)?,
+            stop: to_u32(stop)?,
+            step: to_u32(step)?,
+        })
     }
 
     pub(super) fn normalized_impl(
@@ -346,6 +391,12 @@ enum NominalInstanceInner<'db> {
     /// This variant includes types that are subtypes of "exact tuple" types,
     /// because they represent "all instances of a class that is a tuple subclass".
     NonTuple(ClassType<'db>),
+}
+
+pub(crate) struct SliceLiteral {
+    pub(crate) start: Option<i32>,
+    pub(crate) stop: Option<i32>,
+    pub(crate) step: Option<i32>,
 }
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects

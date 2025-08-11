@@ -90,7 +90,7 @@ use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, semantic_index,
 };
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, Field, MetaclassErrorKind, SliceLiteral};
+use crate::types::class::{CodeGeneratorKind, Field, MetaclassErrorKind};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
@@ -111,6 +111,7 @@ use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
 use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleType};
@@ -8651,9 +8652,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ) => maybe_tuple_nominal
                 .tuple_spec(db)
                 .as_deref()
-                .and_then(|tuple_spec| {
-                    Some((tuple_spec, maybe_slice_nominal.class(db).slice_literal(db)?))
-                })
+                .and_then(|tuple_spec| Some((tuple_spec, maybe_slice_nominal.slice_literal(db)?)))
                 .map(|(tuple, SliceLiteral { start, stop, step })| match tuple {
                     TupleSpec::Fixed(tuple) => {
                         if let Ok(new_elements) = tuple.py_slice(db, start, stop, step) {
@@ -8691,7 +8690,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `"value"[1:3]`, return `"al"`
             (Type::StringLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
-                .class(db)
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
@@ -8729,7 +8727,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
             (Type::BytesLiteral(literal_ty), Type::NominalInstance(nominal)) => nominal
-                .class(db)
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
                     let literal_value = literal_ty.value(db);
