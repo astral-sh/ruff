@@ -823,7 +823,7 @@ impl ReachabilityConstraints {
                 // doesn't help much.
                 // See <https://github.com/astral-sh/ty/issues/968>.
                 if matches!(ty, Type::Dynamic(_)) {
-                    return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 }
 
                 let overloads_iterator =

@@ -505,3 +505,17 @@ class Abstract(Protocol):
 class Concrete(Abstract):
     def method(self) -> str: ...  # error: [invalid-return-type]
 ```
+
+
+## Diagnostics for `invalid-return-type` on dynamic type
+
+```toml
+environment.python-version = "3.12"
+```
+
+```py
+from typing import Never, Any
+
+def f(func: Any) -> Never:  # error: [invalid-return-type]
+    func()
+```
