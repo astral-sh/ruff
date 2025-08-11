@@ -27,10 +27,9 @@ impl<'db> Type<'db> {
                 Self::tuple(TupleType::new(db, alias.specialization(db).tuple(db)))
             }
             _ => {
-                let class_literal = class.class_literal(db).0;
-                if class_literal.is_protocol(db) {
+                if class.is_protocol(db) {
                     Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
-                } else if class_literal.is_typed_dict(db) {
+                } else if class.class_literal(db).0.is_typed_dict(db) {
                     TypedDictType::from(db, class)
                 } else {
                     Self::NominalInstance(NominalInstanceType::from_class(class))
@@ -374,10 +373,8 @@ impl<'db> Protocol<'db> {
     fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
-                .class_literal(db)
-                .0
                 .into_protocol_class(db)
-                .expect("Protocol class literal should be a protocol class")
+                .expect("Class wrapped by `Protocol` should be a protocol class")
                 .interface(db),
             Self::Synthesized(synthesized) => synthesized.interface(),
         }

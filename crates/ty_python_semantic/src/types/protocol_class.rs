@@ -12,8 +12,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::use_def_map,
     types::{
-        CallableType, ClassBase, ClassLiteral, KnownFunction, PropertyInstanceType, Signature,
-        Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer, TypeVarInstance,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownFunction, PropertyInstanceType,
+        Signature, Type, TypeMapping, TypeQualifiers, TypeRelation, TypeTransformer,
+        TypeVarInstance,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
     },
@@ -21,16 +22,24 @@ use crate::{
 
 impl<'db> ClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
-    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClassLiteral<'db>> {
-        self.is_protocol(db).then_some(ProtocolClassLiteral(self))
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db)
+            .then_some(ProtocolClass(ClassType::NonGeneric(self)))
+    }
+}
+
+impl<'db> ClassType<'db> {
+    /// Returns `Some` if this is a protocol class, `None` otherwise.
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        self.is_protocol(db).then_some(ProtocolClass(self))
     }
 }
 
 /// Representation of a single `Protocol` class definition.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) struct ProtocolClassLiteral<'db>(ClassLiteral<'db>);
+pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
-impl<'db> ProtocolClassLiteral<'db> {
+impl<'db> ProtocolClass<'db> {
     /// Returns the protocol members of this class.
     ///
     /// A protocol's members define the interface declared by the protocol.
@@ -51,13 +60,15 @@ impl<'db> ProtocolClassLiteral<'db> {
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
-        self.known_function_decorators(db)
+        self.class_literal(db)
+            .0
+            .known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
     }
 }
 
-impl<'db> Deref for ProtocolClassLiteral<'db> {
-    type Target = ClassLiteral<'db>;
+impl<'db> Deref for ProtocolClass<'db> {
+    type Target = ClassType<'db>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -517,16 +528,19 @@ enum BoundOnClass {
 #[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
-    class: ClassLiteral<'db>,
+    class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     let mut members = BTreeMap::default();
 
-    for parent_protocol in class
-        .iter_mro(db, None)
+    for (parent_protocol, specialization) in class
+        .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
+        .filter_map(|class| {
+            let (class, specialization) = class.class_literal(db);
+            Some((class.into_protocol_class(db)?, specialization))
+        })
     {
-        let parent_scope = parent_protocol.body_scope(db);
+        let parent_scope = parent_protocol.class_literal(db).0.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
 
@@ -567,6 +581,8 @@ fn cached_protocol_interface<'db>(
                 })
                 .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers, bound_on_class)| {
+                    let ty = ty.apply_optional_specialization(db, specialization);
+
                     let kind = match (ty, bound_on_class) {
                         // TODO: if the getter or setter is a function literal, we should
                         // upcast it to a `CallableType` so that two protocols with identical property
@@ -599,14 +615,14 @@ fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
     _value: &ProtocolInterface<'db>,
     _count: u32,
-    _class: ClassLiteral<'db>,
+    _class: ClassType<'db>,
 ) -> salsa::CycleRecoveryAction<ProtocolInterface<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn proto_interface_cycle_initial<'db>(
     db: &'db dyn Db,
-    _class: ClassLiteral<'db>,
+    _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(db)
 }
