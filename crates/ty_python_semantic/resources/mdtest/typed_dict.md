@@ -54,6 +54,7 @@ eve1a: Person = {"name": b"Eve", "age": None}
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`"
 eve1b = Person(name=b"Eve", age=None)
 
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
 eve2a: Person = {"age": 22}
 # error: [missing-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
 eve2b = Person(age=22)
@@ -428,7 +429,7 @@ class Employee(Person):
 
 alice: Employee = {"name": "Alice", "employee_id": 1}
 
-# TODO: this should be an error (missing required key)
+# error: [missing-required-field] "Missing required field 'employee_id' in TypedDict `Employee` constructor"
 eve: Employee = {"name": "Eve"}
 ```
 

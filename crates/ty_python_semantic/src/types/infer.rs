@@ -932,6 +932,32 @@ fn validate_typed_dict_key_assignment<'db, 'ast>(
     false
 }
 
+/// Validates that all required fields are provided in a `TypedDict` construction.
+/// Reports missing required field errors for any fields that are required but not provided.
+fn validate_typed_dict_required_fields<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    provided_fields: &OrderSet<&str>,
+    error_node: AnyNodeRef<'ast>,
+) {
+    let db = context.db();
+    let items = typed_dict.items(db);
+
+    let required_fields: OrderSet<&str> = items
+        .iter()
+        .filter_map(|(field_name, field)| field.is_required().then_some(field_name.as_str()))
+        .collect();
+
+    for missing_field in required_fields.difference(provided_fields) {
+        report_missing_required_field_on_typed_dict(
+            context,
+            error_node,
+            Type::TypedDict(typed_dict),
+            missing_field,
+        );
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// How big a string do we build before bailing?
     ///
@@ -4784,6 +4810,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
 
+                    // Validate that all required fields are provided
+                    let provided_fields: OrderSet<&str> = dict_expr
+                        .items
+                        .iter()
+                        .filter_map(|item| {
+                            item.key
+                                .as_ref()?
+                                .as_string_literal_expr()
+                                .map(|key| key.value.to_str())
+                        })
+                        .collect();
+                    validate_typed_dict_required_fields(
+                        &self.context,
+                        typed_dict,
+                        &provided_fields,
+                        target.into(),
+                    );
+
                     // Override the inferred type of the dict literal to be the `TypedDict` type
                     // This ensures that the dict literal gets the correct type for key access
                     let typed_dict_type = Type::TypedDict(typed_dict);
@@ -6363,26 +6407,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Validate keyword arguments for `TypedDict` constructor
 
                     // Validate that all required fields are provided
-                    let items = typed_dict.items(self.db());
-                    let required_fields: OrderSet<&str> = items
-                        .iter()
-                        .filter_map(|(field_name, field)| {
-                            field.is_required().then_some(field_name.as_str())
-                        })
-                        .collect();
                     let provided_fields: OrderSet<&str> = arguments
                         .keywords
                         .iter()
                         .filter_map(|kw| kw.arg.as_ref().map(|arg| arg.id.as_str()))
                         .collect();
-                    for missing_field in required_fields.difference(&provided_fields) {
-                        report_missing_required_field_on_typed_dict(
-                            &self.context,
-                            call_expression.into(),
-                            typed_dict_type,
-                            missing_field,
-                        );
-                    }
+                    validate_typed_dict_required_fields(
+                        &self.context,
+                        typed_dict,
+                        &provided_fields,
+                        call_expression.into(),
+                    );
 
                     // Validate that each field is assigned a type that is compatible with the field's type
                     for keyword in &arguments.keywords {
