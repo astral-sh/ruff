@@ -114,7 +114,7 @@ use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
-use crate::types::tuple::{Tuple, TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
@@ -10042,7 +10042,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return result;
                 }
 
-                let mut element_types = TupleSpec::with_capacity(elements.len());
+                let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
 
                 // Whether to infer `Todo` for the whole tuple
                 // (see docstring for `element_could_alter_type_of_whole_tuple`)
@@ -10067,7 +10067,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let ty = if return_todo {
                     TupleType::homogeneous(self.db(), todo_type!("PEP 646"))
                 } else {
-                    TupleType::new(self.db(), element_types)
+                    TupleType::new(self.db(), element_types.build())
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
