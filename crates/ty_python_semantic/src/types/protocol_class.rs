@@ -437,9 +437,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
             ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
-            ProtocolMemberKind::Other(ty) => {
-                visitor.visit((*ty, other), |v| ty.is_disjoint_from_impl(db, other, v))
-            }
+            ProtocolMemberKind::Other(ty) => visitor.visit((*ty, other), || {
+                ty.is_disjoint_from_impl(db, other, visitor)
+            }),
         }
     }
 

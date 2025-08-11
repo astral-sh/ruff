@@ -47,7 +47,7 @@ impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
         }
     }
 
-    pub(crate) fn visit(&self, item: T, func: impl FnOnce(&Self) -> R) -> R {
+    pub(crate) fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         if let Some(ty) = self.cache.borrow().get(&item) {
             return *ty;
         }
@@ -57,7 +57,7 @@ impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
             return self.fallback;
         }
 
-        let ret = func(self);
+        let ret = func();
         self.seen.borrow_mut().pop();
         self.cache.borrow_mut().insert(item, ret);
 
