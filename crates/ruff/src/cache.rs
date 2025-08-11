@@ -20,7 +20,6 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
-use ruff_notebook::NotebookIndex;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -292,13 +291,8 @@ impl Cache {
         });
     }
 
-    pub(crate) fn update_lint(
-        &self,
-        path: RelativePathBuf,
-        key: &FileCacheKey,
-        data: LintCacheData,
-    ) {
-        self.update(path, key, ChangeData::Lint(data));
+    pub(crate) fn set_linted(&self, path: RelativePathBuf, key: &FileCacheKey) {
+        self.update(path, key, ChangeData::Linted);
     }
 
     pub(crate) fn set_formatted(&self, path: RelativePathBuf, key: &FileCacheKey) {
@@ -333,23 +327,15 @@ pub(crate) struct FileCache {
 }
 
 impl FileCache {
-    /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
-        self.data.lint.as_ref().map(|lint| {
-            let diagnostics = Vec::new();
-            let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
-                FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
-            } else {
-                FxHashMap::default()
-            };
-            Diagnostics::new(diagnostics, notebook_indexes)
-        })
+    /// Convert the file cache into an empty `Diagnostics`, if it has been linted.
+    pub(crate) fn to_diagnostics(&self) -> Option<Diagnostics> {
+        self.data.linted.then(Diagnostics::default)
     }
 }
 
 #[derive(Debug, Default, bincode::Decode, bincode::Encode)]
 struct FileCacheData {
-    lint: Option<LintCacheData>,
+    linted: bool,
     formatted: bool,
 }
 
@@ -383,19 +369,6 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
-pub(crate) struct LintCacheData {
-    /// Notebook index if this file is a Jupyter Notebook.
-    #[bincode(with_serde)]
-    pub(super) notebook_index: Option<NotebookIndex>,
-}
-
-impl LintCacheData {
-    pub(crate) fn new(notebook_index: Option<NotebookIndex>) -> Self {
-        Self { notebook_index }
-    }
 }
 
 pub(crate) trait PackageCaches {
@@ -485,15 +458,15 @@ struct Change {
 
 #[derive(Debug)]
 enum ChangeData {
-    Lint(LintCacheData),
+    Linted,
     Formatted,
 }
 
 impl ChangeData {
     fn apply(self, data: &mut FileCacheData) {
         match self {
-            ChangeData::Lint(new_lint) => {
-                data.lint = Some(new_lint);
+            ChangeData::Linted => {
+                data.linted = true;
             }
             ChangeData::Formatted => {
                 data.formatted = true;
@@ -909,7 +882,7 @@ mod tests {
             panic!("Cache entry for `source.py` is missing.");
         };
 
-        assert!(file_cache.data.lint.is_some());
+        assert!(file_cache.data.linted);
         assert!(file_cache.data.formatted);
     }
 
@@ -959,7 +932,7 @@ mod tests {
             panic!("Cache entry for `source.py` is missing.");
         };
 
-        assert_eq!(file_cache.data.lint, None);
+        assert!(!file_cache.data.linted);
         assert!(file_cache.data.formatted);
     }
 

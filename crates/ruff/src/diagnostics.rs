@@ -20,14 +20,14 @@ use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{IOError, Violation, fs};
-use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
+use ruff_notebook::{NotebookError, NotebookIndex};
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCacheKey, LintCacheData};
+use crate::cache::{Cache, FileCache, FileCacheKey};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -193,7 +193,7 @@ pub(crate) fn lint_path(
             let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
-                .and_then(|entry| entry.to_diagnostics(path));
+                .and_then(FileCache::to_diagnostics);
             if let Some(diagnostics) = cached_diagnostics {
                 // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
                 // and writing the diff to stdout, respectively). If a file has diagnostics, we
@@ -337,11 +337,7 @@ pub(crate) fn lint_path(
                     diagnostics.is_empty() && fixed.is_empty()
                 }
             } {
-                cache.update_lint(
-                    relative_path.to_owned(),
-                    &key,
-                    LintCacheData::new(transformed.as_ipy_notebook().map(Notebook::index).cloned()),
-                );
+                cache.set_linted(relative_path.to_owned(), &key);
             }
         }
     }
