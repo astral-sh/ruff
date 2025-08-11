@@ -301,7 +301,8 @@ enum Direction {
 /// <https://github.com/astral-sh/ruff/issues/19845>
 /// <https://github.com/python/cpython/blob/v3.14.0rc1/Objects/unicodetype_db.h#L6673-L6711>
 #[rustfmt::skip]
-fn py_unicode_is_whitespace(ch: char) -> bool {
+#[inline]
+const fn py_unicode_is_whitespace(ch: char) -> bool {
     matches!(
         ch,
         | '\u{0009}'
