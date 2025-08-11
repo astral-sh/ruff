@@ -10,13 +10,13 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::infer::infer_definition_types;
-use crate::types::instance::{NominalInstanceType, Protocol, ProtocolInstanceType};
+use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    BoundTypeVarInstance, KnownInstanceType, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
-    declaration_type,
+    BoundTypeVarInstance, KnownClass, KnownInstanceType, Type, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -230,8 +230,22 @@ impl<'db> GenericContext<'db> {
         parameter
     }
 
-    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        self.specialize_partial(db, &vec![None; self.variables(db).len()])
+    pub(crate) fn default_specialization(
+        self,
+        db: &'db dyn Db,
+        known_class: Option<KnownClass>,
+    ) -> Specialization<'db> {
+        let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
+        if known_class == Some(KnownClass::Tuple) {
+            Specialization::new(
+                db,
+                self,
+                partial.types(db),
+                TupleType::homogeneous(db, Type::unknown()),
+            )
+        } else {
+            partial
+        }
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -401,24 +415,14 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
         visitor.visit_type(db, *ty);
     }
     if let Some(tuple) = specialization.tuple_inner(db) {
-        visitor.visit_tuple_type(db, tuple);
+        walk_tuple_type(db, tuple, visitor);
     }
 }
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
-        if let Some(tuple) = self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db)) {
-            return tuple;
-        }
-        if let [element_type] = self.types(db) {
-            if let Some(tuple) = TupleType::new(db, TupleSpec::homogeneous(*element_type)) {
-                return tuple.tuple(db);
-            }
-        }
-        TupleType::new(db, TupleSpec::homogeneous(Type::unknown()))
-            .expect("tuple[Unknown, ...] should never contain Never")
-            .tuple(db)
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
+        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -628,6 +632,16 @@ impl<'db> Specialization<'db> {
             }
         }
 
+        match (self.tuple_inner(db), other.tuple_inner(db)) {
+            (Some(_), None) | (None, Some(_)) => return false,
+            (None, None) => {}
+            (Some(self_tuple), Some(other_tuple)) => {
+                if !self_tuple.is_equivalent_to(db, other_tuple) {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 
@@ -640,6 +654,8 @@ impl<'db> Specialization<'db> {
         for ty in self.types(db) {
             ty.find_legacy_typevars(db, binding_context, typevars);
         }
+        // A tuple's specialization will include all of its element types, so we don't need to also
+        // look in `self.tuple`.
     }
 }
 
@@ -834,59 +850,66 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
-            (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
-                let formal_tuple = formal_tuple.tuple(self.db);
-                let actual_tuple = actual_tuple.tuple(self.db);
-                let Some(most_precise_length) = formal_tuple.len().most_precise(actual_tuple.len()) else {
-                    return Ok(());
-                };
-                let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
-                    return Ok(());
-                };
-                for (formal_element, actual_element) in
-                    formal_tuple.all_elements().zip(actual_tuple.all_elements())
-                {
-                    self.infer(*formal_element, *actual_element)?;
-                }
-            }
-
-            (
-                Type::NominalInstance(NominalInstanceType {
-                    class: ClassType::Generic(formal_alias),
-                    ..
-                })
-                // TODO: This will only handle classes that explicit implement a generic protocol
-                // by listing it as a base class. To handle classes that implicitly implement a
-                // generic protocol, we will need to check the types of the protocol members to be
-                // able to infer the specialization of the protocol that the class implements.
-                | Type::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(ClassType::Generic(formal_alias)),
-                    ..
-                }),
-                Type::NominalInstance(NominalInstanceType {
-                    class: actual_class,
-                    ..
-                }),
-            ) => {
-                let formal_origin = formal_alias.origin(self.db);
-                for base in actual_class.iter_mro(self.db) {
-                    let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
-                        continue;
+            (formal, Type::NominalInstance(actual_nominal)) => {
+                // Special case: `formal` and `actual` are both tuples.
+                if let (Some(formal_tuple), Some(actual_tuple)) = (
+                    formal.tuple_instance_spec(self.db),
+                    actual_nominal.tuple_spec(self.db),
+                ) {
+                    let Some(most_precise_length) =
+                        formal_tuple.len().most_precise(actual_tuple.len())
+                    else {
+                        return Ok(());
                     };
-                    if formal_origin != base_alias.origin(self.db) {
-                        continue;
-                    }
-                    let formal_specialization = formal_alias.specialization(self.db).types(self.db);
-                    let base_specialization = base_alias.specialization(self.db).types(self.db);
-                    for (formal_ty, base_ty) in
-                        formal_specialization.iter().zip(base_specialization)
+                    let Ok(formal_tuple) = formal_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
+                        return Ok(());
+                    };
+                    for (formal_element, actual_element) in
+                        formal_tuple.all_elements().zip(actual_tuple.all_elements())
                     {
-                        self.infer(*formal_ty, *base_ty)?;
+                        self.infer(*formal_element, *actual_element)?;
                     }
                     return Ok(());
+                }
+
+                // Extract formal_alias if this is a generic class
+                let formal_alias = match formal {
+                    Type::NominalInstance(formal_nominal) => {
+                        formal_nominal.class(self.db).into_generic_alias()
+                    }
+                    // TODO: This will only handle classes that explicit implement a generic protocol
+                    // by listing it as a base class. To handle classes that implicitly implement a
+                    // generic protocol, we will need to check the types of the protocol members to be
+                    // able to infer the specialization of the protocol that the class implements.
+                    Type::ProtocolInstance(ProtocolInstanceType {
+                        inner: Protocol::FromClass(ClassType::Generic(alias)),
+                        ..
+                    }) => Some(alias),
+                    _ => None,
+                };
+
+                if let Some(formal_alias) = formal_alias {
+                    let formal_origin = formal_alias.origin(self.db);
+                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
+                        let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
+                            continue;
+                        };
+                        if formal_origin != base_alias.origin(self.db) {
+                            continue;
+                        }
+                        let formal_specialization =
+                            formal_alias.specialization(self.db).types(self.db);
+                        let base_specialization = base_alias.specialization(self.db).types(self.db);
+                        for (formal_ty, base_ty) in
+                            formal_specialization.iter().zip(base_specialization)
+                        {
+                            self.infer(*formal_ty, *base_ty)?;
+                        }
+                        return Ok(());
+                    }
                 }
             }
 

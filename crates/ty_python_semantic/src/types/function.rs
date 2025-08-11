@@ -945,7 +945,7 @@ fn is_instance_truthiness<'db>(
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
             if instance
-                .class
+                .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {
@@ -993,8 +993,6 @@ fn is_instance_truthiness<'db>(
                 .as_ref()
                 .is_some_and(is_instance),
         ),
-
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
 
         Type::FunctionLiteral(..) => {
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))

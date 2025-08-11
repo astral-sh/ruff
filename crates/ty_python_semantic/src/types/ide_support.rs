@@ -94,7 +94,7 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class.class_literal(db);
+                let (class_literal, _specialization) = instance.class(db).class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
             }
 
@@ -137,7 +137,6 @@ impl<'db> AllMembers<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -208,7 +207,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class.known(db),
+                                    instance.class(db).known(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
@@ -868,7 +867,7 @@ mod resolve_definition {
     pub enum ImportAliasResolution {
         /// Resolve import aliases to their original definitions
         ResolveAliases,
-        /// Keep import aliases as-is, don't resolve to original definitions  
+        /// Keep import aliases as-is, don't resolve to original definitions
         PreserveAliases,
     }
 

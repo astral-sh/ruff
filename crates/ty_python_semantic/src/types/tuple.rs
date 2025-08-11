@@ -23,12 +23,12 @@ use std::hash::Hash;
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
+use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
     BoundTypeVarInstance, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
 };
-use crate::types::{SubclassOfType, Truthiness};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
@@ -146,13 +146,6 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 impl get_size2::GetSize for TupleType<'_> {}
 
 impl<'db> Type<'db> {
-    pub(crate) fn tuple(tuple: Option<TupleType<'db>>) -> Self {
-        let Some(tuple) = tuple else {
-            return Type::Never;
-        };
-        Self::Tuple(tuple)
-    }
-
     pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
         Type::tuple(TupleType::homogeneous(db, element))
     }
@@ -169,7 +162,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
-        Type::Tuple(TupleType::empty(db))
+        Type::tuple(Some(TupleType::empty(db)))
     }
 }
 
@@ -227,23 +220,22 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
+    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
+    // `static-frame` as part of a mypy_primer run! This is because it's called
+    // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
-        KnownClass::Tuple
+    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
-            .and_then(|class_literal| match class_literal.generic_context(db) {
-                None => Some(ClassType::NonGeneric(class_literal)),
-                Some(generic_context) if generic_context.variables(db).len() != 1 => None,
-                Some(generic_context) => Some(
-                    class_literal
-                        .apply_specialization(db, |_| generic_context.specialize_tuple(db, self)),
-                ),
-            })
-    }
+            .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
-    pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.to_class_type(db)
-            .map(|class| SubclassOfType::from(db, class))
+        tuple_class.apply_specialization(db, |generic_context| {
+            if generic_context.variables(db).len() == 1 {
+                generic_context.specialize_tuple(db, self)
+            } else {
+                generic_context.default_specialization(db, Some(KnownClass::Tuple))
+            }
+        })
     }
 
     /// Return a normalized version of `self`.
@@ -294,22 +286,8 @@ impl<'db> TupleType<'db> {
         self.tuple(db).is_equivalent_to(db, other.tuple(db))
     }
 
-    pub(crate) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        visitor: &mut PairVisitor<'db>,
-    ) -> bool {
-        self.tuple(db)
-            .is_disjoint_from_impl(db, other.tuple(db), visitor)
-    }
-
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
-    }
-
-    pub(crate) fn truthiness(self, db: &'db dyn Db) -> Truthiness {
-        self.tuple(db).truthiness()
     }
 }
 
@@ -359,10 +337,6 @@ impl<T> FixedLengthTuple<T> {
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> usize {
         self.0.len()
-    }
-
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
     }
 
     pub(crate) fn push(&mut self, element: T) {
@@ -1029,10 +1003,6 @@ impl<T> Tuple<T> {
         }
     }
 
-    pub(crate) const fn is_variadic(&self) -> bool {
-        matches!(self, Tuple::Variable(_))
-    }
-
     /// Returns the length of this tuple.
     pub(crate) fn len(&self) -> TupleLength {
         match self {
@@ -1049,13 +1019,6 @@ impl<T> Tuple<T> {
             (minimum, _) if minimum > 0 => Truthiness::AlwaysTrue,
             // The tuple type is Ambiguous if its inhabitants could be of any length
             _ => Truthiness::Ambiguous,
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Tuple::Fixed(tuple) => tuple.is_empty(),
-            Tuple::Variable(_) => false,
         }
     }
 
@@ -1154,10 +1117,10 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn is_disjoint_from_impl(
-        &'db self,
+    pub(super) fn is_disjoint_from_impl(
+        &self,
         db: &'db dyn Db,
-        other: &'db Self,
+        other: &Self,
         visitor: &mut PairVisitor<'db>,
     ) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
@@ -1172,12 +1135,15 @@ impl<'db> Tuple<Type<'db>> {
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'db>(
+        fn any_disjoint<'s, 'db>(
             db: &'db dyn Db,
-            a: impl IntoIterator<Item = &'db Type<'db>>,
-            b: impl IntoIterator<Item = &'db Type<'db>>,
+            a: impl IntoIterator<Item = &'s Type<'db>>,
+            b: impl IntoIterator<Item = &'s Type<'db>>,
             visitor: &mut PairVisitor<'db>,
-        ) -> bool {
+        ) -> bool
+        where
+            'db: 's,
+        {
             a.into_iter().zip(b).any(|(self_element, other_element)| {
                 self_element.is_disjoint_from_impl(db, *other_element, visitor)
             })
@@ -1231,7 +1197,7 @@ impl<'db> Tuple<Type<'db>> {
         false
     }
 
-    fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
