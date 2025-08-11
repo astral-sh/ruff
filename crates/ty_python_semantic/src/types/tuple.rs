@@ -135,7 +135,7 @@ pub struct TupleType<'db> {
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     for element in tuple.tuple(db).all_elements() {
         visitor.visit_type(db, *element);
@@ -245,7 +245,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Option<Self> {
         TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
     }
@@ -393,7 +393,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
@@ -707,11 +707,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> TupleSpec<'db> {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
@@ -1057,11 +1053,7 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
             Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
@@ -1121,7 +1113,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
@@ -1139,7 +1131,7 @@ impl<'db> Tuple<Type<'db>> {
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'s Type<'db>>,
             b: impl IntoIterator<Item = &'s Type<'db>>,
-            visitor: &mut PairVisitor<'db>,
+            visitor: &PairVisitor<'db>,
         ) -> bool
         where
             'db: 's,

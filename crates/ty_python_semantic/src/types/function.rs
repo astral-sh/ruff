@@ -436,7 +436,7 @@ pub struct FunctionLiteral<'db> {
 fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionLiteral<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(context) = function.inherited_generic_context(db) {
         walk_generic_context(db, context, visitor);
@@ -599,7 +599,7 @@ impl<'db> FunctionLiteral<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -627,7 +627,7 @@ impl get_size2::GetSize for FunctionType<'_> {}
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_function_literal(db, function.literal(db), visitor);
     for mapping in function.type_mappings(db) {
@@ -915,15 +915,10 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let mut visitor = TypeTransformer::default();
-        self.normalized_impl(db, &mut visitor)
+        self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()

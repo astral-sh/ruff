@@ -68,7 +68,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &mut TypeTransformer::default(),
+                &TypeTransformer::default(),
             ),
         ))
     }
@@ -99,7 +99,7 @@ pub struct NominalInstanceType<'db>(
 pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     nominal: NominalInstanceType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     visitor.visit_type(db, nominal.class(db).into());
 }
@@ -241,7 +241,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -296,7 +296,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         let self_spec = self.tuple_spec(db);
         if let Some(self_spec) = self_spec.as_deref() {
@@ -421,7 +421,7 @@ pub struct ProtocolInstanceType<'db> {
 pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     protocol: ProtocolInstanceType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_protocol_interface(db, protocol.inner.interface(db), visitor);
 }
@@ -471,8 +471,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        let mut visitor = TypeTransformer::default();
-        self.normalized_impl(db, &mut visitor)
+        self.normalized_impl(db, &TypeTransformer::default())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -481,7 +480,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
         if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
@@ -533,7 +532,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
-        _visitor: &mut PairVisitor<'db>,
+        _visitor: &PairVisitor<'db>,
     ) -> bool {
         false
     }
@@ -640,7 +639,7 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            visitor: &mut TypeTransformer<'db>,
+            visitor: &TypeTransformer<'db>,
         ) -> Self {
             Self(interface.normalized_impl(db, visitor))
         }

@@ -82,7 +82,7 @@ impl get_size2::GetSize for ProtocolInterface<'_> {}
 pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     interface: ProtocolInterface<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     for member in interface.members(db) {
         walk_protocol_member(db, &member, visitor);
@@ -165,11 +165,7 @@ impl<'db> ProtocolInterface<'db> {
             .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::new(
             db,
             self.inner(db)
@@ -253,10 +249,10 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &mut TypeTransformer::default())
+        self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
@@ -331,7 +327,7 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
                 ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
@@ -404,7 +400,7 @@ pub(super) struct ProtocolMember<'a, 'db> {
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'_, 'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     match member.kind {
         ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
@@ -436,7 +432,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
