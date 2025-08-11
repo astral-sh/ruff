@@ -432,6 +432,75 @@ alice: Employee = {"name": "Alice", "employee_id": 1}
 eve: Employee = {"name": "Eve"}
 ```
 
+When inheriting from a `TypedDict` with a different `total=` setting, inherited fields maintain
+their original requirement status, while new fields follow the child class's `total=` setting:
+
+```py
+from typing import TypedDict
+
+# Case 1: total=True parent, total=False child
+class PersonBase(TypedDict):
+    id: int  # required (from total=True)
+    name: str  # required (from total=True)
+
+class PersonOptional(PersonBase, total=False):
+    age: int  # optional (from total=False)
+    email: str  # optional (from total=False)
+
+# Inherited fields keep their original requirement status
+person1 = PersonOptional(id=1, name="Alice")  # Valid - id/name still required
+person2 = PersonOptional(id=1, name="Alice", age=25)  # Valid - age optional
+person3 = PersonOptional(id=1, name="Alice", email="alice@test.com")  # Valid
+
+# These should be errors - missing required inherited fields
+# error: [missing-required-field] "Missing required field 'id' in TypedDict `PersonOptional` constructor"
+person_invalid1 = PersonOptional(name="Bob")
+
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `PersonOptional` constructor"
+person_invalid2 = PersonOptional(id=2)
+
+# Case 2: total=False parent, total=True child
+class PersonBaseOptional(TypedDict, total=False):
+    id: int  # optional (from total=False)
+    name: str  # optional (from total=False)
+
+class PersonRequired(PersonBaseOptional):  # total=True by default
+    age: int  # required (from total=True)
+
+# New fields in child are required, inherited fields stay optional
+person4 = PersonRequired(age=30)  # Valid - only age required, id/name optional
+person5 = PersonRequired(id=1, name="Charlie", age=35)  # Valid - all provided
+
+# This should be an error - missing required new field
+# error: [missing-required-field] "Missing required field 'age' in TypedDict `PersonRequired` constructor"
+person_invalid3 = PersonRequired(id=3, name="David")
+```
+
+This also works with `Required` and `NotRequired`:
+
+```py
+from typing_extensions import TypedDict, Required, NotRequired
+
+# Case 3: Mixed inheritance with Required/NotRequired
+class PersonMixed(TypedDict, total=False):
+    id: Required[int]  # required despite total=False
+    name: str  # optional due to total=False
+
+class Employee(PersonMixed):  # total=True by default
+    department: str  # required due to total=True
+
+# id stays required (Required override), name stays optional, department is required
+emp1 = Employee(id=1, department="Engineering")  # Valid
+emp2 = Employee(id=2, name="Eve", department="Sales")  # Valid
+
+# Errors for missing required fields
+# error: [missing-required-field] "Missing required field 'id' in TypedDict `Employee` constructor"
+emp_invalid1 = Employee(department="HR")
+
+# error: [missing-required-field] "Missing required field 'department' in TypedDict `Employee` constructor"
+emp_invalid2 = Employee(id=3)
+```
+
 ## Generic `TypedDict`
 
 `TypedDict`s can also be generic.
