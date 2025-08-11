@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_print/mod.rs
 ---
-T201.py:4:1: T201 [*] `print` found
+T201 [*] `print` found
+ --> T201.py:4:1
   |
 2 | import tempfile
 3 |
 4 | print("Hello, world!")  # T201
-  | ^^^^^ T201
+  | ^^^^^
 5 | print("Hello, world!", file=None)  # T201
 6 | print("Hello, world!", file=sys.stdout)  # T201
   |
-  = help: Remove `print`
+help: Remove `print`
 
 ℹ Unsafe fix
 1 1 | import sys
@@ -21,15 +22,16 @@ T201.py:4:1: T201 [*] `print` found
 6 5 | print("Hello, world!", file=sys.stdout)  # T201
 7 6 | print("Hello, world!", file=sys.stderr)  # T201
 
-T201.py:5:1: T201 [*] `print` found
+T201 [*] `print` found
+ --> T201.py:5:1
   |
 4 | print("Hello, world!")  # T201
 5 | print("Hello, world!", file=None)  # T201
-  | ^^^^^ T201
+  | ^^^^^
 6 | print("Hello, world!", file=sys.stdout)  # T201
 7 | print("Hello, world!", file=sys.stderr)  # T201
   |
-  = help: Remove `print`
+help: Remove `print`
 
 ℹ Unsafe fix
 2 2 | import tempfile
@@ -40,15 +42,16 @@ T201.py:5:1: T201 [*] `print` found
 7 6 | print("Hello, world!", file=sys.stderr)  # T201
 8 7 | 
 
-T201.py:6:1: T201 [*] `print` found
+T201 [*] `print` found
+ --> T201.py:6:1
   |
 4 | print("Hello, world!")  # T201
 5 | print("Hello, world!", file=None)  # T201
 6 | print("Hello, world!", file=sys.stdout)  # T201
-  | ^^^^^ T201
+  | ^^^^^
 7 | print("Hello, world!", file=sys.stderr)  # T201
   |
-  = help: Remove `print`
+help: Remove `print`
 
 ℹ Unsafe fix
 3 3 | 
@@ -59,16 +62,17 @@ T201.py:6:1: T201 [*] `print` found
 8 7 | 
 9 8 | with tempfile.NamedTemporaryFile() as fp:
 
-T201.py:7:1: T201 [*] `print` found
+T201 [*] `print` found
+ --> T201.py:7:1
   |
 5 | print("Hello, world!", file=None)  # T201
 6 | print("Hello, world!", file=sys.stdout)  # T201
 7 | print("Hello, world!", file=sys.stderr)  # T201
-  | ^^^^^ T201
+  | ^^^^^
 8 |
 9 | with tempfile.NamedTemporaryFile() as fp:
   |
-  = help: Remove `print`
+help: Remove `print`
 
 ℹ Unsafe fix
 4 4 | print("Hello, world!")  # T201

@@ -173,6 +173,7 @@ impl<'db> Type<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -226,6 +227,7 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
+    #[salsa::tracked]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)

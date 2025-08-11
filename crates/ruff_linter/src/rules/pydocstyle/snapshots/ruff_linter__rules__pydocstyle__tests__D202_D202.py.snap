@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
+D202 [*] No blank lines allowed after function docstring (found 2)
+  --> D202.py:57:5
    |
 55 | # D202
 56 | def outer():
 57 |     """This is a docstring."""
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 55 55 | # D202
@@ -20,14 +21,15 @@ D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
 61 59 |         return
 62 60 | 
 
-D202.py:68:5: D202 [*] No blank lines allowed after function docstring (found 2)
+D202 [*] No blank lines allowed after function docstring (found 2)
+  --> D202.py:68:5
    |
 66 | # D202
 67 | def outer():
 68 |     """This is a docstring."""
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 66 66 | # D202
@@ -39,16 +41,17 @@ D202.py:68:5: D202 [*] No blank lines allowed after function docstring (found 2)
 72 70 |     def inner():
 73 71 |         return
 
-D202.py:80:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D202 [*] No blank lines allowed after function docstring (found 1)
+  --> D202.py:80:5
    |
 78 | # D202
 79 | def outer():
 80 |     """This is a docstring."""
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
 81 |
 82 |     # This is a comment.
    |
-   = help: Remove blank line(s) after function docstring
+help: Remove blank line(s) after function docstring
 
 ℹ Safe fix
 78 78 | # D202

@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301 [*] Use `r"""` if any backslashes in a docstring
+ --> D301.py:2:5
   |
 1 | def double_quotes_backslash():
 2 |     """Sum\\mary."""
-  |     ^^^^^^^^^^^^^^^^ D301
+  |     ^^^^^^^^^^^^^^^^
   |
-  = help: Add `r` prefix
+help: Add `r` prefix
 
 ℹ Unsafe fix
 1 1 | def double_quotes_backslash():
@@ -17,23 +18,25 @@ D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
 4 4 | 
 5 5 | def double_quotes_backslash_raw():
 
-D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
+D301 Use `r"""` if any backslashes in a docstring
+  --> D301.py:37:5
    |
 36 | def shouldnt_add_raw_here2():
 37 |     u"Sum\\mary."
-   |     ^^^^^^^^^^^^^ D301
+   |     ^^^^^^^^^^^^^
    |
-   = help: Add `r` prefix
+help: Add `r` prefix
 
-D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301 [*] Use `r"""` if any backslashes in a docstring
+  --> D301.py:93:5
    |
 92 |   def should_add_raw_for_single_double_quote_escape():
 93 | /     """
 94 | |     This is single quote escape \".
 95 | |     """
-   | |_______^ D301
+   | |_______^
    |
-   = help: Add `r` prefix
+help: Add `r` prefix
 
 ℹ Unsafe fix
 90 90 | 
@@ -45,15 +48,16 @@ D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
 95 95 |     """
 96 96 | 
 
-D301.py:99:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301 [*] Use `r"""` if any backslashes in a docstring
+   --> D301.py:99:5
     |
  98 |   def should_add_raw_for_single_single_quote_escape():
  99 | /     '''
 100 | |     This is single quote escape \'.
 101 | |     '''
-    | |_______^ D301
+    | |_______^
     |
-    = help: Add `r` prefix
+help: Add `r` prefix
 
 ℹ Unsafe fix
 96  96  | 

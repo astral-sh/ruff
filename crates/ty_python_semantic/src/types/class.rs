@@ -89,6 +89,26 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
+fn implicit_attribute_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn implicit_attribute_initial<'db>(
+    _db: &'db dyn Db,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> PlaceAndQualifiers<'db> {
+    Place::Unbound.into()
+}
+
 fn try_mro_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<Mro<'db>, MroError<'db>>,
@@ -2351,6 +2371,25 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> PlaceAndQualifiers<'db> {
+        Self::implicit_attribute_inner(
+            db,
+            class_body_scope,
+            name.to_string(),
+            target_method_decorator,
+        )
+    }
+
+    #[salsa::tracked(
+        cycle_fn=implicit_attribute_recover,
+        cycle_initial=implicit_attribute_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn implicit_attribute_inner(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: String,
+        target_method_decorator: MethodDecorator,
+    ) -> PlaceAndQualifiers<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -2383,7 +2422,7 @@ impl<'db> ClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
+            attribute_declarations(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {
@@ -2441,7 +2480,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         for (attribute_assignments, method_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
+            attribute_assignments(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {

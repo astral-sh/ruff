@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
-snapshot_kind: text
 ---
-PYI032.py:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+ --> PYI032.py:6:29
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
-  |                             ^^^ PYI032
+  |                             ^^^
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
   |
-  = help: Replace with `object`
+help: Replace with `object`
 
 ℹ Safe fix
 3 3 | 
@@ -21,14 +21,15 @@ PYI032.py:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to 
 8 8 | 
 9 9 | 
 
-PYI032.py:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+ --> PYI032.py:7:29
   |
 5 | class Bad:
 6 |     def __eq__(self, other: Any) -> bool: ...  # PYI032
 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # PYI032
-  |                             ^^^^^^^^^^ PYI032
+  |                             ^^^^^^^^^^
   |
-  = help: Replace with `object`
+help: Replace with `object`
 
 ℹ Safe fix
 4 4 | 
@@ -40,14 +41,15 @@ PYI032.py:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to 
 9 9 | 
 10 10 | class Good:
 
-PYI032.py:27:28: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+  --> PYI032.py:27:28
    |
 26 | class BadStringized:
 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
-   |                            ^^^^^ PYI032
+   |                            ^^^^^
 28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
    |
-   = help: Replace with `object`
+help: Replace with `object`
 
 ℹ Safe fix
 24 24 | 
@@ -57,14 +59,15 @@ PYI032.py:27:28: PYI032 [*] Prefer `object` to `Any` for the second parameter to
    27 |+   def __eq__(self, other: object) -> bool: ...  # PYI032
 28 28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
 
-PYI032.py:28:28: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+  --> PYI032.py:28:28
    |
 26 | class BadStringized:
 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
 28 |    def __ne__(self, other: "Any") -> bool: ...  # PYI032
-   |                            ^^^^^ PYI032
+   |                            ^^^^^
    |
-   = help: Replace with `object`
+help: Replace with `object`
 
 ℹ Safe fix
 25 25 | 
