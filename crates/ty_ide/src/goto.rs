@@ -557,7 +557,10 @@ impl GotoTarget<'_> {
 impl Ranged for GotoTarget<'_> {
     fn range(&self) -> TextRange {
         match self {
-            GotoTarget::Expression(expression) => expression.range(),
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Attribute(attribute) => attribute.attr.range,
+                _ => expression.range(),
+            },
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
