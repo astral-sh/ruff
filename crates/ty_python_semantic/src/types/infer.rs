@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_legacy_typevar};
+use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -816,8 +816,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
     called_functions: FxHashSet<FunctionType<'db>>,
 
-    /// Whether we are in a context that binds unbound legacy typevars.
-    legacy_typevar_binding_context: Option<Definition<'db>>,
+    /// Whether we are in a context that binds unbound typevars.
+    typevar_binding_context: Option<Definition<'db>>,
 
     /// The deferred state of inferring types of certain expressions within the region.
     ///
@@ -866,7 +866,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
-            legacy_typevar_binding_context: None,
+            typevar_binding_context: None,
             deferred: VecSet::default(),
             undecorated_type: None,
             cycle_fallback: false,
@@ -2242,12 +2242,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_deref()
             .expect("class type params scope without type params");
 
+        let binding_context = self.index.expect_single_definition(class);
+        let previous_typevar_binding_context =
+            self.typevar_binding_context.replace(binding_context);
+
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            // Note: We do not install a new `legacy_typevar_binding_context`; since this class has
-            // PEP 695 typevars, it should not also bind any legacy typevars via inheriting from
-            // `typing.Generic` or `typing.Protocol`.
             let mut call_arguments =
                 CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value);
@@ -2257,6 +2258,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
         }
+
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
@@ -2269,15 +2272,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_deref()
             .expect("function type params scope without type params");
 
-        // Note: We do not install a new `legacy_typevar_binding_context`; since this function has
-        // PEP 695 typevars, it should not also bind any legacy typevars by referencing them in its
-        // parameter or return type annotations.
+        let binding_context = self.index.expect_single_definition(function);
+        let previous_typevar_binding_context =
+            self.typevar_binding_context.replace(binding_context);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::None,
         );
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
@@ -2286,7 +2290,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_ref()
             .expect("type alias type params scope without type params");
 
+        let binding_context = self.index.expect_single_definition(type_alias);
+        let previous_typevar_binding_context =
+            self.typevar_binding_context.replace(binding_context);
         self.infer_type_parameters(type_params);
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_type_alias(&mut self, type_alias: &ast::StmtTypeAlias) {
@@ -2634,14 +2642,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if self.defer_annotations() {
                 self.deferred.insert(definition);
             } else {
-                let previous_legacy_typevar_binding_context =
-                    self.legacy_typevar_binding_context.replace(definition);
+                let previous_typevar_binding_context =
+                    self.typevar_binding_context.replace(definition);
                 self.infer_return_type_annotation(
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
                 self.infer_parameters(parameters);
-                self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
 
@@ -3054,12 +3062,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
                 self.deferred.insert(definition);
             } else {
-                let previous_legacy_typevar_binding_context =
-                    self.legacy_typevar_binding_context.replace(definition);
+                let previous_typevar_binding_context =
+                    self.typevar_binding_context.replace(definition);
                 for base in class_node.bases() {
                     self.infer_expression(base);
                 }
-                self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+                self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
     }
@@ -3069,23 +3077,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
-        let previous_legacy_typevar_binding_context =
-            self.legacy_typevar_binding_context.replace(definition);
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
         self.infer_parameters(function.parameters.as_ref());
-        self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_class_deferred(&mut self, definition: Definition<'db>, class: &ast::StmtClassDef) {
-        let previous_legacy_typevar_binding_context =
-            self.legacy_typevar_binding_context.replace(definition);
+        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         for base in class.bases() {
             self.infer_expression(base);
         }
-        self.legacy_typevar_binding_context = previous_legacy_typevar_binding_context;
+        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     fn infer_type_alias_definition(
@@ -3394,27 +3400,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default,
         } = node;
 
-        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
-        // scope should have a child containing the class, function, or type alias definition. Find
-        // that scope and use its definition as the binding context.
-        let typevar_scope = definition.file_scope(self.db());
-        let child_scopes = self.index.child_scopes(typevar_scope);
-        let binding_context = child_scopes
-            .filter_map(|(_, binding_scope)| match binding_scope.node() {
-                NodeWithScopeKind::Class(class) => {
-                    Some(DefinitionNodeKey::from(class.node(self.context.module())))
-                }
-                NodeWithScopeKind::Function(function) => Some(DefinitionNodeKey::from(
-                    function.node(self.context.module()),
-                )),
-                NodeWithScopeKind::TypeAlias(alias) => {
-                    Some(DefinitionNodeKey::from(alias.node(self.context.module())))
-                }
-                _ => None,
-            })
-            .map(|key| self.index.expect_single_definition(key))
-            .next();
-
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
@@ -3459,7 +3444,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             &name.id,
             Some(definition),
-            binding_context,
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
@@ -6520,43 +6504,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
         resolved
-            .map_type(|ty| match ty {
-                // If the expression resolves to a legacy typevar, we will have the TypeVarInstance
-                // that was created when the typevar was created, which will not have an associated
-                // binding context. If this expression appears inside of a generic context that
-                // binds that typevar, we need to update the TypeVarInstance to include that
-                // binding context. To do that, we walk the enclosing scopes, looking for the
-                // nearest generic context that binds the typevar.
-                //
-                // If the legacy typevar is still unbound after that search, and we are in a
-                // context that binds unbound legacy typevars (i.e., the signature of a generic
-                // function), bind it with that context.
-                Type::TypeVar(typevar) if typevar.is_legacy(self.db()) => bind_legacy_typevar(
-                    self.db(),
-                    self.context.module(),
-                    self.index,
-                    self.scope().file_scope_id(self.db()),
-                    self.legacy_typevar_binding_context,
-                    typevar,
-                )
-                .map(Type::TypeVar)
-                .unwrap_or(ty),
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                    if typevar.is_legacy(self.db()) =>
-                {
-                    bind_legacy_typevar(
-                        self.db(),
-                        self.context.module(),
-                        self.index,
-                        self.scope().file_scope_id(self.db()),
-                        self.legacy_typevar_binding_context,
-                        typevar,
-                    )
-                    .map(|typevar| Type::KnownInstance(KnownInstanceType::TypeVar(typevar)))
-                    .unwrap_or(ty)
-                }
-                _ => ty,
-            })
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
@@ -6664,30 +6611,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(use_id) = use_id {
             constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
         }
-        let local_is_unbound = local_scope_place.is_unbound();
 
         let place = PlaceAndQualifiers::from(local_scope_place).or_fall_back_to(db, || {
-            let has_bindings_in_this_scope = match place_table.place_id(place_expr) {
-                Some(place_id) => place_table.place(place_id).is_bound(),
-                None => {
-                    assert!(
-                        self.deferred_state.in_string_annotation(),
-                        "Expected the place table to create a place for every Name node"
-                    );
-                    false
-                }
-            };
-
             let current_file = self.file();
-
-            let mut is_nonlocal_binding = false;
+            let mut symbol_resolves_locally = false;
             if let Some(symbol) = place_expr.as_symbol() {
                 if let Some(symbol_id) = place_table.symbol_id(symbol.name()) {
-                    // If we try to access a variable in a class before it has been defined,
-                    // the lookup will fall back to global.
-                    let fallback_to_global = local_is_unbound
-                        && has_bindings_in_this_scope
-                        && scope.node(db).scope_kind().is_class();
+                    // Footgun: `place_expr` and `symbol` were probably constructed with all-zero
+                    // flags. We need to read the place table to get correct flags.
+                    symbol_resolves_locally = place_table.symbol(symbol_id).is_local();
+                    // If we try to access a variable in a class before it has been defined, the
+                    // lookup will fall back to global. See the comment on `Symbol::is_local`.
+                    let fallback_to_global =
+                        scope.node(db).scope_kind().is_class() && symbol_resolves_locally;
                     if self.skip_non_global_scopes(file_scope_id, symbol_id) || fallback_to_global {
                         return global_symbol(self.db(), self.file(), symbol.name()).map_type(
                             |ty| {
@@ -6699,22 +6635,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             },
                         );
                     }
-                    is_nonlocal_binding = self
-                        .index
-                        .symbol_is_nonlocal_in_scope(symbol_id, file_scope_id);
                 }
             }
 
-            // If it's a function-like scope and there is one or more binding in this scope (but
-            // none of those bindings are visible from where we are in the control flow), we cannot
-            // fallback to any bindings in enclosing scopes. As such, we can immediately short-circuit
-            // here and return `Place::Unbound`.
-            //
-            // This is because Python is very strict in its categorisation of whether a variable is
-            // a local variable or not in function-like scopes. If a variable has any bindings in a
-            // function-like scope, it is considered a local variable; it never references another
-            // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_nonlocal_binding {
+            // Symbols that are bound or declared in the local scope, and not marked `nonlocal` or
+            // `global`, never refer to an enclosing scope. (If you reference such a symbol before
+            // it's bound, you get an `UnboundLocalError`.) Short-circuit instead of walking
+            // enclosing scopes in this case. The one exception to this rule is the global fallback
+            // in class bodies, which we already handled above.
+            if symbol_resolves_locally {
                 return Place::Unbound.into();
             }
 
@@ -6758,6 +6687,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
 
+                let has_root_place_been_reassigned = || {
+                    let enclosing_place_table = self.index.place_table(enclosing_scope_file_id);
+                    enclosing_place_table
+                        .parents(place_expr)
+                        .any(|enclosing_root_place_id| {
+                            enclosing_place_table
+                                .place(enclosing_root_place_id)
+                                .is_bound()
+                        })
+                };
+
                 // If the reference is in a nested eager scope, we need to look for the place at
                 // the point where the previous enclosing scope was defined, instead of at the end
                 // of the scope. (Note that the semantic index builder takes care of only
@@ -6799,28 +6739,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager place resolution.
                         EnclosingSnapshotResult::NotFound => {
-                            let enclosing_place_table =
-                                self.index.place_table(enclosing_scope_file_id);
-                            for enclosing_root_place_id in enclosing_place_table.parents(place_expr)
-                            {
-                                let enclosing_root_place =
-                                    enclosing_place_table.place(enclosing_root_place_id);
-                                if enclosing_root_place.is_bound() {
-                                    if let Place::Type(_, _) = place(
-                                        db,
-                                        enclosing_scope_id,
-                                        enclosing_root_place,
-                                        ConsideredDefinitions::AllReachable,
-                                    )
-                                    .place
-                                    {
-                                        return Place::Unbound.into();
-                                    }
-                                }
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
                             }
                             continue;
                         }
-                        EnclosingSnapshotResult::NoLongerInEagerContext => {}
+                        EnclosingSnapshotResult::NoLongerInEagerContext => {
+                            if has_root_place_been_reassigned() {
+                                return Place::Unbound.into();
+                            }
+                        }
                     }
                 }
 
@@ -9088,7 +9016,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typevars: Result<FxOrderSet<_>, GenericContextError> = typevars
             .iter()
             .map(|typevar| match typevar {
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Ok(*typevar),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
+                    self.db(),
+                    self.module(),
+                    self.index,
+                    self.scope().file_scope_id(self.db()),
+                    self.typevar_binding_context,
+                    *typevar,
+                )
+                .ok_or(GenericContextError::InvalidArgument),
                 Type::Dynamic(DynamicType::TodoUnpack) => Err(GenericContextError::NotYetSupported),
                 Type::NominalInstance(NominalInstanceType { class, .. })
                     if matches!(
@@ -9186,7 +9122,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
 
             // builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9247,7 +9183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type,
 
             // builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9317,7 +9253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
 
             // Builder only state
-            legacy_typevar_binding_context: _,
+            typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
             index: _,
@@ -9426,7 +9362,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .in_type_expression(
                                 self.db(),
                                 self.scope(),
-                                self.legacy_typevar_binding_context,
+                                self.typevar_binding_context,
                             )
                             .unwrap_or_else(|error| {
                                 error.into_fallback_type(
@@ -9646,11 +9582,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.legacy_typevar_binding_context,
-                    )
+                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -9667,11 +9599,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(
-                        self.db(),
-                        self.scope(),
-                        self.legacy_typevar_binding_context,
-                    )
+                    .in_type_expression(self.db(), self.scope(), self.typevar_binding_context)
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -10360,7 +10288,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .in_type_expression(
                                 self.db(),
                                 self.scope(),
-                                self.legacy_typevar_binding_context,
+                                self.typevar_binding_context,
                             )
                             .unwrap_or(Type::unknown())
                     }
@@ -11574,11 +11502,12 @@ mod tests {
         .unwrap();
 
         let check_typevar = |var: &'static str,
+                             display: &'static str,
                              upper_bound: Option<&'static str>,
                              constraints: Option<&[&'static str]>,
                              default: Option<&'static str>| {
             let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-            assert_eq!(var_ty.display(&db).to_string(), "typing.TypeVar");
+            assert_eq!(var_ty.display(&db).to_string(), display);
 
             let expected_name_ty = format!(r#"Literal["{var}"]"#);
             let name_ty = var_ty.member(&db, "__name__").place.expect_type();
@@ -11612,14 +11541,32 @@ mod tests {
             );
         };
 
-        check_typevar("T", None, None, None);
-        check_typevar("U", Some("A"), None, None);
-        check_typevar("V", None, Some(&["A", "B"]), None);
-        check_typevar("W", None, None, Some("A"));
-        check_typevar("X", Some("A"), None, Some("A1"));
+        check_typevar("T", "typing.TypeVar(\"T\")", None, None, None);
+        check_typevar("U", "typing.TypeVar(\"U\", bound=A)", Some("A"), None, None);
+        check_typevar(
+            "V",
+            "typing.TypeVar(\"V\", A, B)",
+            None,
+            Some(&["A", "B"]),
+            None,
+        );
+        check_typevar(
+            "W",
+            "typing.TypeVar(\"W\", default=A)",
+            None,
+            None,
+            Some("A"),
+        );
+        check_typevar(
+            "X",
+            "typing.TypeVar(\"X\", bound=A, default=A1)",
+            Some("A"),
+            None,
+            Some("A1"),
+        );
 
         // a typevar with less than two constraints is treated as unconstrained
-        check_typevar("Y", None, None, None);
+        check_typevar("Y", "typing.TypeVar(\"Y\")", None, None, None);
     }
 
     /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing

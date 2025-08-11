@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI025_1.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  --> PYI025_1.pyi:8:33
    |
  7 | def f():
  8 |     from collections.abc import Set  # PYI025
-   |                                 ^^^ PYI025
+   |                                 ^^^
  9 |
 10 | def f():
    |
-   = help: Alias `Set` to `AbstractSet`
+help: Alias `Set` to `AbstractSet`
 
 ℹ Safe fix
 5 5 |     from collections.abc import Container, Sized, Set as AbstractSet, ValuesView  # Ok
@@ -21,15 +22,16 @@ PYI025_1.pyi:8:33: PYI025 [*] Use `from collections.abc import Set as AbstractSe
 10 10 | def f():
 11 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
 
-PYI025_1.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  --> PYI025_1.pyi:11:51
    |
 10 | def f():
 11 |     from collections.abc import Container, Sized, Set, ValuesView  # PYI025
-   |                                                   ^^^ PYI025
+   |                                                   ^^^
 12 |
 13 | def f():
    |
-   = help: Alias `Set` to `AbstractSet`
+help: Alias `Set` to `AbstractSet`
 
 ℹ Safe fix
 8  8  |     from collections.abc import Set  # PYI025
@@ -41,16 +43,17 @@ PYI025_1.pyi:11:51: PYI025 [*] Use `from collections.abc import Set as AbstractS
 13 13 | def f():
 14 14 |     """Test: local symbol renaming."""
 
-PYI025_1.pyi:16:37: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  --> PYI025_1.pyi:16:37
    |
 14 |     """Test: local symbol renaming."""
 15 |     if True:
 16 |         from collections.abc import Set
-   |                                     ^^^ PYI025
+   |                                     ^^^
 17 |     else:
 18 |         Set = 1
    |
-   = help: Alias `Set` to `AbstractSet`
+help: Alias `Set` to `AbstractSet`
 
 ℹ Safe fix
 13 13 | def f():
@@ -76,16 +79,17 @@ PYI025_1.pyi:16:37: PYI025 [*] Use `from collections.abc import Set as AbstractS
 29 29 |         def Set():
 30 30 |             pass
 
-PYI025_1.pyi:33:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  --> PYI025_1.pyi:33:29
    |
 31 |         print(Set)
 32 |
 33 | from collections.abc import Set
-   |                             ^^^ PYI025
+   |                             ^^^
 34 |
 35 | def f():
    |
-   = help: Alias `Set` to `AbstractSet`
+help: Alias `Set` to `AbstractSet`
 
 ℹ Safe fix
 17 17 |     else:
@@ -119,16 +123,17 @@ PYI025_1.pyi:33:29: PYI025 [*] Use `from collections.abc import Set as AbstractS
 42 42 | def f():
 43 43 |     """Test: nonlocal symbol renaming."""
 
-PYI025_1.pyi:44:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+  --> PYI025_1.pyi:44:33
    |
 42 | def f():
 43 |     """Test: nonlocal symbol renaming."""
 44 |     from collections.abc import Set
-   |                                 ^^^ PYI025
+   |                                 ^^^
 45 |
 46 |     def g():
    |
-   = help: Alias `Set` to `AbstractSet`
+help: Alias `Set` to `AbstractSet`
 
 ℹ Safe fix
 41 41 | 

@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
-snapshot_kind: text
 ---
-ruff_noqa_codes.py:8:5: F841 [*] Local variable `x` is assigned to but never used
+F841 [*] Local variable `x` is assigned to but never used
+ --> ruff_noqa_codes.py:8:5
   |
 7 | def f():
 8 |     x = 1
-  |     ^ F841
+  |     ^
   |
-  = help: Remove assignment to unused variable `x`
+help: Remove assignment to unused variable `x`
 
 ℹ Unsafe fix
 5 5 | 

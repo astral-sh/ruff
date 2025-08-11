@@ -161,3 +161,8 @@ r"""first
 'no need' to escape
 "swap" quote style
 "use' ugly triple quotes""".split("\n")
+
+# https://github.com/astral-sh/ruff/issues/19845
+print("S\x1cP\x1dL\x1eI\x1fT".split())
+print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))

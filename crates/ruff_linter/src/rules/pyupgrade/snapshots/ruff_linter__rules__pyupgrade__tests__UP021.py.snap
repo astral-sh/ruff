@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021 [*] `universal_newlines` is deprecated, use `text`
+ --> UP021.py:5:25
   |
 4 | # Errors
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-  |                         ^^^^^^^^^^^^^^^^^^ UP021
+  |                         ^^^^^^^^^^^^^^^^^^
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
   |
-  = help: Replace with `text` keyword argument
+help: Replace with `text` keyword argument
 
 ℹ Safe fix
 2 2 | from subprocess import run
@@ -21,15 +22,16 @@ UP021.py:5:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 7 7 | run(["foo"], universal_newlines=True, check=False)
 8 8 | 
 
-UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021 [*] `universal_newlines` is deprecated, use `text`
+ --> UP021.py:6:25
   |
 4 | # Errors
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-  |                         ^^^^^^^^^^^^^^^^^^ UP021
+  |                         ^^^^^^^^^^^^^^^^^^
 7 | run(["foo"], universal_newlines=True, check=False)
   |
-  = help: Replace with `text` keyword argument
+help: Replace with `text` keyword argument
 
 ℹ Safe fix
 3 3 | 
@@ -41,16 +43,17 @@ UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
 8 8 | 
 9 9 | # OK
 
-UP021.py:7:14: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021 [*] `universal_newlines` is deprecated, use `text`
+ --> UP021.py:7:14
   |
 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
 7 | run(["foo"], universal_newlines=True, check=False)
-  |              ^^^^^^^^^^^^^^^^^^ UP021
+  |              ^^^^^^^^^^^^^^^^^^
 8 |
 9 | # OK
   |
-  = help: Replace with `text` keyword argument
+help: Replace with `text` keyword argument
 
 ℹ Safe fix
 4 4 | # Errors

@@ -2,8 +2,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
-    SubclassOfType, Truthiness, Type, TypeQualifiers,
+    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
+    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers,
     class_base::ClassBase,
     function::{FunctionDecorators, FunctionType},
     infer_expression_type, infer_unpack_types,
@@ -87,6 +87,26 @@ fn inheritance_cycle_initial<'db>(
     _self: ClassLiteral<'db>,
 ) -> Option<InheritanceCycle> {
     None
+}
+
+fn implicit_attribute_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &PlaceAndQualifiers<'db>,
+    _count: u32,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> salsa::CycleRecoveryAction<PlaceAndQualifiers<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn implicit_attribute_initial<'db>(
+    _db: &'db dyn Db,
+    _class_body_scope: ScopeId<'db>,
+    _name: String,
+    _target_method_decorator: MethodDecorator,
+) -> PlaceAndQualifiers<'db> {
+    Place::Unbound.into()
 }
 
 fn try_mro_cycle_recover<'db>(
@@ -250,11 +270,13 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
-        self.specialization(db).find_legacy_typevars(db, typevars);
+        self.specialization(db)
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
@@ -395,11 +417,12 @@ impl<'db> ClassType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
             Self::NonGeneric(_) => {}
-            Self::Generic(generic) => generic.find_legacy_typevars(db, typevars),
+            Self::Generic(generic) => generic.find_legacy_typevars(db, binding_context, typevars),
         }
     }
 
@@ -1200,11 +1223,13 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=pep695_generic_context_cycle_recover, cycle_initial=pep695_generic_context_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
-        let parsed = parsed_module(db, scope.file(db)).load(db);
+        let file = scope.file(db);
+        let parsed = parsed_module(db, file).load(db);
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            let index = semantic_index(db, file);
+            let definition = index.expect_single_definition(class_def_node);
+            GenericContext::from_type_params(db, index, definition, type_params)
         })
     }
 
@@ -1319,21 +1344,7 @@ impl<'db> ClassLiteral<'db> {
         class_stmt
             .bases()
             .iter()
-            .map(
-                |base_node| match definition_expression_type(db, class_definition, base_node) {
-                    Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(generic_context)) => {
-                        Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(
-                            generic_context.with_binding_context(db, class_definition),
-                        ))
-                    }
-                    Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context,
-                    )) => Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(
-                        generic_context.with_binding_context(db, class_definition),
-                    )),
-                    ty => ty,
-                },
-            )
+            .map(|base_node| definition_expression_type(db, class_definition, base_node))
             .collect()
     }
 
@@ -2360,6 +2371,25 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> PlaceAndQualifiers<'db> {
+        Self::implicit_attribute_inner(
+            db,
+            class_body_scope,
+            name.to_string(),
+            target_method_decorator,
+        )
+    }
+
+    #[salsa::tracked(
+        cycle_fn=implicit_attribute_recover,
+        cycle_initial=implicit_attribute_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn implicit_attribute_inner(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: String,
+        target_method_decorator: MethodDecorator,
+    ) -> PlaceAndQualifiers<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -2392,7 +2422,7 @@ impl<'db> ClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
+            attribute_declarations(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {
@@ -2450,7 +2480,7 @@ impl<'db> ClassLiteral<'db> {
         }
 
         for (attribute_assignments, method_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
+            attribute_assignments(db, class_body_scope, &name)
         {
             let method_scope = method_scope_id.to_scope_id(db, file);
             if !is_valid_scope(method_scope) {
@@ -4415,15 +4445,11 @@ impl KnownClass {
                 };
 
                 let containing_assignment = index.expect_single_definition(target);
-                // A freshly created legacy TypeVar does not have a binding context until it is
-                // used in a base class list, function parameter list, or type alias.
-                let binding_context = None;
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                     TypeVarInstance::new(
                         db,
                         &target.id,
                         Some(containing_assignment),
-                        binding_context,
                         bound_or_constraint,
                         variance,
                         *default,

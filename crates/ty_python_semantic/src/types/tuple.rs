@@ -22,12 +22,13 @@ use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 
+use crate::semantic_index::definition::Definition;
 use crate::types::class::{ClassType, KnownClass};
-use crate::types::{SubclassOfType, Truthiness};
 use crate::types::{
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, TypeVarVariance,
+    BoundTypeVarInstance, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance,
     UnionBuilder, UnionType, cyclic::PairVisitor,
 };
+use crate::types::{SubclassOfType, Truthiness};
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
 use crate::{Db, FxOrderSet};
 
@@ -172,6 +173,7 @@ impl<'db> Type<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> TupleType<'db> {
     pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
     where
@@ -225,6 +227,7 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
+    #[salsa::tracked]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)
@@ -270,9 +273,11 @@ impl<'db> TupleType<'db> {
     pub(crate) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        self.tuple(db).find_legacy_typevars(db, typevars);
+        self.tuple(db)
+            .find_legacy_typevars(db, binding_context, typevars);
     }
 
     pub(crate) fn has_relation_to(
@@ -433,10 +438,11 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for ty in &self.0 {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -771,14 +777,16 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for ty in &self.prefix {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
-        self.variable.find_legacy_typevars(db, typevars);
+        self.variable
+            .find_legacy_typevars(db, binding_context, typevars);
         for ty in &self.suffix {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -1118,11 +1126,12 @@ impl<'db> Tuple<Type<'db>> {
     fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self {
-            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, typevars),
-            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, typevars),
+            Tuple::Fixed(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
+            Tuple::Variable(tuple) => tuple.find_legacy_typevars(db, binding_context, typevars),
         }
     }
 

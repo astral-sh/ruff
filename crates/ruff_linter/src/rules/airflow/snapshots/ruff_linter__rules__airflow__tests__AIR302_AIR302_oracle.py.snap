@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_oracle.py:5:1: AIR302 [*] `airflow.hooks.oracle_hook.OracleHook` is moved into `oracle` provider in Airflow 3.0;
+AIR302 [*] `airflow.hooks.oracle_hook.OracleHook` is moved into `oracle` provider in Airflow 3.0;
+ --> AIR302_oracle.py:5:1
   |
 3 | from airflow.hooks.oracle_hook import OracleHook
 4 |
 5 | OracleHook()
-  | ^^^^^^^^^^ AIR302
+  | ^^^^^^^^^^
   |
-  = help: Install `apache-airflow-providers-oracle>=1.0.0` and use `OracleHook` from `airflow.providers.oracle.hooks.oracle` instead.
+help: Install `apache-airflow-providers-oracle>=1.0.0` and use `OracleHook` from `airflow.providers.oracle.hooks.oracle` instead.
 
 ℹ Unsafe fix
 1 1 | from __future__ import annotations
