@@ -143,14 +143,14 @@ impl ProjectDatabase {
             let heap_size = ingredient.heap_size_of_fields().unwrap_or_else(|| {
                 // Salsa currently does not expose a way to track the heap size of interned
                 // query arguments.
-                if ingredient.debug_name().contains("interned_arguments") {
-                    0
-                } else {
-                    panic!(
+                if !ingredient.debug_name().contains("interned_arguments") {
+                    tracing::warn!(
                         "expected `heap_size` to be provided by Salsa struct `{}`",
                         ingredient.debug_name()
-                    )
+                    );
                 }
+
+                0
             });
 
             cmp::Reverse(ingredient.size_of_fields() + heap_size)
@@ -158,10 +158,12 @@ impl ProjectDatabase {
 
         memos.sort_by_key(|(_, memo)| {
             let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
-                panic!(
+                tracing::warn!(
                     "expected `heap_size` to be provided by Salsa query `{}`",
                     memo.debug_name()
-                )
+                );
+
+                0
             });
 
             cmp::Reverse(memo.size_of_fields() + heap_size)
