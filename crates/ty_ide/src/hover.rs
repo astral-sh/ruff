@@ -371,11 +371,11 @@ mod tests {
         );
 
         // TODO: This should render T@Alias once we create GenericContexts for type alias scopes.
-        assert_snapshot!(test.hover(), @r"
-        typing.TypeVar[T: int = bool]
+        assert_snapshot!(test.hover(), @r#"
+        typing.TypeVar("T", bound=int, default=bool)
         ---------------------------------------------
         ```python
-        typing.TypeVar[T: int = bool]
+        typing.TypeVar("T", bound=int, default=bool)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -386,7 +386,7 @@ mod tests {
           |                                              |
           |                                              source
           |
-        ");
+        "#);
     }
 
     #[test]
