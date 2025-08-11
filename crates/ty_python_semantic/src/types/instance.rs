@@ -260,20 +260,21 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.has_relation_to(db, tuple2, relation),
+            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
             _ => self
                 .class(db)
-                .has_relation_to(db, other.class(db), relation),
+                .has_relation_to_impl(db, other.class(db), relation, visitor),
         }
     }
 

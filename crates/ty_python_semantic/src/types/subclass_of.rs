@@ -4,7 +4,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
 };
 use crate::{Db, FxOrderSet};
 
@@ -154,11 +154,12 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
@@ -173,7 +174,7 @@ impl<'db> SubclassOfType<'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to(db, other_class, relation)
+                self_class.has_relation_to_impl(db, other_class, relation, visitor)
             }
         }
     }

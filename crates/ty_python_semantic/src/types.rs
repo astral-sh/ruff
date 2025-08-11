@@ -1350,19 +1350,15 @@ impl<'db> Type<'db> {
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
 
-            (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db);
-                visitor.visit((self_alias_ty, target), |v| {
-                    self_alias_ty.has_relation_to_impl(db, target, relation, v)
-                })
-            }
+            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), |v| {
+                self_alias
+                    .value_type(db)
+                    .has_relation_to_impl(db, target, relation, v)
+            }),
 
-            (_, Type::TypeAlias(target_alias)) => {
-                let target_alias_ty = target_alias.value_type(db);
-                visitor.visit((self, target_alias_ty), |v| {
-                    self.has_relation_to_impl(db, target_alias_ty, relation, v)
-                })
-            }
+            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), |v| {
+                self.has_relation_to_impl(db, target_alias.value_type(db), relation, v)
+            }),
 
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
             // This allows field definitions like `name: str = field(default="")` in dataclasses
@@ -1641,20 +1637,30 @@ impl<'db> Type<'db> {
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
-                    ClassType::NonGeneric(class).has_relation_to(db, subclass_of_class, relation)
+                    ClassType::NonGeneric(class).has_relation_to_impl(
+                        db,
+                        subclass_of_class,
+                        relation,
+                        visitor,
+                    )
                 })
                 .unwrap_or(relation.is_assignability()),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
                 .map(|subclass_of_class| {
-                    ClassType::Generic(alias).has_relation_to(db, subclass_of_class, relation)
+                    ClassType::Generic(alias).has_relation_to_impl(
+                        db,
+                        subclass_of_class,
+                        relation,
+                        visitor,
+                    )
                 })
                 .unwrap_or(relation.is_assignability()),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
-                self_subclass_ty.has_relation_to(db, target_subclass_ty, relation)
+                self_subclass_ty.has_relation_to_impl(db, target_subclass_ty, relation, visitor)
             }
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
@@ -1716,7 +1722,9 @@ impl<'db> Type<'db> {
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
-                self_instance.has_relation_to(db, target_instance, relation)
+                visitor.visit((self, target), |v| {
+                    self_instance.has_relation_to_impl(db, target_instance, relation, v)
+                })
             }
 
             (Type::PropertyInstance(_), _) => KnownClass::Property

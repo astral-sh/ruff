@@ -16,7 +16,7 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     BoundTypeVarInstance, KnownClass, KnownInstanceType, Type, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
-    binding_type, declaration_type,
+    binding_type, cyclic::PairVisitor, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -559,11 +559,12 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
@@ -572,7 +573,7 @@ impl<'db> Specialization<'db> {
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
         {
-            return self_tuple.has_relation_to(db, other_tuple, relation);
+            return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
@@ -600,9 +601,11 @@ impl<'db> Specialization<'db> {
                             && other_type.is_assignable_to(db, *self_type)
                     }
                 },
-                TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
+                TypeVarVariance::Covariant => {
+                    self_type.has_relation_to_impl(db, *other_type, relation, visitor)
+                }
                 TypeVarVariance::Contravariant => {
-                    other_type.has_relation_to(db, *self_type, relation)
+                    other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
                 TypeVarVariance::Bivariant => true,
             };
