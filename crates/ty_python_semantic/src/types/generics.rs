@@ -101,7 +101,7 @@ pub(crate) fn bind_legacy_typevar<'db>(
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::ignore)]
+#[salsa::interned(debug, heap_size=GenericContext::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
@@ -383,6 +383,10 @@ impl<'db> GenericContext<'db> {
             .map(|ty| ty.normalized_impl(db, visitor))
             .collect();
         Self::new(db, variables)
+    }
+
+    fn heap_size((variables,): &(FxOrderSet<TypeVarInstance<'db>>,)) -> usize {
+        ruff_memory_usage::order_set_heap_size(variables)
     }
 }
 

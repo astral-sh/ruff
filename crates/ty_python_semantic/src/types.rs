@@ -8769,7 +8769,7 @@ impl<'db> UnionType<'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::ignore)]
+#[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[returns(ref)]
@@ -8967,6 +8967,11 @@ impl<'db> IntersectionType<'db> {
 
     pub fn has_one_element(&self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
+    }
+
+    fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {
+        ruff_memory_usage::order_set_heap_size(positive)
+            + ruff_memory_usage::order_set_heap_size(negative)
     }
 }
 
