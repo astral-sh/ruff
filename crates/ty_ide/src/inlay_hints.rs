@@ -121,6 +121,11 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         if !self.settings.function_argument_names {
             return;
         }
+
+        if name.starts_with('_') {
+            return;
+        }
+
         self.hints.push(InlayHint {
             position,
             content: InlayHintContent::FunctionArgumentName(name),
@@ -859,6 +864,20 @@ mod tests {
         def bar(y: int): pass
         foo([x=]1)
         bar(2)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_argument_name_starting_with_underscore() {
+        let test = inlay_hint_test(
+            "
+            def foo(_x: int, y: int): pass
+            foo(1, 2)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(_x: int, y: int): pass
+        foo(1, [y=]2)
         ");
     }
 }
