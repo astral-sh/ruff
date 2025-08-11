@@ -314,6 +314,11 @@ impl<'db> NominalInstanceType<'db> {
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self.0 {
+            // The empty tuple is a singleton on CPython and PyPy, but not on other Python
+            // implementations such as GraalPy. Its *use* as a singleton is discouraged and
+            // should not be relied on for type narrowing, so we do not treat it as one.
+            // See:
+            // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
             NominalInstanceInner::ExactTuple(_) => false,
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
