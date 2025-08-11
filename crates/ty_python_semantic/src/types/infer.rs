@@ -1024,13 +1024,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             NodeWithScopeKind::Lambda(lambda) => self.infer_lambda_body(lambda.node(self.module())),
             NodeWithScopeKind::Class(class) => self.infer_class_body(class.node(self.module())),
             NodeWithScopeKind::ClassTypeParameters(class) => {
-                self.infer_class_type_params(class.node(self.module()), scope);
+                self.infer_class_type_params(class.node(self.module()));
             }
             NodeWithScopeKind::FunctionTypeParameters(function) => {
-                self.infer_function_type_params(function.node(self.module()), scope);
+                self.infer_function_type_params(function.node(self.module()));
             }
             NodeWithScopeKind::TypeAliasTypeParameters(type_alias) => {
-                self.infer_type_alias_type_params(type_alias.node(self.module()), scope);
+                self.infer_type_alias_type_params(type_alias.node(self.module()));
             }
             NodeWithScopeKind::TypeAlias(type_alias) => {
                 self.infer_type_alias(type_alias.node(self.module()));
@@ -2236,28 +2236,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(&module.body);
     }
 
-    fn infer_class_type_params(&mut self, class: &ast::StmtClassDef, scope: ScopeId) {
+    fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
         let type_params = class
             .type_params
             .as_deref()
             .expect("class type params scope without type params");
 
-        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
-        // scope should have a child containing the appropriate definition. Find that scope and use
-        // its definition as the binding context.
-        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
-        let binding_context = child_scopes
-            .filter_map(|(_, binding_scope)| match binding_scope.node() {
-                NodeWithScopeKind::Class(class) => {
-                    Some(DefinitionNodeKey::from(class.node(self.context.module())))
-                }
-                _ => None,
-            })
-            .map(|key| self.index.expect_single_definition(key))
-            .next();
-
+        let binding_context = self.index.expect_single_definition(class);
         let previous_typevar_binding_context =
-            std::mem::replace(&mut self.typevar_binding_context, binding_context);
+            self.typevar_binding_context.replace(binding_context);
 
         self.infer_type_parameters(type_params);
 
@@ -2279,28 +2266,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_body(&class.body);
     }
 
-    fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef, scope: ScopeId) {
+    fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
         let type_params = function
             .type_params
             .as_deref()
             .expect("function type params scope without type params");
 
-        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
-        // scope should have a child containing the appropriate definition. Find that scope and use
-        // its definition as the binding context.
-        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
-        let binding_context = child_scopes
-            .filter_map(|(_, binding_scope)| match binding_scope.node() {
-                NodeWithScopeKind::Function(function) => Some(DefinitionNodeKey::from(
-                    function.node(self.context.module()),
-                )),
-                _ => None,
-            })
-            .map(|key| self.index.expect_single_definition(key))
-            .next();
-
+        let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
-            std::mem::replace(&mut self.typevar_binding_context, binding_context);
+            self.typevar_binding_context.replace(binding_context);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::None,
@@ -2310,28 +2284,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias, scope: ScopeId) {
+    fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
         let type_params = type_alias
             .type_params
             .as_ref()
             .expect("type alias type params scope without type params");
 
-        // Find the binding context for the PEP 695 typevars defined in this scope. The typevar
-        // scope should have a child containing the appropriate definition. Find that scope and use
-        // its definition as the binding context.
-        let child_scopes = self.index.child_scopes(scope.file_scope_id(self.db()));
-        let binding_context = child_scopes
-            .filter_map(|(_, binding_scope)| match binding_scope.node() {
-                NodeWithScopeKind::TypeAlias(alias) => {
-                    Some(DefinitionNodeKey::from(alias.node(self.context.module())))
-                }
-                _ => None,
-            })
-            .map(|key| self.index.expect_single_definition(key))
-            .next();
-
+        let binding_context = self.index.expect_single_definition(type_alias);
         let previous_typevar_binding_context =
-            std::mem::replace(&mut self.typevar_binding_context, binding_context);
+            self.typevar_binding_context.replace(binding_context);
         self.infer_type_parameters(type_params);
         self.typevar_binding_context = previous_typevar_binding_context;
     }
