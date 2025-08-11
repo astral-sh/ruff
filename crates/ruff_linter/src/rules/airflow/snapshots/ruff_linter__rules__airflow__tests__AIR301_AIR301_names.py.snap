@@ -323,4 +323,25 @@ AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
 106 | get_sensitive_variables_fields
 107 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
+108 |
+109 | # airflow.secrets.cache
     |
+
+AIR301 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.0
+   --> AIR301_names.py:112:1
+    |
+110 | from airflow.secrets.cache import SecretCache
+111 |
+112 | SecretCache()
+    | ^^^^^^^^^^^
+    |
+help: Use `SecretCache` from `airflow.sdk` instead.
+
+ℹ Unsafe fix
+107 107 | should_hide_value_for_key
+108 108 | 
+109 109 | # airflow.secrets.cache
+110     |-from airflow.secrets.cache import SecretCache
+    110 |+from airflow.sdk import SecretCache
+111 111 | 
+112 112 | SecretCache()
