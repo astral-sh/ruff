@@ -1174,11 +1174,9 @@ impl<'db> Type<'db> {
         match self {
             Type::Callable(_) => Some(self),
 
-            Type::Dynamic(return_ty) => Some(CallableType::single_with_dynamic_return_type(
-                db,
-                Parameters::gradual_form(),
-                return_ty,
-            )),
+            Type::Dynamic(return_ty) => Some(
+                CallableType::single_gradual_with_dynamic_return_type(db, return_ty),
+            ),
 
             Type::FunctionLiteral(function_literal) => {
                 Some(Type::Callable(function_literal.into_callable_type(db)))
@@ -1211,13 +1209,10 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::Dynamic(dynamic) => {
-                    Some(CallableType::single_with_dynamic_return_type(
-                        db,
-                        Parameters::unknown(),
-                        dynamic,
-                    ))
-                }
+                SubclassOfInner::Dynamic(dynamic) => Some(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Some(Type::Dynamic(dynamic))),
+                )),
             },
 
             Type::Union(union) => union.try_map(db, |element| element.into_callable(db)),
@@ -6410,7 +6405,7 @@ pub enum DynamicType {
     TodoUnpack,
 }
 
-impl<'db> DynamicType {
+impl DynamicType {
     #[expect(clippy::unused_self)]
     fn normalized(self) -> Self {
         Self::Any
@@ -8043,7 +8038,6 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
-#[salsa::tracked]
 impl<'db> CallableType<'db> {
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
@@ -8054,21 +8048,103 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    /// Create a callable type with a single non-overloaded signature.
+    /// Create a callable type [`Parameters::gradual`] with a dynamic return type.
     ///
-    /// This is a salsa query because it showed that we create those callable types often,
-    /// which can lead to a significant lock-congestion around interning the signatures:
-    /// https://github.com/astral-sh/ty/issues/968
-    #[salsa::tracked]
-    pub(crate) fn single_with_dynamic_return_type(
+    /// This is a hack to work around a congested lock in Salsa's interning.
+    /// See <https://github.com/astral-sh/ty/issues/968>.
+    ///
+    /// Each of the variant uses their own query to achieve an extra degree of sharding (Salsa
+    /// requires interning even for no-argument queries but each query has its own lock).
+    pub(crate) fn single_gradual_with_dynamic_return_type(
         db: &'db dyn Db,
-        parameters: Parameters<'db>,
         return_type: DynamicType,
     ) -> Type<'db> {
-        CallableType::single(
-            db,
-            Signature::new(parameters, Some(Type::Dynamic(return_type))),
-        )
+        match return_type {
+            DynamicType::Any => {
+                #[salsa::tracked]
+                fn any(db: &dyn Db) -> Type<'_> {
+                    CallableType::single(
+                        db,
+                        Signature::new(Parameters::unknown(), Some(Type::any())),
+                    )
+                }
+
+                any(db)
+            }
+            DynamicType::Unknown => {
+                #[salsa::tracked]
+                fn unknown(db: &dyn Db) -> Type<'_> {
+                    CallableType::single(
+                        db,
+                        Signature::new(Parameters::unknown(), Some(Type::unknown())),
+                    )
+                }
+
+                unknown(db)
+            }
+            #[cfg(debug_assertions)]
+            DynamicType::Todo(_) => CallableType::single(
+                db,
+                Signature::new(Parameters::unknown(), Some(Type::Dynamic(return_type))),
+            ),
+            // The TodoType is a singleton in release builds
+            #[cfg(not(debug_assertions))]
+            DynamicType::Todo(_) => {
+                #[salsa::tracked]
+                fn todo<'db>(db: &'db dyn Db) -> Type<'db> {
+                    CallableType::single(
+                        db,
+                        Signature::new(
+                            Parameters::unknown(),
+                            Some(Type::Dynamic(DynamicType::Todo(TodoType))),
+                        ),
+                    )
+                }
+
+                todo(db)
+            }
+            DynamicType::TodoPEP695ParamSpec => {
+                #[salsa::tracked]
+                fn pep695(db: &dyn Db) -> Type<'_> {
+                    CallableType::single(
+                        db,
+                        Signature::new(
+                            Parameters::unknown(),
+                            Some(Type::Dynamic(DynamicType::TodoPEP695ParamSpec)),
+                        ),
+                    )
+                }
+
+                pep695(db)
+            }
+            DynamicType::TodoTypeAlias => {
+                #[salsa::tracked]
+                fn type_alias(db: &dyn Db) -> Type<'_> {
+                    CallableType::single(
+                        db,
+                        Signature::new(
+                            Parameters::unknown(),
+                            Some(Type::Dynamic(DynamicType::TodoTypeAlias)),
+                        ),
+                    )
+                }
+
+                type_alias(db)
+            }
+            DynamicType::TodoUnpack => {
+                #[salsa::tracked]
+                fn unpack(db: &dyn Db) -> Type<'_> {
+                    CallableType::single(
+                        db,
+                        Signature::new(
+                            Parameters::unknown(),
+                            Some(Type::Dynamic(DynamicType::TodoUnpack)),
+                        ),
+                    )
+                }
+                unpack(db)
+            }
+        }
     }
 
     /// Create a non-overloaded, function-like callable type with a single signature.
@@ -8084,7 +8160,7 @@ impl<'db> CallableType<'db> {
 
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Type<'db> {
-        Self::single_with_dynamic_return_type(db, Parameters::unknown(), DynamicType::Unknown)
+        Self::single(db, Signature::unknown())
     }
 
     pub(crate) fn bind_self(self, db: &'db dyn Db) -> Type<'db> {

@@ -350,6 +350,11 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns the signature which accepts any parameters and returns an `Unknown` type.
+    pub(crate) fn unknown() -> Self {
+        Self::new(Parameters::unknown(), Some(Type::unknown()))
+    }
+
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom(db: &'db dyn Db) -> Self {
         Self::new(Parameters::object(db), Some(Type::Never))
