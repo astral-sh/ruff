@@ -490,13 +490,19 @@ pub(crate) fn lint_stdin(
             (result, transformed, fixed)
         };
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
-        FxHashMap::from_iter([(
-            path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
-            notebook.into_index(),
-        )])
-    } else {
+    // Avoid constructing a map when there are no diagnostics. The index is only used for rendering
+    // diagnostics anyway.
+    let notebook_indexes = if diagnostics.is_empty() {
         FxHashMap::default()
+    } else {
+        if let SourceKind::IpyNotebook(notebook) = transformed {
+            FxHashMap::from_iter([(
+                path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
+                notebook.into_index(),
+            )])
+        } else {
+            FxHashMap::default()
+        }
     };
 
     Ok(Diagnostics {
