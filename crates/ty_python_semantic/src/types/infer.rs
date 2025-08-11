@@ -1216,8 +1216,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if is_protocol
-                    && !(base_class.class_literal(self.db()).0.is_protocol(self.db())
-                        || base_class.is_known(self.db(), KnownClass::Object))
+                    && !(base_class.is_protocol(self.db()) || base_class.is_object(self.db()))
                 {
                     if let Some(builder) = self
                         .context
@@ -6249,11 +6248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
             if !callable_type.is_subclass_of() {
-                if let Some(protocol) = class
-                    .class_literal(self.db())
-                    .0
-                    .into_protocol_class(self.db())
-                {
+                if let Some(protocol) = class.into_protocol_class(self.db()) {
                     report_attempted_protocol_instantiation(
                         &self.context,
                         call_expression,

@@ -95,6 +95,20 @@ class NotAProtocol: ...
 reveal_type(is_protocol(NotAProtocol))  # revealed: Literal[False]
 ```
 
+Note, however, that `is_protocol` returns `False` at runtime for specializations of generic
+protocols. We still consider these to be "protocol classes" internally, regardless:
+
+```py
+class MyGenericProtocol[T](Protocol):
+    x: T
+
+reveal_type(is_protocol(MyGenericProtocol))  # revealed: Literal[True]
+
+# We still consider this a protocol class internally,
+# but the inferred type of the call here reflects the result at runtime:
+reveal_type(is_protocol(MyGenericProtocol[int]))  # revealed: Literal[False]
+```
+
 A type checker should follow the typeshed stubs if a non-class is passed in, and typeshed's stubs
 indicate that the argument passed in must be an instance of `type`.
 
@@ -397,24 +411,38 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 
 ```py
 from ty_extensions import reveal_protocol_interface
-from typing import SupportsIndex, SupportsAbs, ClassVar
+from typing import SupportsIndex, SupportsAbs, ClassVar, Iterator
 
 # error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
 reveal_protocol_interface(Foo)
 # error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
 reveal_protocol_interface(SupportsIndex)
-# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> _T_co@SupportsAbs`)}`"
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> Unknown`)}`"
 reveal_protocol_interface(SupportsAbs)
+# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[Unknown]`), "__next__": MethodMember(`(self) -> Unknown`)}`"
+reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
 reveal_protocol_interface(int)
 # error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type`, found `Literal["foo"]`"
 reveal_protocol_interface("foo")
+```
 
-# TODO: this should be a `revealed-type` diagnostic rather than `invalid-argument-type`, and it should reveal `{"__abs__": MethodMember(`(self) -> int`)}` for the protocol interface
-#
-# error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
+Similar to the way that `typing.is_protocol` returns `False` at runtime for all generic aliases,
+`typing.get_protocol_members` raises an exception at runtime if you pass it a generic alias, so we
+do not implement any special handling for generic aliases passed to the function.
+`ty_extensions.reveal_protocol_interface` can be used on both, however:
+
+```py
+# TODO: these fail at runtime, but we don't emit `[invalid-argument-type]` diagnostics
+# currently due to https://github.com/astral-sh/ty/issues/116
+reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
+reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
+
+# error: [revealed-type] "Revealed protocol interface: `{"__abs__": MethodMember(`(self) -> int`)}`"
 reveal_protocol_interface(SupportsAbs[int])
+# error: [revealed-type] "Revealed protocol interface: `{"__iter__": MethodMember(`(self) -> Iterator[int]`), "__next__": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(Iterator[int])
 
 class BaseProto(Protocol):
     def member(self) -> int: ...
