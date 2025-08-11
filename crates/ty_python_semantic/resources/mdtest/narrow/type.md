@@ -54,20 +54,29 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A | B
 ```
 
-## No narrowing for custom `type` callable
+## No special narrowing for custom `type` callable
+
+`stub.pyi`:
+
+```pyi
+from ty_extensions import TypeOf
+
+def type(x: object) -> TypeOf[int]: ...
+```
 
 ```py
+from stub import type
+
 class A: ...
 class B: ...
 
-def type(x):
-    return int
-
 def _(x: A | B):
     if type(x) is A:
+        reveal_type(x)  # revealed: Never
+    elif type(x) is int:
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: A | B
+        reveal_type(x)  # revealed: Never
 ```
 
 ## No narrowing for multiple arguments

@@ -71,16 +71,30 @@ use crate::types::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
-use crate::types::generics::{GenericContext, walk_generic_context};
+use crate::types::generics::GenericContext;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
     DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
+    TypeVarInstance, UnionBuilder, all_members, infer_scope_types, walk_generic_context,
+    walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
+
+fn return_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Type<'db>,
+    _count: u32,
+    _self: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Type<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn return_type_cycle_initial<'db>(_db: &'db dyn Db, _self: FunctionType<'db>) -> Type<'db> {
+    Type::Dynamic(DynamicType::Divergent)
+}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -885,6 +899,14 @@ impl<'db> FunctionType<'db> {
             .map(|mapping| mapping.normalized_impl(db, visitor))
             .collect();
         Self::new(db, self.literal(db).normalized_impl(db, visitor), mappings)
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition(db).body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, None)
     }
 }
 

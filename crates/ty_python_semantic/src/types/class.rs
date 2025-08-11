@@ -1079,6 +1079,13 @@ impl<'db> ClassType<'db> {
             }
         }
     }
+
+    pub(super) fn has_divergent_type(self, db: &'db dyn Db) -> bool {
+        match self {
+            ClassType::NonGeneric(_) => false,
+            ClassType::Generic(generic) => generic.specialization(db).has_divergent_type(db),
+        }
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
