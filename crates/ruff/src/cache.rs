@@ -13,20 +13,14 @@ use itertools::Itertools;
 use log::{debug, error};
 use rayon::iter::ParallelIterator;
 use rayon::iter::{IntoParallelIterator, ParallelBridge};
-use ruff_linter::codes::Rule;
 use rustc_hash::FxHashMap;
 use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_db::diagnostic::Diagnostic;
-use ruff_diagnostics::Fix;
-use ruff_linter::message::create_lint_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{VERSION, warn_user};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::SourceFileBuilder;
-use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
@@ -342,26 +336,7 @@ impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
     pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
         self.data.lint.as_ref().map(|lint| {
-            let diagnostics = if lint.messages.is_empty() {
-                Vec::new()
-            } else {
-                let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
-                lint.messages
-                    .iter()
-                    .map(|msg| {
-                        create_lint_diagnostic(
-                            &msg.body,
-                            msg.suggestion.as_ref(),
-                            msg.range,
-                            msg.fix.clone(),
-                            msg.parent,
-                            file.clone(),
-                            msg.noqa_offset,
-                            msg.rule,
-                        )
-                    })
-                    .collect()
-            };
+            let diagnostics = Vec::new();
             let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
                 FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
             } else {
@@ -412,84 +387,15 @@ pub(crate) fn init(path: &Path) -> Result<()> {
 
 #[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
 pub(crate) struct LintCacheData {
-    /// Imports made.
-    // pub(super) imports: ImportMap,
-    /// Diagnostic messages.
-    pub(super) messages: Vec<CacheMessage>,
-    /// Source code of the file.
-    ///
-    /// # Notes
-    ///
-    /// This will be empty if `messages` is empty.
-    pub(super) source: String,
     /// Notebook index if this file is a Jupyter Notebook.
     #[bincode(with_serde)]
     pub(super) notebook_index: Option<NotebookIndex>,
 }
 
 impl LintCacheData {
-    pub(crate) fn from_diagnostics(
-        diagnostics: &[Diagnostic],
-        notebook_index: Option<NotebookIndex>,
-    ) -> Self {
-        let source = if let Some(msg) = diagnostics.first() {
-            msg.expect_ruff_source_file().source_text().to_owned()
-        } else {
-            String::new() // No messages, no need to keep the source!
-        };
-
-        let messages = diagnostics
-            .iter()
-            // Parse the kebab-case rule name into a `Rule`. This will fail for syntax errors, so
-            // this also serves to filter them out, but we shouldn't be caching files with syntax
-            // errors anyway.
-            .filter_map(|msg| Some((msg.name().parse().ok()?, msg)))
-            .map(|(rule, msg)| {
-                // Make sure that all message use the same source file.
-                assert_eq!(
-                    msg.expect_ruff_source_file(),
-                    diagnostics.first().unwrap().expect_ruff_source_file(),
-                    "message uses a different source file"
-                );
-                CacheMessage {
-                    rule,
-                    body: msg.body().to_string(),
-                    suggestion: msg.first_help_text().map(ToString::to_string),
-                    range: msg.expect_range(),
-                    parent: msg.parent(),
-                    fix: msg.fix().cloned(),
-                    noqa_offset: msg.noqa_offset(),
-                }
-            })
-            .collect();
-
-        Self {
-            messages,
-            source,
-            notebook_index,
-        }
+    pub(crate) fn new(notebook_index: Option<NotebookIndex>) -> Self {
+        Self { notebook_index }
     }
-}
-
-/// On disk representation of a diagnostic message.
-#[derive(bincode::Decode, Debug, bincode::Encode, PartialEq)]
-pub(super) struct CacheMessage {
-    /// The rule for the cached diagnostic.
-    #[bincode(with_serde)]
-    rule: Rule,
-    /// The message body to display to the user, to explain the diagnostic.
-    body: String,
-    /// The message to display to the user, to explain the suggested fix.
-    suggestion: Option<String>,
-    /// Range into the message's [`FileCache::source`].
-    #[bincode(with_serde)]
-    range: TextRange,
-    #[bincode(with_serde)]
-    parent: Option<TextSize>,
-    #[bincode(with_serde)]
-    fix: Option<Fix>,
-    #[bincode(with_serde)]
-    noqa_offset: Option<TextSize>,
 }
 
 pub(crate) trait PackageCaches {
@@ -612,7 +518,6 @@ mod tests {
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_db::diagnostic::Diagnostic;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::LinterSettings;
     use ruff_linter::settings::flags;
@@ -647,7 +552,7 @@ mod tests {
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
-        let mut parse_errors = Vec::new();
+        let mut errors = Vec::new();
         let mut expected_diagnostics = Diagnostics::default();
         for entry in fs::read_dir(&package_root).unwrap() {
             let entry = entry.unwrap();
@@ -681,8 +586,8 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.inner.iter().any(Diagnostic::is_invalid_syntax) {
-                    parse_errors.push(path.clone());
+                if !diagnostics.inner.is_empty() {
+                    errors.push(path.clone());
                 }
                 paths.push(path);
                 expected_diagnostics += diagnostics;
@@ -695,11 +600,11 @@ mod tests {
         let cache = Cache::open(package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
 
-        parse_errors.sort();
+        errors.sort();
 
         for path in &paths {
-            if parse_errors.binary_search(path).is_ok() {
-                continue; // We don't cache parsing errors.
+            if errors.binary_search(path).is_ok() {
+                continue; // We don't cache files with diagnostics.
             }
 
             let relative_path = cache.relative_path(path).unwrap();
@@ -733,7 +638,7 @@ mod tests {
 
     #[test]
     fn cache_adds_file_on_lint() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_adds_file_on_lint");
         let cache = test_cache.open();
@@ -757,7 +662,7 @@ mod tests {
 
     #[test]
     fn cache_adds_files_on_lint() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_adds_files_on_lint");
         let cache = test_cache.open();
@@ -779,6 +684,31 @@ mod tests {
             2,
             "Both files should be added to the cache"
         );
+        cache.persist().unwrap();
+    }
+
+    #[test]
+    fn cache_does_not_add_file_on_lint_with_diagnostic() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("cache_does_not_add_file_on_lint_with_diagnostic");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
+
+        cache.persist().unwrap();
+        let cache = test_cache.open();
+
+        let results = test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        assert_eq!(results.inner.len(), 1, "Expected one F822 diagnostic");
+        assert_eq!(
+            cache.changes.lock().unwrap().len(),
+            0,
+            "Files with diagnostics should not be cached"
+        );
+
         cache.persist().unwrap();
     }
 
@@ -812,7 +742,7 @@ mod tests {
 
     #[test]
     fn cache_invalidated_on_file_modified_time() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_invalidated_on_file_modified_time");
         let cache = test_cache.open();
@@ -869,7 +799,7 @@ mod tests {
             file.set_permissions(perms)
         }
 
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("cache_invalidated_on_permission_change");
         let cache = test_cache.open();
@@ -922,7 +852,7 @@ mod tests {
         );
 
         // Now actually lint a file.
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
         test_cache.write_source_file("new.py", source);
         let new_path_key = RelativePathBuf::from("new.py");
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
@@ -945,7 +875,7 @@ mod tests {
 
     #[test]
     fn format_updates_cache_entry() {
-        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\"])\n";
 
         let test_cache = TestCache::new("format_updates_cache_entry");
         let cache = test_cache.open();

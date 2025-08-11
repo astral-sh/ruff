@@ -326,8 +326,8 @@ pub(crate) fn lint_path(
     let diagnostics = result.diagnostics;
 
     if let Some((cache, relative_path, key)) = caching {
-        // We don't cache parsing errors.
-        if !has_error {
+        // We don't cache errors.
+        if !has_error && diagnostics.is_empty() {
             // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
             // and writing the diff to stdout, respectively). If a file has diagnostics, we
             // need to avoid reading from and writing to the cache in these modes.
@@ -340,10 +340,7 @@ pub(crate) fn lint_path(
                 cache.update_lint(
                     relative_path.to_owned(),
                     &key,
-                    LintCacheData::from_diagnostics(
-                        &diagnostics,
-                        transformed.as_ipy_notebook().map(Notebook::index).cloned(),
-                    ),
+                    LintCacheData::new(transformed.as_ipy_notebook().map(Notebook::index).cloned()),
                 );
             }
         }
