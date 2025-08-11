@@ -51,7 +51,7 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionType,
         definition_expression_type,
     },
 };
@@ -2299,19 +2299,57 @@ impl<'db> ClassLiteral<'db> {
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
-                // TODO: synthesize a set of overloads with precise types
-                let signature = Signature::new(
-                    Parameters::new([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty),
-                        Parameter::positional_only(Some(Name::new_static("key"))),
-                        Parameter::positional_only(Some(Name::new_static("default")))
-                            .with_default_type(Type::unknown()),
-                    ]),
-                    Some(todo_type!("Support for `TypedDict`")),
-                );
+                let overloads: Vec<_> = self
+                    .fields(db, specialization, field_policy)
+                    .into_iter()
+                    .flat_map(|(name, field)| {
+                        let key_type =
+                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
 
-                Some(CallableType::function_like(db, signature))
+                        // `.get()` for a required field returns the field type,
+                        // while for an optional field it returns a union of the field type and `None`.
+                        let return_type = if field.is_required() {
+                            field.declared_ty
+                        } else {
+                            UnionBuilder::new(db)
+                                .add(field.declared_ty)
+                                .add(Type::none(db))
+                                .build()
+                        };
+
+                        let get_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ]),
+                            Some(return_type),
+                        );
+
+                        // `.get()` with a default value returns the field type
+                        // (we could prevent this method for required fields but for now let's do that)
+                        let get_with_default_sig = Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                                Parameter::positional_only(Some(Name::new_static("default")))
+                                    .with_annotated_type(field.declared_ty),
+                            ]),
+                            Some(field.declared_ty),
+                        );
+
+                        [get_sig, get_with_default_sig]
+                    })
+                    .collect();
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    true,
+                )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
                 // TODO: synthesize a set of overloads with precise types.

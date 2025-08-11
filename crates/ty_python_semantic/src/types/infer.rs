@@ -6176,6 +6176,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let callable_type = self.infer_maybe_standalone_expression(func);
 
+        // Special handling for TypedDict method calls
+        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
+            let value_type = self.expression_type(value);
+            if let Type::TypedDict(typed_dict_ty) = value_type {
+                if attr.id == "get" && !arguments.args.is_empty() {
+                    // Validate the key argument for .get() calls
+                    if let Some(first_arg) = arguments.args.first() {
+                        if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                            value: key_literal,
+                            ..
+                        }) = first_arg
+                        {
+                            let key = key_literal.to_str();
+                            let items = typed_dict_ty.items(self.db());
+                            if !items
+                                .iter()
+                                .any(|(field_name, _)| field_name.as_str() == key)
+                            {
+                                // Key not found, report error with suggestion and return early
+                                let key_ty = Type::StringLiteral(
+                                    crate::types::StringLiteralType::new(self.db(), key),
+                                );
+                                report_invalid_key_on_typed_dict(
+                                    &self.context,
+                                    first_arg.into(),
+                                    first_arg.into(),
+                                    Type::TypedDict(typed_dict_ty),
+                                    key_ty,
+                                    &items,
+                                );
+                                // Return `Unknown` to prevent the overload system from generating its own error
+                                return Type::unknown();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if let Type::FunctionLiteral(function) = callable_type {
             // Make sure that the `function.definition` is only called when the function is defined
             // in the same file as the one we're currently inferring the types for. This is because
@@ -7073,13 +7112,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
-        let ast::ExprAttribute {
-            value,
-            attr,
-            range: _,
-            node_index: _,
-            ctx: _,
-        } = attribute;
+        let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let value_type = self.infer_maybe_standalone_expression(value);
         let db = self.db();

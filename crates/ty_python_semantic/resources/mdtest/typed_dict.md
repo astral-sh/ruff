@@ -450,10 +450,12 @@ class Person(TypedDict, total=False):
 
 ```py
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 class Person(TypedDict):
     name: str
     age: int | None
+    extra: NotRequired[str]
 
 def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
@@ -461,8 +463,21 @@ def _(p: Person) -> None:
 
     reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
 
-    reveal_type(p.get("name"))  # revealed: @Todo(Support for `TypedDict`)
-    reveal_type(p.get("name", "Unknown"))  # revealed: @Todo(Support for `TypedDict`)
+    # `get()` returns the field type for required keys (no None union)
+    reveal_type(p.get("name"))  # revealed: str
+    reveal_type(p.get("age"))  # revealed: int | None
+
+    # `get()` with defaults always returns the field type
+    reveal_type(p.get("name", "default"))  # revealed: str
+    reveal_type(p.get("age", 999))  # revealed: int | None
+
+    # `get()` can return `None` for non-required keys
+    reveal_type(p.get("extra"))  # revealed: str | None
+    reveal_type(p.get("extra", "default"))  # revealed: str
+
+    # Invalid keys with intelligent suggestions
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "nam" - did you mean "name"?"
+    reveal_type(p.get("nam"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes
