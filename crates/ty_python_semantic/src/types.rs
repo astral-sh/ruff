@@ -6419,7 +6419,7 @@ impl<'db> KnownInstanceType<'db> {
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
                     KnownInstanceType::TypeVar(typevar) => {
-                        write!(f, "typing.TypeVar[{}]", typevar.display(self.db))
+                        write!(f, "typing.TypeVar({})", typevar.display(self.db))
                     }
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
