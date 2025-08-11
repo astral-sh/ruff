@@ -60,7 +60,7 @@ pub(crate) enum ModuleResolveMode {
     StubsNotAllowed,
 }
 
-#[salsa::interned]
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub(crate) struct ModuleResolveModeIngredient<'db> {
     mode: ModuleResolveMode,

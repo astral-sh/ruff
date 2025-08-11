@@ -156,13 +156,9 @@ impl ProjectDatabase {
             cmp::Reverse(ingredient.size_of_fields() + heap_size)
         });
 
-        memos.sort_by_key(|(_, memo)| {
+        memos.sort_by_key(|(query, memo)| {
             let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
-                tracing::warn!(
-                    "expected `heap_size` to be provided by Salsa query `{}`",
-                    memo.debug_name()
-                );
-
+                tracing::warn!("expected `heap_size` to be provided by Salsa query `{query}`");
                 0
             });
 

@@ -226,7 +226,7 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, TupleSpec::homogeneous(element))
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         KnownClass::Tuple
             .try_to_class_literal(db)
