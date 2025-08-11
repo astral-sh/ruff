@@ -432,25 +432,20 @@ pub(crate) struct DisplayTypeVarInstance<'db> {
 
 impl Display for DisplayTypeVarInstance<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(self.typevar.name(self.db))?;
+        display_quoted_string(self.typevar.name(self.db)).fmt(f)?;
         match self.typevar.bound_or_constraints(self.db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                write!(f, ": {}", bound.display(self.db))?;
+                write!(f, ", bound={}", bound.display(self.db))?;
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                f.write_str(": (")?;
-                for (idx, constraint) in constraints.iter(self.db).enumerate() {
-                    if idx > 0 {
-                        f.write_str(", ")?;
-                    }
-                    constraint.display(self.db).fmt(f)?;
+                for constraint in constraints.iter(self.db) {
+                    write!(f, ", {}", constraint.display(self.db))?;
                 }
-                f.write_char(')')?;
             }
             None => {}
         }
         if let Some(default_type) = self.typevar.default_ty(self.db) {
-            write!(f, " = {}", default_type.display(self.db))?;
+            write!(f, ", default={}", default_type.display(self.db))?;
         }
         Ok(())
     }
@@ -472,6 +467,10 @@ pub(crate) struct DisplayBoundTypeVarInstance<'db> {
 
 impl Display for DisplayBoundTypeVarInstance<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // This looks very much like DisplayTypeVarInstance::fmt, but note that we have typevar
+        // default values in a subtly different way: if the default value contains other typevars,
+        // here those must be bound as well, whereas in DisplayTypeVarInstance they should not. See
+        // BoundTypeVarInstance::default_ty for more details.
         let typevar = self.bound_typevar.typevar(self.db);
         f.write_str(typevar.name(self.db))?;
         match typevar.bound_or_constraints(self.db) {
@@ -1079,20 +1078,22 @@ impl Display for DisplayTypeArray<'_, '_> {
 
 impl<'db> StringLiteralType<'db> {
     fn display(&'db self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
-        DisplayStringLiteralType { db, ty: self }
+        display_quoted_string(self.value(db))
     }
 }
 
+fn display_quoted_string(string: &str) -> DisplayStringLiteralType<'_> {
+    DisplayStringLiteralType { string }
+}
+
 struct DisplayStringLiteralType<'db> {
-    ty: &'db StringLiteralType<'db>,
-    db: &'db dyn Db,
+    string: &'db str,
 }
 
 impl Display for DisplayStringLiteralType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let value = self.ty.value(self.db);
         f.write_char('"')?;
-        for ch in value.chars() {
+        for ch in self.string.chars() {
             match ch {
                 // `escape_debug` will escape even single quotes, which is not necessary for our
                 // use case as we are already using double quotes to wrap the string.

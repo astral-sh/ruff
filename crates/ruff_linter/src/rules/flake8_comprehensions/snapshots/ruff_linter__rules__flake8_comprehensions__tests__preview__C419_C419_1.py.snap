@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_comprehensions/mod.rs
 ---
-C419_1.py:1:5: C419 [*] Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
+ --> C419_1.py:1:5
   |
 1 | sum([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^
 2 | min([x.val for x in bar])
 3 | max([x.val for x in bar])
   |
-  = help: Remove unnecessary comprehension
+help: Remove unnecessary comprehension
 
 ℹ Unsafe fix
 1   |-sum([x.val for x in bar])
@@ -17,15 +18,16 @@ C419_1.py:1:5: C419 [*] Unnecessary list comprehension
 3 3 | max([x.val for x in bar])
 4 4 | sum([x.val for x in bar], 0)
 
-C419_1.py:2:5: C419 [*] Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
+ --> C419_1.py:2:5
   |
 1 | sum([x.val for x in bar])
 2 | min([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^
 3 | max([x.val for x in bar])
 4 | sum([x.val for x in bar], 0)
   |
-  = help: Remove unnecessary comprehension
+help: Remove unnecessary comprehension
 
 ℹ Unsafe fix
 1 1 | sum([x.val for x in bar])
@@ -35,15 +37,16 @@ C419_1.py:2:5: C419 [*] Unnecessary list comprehension
 4 4 | sum([x.val for x in bar], 0)
 5 5 | 
 
-C419_1.py:3:5: C419 [*] Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
+ --> C419_1.py:3:5
   |
 1 | sum([x.val for x in bar])
 2 | min([x.val for x in bar])
 3 | max([x.val for x in bar])
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^
 4 | sum([x.val for x in bar], 0)
   |
-  = help: Remove unnecessary comprehension
+help: Remove unnecessary comprehension
 
 ℹ Unsafe fix
 1 1 | sum([x.val for x in bar])
@@ -54,16 +57,17 @@ C419_1.py:3:5: C419 [*] Unnecessary list comprehension
 5 5 | 
 6 6 | # OK
 
-C419_1.py:4:5: C419 [*] Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
+ --> C419_1.py:4:5
   |
 2 | min([x.val for x in bar])
 3 | max([x.val for x in bar])
 4 | sum([x.val for x in bar], 0)
-  |     ^^^^^^^^^^^^^^^^^^^^ C419
+  |     ^^^^^^^^^^^^^^^^^^^^
 5 |
 6 | # OK
   |
-  = help: Remove unnecessary comprehension
+help: Remove unnecessary comprehension
 
 ℹ Unsafe fix
 1 1 | sum([x.val for x in bar])
@@ -75,7 +79,8 @@ C419_1.py:4:5: C419 [*] Unnecessary list comprehension
 6 6 | # OK
 7 7 | sum(x.val for x in bar)
 
-C419_1.py:14:5: C419 [*] Unnecessary list comprehension
+C419 [*] Unnecessary list comprehension
+  --> C419_1.py:14:5
    |
 12 |   # Multi-line
 13 |   sum(
@@ -84,11 +89,11 @@ C419_1.py:14:5: C419 [*] Unnecessary list comprehension
 16 | |         for delta in timedelta_list
 17 | |         if delta
 18 | |     ],
-   | |_____^ C419
+   | |_____^
 19 |       dt.timedelta(),
 20 |   )
    |
-   = help: Remove unnecessary comprehension
+help: Remove unnecessary comprehension
 
 ℹ Unsafe fix
 11 11 | 

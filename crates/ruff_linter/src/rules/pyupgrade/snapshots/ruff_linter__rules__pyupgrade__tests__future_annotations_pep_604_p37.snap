@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-future_annotations.py:40:4: UP045 [*] Use `X | None` for type annotations
+UP045 [*] Use `X | None` for type annotations
+  --> future_annotations.py:40:4
    |
 40 | x: Optional[int] = None
-   |    ^^^^^^^^^^^^^ UP045
+   |    ^^^^^^^^^^^^^
 41 |
 42 | MyList: TypeAlias = Union[List[int], List[str]]
    |
-   = help: Convert to `X | None`
+help: Convert to `X | None`
 
 ℹ Unsafe fix
 37 37 |     return y

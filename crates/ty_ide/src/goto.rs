@@ -6,11 +6,13 @@ use std::borrow::Cow;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
+use ruff_db::files::FileRange;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::definitions_for_keyword_argument;
 use ty_python_semantic::{
@@ -258,7 +260,7 @@ impl GotoTarget<'_> {
                 let target_module_name = components[..=*component_index].join(".");
 
                 // Try to resolve the module
-                resolve_module_to_navigation_target(db, &target_module_name)
+                resolve_module_to_navigation_target(db, stub_mapper, &target_module_name)
             }
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
@@ -266,7 +268,7 @@ impl GotoTarget<'_> {
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
                     let full_module_name = alias.name.as_str();
                     // Try to resolve the module
-                    resolve_module_to_navigation_target(db, full_module_name)
+                    resolve_module_to_navigation_target(db, stub_mapper, full_module_name)
                 } else {
                     let alias_range = alias.asname.as_ref().unwrap().range;
                     Some(crate::NavigationTargets::single(NavigationTarget {
@@ -555,7 +557,10 @@ impl GotoTarget<'_> {
 impl Ranged for GotoTarget<'_> {
     fn range(&self) -> TextRange {
         match self {
-            GotoTarget::Expression(expression) => expression.range(),
+            GotoTarget::Expression(expression) => match expression {
+                ast::ExprRef::Attribute(attribute) => attribute.attr.range,
+                _ => expression.range(),
+            },
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
@@ -653,6 +658,7 @@ pub(crate) fn find_goto_target(
 /// Helper function to resolve a module name and create a navigation target.
 fn resolve_module_to_navigation_target(
     db: &dyn crate::Db,
+    stub_mapper: Option<&StubMapper>,
     module_name_str: &str,
 ) -> Option<crate::NavigationTargets> {
     use ty_python_semantic::{ModuleName, resolve_module};
@@ -660,9 +666,11 @@ fn resolve_module_to_navigation_target(
     if let Some(module_name) = ModuleName::new(module_name_str) {
         if let Some(resolved_module) = resolve_module(db, &module_name) {
             if let Some(module_file) = resolved_module.file(db) {
-                return Some(crate::NavigationTargets::single(
-                    crate::NavigationTarget::new(module_file, TextRange::default()),
-                ));
+                let definitions = vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                    module_file,
+                    TextRange::default(),
+                ))];
+                return definitions_to_navigation_targets(db, stub_mapper, definitions);
             }
         }
     }

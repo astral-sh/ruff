@@ -865,12 +865,50 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_nested_instance_attribute() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self.x: int = 1
+
+            class D:
+                def __init__(self):
+                    self.y: C = C()
+
+            d = D()
+            y = d.y.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:4:21
+          |
+        2 |             class C:
+        3 |                 def __init__(self):
+        4 |                     self.x: int = 1
+          |                     ^^^^^^
+        5 |
+        6 |             class D:
+          |
+        info: Source
+          --> main.py:11:21
+           |
+        10 |             d = D()
+        11 |             y = d.y.x
+           |                     ^
+           |
         ");
     }
 
@@ -899,11 +937,11 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -931,11 +969,11 @@ def another_helper(path):
         4 |                     return 42
           |
         info: Source
-         --> main.py:7:19
+         --> main.py:7:21
           |
         6 |             c = C()
         7 |             res = c.foo()
-          |                   ^^^^^
+          |                     ^^^
           |
         ");
     }
@@ -1077,11 +1115,11 @@ def function():
         5 |             class B(A):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:19
           |
         8 |             b = B()
         9 |             y = b.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -1113,11 +1151,11 @@ def function():
         8 |                     return self._value
           |
         info: Source
-          --> main.py:11:13
+          --> main.py:11:15
            |
         10 |             c = C()
         11 |             c.value = 42
-           |             ^^^^^^^
+           |               ^^^^^
            |
         ");
     }
@@ -1188,11 +1226,11 @@ def function():
         8 |             def use_drawable(obj: Drawable):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:21
           |
         8 |             def use_drawable(obj: Drawable):
         9 |                 obj.name
-          |                 ^^^^^^^^
+          |                     ^^^^
           |
         ");
     }

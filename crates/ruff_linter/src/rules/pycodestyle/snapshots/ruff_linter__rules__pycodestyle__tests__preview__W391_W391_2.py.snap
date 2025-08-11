@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-W391_2.py:14:1: W391 [*] Too many newlines at end of file
+W391 [*] Too many newlines at end of file
+  --> W391_2.py:14:1
    |
 12 |       foo()
 13 |       bar()
@@ -9,9 +10,9 @@ W391_2.py:14:1: W391 [*] Too many newlines at end of file
 15 | |
 16 | |
 17 | |
-   | |__^ W391
+   | |__^
    |
-   = help: Remove trailing newlines
+help: Remove trailing newlines
 
 ℹ Safe fix
 11 11 | if __name__ == '__main__':

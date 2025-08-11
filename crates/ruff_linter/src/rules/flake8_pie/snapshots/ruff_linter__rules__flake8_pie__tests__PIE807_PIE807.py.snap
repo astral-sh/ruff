@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
-snapshot_kind: text
 ---
-PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
+PIE807 [*] Prefer `list` over useless lambda
+ --> PIE807.py:3:44
   |
 1 | @dataclass
 2 | class Foo:
 3 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
-  |                                            ^^^^^^^^^^ PIE807
+  |                                            ^^^^^^^^^^
 4 |     bar: Dict[str, int] = field(default_factory=lambda: {})  # PIE807
   |
-  = help: Replace with `lambda` with `list`
+help: Replace with `lambda` with `list`
 
 ℹ Safe fix
 1 1 | @dataclass
@@ -21,14 +21,15 @@ PIE807.py:3:44: PIE807 [*] Prefer `list` over useless lambda
 5 5 | 
 6 6 | 
 
-PIE807.py:4:49: PIE807 [*] Prefer `dict` over useless lambda
+PIE807 [*] Prefer `dict` over useless lambda
+ --> PIE807.py:4:49
   |
 2 | class Foo:
 3 |     foo: List[str] = field(default_factory=lambda: [])  # PIE807
 4 |     bar: Dict[str, int] = field(default_factory=lambda: {})  # PIE807
-  |                                                 ^^^^^^^^^^ PIE807
+  |                                                 ^^^^^^^^^^
   |
-  = help: Replace with `lambda` with `dict`
+help: Replace with `lambda` with `dict`
 
 ℹ Safe fix
 1 1 | @dataclass
@@ -40,14 +41,15 @@ PIE807.py:4:49: PIE807 [*] Prefer `dict` over useless lambda
 6 6 | 
 7 7 | class FooTable(BaseTable):
 
-PIE807.py:8:36: PIE807 [*] Prefer `list` over useless lambda
+PIE807 [*] Prefer `list` over useless lambda
+ --> PIE807.py:8:36
   |
 7 | class FooTable(BaseTable):
 8 |     foo = fields.ListField(default=lambda: [])  # PIE807
-  |                                    ^^^^^^^^^^ PIE807
+  |                                    ^^^^^^^^^^
 9 |     bar = fields.ListField(default=lambda: {})  # PIE807
   |
-  = help: Replace with `lambda` with `list`
+help: Replace with `lambda` with `list`
 
 ℹ Safe fix
 5 5 | 
@@ -59,14 +61,15 @@ PIE807.py:8:36: PIE807 [*] Prefer `list` over useless lambda
 10 10 | 
 11 11 | 
 
-PIE807.py:9:36: PIE807 [*] Prefer `dict` over useless lambda
+PIE807 [*] Prefer `dict` over useless lambda
+ --> PIE807.py:9:36
   |
 7 | class FooTable(BaseTable):
 8 |     foo = fields.ListField(default=lambda: [])  # PIE807
 9 |     bar = fields.ListField(default=lambda: {})  # PIE807
-  |                                    ^^^^^^^^^^ PIE807
+  |                                    ^^^^^^^^^^
   |
-  = help: Replace with `lambda` with `dict`
+help: Replace with `lambda` with `dict`
 
 ℹ Safe fix
 6  6  | 
@@ -78,14 +81,15 @@ PIE807.py:9:36: PIE807 [*] Prefer `dict` over useless lambda
 11 11 | 
 12 12 | class FooTable(BaseTable):
 
-PIE807.py:13:28: PIE807 [*] Prefer `list` over useless lambda
+PIE807 [*] Prefer `list` over useless lambda
+  --> PIE807.py:13:28
    |
 12 | class FooTable(BaseTable):
 13 |     foo = fields.ListField(lambda: [])  # PIE807
-   |                            ^^^^^^^^^^ PIE807
+   |                            ^^^^^^^^^^
 14 |     bar = fields.ListField(default=lambda: {})  # PIE807
    |
-   = help: Replace with `lambda` with `list`
+help: Replace with `lambda` with `list`
 
 ℹ Safe fix
 10 10 | 
@@ -97,14 +101,15 @@ PIE807.py:13:28: PIE807 [*] Prefer `list` over useless lambda
 15 15 | 
 16 16 | 
 
-PIE807.py:14:36: PIE807 [*] Prefer `dict` over useless lambda
+PIE807 [*] Prefer `dict` over useless lambda
+  --> PIE807.py:14:36
    |
 12 | class FooTable(BaseTable):
 13 |     foo = fields.ListField(lambda: [])  # PIE807
 14 |     bar = fields.ListField(default=lambda: {})  # PIE807
-   |                                    ^^^^^^^^^^ PIE807
+   |                                    ^^^^^^^^^^
    |
-   = help: Replace with `lambda` with `dict`
+help: Replace with `lambda` with `dict`
 
 ℹ Safe fix
 11 11 | 

@@ -76,13 +76,14 @@ def my_function(): ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @r#"
         info[goto-definition]: Definition
-         --> mymodule.pyi:1:1
+         --> mymodule.py:1:1
           |
         1 |
           | ^
-        2 | def my_function(): ...
+        2 | def my_function():
+        3 |     return "hello"
           |
         info: Source
          --> main.py:2:6
@@ -90,7 +91,7 @@ def my_function(): ...
         2 | from mymodule import my_function
           |      ^^^^^^^^
           |
-        ");
+        "#);
     }
 
     /// goto-definition on a module ref should go to the .py not the .pyi
@@ -438,12 +439,12 @@ class MyOtherClass:
         6 |         print(self.val)
           |
         info: Source
-         --> main.py:4:1
+         --> main.py:4:3
           |
         2 | from mymodule import MyClass
         3 | x = MyClass(0)
         4 | x.action()
-          | ^^^^^^^^
+          |   ^^^^^^
           |
         ");
     }
@@ -497,11 +498,11 @@ class MyOtherClass:
         6 |         print("hi!")
           |
         info: Source
-         --> main.py:3:5
+         --> main.py:3:13
           |
         2 | from mymodule import MyClass
         3 | x = MyClass.action()
-          |     ^^^^^^^^^^^^^^
+          |             ^^^^^^
           |
         "#);
     }
