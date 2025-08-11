@@ -433,3 +433,24 @@ def f[T: (str, bytes)](suffix: T | None, prefix: T | None):
 def g(x: str):
     f(prefix=x, suffix=".tar.gz")
 ```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import overload
+
+def outer[T](t: T) -> None:
+    def inner[T](t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer[T](t: T) -> None: ...
+def overloaded_outer[T](t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+```
