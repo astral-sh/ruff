@@ -563,4 +563,54 @@ def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
 ```
 
+## Import aliases
+
+`TypedDict` can be imported with aliases and should work correctly:
+
+```py
+from typing import TypedDict as TD
+from typing_extensions import Required
+
+class UserWithAlias(TD, total=False):
+    name: Required[str]
+    age: int
+
+user_empty = UserWithAlias(name="Alice")  # name is required
+user_partial = UserWithAlias(name="Alice", age=30)
+
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `UserWithAlias` constructor"
+user_invalid = UserWithAlias(age=30)
+
+reveal_type(user_empty["name"])  # revealed: str
+reveal_type(user_partial["age"])  # revealed: int
+```
+
+## Shadowing behavior
+
+When a local class shadows the `TypedDict` import, only the actual `TypedDict` import should be
+treated as a `TypedDict`:
+
+```py
+from typing import TypedDict as TD
+
+class TypedDict:
+    def __init__(self):
+        pass
+
+class NotActualTypedDict(TypedDict, total=True):
+    name: str
+
+class ActualTypedDict(TD, total=True):
+    name: str
+
+not_td = NotActualTypedDict()
+reveal_type(not_td)  # revealed: NotActualTypedDict
+
+# error: [missing-required-field] "Missing required field 'name' in TypedDict `ActualTypedDict` constructor"
+actual_td = ActualTypedDict()
+actual_td = ActualTypedDict(name="Alice")
+reveal_type(actual_td)  # revealed: ActualTypedDict
+reveal_type(actual_td["name"])  # revealed: str
+```
+
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html
