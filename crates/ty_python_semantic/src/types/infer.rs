@@ -9016,7 +9016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .collect();
-        typevars.map(|typevars| GenericContext::new(self.db(), typevars, None))
+        typevars.map(|typevars| GenericContext::new(self.db(), typevars))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {

@@ -233,7 +233,7 @@ impl<'db> TupleType<'db> {
             if generic_context.variables(db).len() == 1 {
                 generic_context.specialize_tuple(db, self)
             } else {
-                generic_context.default_specialization(db)
+                generic_context.default_specialization(db, Some(KnownClass::Tuple))
             }
         })
     }

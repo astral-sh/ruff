@@ -94,8 +94,6 @@ pub(crate) fn bind_typevar<'db>(
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<BoundTypeVarInstance<'db>>,
-    // If this is the generic context for a class, is it a known class?
-    known_class: Option<KnownClass>,
 }
 
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -118,7 +116,6 @@ impl<'db> GenericContext<'db> {
         index: &'db SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
-        known_class: Option<KnownClass>,
     ) -> Self {
         let variables: FxOrderSet<_> = type_params_node
             .iter()
@@ -126,7 +123,7 @@ impl<'db> GenericContext<'db> {
                 Self::variable_from_type_param(db, index, binding_context, type_param)
             })
             .collect();
-        Self::new(db, variables, known_class)
+        Self::new(db, variables)
     }
 
     fn variable_from_type_param(
@@ -176,7 +173,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables, None))
+        Some(Self::new(db, variables))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -184,7 +181,6 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn from_base_classes(
         db: &'db dyn Db,
         bases: impl Iterator<Item = Type<'db>>,
-        known_class: Option<KnownClass>,
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
@@ -193,7 +189,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables, known_class))
+        Some(Self::new(db, variables))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -234,9 +230,13 @@ impl<'db> GenericContext<'db> {
         parameter
     }
 
-    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+    pub(crate) fn default_specialization(
+        self,
+        db: &'db dyn Db,
+        known_class: Option<KnownClass>,
+    ) -> Specialization<'db> {
         let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
-        if self.known_class(db) == Some(KnownClass::Tuple) {
+        if known_class == Some(KnownClass::Tuple) {
             Specialization::new(
                 db,
                 self,
@@ -365,7 +365,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor))
             .collect();
-        Self::new(db, variables, self.known_class(db))
+        Self::new(db, variables)
     }
 }
 

@@ -1236,7 +1236,7 @@ impl<'db> ClassLiteral<'db> {
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             let definition = index.expect_single_definition(class_def_node);
-            GenericContext::from_type_params(db, index, definition, type_params, self.known(db))
+            GenericContext::from_type_params(db, index, definition, type_params)
         })
     }
 
@@ -1260,7 +1260,6 @@ impl<'db> ClassLiteral<'db> {
                 .iter()
                 .copied()
                 .filter(|ty| matches!(ty, Type::GenericAlias(_))),
-            self.known(db),
         )
     }
 
@@ -1305,7 +1304,8 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            specialization.unwrap_or_else(|| generic_context.default_specialization(db))
+            specialization
+                .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
         })
     }
 
@@ -1314,7 +1314,7 @@ impl<'db> ClassLiteral<'db> {
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.default_specialization(db)
+            generic_context.default_specialization(db, self.known(db))
         })
     }
 
