@@ -24,7 +24,6 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use crate::semantic_index::definition::Definition;
 use crate::types::Truthiness;
-use crate::types::builder::UnionStrategy;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::{
     BoundTypeVarInstance, Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarVariance,
@@ -1035,15 +1034,7 @@ impl<T> Tuple<T> {
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.homogeneous_element_type_impl(db, UnionStrategy::EliminateSubtypes)
-    }
-
-    pub(crate) fn homogeneous_element_type_impl(
-        &self,
-        db: &'db dyn Db,
-        union_strategy: UnionStrategy,
-    ) -> Type<'db> {
-        UnionType::from_elements_impl(db, self.all_elements(), union_strategy)
+        UnionType::from_elements(db, self.all_elements())
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.

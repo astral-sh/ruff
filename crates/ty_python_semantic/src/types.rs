@@ -19,7 +19,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use type_ordering::union_or_intersection_elements_ordering;
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder, UnionStrategy};
+pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
@@ -8707,24 +8707,11 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        Self::from_elements_impl(db, elements, UnionStrategy::EliminateSubtypes)
-    }
-
-    pub(crate) fn from_elements_impl<I, T>(
-        db: &'db dyn Db,
-        elements: I,
-        strategy: UnionStrategy,
-    ) -> Type<'db>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
         elements
             .into_iter()
-            .fold(
-                UnionBuilder::new(db).strategy(strategy),
-                |builder, element| builder.add(element.into()),
-            )
+            .fold(UnionBuilder::new(db), |builder, element| {
+                builder.add(element.into())
+            })
             .build()
     }
 

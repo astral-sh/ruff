@@ -204,27 +204,9 @@ enum ReduceResult<'db> {
 // representations, so that we can make large unions of literals fast in all operations.
 const MAX_UNION_LITERALS: usize = 200;
 
-pub(crate) enum UnionStrategy {
-    /// Only eliminate equivalent types from the union; allow subtypes to remain.
-    /// Currently we only use this in limited cases to avoid cycles where subtype-checking itself
-    /// needs to construct a union (e.g. for tuples). We may switch to this strategy in more cases
-    /// in future, in order to leave more user-authored unions in their original form.
-    EliminateEquivalentTypes,
-    /// Eliminate any type from the union that is a subtype of another union element. This aims for
-    /// the "most simplified" form of the union.
-    EliminateSubtypes,
-}
-
-impl UnionStrategy {
-    pub(crate) fn should_eliminate_subtypes(&self) -> bool {
-        matches!(self, UnionStrategy::EliminateSubtypes)
-    }
-}
-
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    strategy: UnionStrategy,
 }
 
 impl<'db> UnionBuilder<'db> {
@@ -232,17 +214,7 @@ impl<'db> UnionBuilder<'db> {
         Self {
             db,
             elements: vec![],
-            strategy: UnionStrategy::EliminateSubtypes,
         }
-    }
-
-    pub(crate) fn strategy(mut self, strategy: UnionStrategy) -> Self {
-        self.strategy = strategy;
-        self
-    }
-
-    fn should_eliminate_subtypes(&self) -> bool {
-        self.strategy.should_eliminate_subtypes()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -279,7 +251,6 @@ impl<'db> UnionBuilder<'db> {
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
             // containing it.
-            // TODO respect simplification strategy for literal types, too.
             Type::StringLiteral(literal) => {
                 let mut found = None;
                 let mut to_remove = None;
@@ -457,7 +428,6 @@ impl<'db> UnionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
-                let should_eliminate_subtypes = self.should_eliminate_subtypes();
 
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     let element_type = match element.try_reduce(self.db, ty) {
@@ -482,10 +452,10 @@ impl<'db> UnionBuilder<'db> {
                     }
 
                     if ty.is_equivalent_to(self.db, element_type)
-                        || (should_eliminate_subtypes && ty.is_subtype_of(self.db, element_type))
+                        || ty.is_subtype_of(self.db, element_type)
                     {
                         return;
-                    } else if should_eliminate_subtypes && element_type.is_subtype_of(self.db, ty) {
+                    } else if element_type.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
                     } else if ty_negated.is_subtype_of(self.db, element_type) {
                         // We add `ty` to the union. We just checked that `~ty` is a subtype of an
