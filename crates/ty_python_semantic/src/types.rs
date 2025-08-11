@@ -5969,7 +5969,7 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => {
                 alias
                     .value_type(db)
-                    .find_legacy_typevars(db, binding_context, typevars)
+                    .find_legacy_typevars(db, binding_context, typevars);
             }
 
             Type::Dynamic(_)

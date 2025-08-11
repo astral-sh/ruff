@@ -205,7 +205,13 @@ enum ReduceResult<'db> {
 const MAX_UNION_LITERALS: usize = 200;
 
 pub(crate) enum UnionStrategy {
+    /// Only eliminate equivalent types from the union; allow subtypes to remain.
+    /// Currently we only use this in limited cases to avoid cycles where subtype-checking itself
+    /// needs to construct a union (e.g. for tuples). We may switch to this strategy in more cases
+    /// in future, in order to leave more user-authored unions in their original form.
     EliminateEquivalentTypes,
+    /// Eliminate any type from the union that is a subtype of another union element. This aims for
+    /// the "most simplified" form of the union.
     EliminateSubtypes,
 }
 
