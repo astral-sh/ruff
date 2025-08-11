@@ -1115,13 +1115,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                if let Some((class, solid_base)) = base_class
-                    .to_class_type(self.db())
-                    .and_then(|class| Some((class, class.nearest_solid_base(self.db())?)))
-                {
-                    solid_bases.insert(solid_base, i, class.class_literal(self.db()).0);
-                }
-
                 let base_class = match base_class {
                     Type::SpecialForm(SpecialFormType::Generic) => {
                         if let Some(builder) = self
@@ -1153,10 +1146,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         continue;
                     }
-                    Type::ClassLiteral(class) => class,
-                    // dynamic/unknown bases are never `@final`
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(class) => ClassType::Generic(*class),
                     _ => continue,
                 };
+
+                if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
+                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                }
 
                 if is_protocol
                     && !(base_class.is_protocol(self.db())
@@ -6168,11 +6165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
             if !callable_type.is_subclass_of() {
-                if let Some(protocol) = class
-                    .class_literal(self.db())
-                    .0
-                    .into_protocol_class(self.db())
-                {
+                if let Some(protocol) = class.into_protocol_class(self.db()) {
                     report_attempted_protocol_instantiation(
                         &self.context,
                         call_expression,

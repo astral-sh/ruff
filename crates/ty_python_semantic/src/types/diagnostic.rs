@@ -15,7 +15,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
+use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClass};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
@@ -2338,7 +2338,7 @@ pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
 pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
     function: KnownFunction,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
@@ -2375,7 +2375,7 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 pub(crate) fn report_attempted_protocol_instantiation(
     context: &InferContext,
     call: &ast::ExprCall,
-    protocol: ProtocolClassLiteral,
+    protocol: ProtocolClass,
 ) {
     let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
         return;
