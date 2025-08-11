@@ -32,11 +32,7 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
