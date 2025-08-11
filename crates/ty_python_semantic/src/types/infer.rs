@@ -1418,7 +1418,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Report field ordering violations
                 for name in required_after_default_field_names {
-                    // Find the AST node for this field
                     if let Some(field_node) = class_node.body.iter().find_map(|stmt| {
                         if let ast::Stmt::AnnAssign(ann_assign) = stmt {
                             if let ast::Expr::Name(name_expr) = ann_assign.target.as_ref() {
@@ -1429,7 +1428,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         None
                     }) {
-                        // Report the lint error
                         if let Some(builder) =
                             self.context.report_lint(&DATACLASS_FIELD_ORDER, field_node)
                         {
