@@ -464,6 +464,10 @@ pub(crate) struct DisplayBoundTypeVarInstance<'db> {
 
 impl Display for DisplayBoundTypeVarInstance<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // This looks very much like DisplayTypeVarInstance::fmt, but note that we have typevar
+        // default values in a subtly different way: if the default value contains other typevars,
+        // here those must be bound as well, whereas in DisplayTypeVarInstance they should not. See
+        // BoundTypeVarInstance::default_ty for more details.
         let typevar = self.bound_typevar.typevar(self.db);
         f.write_str(typevar.name(self.db))?;
         match typevar.bound_or_constraints(self.db) {

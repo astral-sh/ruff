@@ -6973,6 +6973,28 @@ fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
+    /// Returns the default value of this typevar, recursively applying its binding context to any
+    /// other typevars that appear in the default.
+    ///
+    /// For instance, in
+    ///
+    /// ```py
+    /// T = TypeVar("T")
+    /// U = TypeVar("U", default=T)
+    ///
+    /// # revealed: typing.TypeVar[U = typing.TypeVar[T]]
+    /// reveal_type(U)
+    ///
+    /// # revealed: typing.Generic[T, U = T@C]
+    /// class C(reveal_type(Generic[T, U])): ...
+    /// ```
+    ///
+    /// In the first case, the use of `U` is unbound, and so we have a [`TypeVarInstance`], and its
+    /// default value (`T`) is also unbound.
+    ///
+    /// By using `U` in the generic class, it becomes bound, and so we have a
+    /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
+    /// (resulting in `T@C`).
     pub(crate) fn default_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let binding_context = self.binding_context(db);
         self.typevar(db)
