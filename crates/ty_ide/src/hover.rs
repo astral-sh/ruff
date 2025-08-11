@@ -189,14 +189,14 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:10:9
+          --> main.py:10:13
            |
          9 |         foo = Foo()
         10 |         foo.a
-           |         ^^^^-
-           |         |   |
-           |         |   Cursor offset
-           |         source
+           |             -
+           |             |
+           |             source
+           |             Cursor offset
            |
         ");
     }
@@ -518,14 +518,14 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:5:13
+         --> main.py:5:15
           |
         3 |                 attr: int = 1
         4 |
         5 |             C.attr = 2
-          |             ^^^^^^- Cursor offset
-          |             |
-          |             source
+          |               ^^^^- Cursor offset
+          |               |
+          |               source
           |
         ");
     }
@@ -551,14 +551,14 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:5:13
+         --> main.py:5:15
           |
         3 |                 attr = 1
         4 |
         5 |             C.attr += 2
-          |             ^^^^^^- Cursor offset
-          |             |
-          |             source
+          |               ^^^^- Cursor offset
+          |               |
+          |               source
           |
         ");
     }
@@ -637,14 +637,14 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:4:17
+         --> main.py:4:22
           |
         2 |         class Foo:
         3 |             def __init__(self, a: int):
         4 |                 self.a: int = a
-          |                 ^^^^^^- Cursor offset
-          |                 |
-          |                 source
+          |                      ^- Cursor offset
+          |                      |
+          |                      source
           |
         ");
     }

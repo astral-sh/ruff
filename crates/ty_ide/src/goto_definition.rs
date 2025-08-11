@@ -439,12 +439,12 @@ class MyOtherClass:
         6 |         print(self.val)
           |
         info: Source
-         --> main.py:4:1
+         --> main.py:4:3
           |
         2 | from mymodule import MyClass
         3 | x = MyClass(0)
         4 | x.action()
-          | ^^^^^^^^
+          |   ^^^^^^
           |
         ");
     }
@@ -498,11 +498,11 @@ class MyOtherClass:
         6 |         print("hi!")
           |
         info: Source
-         --> main.py:3:5
+         --> main.py:3:13
           |
         2 | from mymodule import MyClass
         3 | x = MyClass.action()
-          |     ^^^^^^^^^^^^^^
+          |             ^^^^^^
           |
         "#);
     }
