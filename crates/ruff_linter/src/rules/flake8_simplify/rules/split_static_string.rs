@@ -296,7 +296,7 @@ enum Direction {
     Right,
 }
 
-/// Like [`char::is_whitespace`] but with Python's notion of what is whitespace.
+/// Like [`char::is_whitespace`] but with Python's notion of whitespace.
 ///
 /// <https://github.com/astral-sh/ruff/issues/19845>
 /// <https://github.com/python/cpython/blob/v3.14.0rc1/Objects/unicodetype_db.h#L6673-L6711>
