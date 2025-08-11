@@ -342,10 +342,17 @@ pub(crate) fn lint_path(
         }
     }
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
-        FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
-    } else {
+    // Avoid constructing a map when there are no diagnostics. The index is only used for rendering
+    // diagnostics anyway. This mirrors our caching behavior, which does not preserve an empty index
+    // either.
+    let notebook_indexes = if diagnostics.is_empty() {
         FxHashMap::default()
+    } else {
+        if let SourceKind::IpyNotebook(notebook) = transformed {
+            FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
+        } else {
+            FxHashMap::default()
+        }
     };
 
     Ok(Diagnostics {
