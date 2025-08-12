@@ -224,7 +224,7 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         }
         NonAtomicType::TypedDict(typed_dict) => visitor.visit_typed_dict_type(db, typed_dict),
         NonAtomicType::TypeAlias(alias) => {
-            visitor.visit_type(db, alias.value_type(db));
+            visitor.visit_type_alias_type(db, alias);
         }
     }
 }

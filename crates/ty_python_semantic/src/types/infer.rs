@@ -7151,10 +7151,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let operand_type = self.infer_expression(operand);
 
-        self.infer_unary_expression_impl(*op, operand_type, unary)
+        self.infer_unary_expression_type(*op, operand_type, unary)
     }
 
-    fn infer_unary_expression_impl(
+    fn infer_unary_expression_type(
         &mut self,
         op: ast::UnaryOp,
         operand_type: Type<'db>,
@@ -7165,7 +7165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
-                self.infer_unary_expression_impl(op, alias.value_type(self.db()), unary)
+                self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),

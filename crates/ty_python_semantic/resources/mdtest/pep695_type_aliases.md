@@ -167,6 +167,7 @@ def f(x: OptNestedInt) -> None:
 ### Invalid self-referential
 
 ```py
+# TODO emit a diagnostic here
 type IntOr = int | IntOr
 
 def f(x: IntOr):
