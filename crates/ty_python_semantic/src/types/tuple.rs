@@ -259,7 +259,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
@@ -283,7 +283,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         self.tuple(db)
             .has_relation_to_impl(db, other.tuple(db), relation, visitor)
@@ -413,7 +413,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         Self::from_elements(
             self.0
@@ -438,7 +438,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -724,17 +724,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> TupleSpec<'db> {
-        // TODO maybe use interior mutability in `TypeTransformer` instead of passing around
-        // mutable references to it; then we wouldn't need to collect here.
-        let prefix: Vec<_> = self
-            .prefix
-            .iter()
-            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
-            .collect();
         Self::mixed(
-            prefix,
+            self.prefix
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
             self.variable
                 .apply_type_mapping_impl(db, type_mapping, visitor),
             self.suffix
@@ -764,7 +759,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -829,14 +824,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         other.prenormalized_prefix_elements(db, other_prenormalize_variable),
                     )
                     .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => visitor
-                            .visit((self_ty, other_ty), |v| {
-                                self_ty.has_relation_to_impl(db, other_ty, relation, v)
-                            }),
-                        EitherOrBoth::Left(self_ty) => visitor
-                            .visit((self_ty, other.variable), |v| {
-                                self_ty.has_relation_to_impl(db, other.variable, relation, v)
-                            }),
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to_impl(db, other_ty, relation, visitor)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
+                        }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
@@ -856,14 +849,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 if !(self_suffix.iter().rev())
                     .zip_longest(other_suffix.iter().rev())
                     .all(|pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => visitor
-                            .visit((*self_ty, *other_ty), |v| {
-                                self_ty.has_relation_to_impl(db, *other_ty, relation, v)
-                            }),
-                        EitherOrBoth::Left(self_ty) => visitor
-                            .visit((*self_ty, other.variable), |v| {
-                                self_ty.has_relation_to_impl(db, other.variable, relation, v)
-                            }),
+                        EitherOrBoth::Both(self_ty, other_ty) => {
+                            self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+                        }
+                        EitherOrBoth::Left(self_ty) => {
+                            self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
+                        }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
@@ -1062,7 +1053,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
@@ -1089,7 +1080,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match self {
             Tuple::Fixed(self_tuple) => {

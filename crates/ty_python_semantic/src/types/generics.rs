@@ -464,15 +464,14 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        let mut visitor = TypeTransformer::default();
-        self.apply_type_mapping_impl(db, type_mapping, &mut visitor)
+        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -564,7 +563,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {

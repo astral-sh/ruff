@@ -1318,8 +1318,7 @@ impl<'db> Type<'db> {
     }
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
-        let mut visitor = PairVisitor::new(true);
-        self.has_relation_to_impl(db, target, relation, &mut visitor)
+        self.has_relation_to_impl(db, target, relation, &PairVisitor::new(true))
     }
 
     fn has_relation_to_impl(
@@ -1327,7 +1326,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
@@ -1350,14 +1349,14 @@ impl<'db> Type<'db> {
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
 
-            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), |v| {
+            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
                 self_alias
                     .value_type(db)
-                    .has_relation_to_impl(db, target, relation, v)
+                    .has_relation_to_impl(db, target, relation, visitor)
             }),
 
-            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), |v| {
-                self.has_relation_to_impl(db, target_alias.value_type(db), relation, v)
+            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
+                self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
             }),
 
             // Pretend that instances of `dataclasses.Field` are assignable to their default type.
@@ -1722,8 +1721,8 @@ impl<'db> Type<'db> {
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
-                visitor.visit((self, target), |v| {
-                    self_instance.has_relation_to_impl(db, target_instance, relation, v)
+                visitor.visit((self, target), || {
+                    self_instance.has_relation_to_impl(db, target_instance, relation, visitor)
                 })
             }
 
@@ -1756,15 +1755,14 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        let mut visitor = PairVisitor::new(true);
-        self.is_equivalent_to_impl(db, other, &mut visitor)
+        self.is_equivalent_to_impl(db, other, &PairVisitor::new(true))
     }
 
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         if self == other {
             return true;
@@ -1783,15 +1781,15 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(self_alias), _) => {
                 let self_alias_ty = self_alias.value_type(db);
-                visitor.visit((self_alias_ty, other), |v| {
-                    self_alias_ty.is_equivalent_to_impl(db, other, v)
+                visitor.visit((self_alias_ty, other), || {
+                    self_alias_ty.is_equivalent_to_impl(db, other, visitor)
                 })
             }
 
             (_, Type::TypeAlias(other_alias)) => {
                 let other_alias_ty = other_alias.value_type(db);
-                visitor.visit((self, other_alias_ty), |v| {
-                    self.is_equivalent_to_impl(db, other_alias_ty, v)
+                visitor.visit((self, other_alias_ty), || {
+                    self.is_equivalent_to_impl(db, other_alias_ty, visitor)
                 })
             }
 
@@ -1881,15 +1879,15 @@ impl<'db> Type<'db> {
 
             (Type::TypeAlias(alias), _) => {
                 let self_alias_ty = alias.value_type(db);
-                visitor.visit((self_alias_ty, other), |v| {
-                    self_alias_ty.is_disjoint_from_impl(db, other, v)
+                visitor.visit((self_alias_ty, other), || {
+                    self_alias_ty.is_disjoint_from_impl(db, other, visitor)
                 })
             }
 
             (_, Type::TypeAlias(alias)) => {
                 let other_alias_ty = alias.value_type(db);
-                visitor.visit((self, other_alias_ty), |v| {
-                    self.is_disjoint_from_impl(db, other_alias_ty, v)
+                visitor.visit((self, other_alias_ty), || {
+                    self.is_disjoint_from_impl(db, other_alias_ty, visitor)
                 })
             }
 
@@ -5737,15 +5735,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
-        let mut visitor = TypeTransformer::default();
-        self.apply_type_mapping_impl(db, type_mapping, &mut visitor)
+        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
     }
 
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
@@ -5847,7 +5844,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping)),
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, |v| alias.value_type(db).apply_type_mapping_impl(db, type_mapping, v))
+                visitor.visit(self, || alias.value_type(db).apply_type_mapping_impl(db, type_mapping, visitor))
             }
 
             Type::ModuleLiteral(_)
@@ -9196,7 +9193,7 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         Self {
             defining_class: self

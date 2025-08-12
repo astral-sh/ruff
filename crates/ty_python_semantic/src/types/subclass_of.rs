@@ -116,7 +116,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
@@ -159,7 +159,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {

@@ -265,7 +265,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match (self.0, other.0) {
             (
@@ -345,7 +345,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -558,7 +558,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -653,7 +653,7 @@ mod synthesized_protocol {
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
-            _visitor: &mut TypeTransformer<'db>,
+            _visitor: &TypeTransformer<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }

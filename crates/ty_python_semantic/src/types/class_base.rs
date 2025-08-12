@@ -253,7 +253,7 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
@@ -272,7 +272,7 @@ impl<'db> ClassBase<'db> {
             self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
-                &mut TypeTransformer::default(),
+                &TypeTransformer::default(),
             )
         } else {
             self
