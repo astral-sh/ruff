@@ -91,8 +91,8 @@ pub fn indent<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
 /// ```
 /// # use ruff_python_trivia::textwrap::indent_first_line;
 ///
-/// assert_eq!(indent_first_line("First line.\n\n\nSecond line.\n", "  "),
-///            "  First line.\n\n\nSecond line.\n");
+/// assert_eq!(indent_first_line("\n\n\nSecond line.\n", "  "),
+///            "\n\n\nSecond line.\n");
 /// ```
 ///
 /// Leading and trailing whitespace coming from the text itself is
