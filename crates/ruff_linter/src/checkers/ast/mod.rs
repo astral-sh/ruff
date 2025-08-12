@@ -28,7 +28,9 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, IntoDiagnosticMessage, Span, SubDiagnostic, SubDiagnosticSeverity,
+};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
@@ -3304,6 +3306,22 @@ impl DiagnosticGuard<'_, '_> {
             Ok(Some(fix)) => self.set_fix(fix),
             Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
         }
+    }
+
+    /// Add an "info" sub-diagnostic with the given message and range.
+    ///
+    /// Note that this shadows `Diagnostic::info` from the `Deref` implementation because we'll
+    /// usually want to attach a range here.
+    pub(crate) fn info<'a>(
+        &mut self,
+        message: impl IntoDiagnosticMessage + 'a,
+        range: impl Ranged,
+    ) {
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, message);
+        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let ann = Annotation::primary(span);
+        sub.annotate(ann);
+        self.diagnostic.as_mut().unwrap().sub(sub);
     }
 }
 
