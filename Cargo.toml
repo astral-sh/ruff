@@ -59,7 +59,9 @@ assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
-bitvec = { version = "1.0.1", default-features = false, features = ["alloc"] }
+bitvec = { version = "1.0.1", default-features = false, features = [
+    "alloc",
+] }
 bstr = { version = "1.9.1" }
 cachedir = { version = "0.3.1" }
 camino = { version = "1.1.7" }
@@ -141,7 +143,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "c7b2d7040a93488a3133ec6b2464b796005f362f", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "e5bd9eb673696702cef43ce63b54a8cecf9a9dfe", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -158,11 +160,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.13.2", features = [
-    "union",
-    "const_generics",
-    "const_new",
-] }
+smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
 snapbox = { version = "0.6.0", features = [
     "diff",
     "term-svg",
@@ -231,12 +229,12 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
-needless_continue = "allow"            # An explicit continue can be more readable, especially if the alternative is an empty block.
+needless_continue = "allow" # An explicit continue can be more readable, especially if the alternative is an empty block.
 unnecessary_debug_formatting = "allow" # too many instances, the display also doesn't quote the path which is often desired in logs where we use them the most often.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
-ignore_without_reason = "allow"          # Too many exsisting instances, and there's no auto fix.
+ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"

@@ -3450,7 +3450,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e#ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e5bd9eb673696702cef43ce63b54a8cecf9a9dfe#e5bd9eb673696702cef43ce63b54a8cecf9a9dfe"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3474,12 +3474,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e#ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e5bd9eb673696702cef43ce63b54a8cecf9a9dfe#e5bd9eb673696702cef43ce63b54a8cecf9a9dfe"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e#ab89d3d1b2c2f59e3ec8cd6201f73ce724c6088e"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=e5bd9eb673696702cef43ce63b54a8cecf9a9dfe#e5bd9eb673696702cef43ce63b54a8cecf9a9dfe"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3903,6 +3903,9 @@ name = "thin-vec"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "144f754d318415ac792f9d69fc87abbbfc043ce2ef041c60f16ad828f638717d"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "thiserror"
