@@ -285,10 +285,16 @@ impl ModuleName {
             range: _,
             node_index: _,
         } = node;
+        Self::from_identifier_parts(db, importing_file, module.as_deref(), *level)
+    }
 
-        let module = module.as_deref();
-
-        if let Some(level) = NonZeroU32::new(*level) {
+    pub(crate) fn from_identifier_parts(
+        db: &dyn Db,
+        importing_file: File,
+        module: Option<&str>,
+        level: u32,
+    ) -> Result<Self, ModuleNameResolutionError> {
+        if let Some(level) = NonZeroU32::new(level) {
             relative_module_name(db, importing_file, module, level)
         } else {
             module
