@@ -37,6 +37,26 @@ impl ModulePath {
         )
     }
 
+    /// Returns true if this is a path to a "stub file."
+    ///
+    /// i.e., A module whose file extension is `pyi`.
+    #[must_use]
+    pub(crate) fn is_stub_file(&self) -> bool {
+        self.relative_path.extension() == Some("pyi")
+    }
+
+    /// Returns true if this is a path to a "stub package."
+    ///
+    /// i.e., A module whose top-most parent package corresponds to a
+    /// directory with a `-stubs` suffix in its name.
+    #[must_use]
+    pub(crate) fn is_stub_package(&self) -> bool {
+        let Some(first) = self.relative_path.components().next() else {
+            return false;
+        };
+        first.as_str().ends_with("-stubs")
+    }
+
     pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
@@ -663,6 +683,23 @@ impl SearchPath {
     pub(crate) fn as_vendored_path(&self) -> Option<&VendoredPath> {
         self.as_path().as_vendored_path()
     }
+
+    /// Returns a succinct string representing the *internal kind* of this
+    /// search path. This is useful in snapshot tests where one wants to
+    /// capture this specific detail about search paths.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn debug_kind(&self) -> &'static str {
+        match *self.0 {
+            SearchPathInner::Extra(_) => "extra",
+            SearchPathInner::FirstParty(_) => "first-party",
+            SearchPathInner::StandardLibraryCustom(_) => "std-custom",
+            SearchPathInner::StandardLibraryReal(_) => "std-real",
+            SearchPathInner::SitePackages(_) => "site-packages",
+            SearchPathInner::Editable(_) => "editable",
+            SearchPathInner::StandardLibraryVendored(_) => "std-vendored",
+        }
+    }
 }
 
 impl PartialEq<SystemPath> for SearchPath {
@@ -749,6 +786,13 @@ impl<'db> SystemOrVendoredPathRef<'db> {
         }
     }
 
+    pub(super) fn extension(&self) -> Option<&str> {
+        match self {
+            Self::System(system) => system.extension(),
+            Self::Vendored(vendored) => vendored.extension(),
+        }
+    }
+
     pub(super) fn parent<'a>(&'a self) -> Option<SystemOrVendoredPathRef<'a>>
     where
         'a: 'db,
@@ -771,6 +815,18 @@ impl<'db> SystemOrVendoredPathRef<'db> {
             SystemOrVendoredPathRef::Vendored(path) => Some(path),
             SystemOrVendoredPathRef::System(_) => None,
         }
+    }
+}
+
+impl<'a> From<&'a SystemPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a SystemPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::System(path)
+    }
+}
+
+impl<'a> From<&'a VendoredPath> for SystemOrVendoredPathRef<'a> {
+    fn from(path: &'a VendoredPath) -> SystemOrVendoredPathRef<'a> {
+        SystemOrVendoredPathRef::Vendored(path)
     }
 }
 
