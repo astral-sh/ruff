@@ -20,7 +20,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::Tuple;
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
@@ -668,7 +668,7 @@ impl<'db> ClassType<'db> {
             "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .and_then(|spec| spec.tuple(db))
-                    .and_then(|tuple| tuple.len().into_fixed_length())
+                    .and_then(|tuple| tuple.len(db).into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
@@ -679,7 +679,7 @@ impl<'db> ClassType<'db> {
             "__bool__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
                     .and_then(|spec| spec.tuple(db))
-                    .map(|tuple| tuple.truthiness().into_type(db))
+                    .map(|tuple| tuple.truthiness(db).into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_simple_tuple_method(return_type)
@@ -692,13 +692,15 @@ impl<'db> ClassType<'db> {
                         let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
                             FxIndexMap::default();
 
+                        let tuple = tuple.inner(db);
+
                         match tuple {
                             // E.g. for `tuple[int, str]`, we will generate the following overloads:
                             //
                             //    __getitem__(self, index: Literal[0, -2], /) -> int
                             //    __getitem__(self, index: Literal[1, -1], /) -> str
                             //
-                            TupleSpec::Fixed(fixed_length_tuple) => {
+                            Tuple::Fixed(fixed_length_tuple) => {
                                 let tuple_length = fixed_length_tuple.len();
 
                                 for (index, ty) in fixed_length_tuple.elements().enumerate() {
@@ -721,7 +723,7 @@ impl<'db> ClassType<'db> {
                             //    __getitem__(self, index: Literal[-2], /) -> bytes
                             //    __getitem__(self, index: Literal[-3], /) -> float | str
                             //
-                            TupleSpec::Variable(variable_length_tuple) => {
+                            Tuple::Variable(variable_length_tuple) => {
                                 for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
                                     if let Ok(index) = i64::try_from(index) {
                                         element_type_to_indices.entry(*ty).or_default().push(index);
@@ -851,7 +853,9 @@ impl<'db> ClassType<'db> {
                 let mut iterable_parameter =
                     Parameter::positional_only(Some(Name::new_static("iterable")));
 
-                let tuple = specialization.and_then(|spec| spec.tuple(db));
+                let tuple = specialization
+                    .and_then(|spec| spec.tuple(db))
+                    .map(|spec| spec.inner(db));
 
                 match tuple {
                     Some(tuple) => {
@@ -4720,7 +4724,7 @@ impl SlotsKind {
             // __slots__ = ("a", "b")
             Type::NominalInstance(nominal) => match nominal
                 .tuple_spec(db)
-                .and_then(|spec| spec.len().into_fixed_length())
+                .and_then(|spec| spec.len(db).into_fixed_length())
             {
                 Some(0) => Self::Empty,
                 Some(_) => Self::NotEmpty,

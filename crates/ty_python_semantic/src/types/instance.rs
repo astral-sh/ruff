@@ -1,6 +1,5 @@
 //! Instance types: both nominal and structural.
 
-use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use super::protocol_class::ProtocolInterface;
@@ -25,9 +24,8 @@ impl<'db> Type<'db> {
             Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
                 db,
                 specialization
-                    .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                    .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-                    .as_ref(),
+                    .and_then(|spec| spec.tuple(db))
+                    .unwrap_or_else(|| TupleSpec::homogeneous(db, Type::unknown())),
             )),
             _ if class_literal.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
@@ -42,6 +40,29 @@ impl<'db> Type<'db> {
             return Type::Never;
         };
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+    }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(
+            TupleType::homogeneous(db, element),
+        )))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(
+            TupleType::empty(db),
+        )))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::heterogeneous(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
     }
 
     /// **Private** helper function to create a `Type::NominalInstance` from a class that
@@ -114,17 +135,17 @@ impl<'db> NominalInstanceType<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
-    pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+    pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<TupleSpec<'db>> {
         fn own_tuple_spec_of_class<'db>(
             db: &'db dyn Db,
             class: ClassType<'db>,
-        ) -> Option<Cow<'db, TupleSpec<'db>>> {
+        ) -> Option<TupleSpec<'db>> {
             let (class_literal, specialization) = class.class_literal(db);
             match class_literal.known(db)? {
                 KnownClass::Tuple => Some(
                     specialization
-                        .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                        .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
+                        .and_then(|spec| spec.tuple(db))
+                        .unwrap_or_else(|| TupleSpec::homogeneous(db, Type::unknown())),
                 ),
                 KnownClass::VersionInfo => {
                     let python_version = Program::get(db).python_version(db);
@@ -144,20 +165,23 @@ impl<'db> NominalInstanceType<'db> {
                         Type::Union(UnionType::new(db, elements))
                     };
 
-                    Some(Cow::Owned(TupleSpec::from_elements([
-                        Type::IntLiteral(python_version.major.into()),
-                        Type::IntLiteral(python_version.minor.into()),
-                        int_instance_ty,
-                        release_level_ty,
-                        int_instance_ty,
-                    ])))
+                    Some(TupleSpec::heterogeneous(
+                        db,
+                        [
+                            Type::IntLiteral(python_version.major.into()),
+                            Type::IntLiteral(python_version.minor.into()),
+                            int_instance_ty,
+                            release_level_ty,
+                            int_instance_ty,
+                        ],
+                    ))
                 }
                 _ => None,
             }
         }
 
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
+            NominalInstanceInner::ExactTuple(tuple) => Some(tuple.spec),
             NominalInstanceInner::NonTuple(class) => {
                 // Avoid an expensive MRO traversal for common stdlib classes.
                 if class
@@ -192,9 +216,9 @@ impl<'db> NominalInstanceType<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
-    pub(super) fn own_tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+    pub(super) fn own_tuple_spec(&self) -> Option<TupleSpec<'db>> {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
+            NominalInstanceInner::ExactTuple(tuple) => Some(tuple.spec),
             NominalInstanceInner::NonTuple(_) => None,
         }
     }
@@ -298,9 +322,9 @@ impl<'db> NominalInstanceType<'db> {
         visitor: &PairVisitor<'db>,
     ) -> bool {
         let self_spec = self.tuple_spec(db);
-        if let Some(self_spec) = self_spec.as_deref() {
+        if let Some(self_spec) = self_spec {
             let other_spec = other.tuple_spec(db);
-            if let Some(other_spec) = other_spec.as_deref() {
+            if let Some(other_spec) = other_spec {
                 if self_spec.is_disjoint_from_impl(db, other_spec, visitor) {
                     return true;
                 }

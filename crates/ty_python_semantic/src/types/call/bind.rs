@@ -3,7 +3,6 @@
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
 
-use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -1034,10 +1033,8 @@ impl<'db> Bindings<'db> {
                                     );
                                     continue;
                                 };
-                                overload.set_return_type(Type::tuple(TupleType::new(
-                                    db,
-                                    tuple_spec.as_ref(),
-                                )));
+                                overload
+                                    .set_return_type(Type::tuple(TupleType::new(db, tuple_spec)));
                             }
                         }
 
@@ -2151,9 +2148,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // arbitrary number of `Unknown`s at the end, so that if the expanded value has a
             // smaller arity than the unexpanded value, we still have enough values to assign to
             // the already matched parameters.
-            let argument_types = match argument_types.as_ref() {
+            let argument_types = match argument_types.inner(self.db) {
                 Tuple::Fixed(_) => {
-                    Cow::Owned(argument_types.concat(self.db, &Tuple::homogeneous(Type::unknown())))
+                    argument_types.concat(self.db, &Tuple::homogeneous(Type::unknown()))
                 }
                 Tuple::Variable(_) => argument_types,
             };
@@ -2173,13 +2170,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             // Check the types by zipping through the splatted argument types and their matched
             // parameters.
-            for (argument_type, parameter_index) in (argument_types.all_elements())
+            for (argument_type, parameter_index) in (argument_types.all_elements(self.db))
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
                     adjusted_argument_index,
                     argument,
-                    *argument_type,
+                    argument_type,
                     *parameter_index,
                 );
             }

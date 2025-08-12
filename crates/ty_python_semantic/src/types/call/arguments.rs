@@ -53,7 +53,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         let ty = infer_argument_type(arg, value);
                         let length = ty
                             .try_iterate(db)
-                            .map(|tuple| tuple.len())
+                            .map(|tuple| tuple.len(db))
                             .unwrap_or(TupleLength::unknown());
                         (Argument::Variadic(length), Some(ty))
                     }
@@ -225,7 +225,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
             if let Some(spec) = instance.tuple_spec(db) {
-                return match &*spec {
+                return match spec.inner(db) {
                     Tuple::Fixed(fixed_length_tuple) => {
                         let expanded = fixed_length_tuple
                             .all_elements()
@@ -237,7 +237,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                                 }
                             })
                             .multi_cartesian_product()
-                            .map(|types| Type::tuple(TupleType::from_elements(db, types)))
+                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
                             .collect::<Vec<_>>();
 
                         if expanded.len() == 1 {

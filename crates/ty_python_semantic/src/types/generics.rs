@@ -241,7 +241,7 @@ impl<'db> GenericContext<'db> {
                 db,
                 self,
                 partial.types(db),
-                TupleType::homogeneous(db, Type::unknown()),
+                Some(TupleType::homogeneous(db, Type::unknown())),
             )
         } else {
             partial
@@ -424,8 +424,8 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
 
 impl<'db> Specialization<'db> {
     /// Returns the tuple spec for a specialization of the `tuple` class.
-    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
-        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<TupleSpec<'db>> {
+        self.tuple_inner(db).map(|tuple_type| tuple_type.spec)
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -867,6 +867,8 @@ impl<'db> SpecializationBuilder<'db> {
                     formal.tuple_instance_spec(self.db),
                     actual_nominal.tuple_spec(self.db),
                 ) {
+                    let formal_tuple = formal_tuple.inner(self.db);
+                    let actual_tuple = actual_tuple.inner(self.db);
                     let Some(most_precise_length) =
                         formal_tuple.len().most_precise(actual_tuple.len())
                     else {

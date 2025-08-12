@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
-use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
+use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleUnpacker};
 use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
@@ -123,12 +123,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
 
                 for ty in unpack_types.iter().copied() {
-                    let tuple = ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, ty, value_expr);
-                        Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(self.db())))
-                    });
+                    let tuple = ty
+                        .try_iterate(self.db())
+                        .map(|tuple| Cow::Borrowed(tuple.inner(self.db())))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(&self.context, ty, value_expr);
+                            Cow::Owned(Tuple::homogeneous(err.fallback_element_type(self.db())))
+                        });
 
-                    if let Err(err) = unpacker.unpack_tuple(tuple.as_ref()) {
+                    if let Err(err) = unpacker.unpack_tuple(&tuple) {
                         unpacker
                             .unpack_tuple(&Tuple::homogeneous(Type::unknown()))
                             .expect("adding a homogeneous tuple should always succeed");
