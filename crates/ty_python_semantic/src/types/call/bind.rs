@@ -1056,6 +1056,22 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownClass::NewType) => match overload.parameter_types() {
+                            [Some(Type::StringLiteral(name)), Some(supertype)] => {
+                                let params = DataclassParams::default();
+                                overload.set_return_type(Type::from(ClassLiteral::new(
+                                    db,
+                                    ast::name::Name::new(name.value(db)),
+                                    what_goes_here,
+                                    None,
+                                    None,
+                                    None,
+                                    None,
+                                )));
+                            }
+                            _ => {}
+                        },
+
                         _ => {}
                     },
 
