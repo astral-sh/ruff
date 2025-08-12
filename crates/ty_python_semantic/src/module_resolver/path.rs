@@ -231,6 +231,10 @@ impl ModulePath {
 
     #[must_use]
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
+        fn strip_stubs(component: &str) -> &str {
+            component.strip_suffix("-stubs").unwrap_or(component)
+        }
+
         let ModulePath {
             search_path: _,
             relative_path,
@@ -239,13 +243,28 @@ impl ModulePath {
             stdlib_path_to_module_name(relative_path)
         } else {
             let parent = relative_path.parent()?;
+            let name = relative_path.file_stem()?;
+            if parent.as_str().is_empty() {
+                // Stubs should only be stripped when there is no
+                // extension. e.g., `foo-stubs` should be stripped
+                // by not `foo-stubs.pyi`. In the latter case,
+                // `ModuleName::new` will fail (which is what we want).
+                return ModuleName::new(if relative_path.extension().is_some() {
+                    name
+                } else {
+                    strip_stubs(relative_path.as_str())
+                });
+            }
+
             let parent_components = parent.components().enumerate().map(|(index, component)| {
                 let component = component.as_str();
 
-                // For stub packages, strip the `-stubs` suffix from the first component
-                // because it isn't a valid module name part AND the module name is the name without the `-stubs`.
+                // For stub packages, strip the `-stubs` suffix from
+                // the first component because it isn't a valid module
+                // name part AND the module name is the name without
+                // the `-stubs`.
                 if index == 0 {
-                    component.strip_suffix("-stubs").unwrap_or(component)
+                    strip_stubs(component)
                 } else {
                     component
                 }
@@ -256,7 +275,7 @@ impl ModulePath {
             if skip_final_part {
                 ModuleName::from_components(parent_components)
             } else {
-                ModuleName::from_components(parent_components.chain(relative_path.file_stem()))
+                ModuleName::from_components(parent_components.chain([name]))
             }
         }
     }
@@ -1244,5 +1263,48 @@ mod tests {
         assert_eq!(xml_etree.to_file(&resolver), None);
         assert!(!xml_etree.is_directory(&resolver));
         assert!(!xml_etree.is_regular_package(&resolver));
+    }
+
+    #[test]
+    fn strip_not_top_level_stubs_suffix() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs");
+        mp.push("quux");
+        assert_eq!(
+            mp.to_module_name(),
+            Some(ModuleName::new_static("foo.quux").unwrap())
+        );
+    }
+
+    /// Tests that a module path of just `foo-stubs` will correctly be
+    /// converted to a module name of just `foo`.
+    ///
+    /// This is a regression test where this conversion ended up
+    /// treating the module path as invalid and returning `None` from
+    /// `ModulePath::to_module_name` instead.
+    #[test]
+    fn strip_top_level_stubs_suffix() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs");
+        assert_eq!(
+            mp.to_module_name(),
+            Some(ModuleName::new_static("foo").unwrap())
+        );
+    }
+
+    /// Tests that paths like `foo-stubs.pyi` don't have `-stubs`
+    /// stripped. (And this leads to failing to create a `ModuleName`,
+    /// which is what we want.)
+    #[test]
+    fn no_strip_with_extension() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new().build();
+        let sp = SearchPath::first_party(db.system(), src).unwrap();
+        let mut mp = sp.to_module_path();
+        mp.push("foo-stubs.pyi");
+        assert_eq!(mp.to_module_name(), None);
     }
 }
