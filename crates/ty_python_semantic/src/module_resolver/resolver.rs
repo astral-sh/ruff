@@ -1153,6 +1153,64 @@ mod tests {
     }
 
     #[test]
+    fn stubs_over_module_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Module, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo.pyi");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    /// Tests precedence when there is a package and a sibling stub file.
+    ///
+    /// NOTE: I am unsure if this is correct. I wrote this test to match
+    /// behavior while implementing "list modules." Notably, in this case, the
+    /// regular source file gets priority. But in `stubs_over_module_source`
+    /// above, the stub file gets priority.
+    #[test]
+    fn stubs_over_package_source() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo/__init__.py", ""), ("foo.pyi", "")])
+            .build();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+
+        assert_eq!(
+            Some(&foo_module),
+            resolve_module(&db, &foo_module_name).as_ref()
+        );
+
+        assert_eq!("foo", foo_module.name(&db));
+        assert_eq!(&src, foo_module.search_path(&db).unwrap());
+        assert_eq!(ModuleKind::Package, foo_module.kind(&db));
+
+        let expected_foo_path = src.join("foo/__init__.py");
+        assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
+        assert_eq!(
+            Some(foo_module),
+            path_to_module(&db, &FilePath::System(expected_foo_path))
+        );
+    }
+
+    #[test]
     fn builtins_vendored() {
         let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
             .with_vendored_typeshed()
