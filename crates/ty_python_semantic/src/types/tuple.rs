@@ -456,9 +456,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next() else {
                         return false;
                     };
-                    if !visitor.visit((*self_ty, *other_ty), |v| {
-                        self_ty.has_relation_to_impl(db, *other_ty, relation, v)
-                    }) {
+                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -466,9 +464,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next_back() else {
                         return false;
                     };
-                    if !visitor.visit((*self_ty, *other_ty), |v| {
-                        self_ty.has_relation_to_impl(db, *other_ty, relation, v)
-                    }) {
+                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -476,9 +472,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
                 self_iter.all(|self_ty| {
-                    visitor.visit((*self_ty, other.variable), |v| {
-                        self_ty.has_relation_to_impl(db, other.variable, relation, v)
-                    })
+                    self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
                 })
             }
         }
@@ -797,9 +791,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next() else {
                         return false;
                     };
-                    if !visitor.visit((self_ty, other_ty), |v| {
-                        self_ty.has_relation_to_impl(db, other_ty, relation, v)
-                    }) {
+                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -808,9 +800,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next_back() else {
                         return false;
                     };
-                    if !visitor.visit((*self_ty, other_ty), |v| {
-                        self_ty.has_relation_to_impl(db, other_ty, relation, v)
-                    }) {
+                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -885,10 +875,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                visitor.visit((self.variable, other.variable), |v| {
-                    self.variable
-                        .has_relation_to_impl(db, other.variable, relation, v)
-                })
+                self.variable
+                    .has_relation_to_impl(db, other.variable, relation, visitor)
             }
         }
     }
