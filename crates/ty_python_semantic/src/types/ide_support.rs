@@ -132,6 +132,8 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
 
+            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)

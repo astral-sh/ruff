@@ -135,6 +135,8 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
+            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db)),
+
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
@@ -247,9 +249,16 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping<'a>(self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
+    ) -> Self {
         match self {
-            Self::Class(class) => Self::Class(class.apply_type_mapping(db, type_mapping)),
+            Self::Class(class) => {
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
     }
@@ -260,7 +269,11 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping(db, &TypeMapping::Specialization(specialization))
+            self.apply_type_mapping_impl(
+                db,
+                &TypeMapping::Specialization(specialization),
+                &TypeTransformer::default(),
+            )
         } else {
             self
         }

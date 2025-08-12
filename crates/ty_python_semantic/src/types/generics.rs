@@ -16,7 +16,7 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     BoundTypeVarInstance, KnownClass, KnownInstanceType, Type, TypeMapping, TypeRelation,
     TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
-    binding_type, declaration_type,
+    binding_type, cyclic::PairVisitor, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -304,9 +304,9 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn specialize_tuple(
         self,
         db: &'db dyn Db,
+        element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        let element_type = tuple.tuple(db).homogeneous_element_type(db);
         Specialization::new(db, self, Box::from([element_type]), Some(tuple))
     }
 
@@ -464,14 +464,23 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
+        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.apply_type_mapping(db, type_mapping))
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
             .collect();
         let tuple_inner = self
             .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping(db, type_mapping));
+            .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
@@ -549,11 +558,12 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
@@ -562,7 +572,7 @@ impl<'db> Specialization<'db> {
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
         {
-            return self_tuple.has_relation_to(db, other_tuple, relation);
+            return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
@@ -590,9 +600,11 @@ impl<'db> Specialization<'db> {
                             && other_type.is_assignable_to(db, *self_type)
                     }
                 },
-                TypeVarVariance::Covariant => self_type.has_relation_to(db, *other_type, relation),
+                TypeVarVariance::Covariant => {
+                    self_type.has_relation_to_impl(db, *other_type, relation, visitor)
+                }
                 TypeVarVariance::Contravariant => {
-                    other_type.has_relation_to(db, *self_type, relation)
+                    other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
                 TypeVarVariance::Bivariant => true,
             };

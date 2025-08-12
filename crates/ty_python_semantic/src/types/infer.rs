@@ -3956,6 +3956,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            Type::TypeAlias(alias) => self.validate_attribute_assignment(
+                target,
+                alias.value_type(self.db()),
+                attribute,
+                value_ty,
+                emit_diagnostics,
+            ),
+
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance)
                 if instance.class(db).is_known(db, KnownClass::Super) =>
@@ -7143,9 +7151,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let operand_type = self.infer_expression(operand);
 
+        self.infer_unary_expression_type(*op, operand_type, unary)
+    }
+
+    fn infer_unary_expression_type(
+        &mut self,
+        op: ast::UnaryOp,
+        operand_type: Type<'db>,
+        unary: &ast::ExprUnaryOp,
+    ) -> Type<'db> {
         match (op, operand_type) {
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
+
+            (_, Type::TypeAlias(alias)) => {
+                self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
+            }
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
@@ -7306,6 +7327,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                 )
             }),
+
+            (Type::TypeAlias(alias), rhs, _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                alias.value_type(self.db()),
+                rhs,
+                op,
+            ),
+
+            (lhs, Type::TypeAlias(alias), _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                lhs,
+                alias.value_type(self.db()),
+                op,
+            ),
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).

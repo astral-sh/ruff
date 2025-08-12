@@ -243,6 +243,7 @@ impl<'db> Completion<'db> {
                 | Type::KnownInstance(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
             })
         }
         imp(db, self.ty)

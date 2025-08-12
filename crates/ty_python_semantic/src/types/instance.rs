@@ -260,20 +260,21 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.has_relation_to(db, tuple2, relation),
+            ) => tuple1.has_relation_to_impl(db, tuple2, relation, visitor),
             _ => self
                 .class(db)
-                .has_relation_to(db, other.class(db), relation),
+                .has_relation_to_impl(db, other.class(db), relation, visitor),
         }
     }
 
@@ -340,17 +341,18 @@ impl<'db> NominalInstanceType<'db> {
         SubclassOfType::from(db, self.class(db))
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.apply_type_mapping(db, type_mapping))
+                Type::tuple(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             NominalInstanceInner::NonTuple(class) => {
-                Type::non_tuple_instance(class.apply_type_mapping(db, type_mapping))
+                Type::non_tuple_instance(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -552,17 +554,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
-                Self::from_class(class.apply_type_mapping(db, type_mapping))
+                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, visitor))
             }
             Protocol::Synthesized(synthesized) => {
-                Self::synthesized(synthesized.apply_type_mapping(db, type_mapping))
+                Self::synthesized(synthesized.apply_type_mapping_impl(db, type_mapping, visitor))
             }
         }
     }
@@ -646,10 +649,11 @@ mod synthesized_protocol {
             Self(self.0.materialize(db, variance))
         }
 
-        pub(super) fn apply_type_mapping<'a>(
+        pub(super) fn apply_type_mapping_impl<'a>(
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
+            _visitor: &TypeTransformer<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }

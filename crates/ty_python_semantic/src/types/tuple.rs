@@ -223,7 +223,7 @@ impl<'db> TupleType<'db> {
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of a mypy_primer run! This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(cycle_fn=to_class_type_cycle_recover, cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db)
@@ -231,7 +231,8 @@ impl<'db> TupleType<'db> {
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                generic_context.specialize_tuple(db, self)
+                let element_type = self.tuple(db).homogeneous_element_type(db);
+                generic_context.specialize_tuple(db, element_type, self)
             } else {
                 generic_context.default_specialization(db, Some(KnownClass::Tuple))
             }
@@ -254,12 +255,17 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, self.tuple(db).materialize(db, variance))
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).apply_type_mapping(db, type_mapping))
+        TupleType::new(
+            db,
+            self.tuple(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor),
+        )
     }
 
     pub(crate) fn find_legacy_typevars(
@@ -272,14 +278,15 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars(db, binding_context, typevars);
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         self.tuple(db)
-            .has_relation_to(db, other.tuple(db), relation)
+            .has_relation_to_impl(db, other.tuple(db), relation, visitor)
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -289,6 +296,29 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
+}
+
+fn to_class_type_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &ClassType<'db>,
+    _count: u32,
+    _self: TupleType<'db>,
+) -> salsa::CycleRecoveryAction<ClassType<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn to_class_type_cycle_initial<'db>(db: &'db dyn Db, self_: TupleType<'db>) -> ClassType<'db> {
+    let tuple_class = KnownClass::Tuple
+        .try_to_class_literal(db)
+        .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
+
+    tuple_class.apply_specialization(db, |generic_context| {
+        if generic_context.variables(db).len() == 1 {
+            generic_context.specialize_tuple(db, Type::Never, self_)
+        } else {
+            generic_context.default_specialization(db, Some(KnownClass::Tuple))
+        }
+    })
 }
 
 /// A tuple spec describes the contents of a tuple type, which might be fixed- or variable-length.
@@ -379,11 +409,16 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         Self::from_elements(self.0.iter().map(|ty| ty.materialize(db, variance)))
     }
 
-    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+    fn apply_type_mapping_impl<'a>(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
+    ) -> Self {
         Self::from_elements(
             self.0
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
@@ -398,18 +433,19 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
                 self.0.len() == other.0.len()
-                    && (self.0.iter())
-                        .zip(&other.0)
-                        .all(|(self_ty, other_ty)| self_ty.has_relation_to(db, *other_ty, relation))
+                    && (self.0.iter()).zip(&other.0).all(|(self_ty, other_ty)| {
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+                    })
             }
 
             Tuple::Variable(other) => {
@@ -420,7 +456,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -428,14 +464,16 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                     let Some(self_ty) = self_iter.next_back() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, *other_ty, relation) {
+                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
                         return false;
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| self_ty.has_relation_to(db, other.variable, relation))
+                self_iter.all(|self_ty| {
+                    self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
+                })
             }
         }
     }
@@ -669,19 +707,21 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         )
     }
 
-    fn apply_type_mapping<'a>(
+    fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
-            self.variable.apply_type_mapping(db, type_mapping),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+            self.variable
+                .apply_type_mapping_impl(db, type_mapping, visitor),
             self.suffix
                 .iter()
-                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
     }
 
@@ -701,11 +741,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(
+    fn has_relation_to_impl(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -732,7 +773,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
+                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -741,7 +782,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     let Some(other_ty) = other_iter.next_back() else {
                         return false;
                     };
-                    if !self_ty.has_relation_to(db, other_ty, relation) {
+                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
                         return false;
                     }
                 }
@@ -771,10 +812,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     )
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, other_ty, relation)
+                            self_ty.has_relation_to_impl(db, other_ty, relation, visitor)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -796,10 +837,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     .zip_longest(other_suffix.iter().rev())
                     .all(|pair| match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.has_relation_to(db, *other_ty, relation)
+                            self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
                         }
                         EitherOrBoth::Left(self_ty) => {
-                            self_ty.has_relation_to(db, other.variable, relation)
+                            self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
                         }
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
@@ -812,7 +853,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable.has_relation_to(db, other.variable, relation)
+                self.variable
+                    .has_relation_to_impl(db, other.variable, relation, visitor)
             }
         }
     }
@@ -979,14 +1021,17 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn apply_type_mapping<'a>(
+    pub(crate) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.apply_type_mapping(db, type_mapping)),
-            Tuple::Variable(tuple) => tuple.apply_type_mapping(db, type_mapping),
+            Tuple::Fixed(tuple) => {
+                Tuple::Fixed(tuple.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
+            Tuple::Variable(tuple) => tuple.apply_type_mapping_impl(db, type_mapping, visitor),
         }
     }
 
@@ -1002,10 +1047,20 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to(&self, db: &'db dyn Db, other: &Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
+    ) -> bool {
         match self {
-            Tuple::Fixed(self_tuple) => self_tuple.has_relation_to(db, other, relation),
-            Tuple::Variable(self_tuple) => self_tuple.has_relation_to(db, other, relation),
+            Tuple::Fixed(self_tuple) => {
+                self_tuple.has_relation_to_impl(db, other, relation, visitor)
+            }
+            Tuple::Variable(self_tuple) => {
+                self_tuple.has_relation_to_impl(db, other, relation, visitor)
+            }
         }
     }
 

@@ -1000,6 +1000,8 @@ fn is_instance_truthiness<'db>(
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
+        Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
+
         Type::BoundMethod(..)
         | Type::MethodWrapper(..)
         | Type::WrapperDescriptor(..)

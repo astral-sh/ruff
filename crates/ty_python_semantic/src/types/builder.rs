@@ -246,6 +246,7 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
+            Type::TypeAlias(alias) => self.add_in_place(alias.value_type(self.db)),
             // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
@@ -542,6 +543,10 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
         match ty {
+            Type::TypeAlias(alias) => {
+                let value_type = alias.value_type(self.db);
+                self.add_positive(value_type)
+            }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
@@ -629,6 +634,10 @@ impl<'db> IntersectionBuilder<'db> {
 
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
+            Type::TypeAlias(alias) => {
+                let value_type = alias.value_type(self.db);
+                self.add_negative(value_type)
+            }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
                     self = self.add_negative(*elem);

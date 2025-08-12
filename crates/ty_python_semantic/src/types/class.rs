@@ -43,7 +43,7 @@ use crate::{
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
-        definition_expression_type,
+        cyclic::PairVisitor, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -251,15 +251,17 @@ impl<'db> GenericAlias<'db> {
         self.origin(db).definition(db)
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).apply_type_mapping(db, type_mapping),
+            self.specialization(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor),
         )
     }
 
@@ -400,14 +402,17 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
+            Self::Generic(generic) => {
+                Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
         }
     }
 
@@ -456,14 +461,15 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
+        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
@@ -479,10 +485,11 @@ impl<'db> ClassType<'db> {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
                         base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to(
+                            && base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
                                 relation,
+                                visitor,
                             )
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
