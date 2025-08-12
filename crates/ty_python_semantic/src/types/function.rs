@@ -120,6 +120,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for FunctionDecorators {}
+
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
         match decorator_type {
@@ -184,7 +186,7 @@ impl Default for DataclassTransformerParams {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
@@ -406,7 +408,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
@@ -433,10 +435,13 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionLiteral<'_> {}
+
 fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionLiteral<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(context) = function.inherited_generic_context(db) {
         walk_generic_context(db, context, visitor);
@@ -599,7 +604,7 @@ impl<'db> FunctionLiteral<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -609,7 +614,7 @@ impl<'db> FunctionLiteral<'db> {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
@@ -627,7 +632,7 @@ impl get_size2::GetSize for FunctionType<'_> {}
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_function_literal(db, function.literal(db), visitor);
     for mapping in function.type_mappings(db) {
@@ -915,15 +920,10 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let mut visitor = TypeTransformer::default();
-        self.normalized_impl(db, &mut visitor)
+        self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
@@ -945,7 +945,7 @@ fn is_instance_truthiness<'db>(
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
             if instance
-                .class
+                .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {
@@ -993,8 +993,6 @@ fn is_instance_truthiness<'db>(
                 .as_ref()
                 .is_some_and(is_instance),
         ),
-
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
 
         Type::FunctionLiteral(..) => {
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
@@ -1064,7 +1062,15 @@ fn last_definition_signature_cycle_initial<'db>(
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    get_size2::GetSize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]

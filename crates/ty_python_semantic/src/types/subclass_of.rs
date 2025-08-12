@@ -20,7 +20,7 @@ pub struct SubclassOfType<'db> {
 pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     subclass_of: SubclassOfType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     visitor.visit_type(db, Type::from(subclass_of.subclass_of));
 }
@@ -185,11 +185,7 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -252,11 +248,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),

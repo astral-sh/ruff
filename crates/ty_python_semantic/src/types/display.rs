@@ -73,9 +73,17 @@ impl Display for DisplayRepresentation<'_> {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
-                match (instance.class, instance.class.known(self.db)) {
+                let class = instance.class(self.db);
+
+                match (class, class.known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
+                        .specialization(self.db)
+                        .tuple(self.db)
+                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
+                        .display(self.db)
+                        .fmt(f),
                     (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
                     (ClassType::Generic(alias), _) => alias.display(self.db).fmt(f),
                 }
@@ -207,7 +215,6 @@ impl Display for DisplayRepresentation<'_> {
                     name = enum_literal.name(self.db),
                 )
             }
-            Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
             Type::TypeVar(bound_typevar) => {
                 f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
                 if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
@@ -235,9 +242,7 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => {
-                f.write_str(typed_dict.defining_class(self.db).name(self.db))
-            }
+            Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class.name(self.db)),
         }
     }
 }
@@ -395,8 +400,8 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.origin.is_known(self.db, KnownClass::Tuple) {
-            self.specialization.tuple(self.db).display(self.db).fmt(f)
+        if let Some(tuple) = self.specialization.tuple(self.db) {
+            tuple.display(self.db).fmt(f)
         } else {
             write!(
                 f,
