@@ -364,7 +364,7 @@ impl<'db> GenericContext<'db> {
         Self::new(db, variables)
     }
 
-    fn heap_size((variables,): &(FxOrderSet<TypeVarInstance<'db>>,)) -> usize {
+    fn heap_size((variables,): &(FxOrderSet<BoundTypeVarInstance<'db>>,)) -> usize {
         ruff_memory_usage::order_set_heap_size(variables)
     }
 }
