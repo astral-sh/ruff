@@ -547,7 +547,7 @@ mod tests {
                     continue;
                 }
 
-                let diagnostics = lint_path(
+                let mut diagnostics = lint_path(
                     &path,
                     Some(PackageRoot::root(&package_root)),
                     &settings.linter,
@@ -557,7 +557,14 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if !diagnostics.inner.is_empty() {
+                if diagnostics.inner.is_empty() {
+                    // We won't load a notebook index from the cache for files without diagnostics,
+                    // so remove them from `expected_diagnostics` too. This allows us to keep the
+                    // full equality assertion below.
+                    diagnostics
+                        .notebook_indexes
+                        .remove(&path.to_string_lossy().to_string());
+                } else {
                     paths_with_diagnostics.push(path.clone());
                 }
                 paths.push(path);
