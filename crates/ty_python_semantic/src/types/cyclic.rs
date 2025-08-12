@@ -1,3 +1,23 @@
+//! Cycle detection for recursive types.
+//!
+//! The visitors here (`TypeTransformer` and `PairVisitor`) are used in methods that recursively
+//! visit types to transform them (e.g. `Type::normalize`) or to decide a relation between a pair
+//! of types (e.g. `Type::has_relation_to`).
+//!
+//! The typical pattern is that the "entry" method (e.g. `Type::has_relation_to`) will create a
+//! visitor and pass it to the recursive method (e.g. `Type::has_relation_to_impl`). Rust types
+//! that form part of a complex type (e.g. tuples, protocols, nominal instances, etc) should
+//! usually just implement the recursive method, and all recursive calls should call the recursive
+//! method and pass along the visitor.
+//!
+//! Not all recursive calls need to actually call `.visit` on the visitor; only when visiting types
+//! that can create a recursive relationship (this includes, for example, type aliases and
+//! protocols).
+//!
+//! There is a risk of double-visiting, for example if `Type::has_relation_to_impl` calls
+//! `visitor.visit` when visiting a protocol type, and then internal `has_relation_to_impl` methods
+//! of the Rust types implementing protocols also call `visitor.visit`. The best way to avoid this
+//! is to prefer always calling `visitor.visit` only in the main recursive method on `Type`.
 use rustc_hash::FxHashMap;
 
 use crate::FxIndexSet;

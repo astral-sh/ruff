@@ -2034,14 +2034,15 @@ impl<'db> Type<'db> {
             }
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db), visitor)
-            }
+                }),
+
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
-            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
+            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db), visitor)
-            }
+            }),
 
             // The absence of a protocol member on one of these types guarantees
             // that the type will be disjoint from the protocol,
@@ -2096,27 +2097,27 @@ impl<'db> Type<'db> {
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)
                 | Type::EnumLiteral(..)),
-            )  => any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor),
+            )  => visitor.visit((self, other), || any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor)),
 
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
-                if n.class(db).is_final(db) =>
+                if n.class(db).is_final(db) => visitor.visit((self, other), ||
             {
                 any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
-            }
+            }),
 
             (Type::ProtocolInstance(protocol), other)
-            | (other, Type::ProtocolInstance(protocol)) => {
+            | (other, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
                         other.member(db, member.name()).place,
                         Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, attribute_type, visitor)
                     )
                 })
-            }
+            }),
 
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
