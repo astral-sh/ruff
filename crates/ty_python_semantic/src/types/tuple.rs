@@ -452,19 +452,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 }
 
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for FixedLengthTuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        unsafe {
-            let old_value = &mut *old_pointer;
-            Box::maybe_update(&raw mut old_value.0, new_value.0)
-        }
-    }
-}
-
 impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
@@ -847,21 +834,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 }
 
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for VariableLengthTuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_value = unsafe { &mut *old_pointer };
-        let mut changed = false;
-        changed |= unsafe { Box::maybe_update(&raw mut old_value.prefix, new_value.prefix) };
-        changed |= unsafe { T::maybe_update(&raw mut old_value.variable, new_value.variable) };
-        changed |= unsafe { Box::maybe_update(&raw mut old_value.suffix, new_value.suffix) };
-        changed
-    }
-}
-
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
     type Item = Type<'db>;
 
@@ -1146,28 +1118,6 @@ impl<T> From<FixedLengthTuple<T>> for Tuple<T> {
 impl<T> From<VariableLengthTuple<T>> for Tuple<T> {
     fn from(tuple: VariableLengthTuple<T>) -> Self {
         Tuple::Variable(tuple)
-    }
-}
-
-#[allow(unsafe_code)]
-unsafe impl<T> salsa::Update for Tuple<T>
-where
-    T: salsa::Update,
-{
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_value = unsafe { &mut *old_pointer };
-        match (old_value, new_value) {
-            (Tuple::Fixed(old), Tuple::Fixed(new)) => unsafe {
-                FixedLengthTuple::maybe_update(old, new)
-            },
-            (Tuple::Variable(old), Tuple::Variable(new)) => unsafe {
-                VariableLengthTuple::maybe_update(old, new)
-            },
-            (old_value, new_value) => {
-                *old_value = new_value;
-                true
-            }
-        }
     }
 }
 
