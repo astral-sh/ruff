@@ -109,9 +109,8 @@ pub fn indent_first_line<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
     }
 
     let mut lines = text.universal_newlines();
-    let first_line = lines.next();
-
-    if let Some(first_line) = first_line {
+    let Some(first_line) = lines.next() else {
+        return Cow::Borrowed(text);
         let mut result = String::with_capacity(text.len() + prefix.len());
 
         // Indent only the first line
