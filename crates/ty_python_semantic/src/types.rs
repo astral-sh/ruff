@@ -1062,49 +1062,49 @@ impl<'db> Type<'db> {
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Type::Union(union) => {
-                visitor.visit(self, |v| Type::Union(union.normalized_impl(db, v)))
+                visitor.visit(self, || Type::Union(union.normalized_impl(db, visitor)))
             }
-            Type::Intersection(intersection) => visitor.visit(self, |v| {
-                Type::Intersection(intersection.normalized_impl(db, v))
+            Type::Intersection(intersection) => visitor.visit(self, || {
+                Type::Intersection(intersection.normalized_impl(db, visitor))
             }),
-            Type::Callable(callable) => {
-                visitor.visit(self, |v| Type::Callable(callable.normalized_impl(db, v)))
-            }
+            Type::Callable(callable) => visitor.visit(self, || {
+                Type::Callable(callable.normalized_impl(db, visitor))
+            }),
             Type::ProtocolInstance(protocol) => {
-                visitor.visit(self, |v| protocol.normalized_impl(db, v))
+                visitor.visit(self, || protocol.normalized_impl(db, visitor))
             }
             Type::NominalInstance(instance) => {
-                visitor.visit(self, |v| instance.normalized_impl(db, v))
+                visitor.visit(self, || instance.normalized_impl(db, visitor))
             }
-            Type::FunctionLiteral(function) => visitor.visit(self, |v| {
-                Type::FunctionLiteral(function.normalized_impl(db, v))
+            Type::FunctionLiteral(function) => visitor.visit(self, || {
+                Type::FunctionLiteral(function.normalized_impl(db, visitor))
             }),
-            Type::PropertyInstance(property) => visitor.visit(self, |v| {
-                Type::PropertyInstance(property.normalized_impl(db, v))
+            Type::PropertyInstance(property) => visitor.visit(self, || {
+                Type::PropertyInstance(property.normalized_impl(db, visitor))
             }),
-            Type::MethodWrapper(method_kind) => visitor.visit(self, |v| {
-                Type::MethodWrapper(method_kind.normalized_impl(db, v))
+            Type::MethodWrapper(method_kind) => visitor.visit(self, || {
+                Type::MethodWrapper(method_kind.normalized_impl(db, visitor))
             }),
-            Type::BoundMethod(method) => {
-                visitor.visit(self, |v| Type::BoundMethod(method.normalized_impl(db, v)))
-            }
-            Type::BoundSuper(bound_super) => visitor.visit(self, |v| {
-                Type::BoundSuper(bound_super.normalized_impl(db, v))
+            Type::BoundMethod(method) => visitor.visit(self, || {
+                Type::BoundMethod(method.normalized_impl(db, visitor))
             }),
-            Type::GenericAlias(generic) => {
-                visitor.visit(self, |v| Type::GenericAlias(generic.normalized_impl(db, v)))
-            }
-            Type::SubclassOf(subclass_of) => visitor.visit(self, |v| {
-                Type::SubclassOf(subclass_of.normalized_impl(db, v))
+            Type::BoundSuper(bound_super) => visitor.visit(self, || {
+                Type::BoundSuper(bound_super.normalized_impl(db, visitor))
             }),
-            Type::TypeVar(bound_typevar) => visitor.visit(self, |v| {
-                Type::TypeVar(bound_typevar.normalized_impl(db, v))
+            Type::GenericAlias(generic) => visitor.visit(self, || {
+                Type::GenericAlias(generic.normalized_impl(db, visitor))
             }),
-            Type::KnownInstance(known_instance) => visitor.visit(self, |v| {
-                Type::KnownInstance(known_instance.normalized_impl(db, v))
+            Type::SubclassOf(subclass_of) => visitor.visit(self, || {
+                Type::SubclassOf(subclass_of.normalized_impl(db, visitor))
             }),
-            Type::TypeIs(type_is) => visitor.visit(self, |v| {
-                type_is.with_type(db, type_is.return_type(db).normalized_impl(db, v))
+            Type::TypeVar(bound_typevar) => visitor.visit(self, || {
+                Type::TypeVar(bound_typevar.normalized_impl(db, visitor))
+            }),
+            Type::KnownInstance(known_instance) => visitor.visit(self, || {
+                Type::KnownInstance(known_instance.normalized_impl(db, visitor))
+            }),
+            Type::TypeIs(type_is) => visitor.visit(self, || {
+                type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::EnumLiteral(enum_literal)
