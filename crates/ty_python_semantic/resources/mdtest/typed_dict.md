@@ -480,7 +480,7 @@ def _(p: Person) -> None:
     # `pop()` only works on non-required fields
     reveal_type(p.pop("extra"))  # revealed: str
     reveal_type(p.pop("extra", "fallback"))  # revealed: str
-    # error: [invalid-argument-type] "Argument is incorrect: Expected `Literal["extra"]`, found `Literal["name"]`"
+    # error: [invalid-argument-type] "Cannot pop required field 'name' from TypedDict `Person`"
     reveal_type(p.pop("name"))  # revealed: Unknown
 
     # `setdefault()` always returns the field type

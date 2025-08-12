@@ -2903,6 +2903,21 @@ pub(crate) fn report_missing_typed_dict_key<'db>(
     }
 }
 
+pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
+        ));
+    }
+}
+
 /// This function receives an unresolved `from foo import bar` import,
 /// where `foo` can be resolved to a module but that module does not
 /// have a `bar` member or submodule.

@@ -100,12 +100,12 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
     UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
-    report_implicit_return_type, report_instance_layout_conflict,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
-    report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_namedtuple_field_without_default_after_field_with_default,
+    report_cannot_pop_required_field_on_typed_dict, report_implicit_return_type,
+    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
+    report_invalid_assignment, report_invalid_attribute_assignment,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_return_type, report_namedtuple_field_without_default_after_field_with_default,
     report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
@@ -6192,10 +6192,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let key = key_literal.to_str();
                             let items = typed_dict_ty.items(self.db());
-                            if !items
+
+                            // Check if key exists
+                            if let Some((_, field)) = items
                                 .iter()
-                                .any(|(field_name, _)| field_name.as_str() == key)
+                                .find(|(field_name, _)| field_name.as_str() == key)
                             {
+                                // Key exists - check if it's a `pop()` on a required field
+                                if attr.id.as_str() == "pop" && field.is_required() {
+                                    report_cannot_pop_required_field_on_typed_dict(
+                                        &self.context,
+                                        first_arg.into(),
+                                        Type::TypedDict(typed_dict_ty),
+                                        key,
+                                    );
+                                    return Type::unknown();
+                                }
+                            } else {
                                 // Key not found, report error with suggestion and return early
                                 let key_ty = Type::StringLiteral(
                                     crate::types::StringLiteralType::new(self.db(), key),
