@@ -111,25 +111,24 @@ pub fn indent_first_line<'a>(text: &'a str, prefix: &str) -> Cow<'a, str> {
     let mut lines = text.universal_newlines();
     let Some(first_line) = lines.next() else {
         return Cow::Borrowed(text);
-        let mut result = String::with_capacity(text.len() + prefix.len());
+    };
 
-        // Indent only the first line
-        if first_line.trim_whitespace().is_empty() {
-            result.push_str(prefix.trim_whitespace_end());
-        } else {
-            result.push_str(prefix);
-        }
-        result.push_str(first_line.as_full_str());
+    let mut result = String::with_capacity(text.len() + prefix.len());
 
-        // Add remaining lines without indentation
-        for line in lines {
-            result.push_str(line.as_full_str());
-        }
-
-        Cow::Owned(result)
+    // Indent only the first line
+    if first_line.trim_whitespace().is_empty() {
+        result.push_str(prefix.trim_whitespace_end());
     } else {
-        Cow::Borrowed(text)
+        result.push_str(prefix);
     }
+    result.push_str(first_line.as_full_str());
+
+    // Add remaining lines without indentation
+    for line in lines {
+        result.push_str(line.as_full_str());
+    }
+
+    Cow::Owned(result)
 }
 
 /// Removes common leading whitespace from each line.
