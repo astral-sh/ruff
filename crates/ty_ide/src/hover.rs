@@ -425,14 +425,14 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:25:9
+          --> main.py:25:11
            |
         24 |         x = MyClass(0)
         25 |         x.my_method(2, 3)
-           |         ^^^^^^^-^^^
-           |         |      |
-           |         |      Cursor offset
-           |         source
+           |           ^^^^^-^^^
+           |           |    |
+           |           |    Cursor offset
+           |           source
            |
         ");
     }
