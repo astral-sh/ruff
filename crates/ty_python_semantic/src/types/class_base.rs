@@ -83,7 +83,7 @@ impl<'db> ClassBase<'db> {
                     let fields = subclass.own_fields(db, None);
                     Self::try_from_type(
                         db,
-                        TupleType::from_elements(
+                        TupleType::heterogeneous(
                             db,
                             fields.values().map(|field| field.declared_ty),
                         )?
@@ -149,7 +149,7 @@ impl<'db> ClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
-            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db)),
+            Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
 
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)
