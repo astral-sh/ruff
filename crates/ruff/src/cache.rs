@@ -525,7 +525,7 @@ mod tests {
         assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
-        let mut errors = Vec::new();
+        let mut paths_with_diagnostics = Vec::new();
         let mut expected_diagnostics = Diagnostics::default();
         for entry in fs::read_dir(&package_root).unwrap() {
             let entry = entry.unwrap();
@@ -560,7 +560,7 @@ mod tests {
                 )
                 .unwrap();
                 if !diagnostics.inner.is_empty() {
-                    errors.push(path.clone());
+                    paths_with_diagnostics.push(path.clone());
                 }
                 paths.push(path);
                 expected_diagnostics += diagnostics;
@@ -573,10 +573,10 @@ mod tests {
         let cache = Cache::open(package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
 
-        errors.sort();
+        paths_with_diagnostics.sort();
 
         for path in &paths {
-            if errors.binary_search(path).is_ok() {
+            if paths_with_diagnostics.binary_search(path).is_ok() {
                 continue; // We don't cache files with diagnostics.
             }
 
