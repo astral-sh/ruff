@@ -99,7 +99,7 @@ pub struct GenericContext<'db> {
 pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     context: GenericContext<'db>,
-    visitor: &V,
+    visitor: &mut V,
 ) {
     for bound_typevar in context.variables(db) {
         visitor.visit_bound_type_var_type(db, *bound_typevar);
@@ -355,7 +355,11 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, expanded.into_boxed_slice(), None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let variables: FxOrderSet<_> = self
             .variables(db)
             .iter()
@@ -411,7 +415,7 @@ impl get_size2::GetSize for Specialization<'_> {}
 pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
-    visitor: &V,
+    visitor: &mut V,
 ) {
     walk_generic_context(db, specialization.generic_context(db), visitor);
     for ty in specialization.types(db) {
@@ -464,14 +468,14 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
+        self.apply_type_mapping_impl(db, type_mapping, &mut TypeTransformer::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -522,7 +526,11 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -563,7 +571,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
@@ -683,7 +691,7 @@ pub struct PartialSpecialization<'a, 'db> {
 pub(super) fn walk_partial_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: &PartialSpecialization<'_, 'db>,
-    visitor: &V,
+    visitor: &mut V,
 ) {
     walk_generic_context(db, specialization.generic_context, visitor);
     for ty in &*specialization.types {
@@ -716,7 +724,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> PartialSpecialization<'db, 'db> {
         let generic_context = self.generic_context.normalized_impl(db, visitor);
         let types: Cow<_> = self

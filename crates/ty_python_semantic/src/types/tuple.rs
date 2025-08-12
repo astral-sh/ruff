@@ -135,7 +135,7 @@ pub struct TupleType<'db> {
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     tuple: TupleType<'db>,
-    visitor: &V,
+    visitor: &mut V,
 ) {
     for element in tuple.tuple(db).all_elements() {
         visitor.visit_type(db, *element);
@@ -246,7 +246,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Option<Self> {
         TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
     }
@@ -259,7 +259,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Option<Self> {
         TupleType::new(
             db,
@@ -283,7 +283,7 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         self.tuple(db)
             .has_relation_to_impl(db, other.tuple(db), relation, visitor)
@@ -401,7 +401,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
         Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
@@ -413,7 +413,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         Self::from_elements(
             self.0
@@ -438,7 +438,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -695,7 +695,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> TupleSpec<'db> {
+    fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
             .map(|ty| ty.normalized_impl(db, visitor))
@@ -724,12 +728,13 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
             self.prefix
                 .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+                .collect::<Vec<_>>(),
             self.variable
                 .apply_type_mapping_impl(db, type_mapping, visitor),
             self.suffix
@@ -759,7 +764,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match other {
             Tuple::Fixed(other) => {
@@ -1035,7 +1040,11 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         match self {
             Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
             Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
@@ -1053,7 +1062,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &mut TypeTransformer<'db>,
     ) -> Self {
         match self {
             Tuple::Fixed(tuple) => {
@@ -1080,7 +1089,7 @@ impl<'db> Tuple<Type<'db>> {
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         match self {
             Tuple::Fixed(self_tuple) => {
@@ -1108,7 +1117,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        visitor: &PairVisitor<'db>,
+        visitor: &mut PairVisitor<'db>,
     ) -> bool {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
@@ -1126,7 +1135,7 @@ impl<'db> Tuple<Type<'db>> {
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'s Type<'db>>,
             b: impl IntoIterator<Item = &'s Type<'db>>,
-            visitor: &PairVisitor<'db>,
+            visitor: &mut PairVisitor<'db>,
         ) -> bool
         where
             'db: 's,

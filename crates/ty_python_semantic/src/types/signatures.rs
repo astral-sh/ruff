@@ -61,7 +61,11 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -241,7 +245,7 @@ pub struct Signature<'db> {
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
-    visitor: &V,
+    visitor: &mut V,
 ) {
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
@@ -380,7 +384,11 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         Self {
             generic_context: self
                 .generic_context
@@ -1360,7 +1368,11 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &mut TypeTransformer<'db>,
+    ) -> Self {
         let Parameter {
             annotated_type,
             kind,
