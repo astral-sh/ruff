@@ -2262,7 +2262,11 @@ import fo<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2274,7 +2278,11 @@ import foo as ba<CURSOR>
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -2286,7 +2294,11 @@ from fo<CURSOR> import wat
 ",
         );
 
-        assert_snapshot!(test.completions_without_builtins(), @"<No completions found>");
+        // This snapshot would generate a big list of modules,
+        // which is kind of annoying. So just assert that it
+        // runs without panicking and produces some non-empty
+        // output.
+        assert!(!test.completions_without_builtins().is_empty());
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
