@@ -3073,6 +3073,7 @@ name = "ruff_memory_usage"
 version = "0.0.0"
 dependencies = [
  "get-size2",
+ "ordermap",
 ]
 
 [[package]]

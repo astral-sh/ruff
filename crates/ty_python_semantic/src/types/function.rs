@@ -120,6 +120,8 @@ bitflags! {
     }
 }
 
+impl get_size2::GetSize for FunctionDecorators {}
+
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
         match decorator_type {
@@ -184,7 +186,7 @@ impl Default for DataclassTransformerParams {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
@@ -406,7 +408,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
@@ -432,6 +434,9 @@ pub struct FunctionLiteral<'db> {
     /// [updated]: crate::types::class::ClassLiteral::own_class_member
     inherited_generic_context: Option<GenericContext<'db>>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionLiteral<'_> {}
 
 fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -609,7 +614,7 @@ impl<'db> FunctionLiteral<'db> {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
@@ -1057,7 +1062,15 @@ fn last_definition_signature_cycle_initial<'db>(
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    get_size2::GetSize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
