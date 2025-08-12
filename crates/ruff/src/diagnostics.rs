@@ -312,24 +312,21 @@ pub(crate) fn lint_path(
             (result, transformed, fixed)
         };
 
-    let has_error = result.has_syntax_errors();
     let diagnostics = result.diagnostics;
 
     if let Some((cache, relative_path, key)) = caching {
-        // We don't cache errors.
-        if !has_error && diagnostics.is_empty() {
-            // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
-            // and writing the diff to stdout, respectively). If a file has diagnostics, we
-            // need to avoid reading from and writing to the cache in these modes.
-            if match fix_mode {
-                flags::FixMode::Generate => true,
-                flags::FixMode::Apply | flags::FixMode::Diff => {
-                    diagnostics.is_empty() && fixed.is_empty()
-                }
-            } {
-                cache.set_linted(relative_path.to_owned(), &key);
-            }
-        }
+        // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
+        // and writing the diff to stdout, respectively). If a file has diagnostics
+        // with fixes, we need to avoid reading from and writing to the cache in these
+        // modes.
+        let use_fixes = match fix_mode {
+            flags::FixMode::Generate => true,
+            flags::FixMode::Apply | flags::FixMode::Diff => fixed.is_empty(),
+        };
+
+        // We don't cache files with diagnostics.
+        let linted = diagnostics.is_empty() && use_fixes;
+        cache.set_linted(relative_path.to_owned(), &key, linted);
     }
 
     // Avoid constructing a map when there are no diagnostics. The index is only used for rendering

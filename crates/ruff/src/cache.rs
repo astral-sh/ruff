@@ -289,8 +289,8 @@ impl Cache {
         });
     }
 
-    pub(crate) fn set_linted(&self, path: RelativePathBuf, key: &FileCacheKey) {
-        self.update(path, key, ChangeData::Linted);
+    pub(crate) fn set_linted(&self, path: RelativePathBuf, key: &FileCacheKey, yes: bool) {
+        self.update(path, key, ChangeData::Linted(yes));
     }
 
     pub(crate) fn set_formatted(&self, path: RelativePathBuf, key: &FileCacheKey) {
@@ -456,15 +456,15 @@ struct Change {
 
 #[derive(Debug)]
 enum ChangeData {
-    Linted,
+    Linted(bool),
     Formatted,
 }
 
 impl ChangeData {
     fn apply(self, data: &mut FileCacheData) {
         match self {
-            ChangeData::Linted => {
-                data.linted = true;
+            ChangeData::Linted(yes) => {
+                data.linted = yes;
             }
             ChangeData::Formatted => {
                 data.formatted = true;
@@ -496,7 +496,7 @@ mod tests {
     use ruff_python_ast::{PySourceType, PythonVersion};
     use ruff_workspace::Settings;
 
-    use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
+    use crate::cache::{self, ChangeData, FileCache, FileCacheData, FileCacheKey};
     use crate::cache::{Cache, RelativePathBuf};
     use crate::commands::format::{FormatCommandError, FormatMode, FormatResult, format_path};
     use crate::diagnostics::{Diagnostics, lint_path};
@@ -676,8 +676,17 @@ mod tests {
         assert_eq!(results.inner.len(), 1, "Expected one F822 diagnostic");
         assert_eq!(
             cache.changes.lock().unwrap().len(),
-            0,
-            "Files with diagnostics should not be cached"
+            1,
+            "Files with diagnostics still trigger change events"
+        );
+        assert!(
+            cache
+                .changes
+                .lock()
+                .unwrap()
+                .last()
+                .is_some_and(|change| matches!(change.new_data, ChangeData::Linted(false))),
+            "Files with diagnostics are marked as unlinted"
         );
 
         cache.persist().unwrap();
