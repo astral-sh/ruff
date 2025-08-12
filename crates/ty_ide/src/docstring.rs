@@ -54,8 +54,12 @@ impl Docstring {
 
     /// Render the docstring for markdown display
     pub fn render_markdown(&self) -> String {
-        // TODO: now actually parse it and "render" it to markdown
-        documentation_trim(&self.0)
+        let trimmed = documentation_trim(&self.0);
+        // TODO: now actually parse it and "render" it to markdown.
+        //
+        // For now we just wrap the content in a plaintext codeblock
+        // to avoid the contents erroneously being interpreted as markdown.
+        format!("```text\n{trimmed}\n```")
     }
 
     /// Extract parameter documentation from popular docstring formats.
@@ -514,6 +518,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
@@ -524,6 +529,8 @@ mod tests {
 
         Returns:
             str: The return value description
+
+        ```
         ");
     }
 
@@ -585,6 +592,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Parameters
@@ -601,6 +609,8 @@ mod tests {
         -------
         str
             The return value description
+
+        ```
         ");
     }
 
@@ -616,7 +626,12 @@ mod tests {
 
         assert_snapshot!(docstring.render_plaintext(), @"This is a simple function description without parameter documentation.");
 
-        assert_snapshot!(docstring.render_markdown(), @"This is a simple function description without parameter documentation.");
+        assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
+        This is a simple function description without parameter documentation.
+
+        ```
+        ");
     }
 
     #[test]
@@ -665,6 +680,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
@@ -675,6 +691,8 @@ mod tests {
         ----------
         param3 : bool
             NumPy-style parameter
+
+        ```
         ");
     }
 
@@ -720,6 +738,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         :param str param1: The first parameter description
@@ -728,6 +747,8 @@ mod tests {
         :param param3: A parameter without type annotation
         :returns: The return value description
         :rtype: str
+
+        ```
         ");
     }
 
@@ -785,6 +806,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
@@ -797,6 +819,8 @@ mod tests {
         ----------
         param4 : bool
             NumPy-style parameter
+
+        ```
         ");
     }
 
@@ -858,6 +882,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Parameters
@@ -874,6 +899,8 @@ mod tests {
         -------
         str
             The return value description
+
+        ```
         ");
     }
 
@@ -926,6 +953,7 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Parameters
@@ -937,6 +965,8 @@ mod tests {
                 This is a continuation of param2 description.
         param3
                 A parameter without type annotation
+
+        ```
         ");
     }
 
@@ -986,11 +1016,14 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_windows.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
             param1 (str): The first parameter
             param2 (int): The second parameter
+
+        ```
         ");
 
         assert_snapshot!(docstring_mac.render_plaintext(), @r"
@@ -1002,11 +1035,14 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_mac.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
             param1 (str): The first parameter
             param2 (int): The second parameter
+
+        ```
         ");
 
         assert_snapshot!(docstring_unix.render_plaintext(), @r"
@@ -1018,11 +1054,14 @@ mod tests {
         ");
 
         assert_snapshot!(docstring_unix.render_markdown(), @r"
+        ```text
         This is a function description.
 
         Args:
             param1 (str): The first parameter
             param2 (int): The second parameter
+
+        ```
         ");
     }
 }

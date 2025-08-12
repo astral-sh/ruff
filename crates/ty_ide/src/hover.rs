@@ -132,12 +132,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 
                     match self.kind {
                         MarkupKind::PlainText => docstring.render_plaintext().fmt(f)?,
-                        MarkupKind::Markdown => {
-                            // TODO: make render_markdown_documentation actually render to markdown.
-                            // For now we wrap everything in a plaintext code block
-                            let markdown = docstring.render_markdown();
-                            self.kind.fenced_code_block(markdown, "text").fmt(f)?;
-                        }
+                        MarkupKind::Markdown => docstring.render_markdown().fmt(f)?,
                     }
                 }
             }
