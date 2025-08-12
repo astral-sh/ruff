@@ -1015,6 +1015,12 @@ impl<'db> Type<'db> {
         Self::BytesLiteral(BytesLiteralType::new(db, bytes))
     }
 
+    pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
+        Self::TypedDict(TypedDictType {
+            defining_class: defining_class.into(),
+        })
+    }
+
     #[must_use]
     pub fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         IntersectionBuilder::new(db).add_negative(*self).build()
@@ -5230,16 +5236,12 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ if class.is_typed_dict(db) => {
-                        TypedDictType::from(db, ClassType::NonGeneric(*class))
-                    }
+                    _ if class.is_typed_dict(db) => Type::typed_dict(*class),
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => {
-                Ok(TypedDictType::from(db, ClassType::from(*alias)))
-            }
+            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::typed_dict(*alias)),
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -5562,7 +5564,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class(db)),
+            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class),
         }
     }
 
@@ -5974,7 +5976,7 @@ impl<'db> Type<'db> {
             },
 
             Type::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class(db).definition(db)))
+                Some(TypeDefinition::Class(typed_dict.defining_class.definition(db)))
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -9022,24 +9024,16 @@ impl<'db> EnumLiteralType<'db> {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
 pub struct TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
     defining_class: ClassType<'db>,
 }
 
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for TypedDictType<'_> {}
-
 impl<'db> TypedDictType<'db> {
-    pub(crate) fn from(db: &'db dyn Db, defining_class: ClassType<'db>) -> Type<'db> {
-        Type::TypedDict(Self::new(db, defining_class))
-    }
-
     pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class(db).class_literal(db);
+        let (class_literal, specialization) = self.defining_class.class_literal(db);
         class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
 
@@ -9048,10 +9042,9 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        Self::new(
-            db,
-            self.defining_class(db).apply_type_mapping(db, type_mapping),
-        )
+        Self {
+            defining_class: self.defining_class.apply_type_mapping(db, type_mapping),
+        }
     }
 }
 
@@ -9060,7 +9053,7 @@ fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class(db).into());
+    visitor.visit_type(db, typed_dict.defining_class.into());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

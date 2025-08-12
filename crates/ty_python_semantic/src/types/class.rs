@@ -2922,6 +2922,12 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     }
 }
 
+impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
+    fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
+        ClassType::NonGeneric(class)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
