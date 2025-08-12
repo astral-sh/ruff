@@ -26,7 +26,7 @@ use crate::semantic_index::scope::{FileScopeId, ScopeId};
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct Unpack<'db> {
     pub(crate) file: File,
 
@@ -45,6 +45,9 @@ pub(crate) struct Unpack<'db> {
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
     pub(crate) value: UnpackValue<'db>,
 }
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
     pub(crate) fn target<'ast>(
@@ -67,7 +70,7 @@ impl<'db> Unpack<'db> {
 }
 
 /// The expression that is being unpacked.
-#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UnpackValue<'db> {
     /// The kind of unpack expression
     kind: UnpackKind,
@@ -99,7 +102,7 @@ impl<'db> UnpackValue<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum EvaluationMode {
     Sync,
     Async,
@@ -119,7 +122,7 @@ impl EvaluationMode {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable { mode: EvaluationMode },
@@ -130,7 +133,7 @@ pub(crate) enum UnpackKind {
 }
 
 /// The position of the target element in an unpacking.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum UnpackPosition {
     /// The target element is in the first position of the unpacking.
     First,

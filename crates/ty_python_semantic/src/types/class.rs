@@ -43,7 +43,7 @@ use crate::{
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
-        definition_expression_type,
+        cyclic::PairVisitor, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -212,7 +212,7 @@ impl CodeGeneratorKind {
 /// # Ordering
 /// Ordering is based on the generic aliases's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
@@ -222,7 +222,7 @@ pub struct GenericAlias<'db> {
 pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     alias: GenericAlias<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_specialization(db, alias.specialization(db), visitor);
 }
@@ -231,11 +231,7 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
@@ -255,15 +251,17 @@ impl<'db> GenericAlias<'db> {
         self.origin(db).definition(db)
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).apply_type_mapping(db, type_mapping),
+            self.specialization(db)
+                .apply_type_mapping_impl(db, type_mapping, visitor),
         )
     }
 
@@ -273,8 +271,6 @@ impl<'db> GenericAlias<'db> {
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        // A tuple's specialization will include all of its element types, so we don't need to also
-        // look in `self.tuple`.
         self.specialization(db)
             .find_legacy_typevars(db, binding_context, typevars);
     }
@@ -316,11 +312,14 @@ impl<'db> ClassType<'db> {
         matches!(self, Self::NonGeneric(_))
     }
 
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
+        match self {
+            Self::NonGeneric(_) => None,
+            Self::Generic(generic) => Some(generic),
+        }
+    }
+
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
@@ -403,14 +402,17 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.apply_type_mapping(db, type_mapping)),
+            Self::Generic(generic) => {
+                Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, visitor))
+            }
         }
     }
 
@@ -459,14 +461,15 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to(db, other, TypeRelation::Subtyping)
+        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
@@ -482,10 +485,11 @@ impl<'db> ClassType<'db> {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
                         base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to(
+                            && base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
                                 relation,
+                                visitor,
                             )
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
@@ -663,7 +667,8 @@ impl<'db> ClassType<'db> {
         match name {
             "__len__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
-                    .and_then(|spec| spec.tuple(db).len().into_fixed_length())
+                    .and_then(|spec| spec.tuple(db))
+                    .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
                     .map(Type::IntLiteral)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
@@ -673,7 +678,8 @@ impl<'db> ClassType<'db> {
 
             "__bool__" if class_literal.is_tuple(db) => {
                 let return_type = specialization
-                    .map(|spec| spec.tuple(db).truthiness().into_type(db))
+                    .and_then(|spec| spec.tuple(db))
+                    .map(|tuple| tuple.truthiness().into_type(db))
                     .unwrap_or_else(|| KnownClass::Bool.to_instance(db));
 
                 synthesize_simple_tuple_method(return_type)
@@ -681,9 +687,8 @@ impl<'db> ClassType<'db> {
 
             "__getitem__" if class_literal.is_tuple(db) => {
                 specialization
-                    .map(|spec| {
-                        let tuple = spec.tuple(db);
-
+                    .and_then(|spec| spec.tuple(db))
+                    .map(|tuple| {
                         let mut element_type_to_indices: FxIndexMap<Type<'db>, Vec<i64>> =
                             FxIndexMap::default();
 
@@ -846,11 +851,12 @@ impl<'db> ClassType<'db> {
                 let mut iterable_parameter =
                     Parameter::positional_only(Some(Name::new_static("iterable")));
 
-                match specialization {
-                    Some(spec) => {
+                let tuple = specialization.and_then(|spec| spec.tuple(db));
+
+                match tuple {
+                    Some(tuple) => {
                         // TODO: Once we support PEP 646 annotations for `*args` parameters, we can
                         // use the tuple itself as the argument type.
-                        let tuple = spec.tuple(db);
                         let tuple_len = tuple.len();
 
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
@@ -885,7 +891,7 @@ impl<'db> ClassType<'db> {
                 // - a zero-length tuple
                 // - an unspecialized tuple
                 // - a tuple with no minimum length
-                if specialization.is_none_or(|spec| spec.tuple(db).len().minimum() == 0) {
+                if tuple.is_none_or(|tuple| tuple.len().minimum() == 0) {
                     iterable_parameter =
                         iterable_parameter.with_default_type(Type::empty_tuple(db));
                 }
@@ -1149,7 +1155,7 @@ pub(crate) struct Field<'db> {
 /// # Ordering
 /// Ordering is based on the class's id assigned by salsa and not on the class literal's values.
 /// The id may change between runs, or when the class literal was garbage collected and recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct ClassLiteral<'db> {
     /// Name of the class at definition
@@ -1228,7 +1234,7 @@ impl<'db> ClassLiteral<'db> {
         let parsed = parsed_module(db, file).load(db);
         let class_def_node = scope.node(db).expect_class(&parsed);
         class_def_node.type_params.as_ref().map(|type_params| {
-            let index = semantic_index(db, file);
+            let index = semantic_index(db, scope.file(db));
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(db, index, definition, type_params)
         })
@@ -1298,7 +1304,8 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            specialization.unwrap_or_else(|| generic_context.default_specialization(db))
+            specialization
+                .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
         })
     }
 
@@ -1307,7 +1314,7 @@ impl<'db> ClassLiteral<'db> {
     /// applies the default specialization to the class's typevars.
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.default_specialization(db)
+            generic_context.default_specialization(db, self.known(db))
         })
     }
 
@@ -1888,7 +1895,7 @@ impl<'db> ClassLiteral<'db> {
 
                 if field_ty
                     .into_nominal_instance()
-                    .is_some_and(|instance| instance.class.is_known(db, KnownClass::KwOnly))
+                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
                 {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
@@ -2923,6 +2930,12 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     }
 }
 
+impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
+    fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
+        ClassType::NonGeneric(class)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
@@ -2999,7 +3012,7 @@ pub(super) enum SolidBaseKind {
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
 /// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
@@ -3101,7 +3114,10 @@ impl KnownClass {
 
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
-    pub(crate) const fn bool(self) -> Truthiness {
+    ///
+    /// Returns `None` for `KnownClass::Tuple`, since the truthiness of a tuple
+    /// depends on its spec.
+    pub(crate) const fn bool(self) -> Option<Truthiness> {
         match self {
             // N.B. It's only generally safe to infer `Truthiness::AlwaysTrue` for a `KnownClass`
             // variant if the class's `__bool__` method always returns the same thing *and* the
@@ -3127,9 +3143,9 @@ impl KnownClass {
             | Self::GeneratorType
             | Self::AsyncGeneratorType
             | Self::MethodWrapperType
-            | Self::CoroutineType => Truthiness::AlwaysTrue,
+            | Self::CoroutineType => Some(Truthiness::AlwaysTrue),
 
-            Self::NoneType => Truthiness::AlwaysFalse,
+            Self::NoneType => Some(Truthiness::AlwaysFalse),
 
             Self::Any
             | Self::BaseException
@@ -3146,7 +3162,6 @@ impl KnownClass {
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::Set
-            | Self::Tuple
             | Self::Int
             | Self::Type
             | Self::Bytes
@@ -3185,7 +3200,9 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
-            | Self::TypedDictFallback => Truthiness::Ambiguous,
+            | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
+
+            Self::Tuple => None,
         }
     }
 
@@ -3430,6 +3447,82 @@ impl KnownClass {
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
             | KnownClass::TypedDictFallback => false,
+        }
+    }
+
+    pub(crate) const fn is_tuple_subclass(self) -> bool {
+        match self {
+            KnownClass::Tuple | KnownClass::VersionInfo => true,
+
+            KnownClass::Bool
+            | KnownClass::Object
+            | KnownClass::Bytes
+            | KnownClass::Bytearray
+            | KnownClass::Type
+            | KnownClass::Int
+            | KnownClass::Float
+            | KnownClass::Complex
+            | KnownClass::Str
+            | KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Dict
+            | KnownClass::Slice
+            | KnownClass::Property
+            | KnownClass::BaseException
+            | KnownClass::Exception
+            | KnownClass::BaseExceptionGroup
+            | KnownClass::ExceptionGroup
+            | KnownClass::Staticmethod
+            | KnownClass::Classmethod
+            | KnownClass::Awaitable
+            | KnownClass::Generator
+            | KnownClass::Deprecated
+            | KnownClass::Super
+            | KnownClass::Enum
+            | KnownClass::EnumType
+            | KnownClass::Auto
+            | KnownClass::Member
+            | KnownClass::Nonmember
+            | KnownClass::ABCMeta
+            | KnownClass::GenericAlias
+            | KnownClass::ModuleType
+            | KnownClass::FunctionType
+            | KnownClass::MethodType
+            | KnownClass::MethodWrapperType
+            | KnownClass::WrapperDescriptorType
+            | KnownClass::UnionType
+            | KnownClass::GeneratorType
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::CoroutineType
+            | KnownClass::NoneType
+            | KnownClass::Any
+            | KnownClass::StdlibAlias
+            | KnownClass::SpecialForm
+            | KnownClass::TypeVar
+            | KnownClass::ParamSpec
+            | KnownClass::ParamSpecArgs
+            | KnownClass::ParamSpecKwargs
+            | KnownClass::TypeVarTuple
+            | KnownClass::TypeAliasType
+            | KnownClass::NoDefaultType
+            | KnownClass::NamedTuple
+            | KnownClass::NewType
+            | KnownClass::SupportsIndex
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::DefaultDict
+            | KnownClass::Deque
+            | KnownClass::OrderedDict
+            | KnownClass::EllipsisType
+            | KnownClass::NotImplementedType
+            | KnownClass::Field
+            | KnownClass::KwOnly
+            | KnownClass::InitVar
+            | KnownClass::TypedDictFallback
+            | KnownClass::NamedTupleFallback => false,
         }
     }
 
@@ -3875,8 +3968,10 @@ impl KnownClass {
         }
     }
 
-    /// Return true if all instances of this `KnownClass` compare equal.
-    pub(super) const fn is_single_valued(self) -> bool {
+    /// Returns `Some(true)` if all instances of this `KnownClass` compare equal.
+    /// Returns `None` for `KnownClass::Tuple`, since whether or not a tuple type
+    /// is single-valued depends on the tuple spec.
+    pub(super) const fn is_single_valued(self) -> Option<bool> {
         match self {
             Self::NoneType
             | Self::NoDefaultType
@@ -3884,7 +3979,7 @@ impl KnownClass {
             | Self::EllipsisType
             | Self::TypeAliasType
             | Self::UnionType
-            | Self::NotImplementedType => true,
+            | Self::NotImplementedType => Some(true),
 
             Self::Any
             | Self::Bool
@@ -3897,7 +3992,6 @@ impl KnownClass {
             | Self::Complex
             | Self::Str
             | Self::List
-            | Self::Tuple
             | Self::Set
             | Self::FrozenSet
             | Self::Dict
@@ -3949,7 +4043,9 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
-            | Self::TypedDictFallback => false,
+            | Self::TypedDictFallback => Some(false),
+
+            Self::Tuple => None,
         }
     }
 
@@ -4556,47 +4652,6 @@ impl<'db> KnownClassLookupError<'db> {
     }
 }
 
-pub(crate) struct SliceLiteral {
-    pub(crate) start: Option<i32>,
-    pub(crate) stop: Option<i32>,
-    pub(crate) step: Option<i32>,
-}
-
-impl<'db> ClassType<'db> {
-    /// If this class is a specialization of `slice`, returns a [`SliceLiteral`] describing it.
-    /// Otherwise returns `None`.
-    ///
-    /// The specialization must be one in which the typevars are solved as being statically known
-    /// integers or `None`.
-    pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
-        let ClassType::Generic(alias) = self else {
-            return None;
-        };
-        if !alias.origin(db).is_known(db, KnownClass::Slice) {
-            return None;
-        }
-        let [start, stop, step] = alias.specialization(db).types(db) else {
-            return None;
-        };
-
-        let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
-            Type::NominalInstance(instance)
-                if instance.class.is_known(db, KnownClass::NoneType) =>
-            {
-                Some(None)
-            }
-            _ => None,
-        };
-        Some(SliceLiteral {
-            start: to_u32(start)?,
-            stop: to_u32(stop)?,
-            step: to_u32(step)?,
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassError<'db> {
     kind: MetaclassErrorKind<'db>,
@@ -4664,16 +4719,14 @@ impl SlotsKind {
 
         match slots_ty {
             // __slots__ = ("a", "b")
-            Type::Tuple(tuple) => {
-                let tuple = tuple.tuple(db);
-                if tuple.is_variadic() {
-                    Self::Dynamic
-                } else if tuple.is_empty() {
-                    Self::Empty
-                } else {
-                    Self::NotEmpty
-                }
-            }
+            Type::NominalInstance(nominal) => match nominal
+                .tuple_spec(db)
+                .and_then(|spec| spec.len().into_fixed_length())
+            {
+                Some(0) => Self::Empty,
+                Some(_) => Self::NotEmpty,
+                None => Self::Dynamic,
+            },
 
             // __slots__ = "abc"  # Same as `("abc",)`
             Type::StringLiteral(_) => Self::NotEmpty,

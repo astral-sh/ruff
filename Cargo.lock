@@ -3073,6 +3073,7 @@ name = "ruff_memory_usage"
 version = "0.0.0"
 dependencies = [
  "get-size2",
+ "ordermap",
 ]
 
 [[package]]
@@ -3449,7 +3450,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=940f9c09a7d0a0903bc7edc4a3f1977382980f0b#940f9c09a7d0a0903bc7edc4a3f1977382980f0b"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3473,12 +3474,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=940f9c09a7d0a0903bc7edc4a3f1977382980f0b#940f9c09a7d0a0903bc7edc4a3f1977382980f0b"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=940f9c09a7d0a0903bc7edc4a3f1977382980f0b#940f9c09a7d0a0903bc7edc4a3f1977382980f0b"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "proc-macro2",
  "quote",
