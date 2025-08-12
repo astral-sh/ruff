@@ -7,14 +7,14 @@ use super::{
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
-use crate::types::LintDiagnosticGuard;
-use crate::types::class::{Field, SolidBase, SolidBaseKind};
+use crate::types::class::{ClassType, Field, SolidBase, SolidBaseKind};
 use crate::types::function::KnownFunction;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::{LintDiagnosticGuard, Protocol, ProtocolInstanceType};
 use crate::types::{SpecialFormType, Type, protocol_class::ProtocolClassLiteral};
 use crate::util::diagnostics::format_enumeration;
 use crate::{Db, FxIndexMap, FxOrderMap, Module, ModuleName, Program, declare_lint};
@@ -1854,10 +1854,7 @@ pub(super) fn report_invalid_assignment(
     }
 }
 
-fn type_to_class_literal<'db>(
-    ty: Type<'db>,
-    db: &'db dyn crate::Db,
-) -> Option<crate::types::class::ClassLiteral<'db>> {
+fn type_to_class_literal<'db>(ty: Type<'db>, db: &'db dyn crate::Db) -> Option<ClassLiteral<'db>> {
     match ty {
         Type::ClassLiteral(class) => Some(class),
         Type::NominalInstance(instance) => match instance.class(db) {
@@ -1865,6 +1862,21 @@ fn type_to_class_literal<'db>(
             crate::types::class::ClassType::Generic(alias) => Some(alias.origin(db)),
         },
         Type::EnumLiteral(enum_literal) => Some(enum_literal.enum_class(db)),
+        Type::GenericAlias(alias) => Some(alias.origin(db)),
+        Type::ProtocolInstance(ProtocolInstanceType {
+            inner: Protocol::FromClass(class),
+            ..
+        }) => match class {
+            ClassType::NonGeneric(class) => Some(class),
+            ClassType::Generic(alias) => Some(alias.origin(db)),
+        },
+        Type::TypedDict(typed_dict) => match typed_dict.defining_class(db) {
+            ClassType::NonGeneric(class) => Some(class),
+            ClassType::Generic(alias) => Some(alias.origin(db)),
+        },
+        Type::SubclassOf(subclass_of) => {
+            type_to_class_literal(Type::from(subclass_of.subclass_of().into_class()?), db)
+        }
         _ => None,
     }
 }

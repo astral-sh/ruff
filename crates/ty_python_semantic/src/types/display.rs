@@ -74,35 +74,62 @@ pub struct QualifiedDisplayType<'db> {
 impl Display for QualifiedDisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.ty {
-            Type::ClassLiteral(literal) => {
-                write!(f, "{}", self.get_qualified_representation(*literal))
-            }
+            Type::ClassLiteral(literal) => f.write_str(&self.qualified_representation(*literal)),
             Type::NominalInstance(instance) => match instance.class(self.db) {
-                ClassType::NonGeneric(class) => {
-                    write!(f, "{}", self.get_qualified_representation(class))
-                }
+                ClassType::NonGeneric(class) => f.write_str(&self.qualified_representation(class)),
                 ClassType::Generic(alias) => {
-                    write!(
-                        f,
-                        "{}",
-                        self.get_qualified_representation(alias.origin(self.db))
-                    )
+                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
                 }
             },
             Type::EnumLiteral(enum_literal) => {
                 write!(
                     f,
                     "Literal[{}]",
-                    self.get_qualified_representation(enum_literal.enum_class(self.db))
+                    self.qualified_representation(enum_literal.enum_class(self.db))
                 )
             }
+            Type::GenericAlias(alias) => {
+                write!(
+                    f,
+                    "<class '{}'>",
+                    &self.qualified_representation(alias.origin(self.db))
+                )
+            }
+            Type::ProtocolInstance(protocol) => match protocol.inner {
+                Protocol::FromClass(ClassType::NonGeneric(class)) => {
+                    f.write_str(&self.qualified_representation(class))
+                }
+                Protocol::FromClass(ClassType::Generic(alias)) => {
+                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
+                }
+                Protocol::Synthesized(_) => self.ty.display(self.db).fmt(f),
+            },
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                    write!(f, "type[{}]", self.qualified_representation(class))
+                }
+                SubclassOfInner::Class(ClassType::Generic(alias)) => {
+                    write!(
+                        f,
+                        "type[{}]",
+                        self.qualified_representation(alias.origin(self.db))
+                    )
+                }
+                SubclassOfInner::Dynamic(_) => self.ty.display(self.db).fmt(f),
+            },
+            Type::TypedDict(typed_dict) => match typed_dict.defining_class(self.db) {
+                ClassType::NonGeneric(class) => f.write_str(&self.qualified_representation(class)),
+                ClassType::Generic(alias) => {
+                    f.write_str(&self.qualified_representation(alias.origin(self.db)))
+                }
+            },
             _ => self.ty.display(self.db).fmt(f),
         }
     }
 }
 
 impl QualifiedDisplayType<'_> {
-    fn get_qualified_representation(self, class: ClassLiteral) -> String {
+    fn qualified_representation(self, class: ClassLiteral) -> String {
         let body_scope = class.body_scope(self.db);
         let file = body_scope.file(self.db);
         let module_ast = parsed_module(self.db, file).load(self.db);
@@ -125,7 +152,10 @@ impl QualifiedDisplayType<'_> {
                 }
                 ScopeKind::Function => {
                     if let Some(function_def) = node.as_function(&module_ast) {
-                        name_parts.push(format!("<local in {}>", function_def.name.as_str()));
+                        name_parts.push(format!(
+                            "<locals of function '{}'>",
+                            function_def.name.as_str()
+                        ));
                     }
                 }
                 _ => {}
