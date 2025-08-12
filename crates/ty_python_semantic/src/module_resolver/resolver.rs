@@ -656,7 +656,7 @@ struct ModuleNameIngredient<'db> {
 /// This includes "builtin" modules, which can never be shadowed at runtime either, as well as the
 /// `types` module, which tends to be imported early in Python startup, so can't be consistently
 /// shadowed, and is important to type checking.
-fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
+pub(super) fn is_non_shadowable(minor_version: u8, module_name: &str) -> bool {
     module_name == "types" || ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name)
 }
 
@@ -890,7 +890,10 @@ fn resolve_name_in_search_path(
 ///
 /// `.pyi` files take priority, as they always have priority when
 /// resolving modules.
-fn resolve_file_module(module: &ModulePath, resolver_state: &ResolverContext) -> Option<File> {
+pub(super) fn resolve_file_module(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> Option<File> {
     // Stubs have precedence over source files
     let stub_file = if resolver_state.mode.stubs_allowed() {
         module.with_pyi_extension().to_file(resolver_state)
