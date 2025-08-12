@@ -9,7 +9,7 @@ use crate::system::file_time_now;
 /// * The last modification time of the file.
 /// * The hash of the file's content.
 /// * The revision as it comes from an external system, for example the LSP.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
 pub struct FileRevision(u128);
 
 impl FileRevision {

@@ -23,7 +23,7 @@ use crate::glob::portable::AbsolutePortableGlobPattern;
 /// Two filters are equal if they're constructed from the same patterns (including order).
 /// Two filters that exclude the exact same files but were constructed from different patterns aren't considered
 /// equal.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ExcludeFilter {
     ignore: Gitignore,
 }
@@ -118,10 +118,12 @@ impl ExcludeFilterBuilder {
 /// Two ignore matches are only equal if they're constructed from the same patterns (including order).
 /// Two matchers that were constructed from different patterns but result in
 /// including the same files don't compare equal.
-#[derive(Clone)]
+#[derive(Clone, get_size2::GetSize)]
 struct Gitignore {
+    #[get_size(ignore)]
     set: GlobSet,
     globs: Vec<IgnoreGlob>,
+    #[get_size(ignore)]
     matches: Option<Arc<Pool<Vec<usize>>>>,
 }
 
@@ -185,7 +187,7 @@ enum Match {
     Allow,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct IgnoreGlob {
     /// The pattern that was originally parsed.
     original: String,
