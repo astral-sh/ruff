@@ -23,8 +23,6 @@ use ruff_macros::CacheKey;
 use ruff_workspace::Settings;
 use ruff_workspace::resolver::Resolver;
 
-use crate::diagnostics::Diagnostics;
-
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
@@ -327,9 +325,9 @@ pub(crate) struct FileCache {
 }
 
 impl FileCache {
-    /// Convert the file cache into an empty `Diagnostics`, if it has been linted.
-    pub(crate) fn to_diagnostics(&self) -> Option<Diagnostics> {
-        self.data.linted.then(Diagnostics::default)
+    /// Return whether or not the file in the cache was linted and found to have no diagnostics.
+    pub(crate) fn linted(&self) -> bool {
+        self.data.linted
     }
 }
 

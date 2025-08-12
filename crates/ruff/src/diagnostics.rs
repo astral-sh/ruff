@@ -193,19 +193,9 @@ pub(crate) fn lint_path(
             let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
             let cached_diagnostics = cache
                 .get(relative_path, &cache_key)
-                .and_then(FileCache::to_diagnostics);
-            if let Some(diagnostics) = cached_diagnostics {
-                // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
-                // and writing the diff to stdout, respectively). If a file has diagnostics, we
-                // need to avoid reading from and writing to the cache in these modes.
-                if match fix_mode {
-                    flags::FixMode::Generate => true,
-                    flags::FixMode::Apply | flags::FixMode::Diff => {
-                        diagnostics.inner.is_empty() && diagnostics.fixed.is_empty()
-                    }
-                } {
-                    return Ok(diagnostics);
-                }
+                .is_some_and(FileCache::linted);
+            if cached_diagnostics {
+                return Ok(Diagnostics::default());
             }
 
             // Stash the file metadata for later so when we update the cache it reflects the prerun
