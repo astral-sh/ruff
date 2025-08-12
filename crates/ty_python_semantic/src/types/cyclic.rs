@@ -22,6 +22,7 @@ use rustc_hash::FxHashMap;
 
 use crate::FxIndexSet;
 use crate::types::Type;
+use std::cell::RefCell;
 use std::cmp::Eq;
 use std::hash::Hash;
 
@@ -44,7 +45,7 @@ pub(crate) struct CycleDetector<T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    seen: FxIndexSet<T>,
+    seen: RefCell<FxIndexSet<T>>,
 
     /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
     /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
@@ -52,7 +53,7 @@ pub(crate) struct CycleDetector<T, R> {
     /// chain we're currently in. Since this cache is just a performance optimisation, it doesn't
     /// make sense to pop items off the end of the cache after they've been visited (it would
     /// sort-of defeat the point of a cache if we did!)
-    cache: FxHashMap<T, R>,
+    cache: RefCell<FxHashMap<T, R>>,
 
     fallback: R,
 }
@@ -60,25 +61,25 @@ pub(crate) struct CycleDetector<T, R> {
 impl<T: Hash + Eq + Copy, R: Copy> CycleDetector<T, R> {
     pub(crate) fn new(fallback: R) -> Self {
         CycleDetector {
-            seen: FxIndexSet::default(),
-            cache: FxHashMap::default(),
+            seen: RefCell::new(FxIndexSet::default()),
+            cache: RefCell::new(FxHashMap::default()),
             fallback,
         }
     }
 
-    pub(crate) fn visit(&mut self, item: T, func: impl FnOnce(&mut Self) -> R) -> R {
-        if let Some(val) = self.cache.get(&item) {
+    pub(crate) fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
+        if let Some(val) = self.cache.borrow().get(&item) {
             return *val;
         }
 
         // We hit a cycle
-        if !self.seen.insert(item) {
+        if !self.seen.borrow_mut().insert(item) {
             return self.fallback;
         }
 
-        let ret = func(self);
-        self.seen.pop();
-        self.cache.insert(item, ret);
+        let ret = func();
+        self.seen.borrow_mut().pop();
+        self.cache.borrow_mut().insert(item, ret);
 
         ret
     }

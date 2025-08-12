@@ -222,7 +222,7 @@ pub struct GenericAlias<'db> {
 pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     alias: GenericAlias<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_specialization(db, alias.specialization(db), visitor);
 }
@@ -231,11 +231,7 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
@@ -259,7 +255,7 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -323,11 +319,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
@@ -414,7 +406,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
@@ -469,12 +461,7 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to_impl(
-            db,
-            other,
-            TypeRelation::Subtyping,
-            &mut PairVisitor::new(true),
-        )
+        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
     }
 
     pub(super) fn has_relation_to_impl(
@@ -482,7 +469,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &mut PairVisitor<'db>,
+        visitor: &PairVisitor<'db>,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
