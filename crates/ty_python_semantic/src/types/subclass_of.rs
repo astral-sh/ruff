@@ -1,9 +1,10 @@
 use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
+use crate::semantic_index::definition::Definition;
 use crate::types::{
-    ClassType, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
-    TypeTransformer, TypeVarInstance,
+    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -19,7 +20,7 @@ pub struct SubclassOfType<'db> {
 pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     subclass_of: SubclassOfType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     visitor.visit_type(db, Type::from(subclass_of.subclass_of));
 }
@@ -89,17 +90,20 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::TypeVar(TypeVarInstance::new(
+                    Type::TypeVar(BoundTypeVarInstance::new(
                         db,
-                        Name::new_static("T_all"),
-                        None,
-                        None,
-                        Some(TypeVarBoundOrConstraints::UpperBound(
-                            KnownClass::Type.to_instance(db),
-                        )),
-                        variance,
-                        None,
-                        TypeVarKind::Pep695,
+                        TypeVarInstance::new(
+                            db,
+                            Name::new_static("T_all"),
+                            None,
+                            Some(TypeVarBoundOrConstraints::UpperBound(
+                                KnownClass::Type.to_instance(db),
+                            )),
+                            variance,
+                            None,
+                            TypeVarKind::Pep695,
+                        ),
+                        BindingContext::Synthetic,
                     ))
                 }
                 TypeVarVariance::Bivariant => unreachable!(),
@@ -124,11 +128,12 @@ impl<'db> SubclassOfType<'db> {
     pub(super) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars(db, typevars);
+                class.find_legacy_typevars(db, binding_context, typevars);
             }
             SubclassOfInner::Dynamic(_) => {}
         }
@@ -180,11 +185,7 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -247,11 +248,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),

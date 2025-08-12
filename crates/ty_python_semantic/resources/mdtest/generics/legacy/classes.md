@@ -411,10 +411,9 @@ def test_seq(x: Sequence[T]) -> Sequence[T]:
     return x
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
-    # TODO: should be `Sequence[int | float | complex | list[int]]`
-    reveal_type(test_seq(t1))  # revealed: Sequence[Unknown]
-    # TODO: should be `Sequence[int | str]`
-    reveal_type(test_seq(t2))  # revealed: Sequence[Unknown]
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
     # TODO: this should be `Sequence[Never]`
     reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```

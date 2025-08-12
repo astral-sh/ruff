@@ -32,11 +32,7 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
@@ -87,7 +83,7 @@ impl<'db> ClassBase<'db> {
             }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class.is_known(db, KnownClass::GenericAlias) =>
+                if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
@@ -153,7 +149,6 @@ impl<'db> ClassBase<'db> {
             | Type::EnumLiteral(_)
             | Type::StringLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)

@@ -119,54 +119,58 @@ pub(crate) fn enum_metadata<'db>(
             }
 
             let inferred = place_from_bindings(db, bindings);
+
             let value_ty = match inferred {
                 Place::Unbound => {
                     return None;
                 }
                 Place::Type(ty, _) => {
-                    match ty {
+                    let special_case = match ty {
                         Type::Callable(_) | Type::FunctionLiteral(_) => {
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        // enum.nonmember
-                        Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Nonmember) =>
-                        {
-                            return None;
-                        }
-                        // enum.member
-                        Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Member) =>
-                        {
-                            ty.member(db, "value")
-                                .place
-                                .ignore_possibly_unbound()
-                                .unwrap_or(Type::unknown())
-                        }
-                        // enum.auto
-                        Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Auto) =>
-                        {
-                            auto_counter += 1;
-                            Type::IntLiteral(auto_counter)
-                        }
-                        _ => {
-                            let dunder_get = ty
-                                .member_lookup_with_policy(
-                                    db,
-                                    "__get__".into(),
-                                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                                )
-                                .place;
+                        Type::NominalInstance(instance) => match instance.class(db).known(db) {
+                            // enum.nonmember
+                            Some(KnownClass::Nonmember) => return None,
 
-                            match dunder_get {
-                                Place::Unbound | Place::Type(Type::Dynamic(_), _) => ty,
+                            // enum.member
+                            Some(KnownClass::Member) => Some(
+                                ty.member(db, "value")
+                                    .place
+                                    .ignore_possibly_unbound()
+                                    .unwrap_or(Type::unknown()),
+                            ),
 
-                                Place::Type(_, _) => {
-                                    // Descriptors are not considered members.
-                                    return None;
-                                }
+                            // enum.auto
+                            Some(KnownClass::Auto) => {
+                                auto_counter += 1;
+                                Some(Type::IntLiteral(auto_counter))
+                            }
+
+                            _ => None,
+                        },
+
+                        _ => None,
+                    };
+
+                    if let Some(special_case) = special_case {
+                        special_case
+                    } else {
+                        let dunder_get = ty
+                            .member_lookup_with_policy(
+                                db,
+                                "__get__".into(),
+                                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                            )
+                            .place;
+
+                        match dunder_get {
+                            Place::Unbound | Place::Type(Type::Dynamic(_), _) => ty,
+
+                            Place::Type(_, _) => {
+                                // Descriptors are not considered members.
+                                return None;
                             }
                         }
                     }
@@ -203,7 +207,7 @@ pub(crate) fn enum_metadata<'db>(
                 Ok(PlaceAndQualifiers {
                     place: Place::Type(Type::NominalInstance(instance), _),
                     ..
-                }) if instance.class.is_known(db, KnownClass::Member) => {
+                }) if instance.class(db).is_known(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {

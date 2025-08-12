@@ -1,21 +1,21 @@
 use crate::{
     Db, FxIndexSet,
     types::{
-        BoundMethodType, BoundSuperType, CallableType, GenericAlias, IntersectionType,
-        KnownInstanceType, MethodWrapperKind, NominalInstanceType, PropertyInstanceType,
-        ProtocolInstanceType, SubclassOfType, Type, TypeAliasType, TypeIsType, TypeVarInstance,
-        TypedDictType, UnionType,
+        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
+        IntersectionType, KnownInstanceType, MethodWrapperKind, NominalInstanceType,
+        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
+        TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         subclass_of::walk_subclass_of_type,
-        tuple::{TupleType, walk_tuple_type},
-        walk_bound_method_type, walk_bound_super_type, walk_callable_type, walk_intersection_type,
-        walk_known_instance_type, walk_method_wrapper_type, walk_property_instance_type,
-        walk_type_alias_type, walk_type_var_type, walk_typed_dict_type, walk_typeis_type,
-        walk_union,
+        walk_bound_method_type, walk_bound_super_type, walk_bound_type_var_type,
+        walk_callable_type, walk_intersection_type, walk_known_instance_type,
+        walk_method_wrapper_type, walk_property_instance_type, walk_type_alias_type,
+        walk_type_var_type, walk_typed_dict_type, walk_typeis_type, walk_union,
     },
 };
+use std::cell::{Cell, RefCell};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -23,93 +23,77 @@ use crate::{
 /// but it makes it easy for implementors of the trait to do so.
 /// See [`any_over_type`] for an example of how to do this.
 pub(crate) trait TypeVisitor<'db> {
-    fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>);
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
-    fn visit_union_type(&mut self, db: &'db dyn Db, union: UnionType<'db>) {
+    fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
         walk_union(db, union, self);
     }
 
-    fn visit_intersection_type(&mut self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
+    fn visit_intersection_type(&self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
         walk_intersection_type(db, intersection, self);
     }
 
-    fn visit_tuple_type(&mut self, db: &'db dyn Db, tuple: TupleType<'db>) {
-        walk_tuple_type(db, tuple, self);
-    }
-
-    fn visit_callable_type(&mut self, db: &'db dyn Db, callable: CallableType<'db>) {
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         walk_callable_type(db, callable, self);
     }
 
-    fn visit_property_instance_type(
-        &mut self,
-        db: &'db dyn Db,
-        property: PropertyInstanceType<'db>,
-    ) {
+    fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
         walk_property_instance_type(db, property, self);
     }
 
-    fn visit_typeis_type(&mut self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
+    fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
         walk_typeis_type(db, type_is, self);
     }
 
-    fn visit_subclass_of_type(&mut self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
+    fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
         walk_subclass_of_type(db, subclass_of, self);
     }
 
-    fn visit_generic_alias_type(&mut self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
         walk_generic_alias(db, alias, self);
     }
 
-    fn visit_function_type(&mut self, db: &'db dyn Db, function: FunctionType<'db>) {
+    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
         walk_function_type(db, function, self);
     }
 
-    fn visit_bound_method_type(&mut self, db: &'db dyn Db, method: BoundMethodType<'db>) {
+    fn visit_bound_method_type(&self, db: &'db dyn Db, method: BoundMethodType<'db>) {
         walk_bound_method_type(db, method, self);
     }
 
-    fn visit_bound_super_type(&mut self, db: &'db dyn Db, bound_super: BoundSuperType<'db>) {
+    fn visit_bound_super_type(&self, db: &'db dyn Db, bound_super: BoundSuperType<'db>) {
         walk_bound_super_type(db, bound_super, self);
     }
 
-    fn visit_nominal_instance_type(&mut self, db: &'db dyn Db, nominal: NominalInstanceType<'db>) {
+    fn visit_nominal_instance_type(&self, db: &'db dyn Db, nominal: NominalInstanceType<'db>) {
         walk_nominal_instance_type(db, nominal, self);
     }
 
-    fn visit_type_var_type(&mut self, db: &'db dyn Db, type_var: TypeVarInstance<'db>) {
-        walk_type_var_type(db, type_var, self);
+    fn visit_bound_type_var_type(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) {
+        walk_bound_type_var_type(db, bound_typevar, self);
     }
 
-    fn visit_protocol_instance_type(
-        &mut self,
-        db: &'db dyn Db,
-        protocol: ProtocolInstanceType<'db>,
-    ) {
+    fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+        walk_type_var_type(db, typevar, self);
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
         walk_protocol_instance_type(db, protocol, self);
     }
 
-    fn visit_method_wrapper_type(
-        &mut self,
-        db: &'db dyn Db,
-        method_wrapper: MethodWrapperKind<'db>,
-    ) {
+    fn visit_method_wrapper_type(&self, db: &'db dyn Db, method_wrapper: MethodWrapperKind<'db>) {
         walk_method_wrapper_type(db, method_wrapper, self);
     }
 
-    fn visit_known_instance_type(
-        &mut self,
-        db: &'db dyn Db,
-        known_instance: KnownInstanceType<'db>,
-    ) {
+    fn visit_known_instance_type(&self, db: &'db dyn Db, known_instance: KnownInstanceType<'db>) {
         walk_known_instance_type(db, known_instance, self);
     }
 
-    fn visit_type_alias_type(&mut self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+    fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
         walk_type_alias_type(db, type_alias, self);
     }
 
-    fn visit_typed_dict_type(&mut self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
         walk_typed_dict_type(db, typed_dict, self);
     }
 }
@@ -119,7 +103,6 @@ pub(crate) trait TypeVisitor<'db> {
 enum NonAtomicType<'db> {
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
-    Tuple(TupleType<'db>),
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
@@ -131,7 +114,7 @@ enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
-    TypeVar(TypeVarInstance<'db>),
+    TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
 }
@@ -169,7 +152,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
             Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
-            Type::Tuple(tuple) => TypeKind::NonAtomic(NonAtomicType::Tuple(tuple)),
             Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
@@ -194,7 +176,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::TypeVar(type_var) => TypeKind::NonAtomic(NonAtomicType::TypeVar(type_var)),
+            Type::TypeVar(bound_typevar) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
+            }
             Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
@@ -206,7 +190,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
 fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     non_atomic_type: NonAtomicType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     match non_atomic_type {
         NonAtomicType::FunctionLiteral(function) => visitor.visit_function_type(db, function),
@@ -214,7 +198,6 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_intersection_type(db, intersection);
         }
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
-        NonAtomicType::Tuple(tuple) => visitor.visit_tuple_type(db, tuple),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
         NonAtomicType::MethodWrapper(method_wrapper) => {
@@ -231,7 +214,9 @@ fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::TypeVar(type_var) => visitor.visit_type_var_type(db, type_var),
+        NonAtomicType::TypeVar(bound_typevar) => {
+            visitor.visit_bound_type_var_type(db, bound_typevar);
+        }
         NonAtomicType::ProtocolInstance(protocol) => {
             visitor.visit_protocol_instance_type(db, protocol);
         }
@@ -250,23 +235,25 @@ pub(super) fn any_over_type<'db>(
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
-        seen_types: FxIndexSet<NonAtomicType<'db>>,
-        found_matching_type: bool,
+        seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        found_matching_type: Cell<bool>,
     }
 
     impl<'db> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_> {
-        fn visit_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-            if self.found_matching_type {
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            let already_found = self.found_matching_type.get();
+            if already_found {
                 return;
             }
-            self.found_matching_type |= (self.query)(ty);
-            if self.found_matching_type {
+            let found = already_found | (self.query)(ty);
+            self.found_matching_type.set(found);
+            if found {
                 return;
             }
             match TypeKind::from(ty) {
                 TypeKind::Atomic => {}
                 TypeKind::NonAtomic(non_atomic_type) => {
-                    if !self.seen_types.insert(non_atomic_type) {
+                    if !self.seen_types.borrow_mut().insert(non_atomic_type) {
                         // If we have already seen this type, we can skip it.
                         return;
                     }
@@ -276,11 +263,11 @@ pub(super) fn any_over_type<'db>(
         }
     }
 
-    let mut visitor = AnyOverTypeVisitor {
+    let visitor = AnyOverTypeVisitor {
         query,
-        seen_types: FxIndexSet::default(),
-        found_matching_type: false,
+        seen_types: RefCell::new(FxIndexSet::default()),
+        found_matching_type: Cell::new(false),
     };
     visitor.visit_type(db, ty);
-    visitor.found_matching_type
+    visitor.found_matching_type.get()
 }
