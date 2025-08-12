@@ -83,11 +83,10 @@ fn documentation_trim(docs: &str) -> String {
     // First apply tab expansion as we don't want tabs in our output
     // (python says tabs are equal to 8 spaces).
     //
-    // We also trim off trailing whitespace here so we don't need to
-    // handle trailing blank lines later. We can't trim away leading
-    // whitespace yet, because we need to identify the first line
-    // and handle it specially.
-    let expanded = docs.trim_whitespace_end().replace('\t', "        ");
+    // We also trim off all trailing whitespace here to eliminate trailing newlines so we
+    // don't need to handle trailing blank lines later. We can't trim away leading
+    // whitespace yet, because we need to identify the first line and handle it specially.
+    let expanded = docs.trim_end().replace('\t', "        ");
 
     // Compute the minimum indention of all non-empty non-first lines
     // and statistics about leading blank lines to help trim them later.
@@ -471,6 +470,8 @@ fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
     use super::*;
 
     #[test]
@@ -488,7 +489,8 @@ mod tests {
             str: The return value description
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(&param_docs["param1"], "The first parameter description");
@@ -497,6 +499,32 @@ mod tests {
             "The second parameter description\nThis is a continuation of param2 description."
         );
         assert_eq!(&param_docs["param3"], "A parameter without type annotation");
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter description
+            param2 (int): The second parameter description
+                This is a continuation of param2 description.
+            param3: A parameter without type annotation
+
+        Returns:
+            str: The return value description
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter description
+            param2 (int): The second parameter description
+                This is a continuation of param2 description.
+            param3: A parameter without type annotation
+
+        Returns:
+            str: The return value description
+        ");
     }
 
     #[test]
@@ -520,7 +548,8 @@ mod tests {
             The return value description
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(
@@ -535,6 +564,44 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+            The first parameter description
+        param2 : int
+            The second parameter description
+            This is a continuation of param2 description.
+        param3
+            A parameter without type annotation
+
+        Returns
+        -------
+        str
+            The return value description
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+            The first parameter description
+        param2 : int
+            The second parameter description
+            This is a continuation of param2 description.
+        param3
+            A parameter without type annotation
+
+        Returns
+        -------
+        str
+            The return value description
+        ");
     }
 
     #[test]
@@ -543,8 +610,13 @@ mod tests {
         This is a simple function description without parameter documentation.
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
         assert!(param_docs.is_empty());
+
+        assert_snapshot!(docstring.render_plaintext(), @"This is a simple function description without parameter documentation.");
+
+        assert_snapshot!(docstring.render_markdown(), @"This is a simple function description without parameter documentation.");
     }
 
     #[test]
@@ -562,7 +634,8 @@ mod tests {
             NumPy-style parameter
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(
@@ -577,6 +650,32 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "NumPy-style parameter"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): Google-style parameter
+            param2 (int): Another Google-style parameter
+
+        Parameters
+        ----------
+        param3 : bool
+            NumPy-style parameter
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): Google-style parameter
+            param2 (int): Another Google-style parameter
+
+        Parameters
+        ----------
+        param3 : bool
+            NumPy-style parameter
+        ");
     }
 
     #[test]
@@ -592,7 +691,8 @@ mod tests {
         :rtype: str
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(
@@ -607,6 +707,28 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        :param str param1: The first parameter description
+        :param int param2: The second parameter description
+            This is a continuation of param2 description.
+        :param param3: A parameter without type annotation
+        :returns: The return value description
+        :rtype: str
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        :param str param1: The first parameter description
+        :param int param2: The second parameter description
+            This is a continuation of param2 description.
+        :param param3: A parameter without type annotation
+        :returns: The return value description
+        :rtype: str
+        ");
     }
 
     #[test]
@@ -626,7 +748,8 @@ mod tests {
             NumPy-style parameter
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 4);
         assert_eq!(
@@ -645,6 +768,36 @@ mod tests {
             param_docs.get("param4").expect("param4 should exist"),
             "NumPy-style parameter"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): Google-style parameter
+
+        :param int param2: reST-style parameter
+        :param param3: Another reST-style parameter
+
+        Parameters
+        ----------
+        param4 : bool
+            NumPy-style parameter
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): Google-style parameter
+
+        :param int param2: reST-style parameter
+        :param param3: Another reST-style parameter
+
+        Parameters
+        ----------
+        param4 : bool
+            NumPy-style parameter
+        ");
     }
 
     #[test]
@@ -668,7 +821,8 @@ mod tests {
             The return value description
         "#;
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(
@@ -683,6 +837,44 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+            The first parameter description
+        param2 : int
+            The second parameter description
+            This is a continuation of param2 description.
+        param3
+            A parameter without type annotation
+
+        Returns
+        -------
+        str
+            The return value description
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+            The first parameter description
+        param2 : int
+            The second parameter description
+            This is a continuation of param2 description.
+        param3
+            A parameter without type annotation
+
+        Returns
+        -------
+        str
+            The return value description
+        ");
     }
 
     #[test]
@@ -702,7 +894,8 @@ mod tests {
 \t\tA parameter without type annotation
         ";
 
-        let param_docs = Docstring::new(docstring.to_owned()).parameter_documentation();
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
 
         assert_eq!(param_docs.len(), 3);
         assert_eq!(
@@ -717,6 +910,34 @@ mod tests {
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+
+        assert_snapshot!(docstring.render_plaintext(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+                The first parameter description
+        param2 : int
+                The second parameter description
+                This is a continuation of param2 description.
+        param3
+                A parameter without type annotation
+        ");
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        This is a function description.
+
+        Parameters
+        ----------
+        param1 : str
+                The first parameter description
+        param2 : int
+                The second parameter description
+                This is a continuation of param2 description.
+        param3
+                A parameter without type annotation
+        ");
     }
 
     #[test]
@@ -730,10 +951,13 @@ mod tests {
         // Test with Unix-style line endings (\n) - should work the same
         let docstring_unix = "This is a function description.\n\nArgs:\n    param1 (str): The first parameter\n    param2 (int): The second parameter\n";
 
-        let param_docs_windows =
-            Docstring::new(docstring_windows.to_owned()).parameter_documentation();
-        let param_docs_mac = Docstring::new(docstring_mac.to_owned()).parameter_documentation();
-        let param_docs_unix = Docstring::new(docstring_unix.to_owned()).parameter_documentation();
+        let docstring_windows = Docstring::new(docstring_windows.to_owned());
+        let docstring_mac = Docstring::new(docstring_mac.to_owned());
+        let docstring_unix = Docstring::new(docstring_unix.to_owned());
+
+        let param_docs_windows = docstring_windows.parameter_documentation();
+        let param_docs_mac = docstring_mac.parameter_documentation();
+        let param_docs_unix = docstring_unix.parameter_documentation();
 
         // All should produce the same results
         assert_eq!(param_docs_windows.len(), 2);
@@ -752,5 +976,53 @@ mod tests {
             param_docs_unix.get("param1"),
             Some(&"The first parameter".to_string())
         );
+
+        assert_snapshot!(docstring_windows.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
+
+        assert_snapshot!(docstring_windows.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
+
+        assert_snapshot!(docstring_mac.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
+
+        assert_snapshot!(docstring_mac.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
+
+        assert_snapshot!(docstring_unix.render_plaintext(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
+
+        assert_snapshot!(docstring_unix.render_markdown(), @r"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter
+            param2 (int): The second parameter
+        ");
     }
 }
