@@ -461,8 +461,6 @@ def _(p: Person) -> None:
     reveal_type(p.keys())  # revealed: dict_keys[str, object]
     reveal_type(p.values())  # revealed: dict_values[str, object]
 
-    reveal_type(p.setdefault("name", "Alice"))  # revealed: @Todo(Support for `TypedDict`)
-
     # `get()` returns the field type for required keys (no None union)
     reveal_type(p.get("name"))  # revealed: str
     reveal_type(p.get("age"))  # revealed: int | None
@@ -478,6 +476,19 @@ def _(p: Person) -> None:
     # Invalid keys with intelligent suggestions
     # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "nam" - did you mean "name"?"
     reveal_type(p.get("nam"))  # revealed: Unknown
+
+    # `pop()` only works on non-required fields
+    reveal_type(p.pop("extra"))  # revealed: str
+    reveal_type(p.pop("extra", "fallback"))  # revealed: str
+    # error: [invalid-argument-type] "Argument is incorrect: Expected `Literal["extra"]`, found `Literal["name"]`"
+    reveal_type(p.pop("name"))  # revealed: Unknown
+
+    # `setdefault()` always returns the field type
+    reveal_type(p.setdefault("name", "Alice"))  # revealed: str
+    reveal_type(p.setdefault("extra", "default"))  # revealed: str
+
+    # error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extraz" - did you mean "extra"?"
+    reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
 ## Unlike normal classes

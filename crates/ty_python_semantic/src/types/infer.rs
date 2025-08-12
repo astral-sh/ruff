@@ -6176,12 +6176,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let callable_type = self.infer_maybe_standalone_expression(func);
 
-        // Special handling for TypedDict method calls
+        // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
             let value_type = self.expression_type(value);
             if let Type::TypedDict(typed_dict_ty) = value_type {
-                if attr.id == "get" && !arguments.args.is_empty() {
-                    // Validate the key argument for .get() calls
+                if matches!(attr.id.as_str(), "get" | "pop" | "setdefault")
+                    && !arguments.args.is_empty()
+                {
+                    // Validate the key argument for `TypedDict` methods
                     if let Some(first_arg) = arguments.args.first() {
                         if let ast::Expr::StringLiteral(ast::ExprStringLiteral {
                             value: key_literal,
