@@ -186,13 +186,15 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                 source_order::walk_expr(self, expr);
             }
             Expr::Call(call) => {
-                let details = inlay_hint_function_argument_details(self.db, &self.model, call)
-                    .unwrap_or_default();
+                let argument_names =
+                    inlay_hint_function_argument_details(self.db, &self.model, call)
+                        .map(|details| details.argument_names)
+                        .unwrap_or_default();
 
                 self.visit_expr(&call.func);
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
-                    if let Some(name) = details.argument_names.get(&index) {
+                    if let Some(name) = argument_names.get(&index) {
                         self.add_function_argument_name(
                             arg_or_keyword.range().start(),
                             name.to_string(),
