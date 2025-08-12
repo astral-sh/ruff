@@ -29,6 +29,12 @@ use rustc_hash::FxHashMap;
 
 use crate::cache::{Cache, FileCache, FileCacheKey};
 
+/// A collection of [`Diagnostic`]s and additional information needed to render them.
+///
+/// Note that `notebook_indexes` may be empty if there are no diagnostics because the
+/// `NotebookIndex` isn't cached in this case. This isn't a problem for any current uses as of
+/// 2025-08-12, which are all related to diagnostic rendering, but could be surprising if used
+/// differently in the future.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
     pub(crate) inner: Vec<Diagnostic>,
