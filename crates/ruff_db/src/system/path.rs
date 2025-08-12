@@ -236,7 +236,7 @@ impl SystemPath {
     ///
     /// [`CurDir`]: camino::Utf8Component::CurDir
     #[inline]
-    pub fn components(&self) -> camino::Utf8Components {
+    pub fn components(&self) -> camino::Utf8Components<'_> {
         self.0.components()
     }
 
@@ -762,7 +762,7 @@ impl SystemVirtualPath {
 }
 
 /// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
-#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub struct SystemVirtualPathBuf(String);
 
 impl SystemVirtualPathBuf {

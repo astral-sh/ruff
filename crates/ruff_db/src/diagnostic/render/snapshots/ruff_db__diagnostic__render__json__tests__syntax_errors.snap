@@ -5,7 +5,7 @@ expression: env.render_diagnostics(&diagnostics)
 [
   {
     "cell": null,
-    "code": null,
+    "code": "invalid-syntax",
     "end_location": {
       "column": 1,
       "row": 2
@@ -16,13 +16,13 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 15,
       "row": 1
     },
-    "message": "SyntaxError: Expected one or more symbol names after import",
+    "message": "Expected one or more symbol names after import",
     "noqa_row": null,
     "url": null
   },
   {
     "cell": null,
-    "code": null,
+    "code": "invalid-syntax",
     "end_location": {
       "column": 1,
       "row": 4
@@ -33,7 +33,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 12,
       "row": 3
     },
-    "message": "SyntaxError: Expected ')', found newline",
+    "message": "Expected ')', found newline",
     "noqa_row": null,
     "url": null
   }

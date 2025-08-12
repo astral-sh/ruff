@@ -23,6 +23,7 @@ ruff_graph = { path = "crates/ruff_graph" }
 ruff_index = { path = "crates/ruff_index" }
 ruff_linter = { path = "crates/ruff_linter" }
 ruff_macros = { path = "crates/ruff_macros" }
+ruff_memory_usage = { path = "crates/ruff_memory_usage" }
 ruff_notebook = { path = "crates/ruff_notebook" }
 ruff_options_metadata = { path = "crates/ruff_options_metadata" }
 ruff_python_ast = { path = "crates/ruff_python_ast" }
@@ -40,6 +41,7 @@ ruff_text_size = { path = "crates/ruff_text_size" }
 ruff_workspace = { path = "crates/ruff_workspace" }
 
 ty = { path = "crates/ty" }
+ty_combine = { path = "crates/ty_combine" }
 ty_ide = { path = "crates/ty_ide" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
@@ -73,7 +75,7 @@ console_error_panic_hook = { version = "0.1.7" }
 console_log = { version = "1.0.0" }
 countme = { version = "3.0.1" }
 compact_str = "0.9.0"
-criterion = { version = "0.6.0", default-features = false }
+criterion = { version = "0.7.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
 dir-test = { version = "0.4.0" }
@@ -83,7 +85,7 @@ etcetera = { version = "0.10.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.5.0", features = [
+get-size2 = { version = "0.6.2", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -141,7 +143,12 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa", rev = "dba66f1a37acca014c2402f231ed5b361bd7d8fe" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "918d35d873b2b73a0237536144ef4d22e8d57f27", default-features = false, features = [
+    "compact_str",
+    "macros",
+    "salsa_unstable",
+    "inventory",
+] }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -166,7 +173,6 @@ strum_macros = { version = "0.27.0" }
 syn = { version = "2.0.55" }
 tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
-thin-vec = { version = "0.2.14" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
 toml = { version = "0.9.0" }

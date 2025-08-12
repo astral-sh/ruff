@@ -6,7 +6,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::enum_member_literals;
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::{Tuple, TupleLength, TupleType};
 
 use super::Type;
 
@@ -51,12 +51,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                         let ty = infer_argument_type(arg, value);
-                        let length = match ty {
-                            Type::Tuple(tuple) => tuple.tuple(db).len(),
-                            // TODO: have `Type::try_iterator` return a tuple spec, and use its
-                            // length as this argument's arity
-                            _ => TupleLength::unknown(),
-                        };
+                        let length = ty
+                            .try_iterate(db)
+                            .map(|tuple| tuple.len())
+                            .unwrap_or(TupleLength::unknown());
                         (Argument::Variadic(length), Some(ty))
                     }
                     _ => (Argument::Positional, None),
@@ -99,7 +97,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
     /// of this argument list. (If `bound_self` is none, we return the argument list
     /// unmodified.)
-    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<'_, Self> {
         if bound_self.is_some() {
             let arguments = std::iter::once(Argument::Synthetic)
                 .chain(self.arguments.iter().copied())
@@ -216,46 +214,48 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     match ty {
         Type::NominalInstance(instance) => {
-            if instance.class.is_known(db, KnownClass::Bool) {
+            let class = instance.class(db);
+
+            if class.is_known(db, KnownClass::Bool) {
                 return Some(vec![
                     Type::BooleanLiteral(true),
                     Type::BooleanLiteral(false),
                 ]);
             }
 
-            let class_literal = instance.class.class_literal(db).0;
+            // If the class is a fixed-length tuple subtype, we expand it to its elements.
+            if let Some(spec) = instance.tuple_spec(db) {
+                return match &*spec {
+                    Tuple::Fixed(fixed_length_tuple) => {
+                        let expanded = fixed_length_tuple
+                            .all_elements()
+                            .map(|element| {
+                                if let Some(expanded) = expand_type(db, *element) {
+                                    Either::Left(expanded.into_iter())
+                                } else {
+                                    Either::Right(std::iter::once(*element))
+                                }
+                            })
+                            .multi_cartesian_product()
+                            .map(|types| Type::tuple(TupleType::from_elements(db, types)))
+                            .collect::<Vec<_>>();
 
-            if let Some(enum_members) = enum_member_literals(db, class_literal, None) {
+                        if expanded.len() == 1 {
+                            // There are no elements in the tuple type that can be expanded.
+                            None
+                        } else {
+                            Some(expanded)
+                        }
+                    }
+                    Tuple::Variable(_) => None,
+                };
+            }
+
+            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
                 return Some(enum_members.collect());
             }
 
             None
-        }
-        Type::Tuple(tuple_type) => {
-            // Note: This should only account for tuples of known length, i.e., `tuple[bool, ...]`
-            // should not be expanded here.
-            let tuple = tuple_type.tuple(db);
-            if !matches!(tuple, TupleSpec::Fixed(_)) {
-                return None;
-            }
-            let expanded = tuple
-                .all_elements()
-                .map(|element| {
-                    if let Some(expanded) = expand_type(db, *element) {
-                        Either::Left(expanded.into_iter())
-                    } else {
-                        Either::Right(std::iter::once(*element))
-                    }
-                })
-                .multi_cartesian_product()
-                .map(|types| TupleType::from_elements(db, types))
-                .collect::<Vec<_>>();
-            if expanded.len() == 1 {
-                // There are no elements in the tuple type that can be expanded.
-                None
-            } else {
-                Some(expanded)
-            }
         }
         Type::Union(union) => Some(union.iter(db).copied().collect()),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
@@ -308,17 +308,17 @@ mod tests {
         let false_ty = Type::BooleanLiteral(false);
 
         // Empty tuple
-        let empty_tuple = TupleType::empty(&db);
+        let empty_tuple = Type::empty_tuple(&db);
         let expanded = expand_type(&db, empty_tuple);
         assert!(expanded.is_none());
 
         // None of the elements can be expanded.
-        let tuple_type1 = TupleType::from_elements(&db, [int_ty, str_ty]);
+        let tuple_type1 = Type::heterogeneous_tuple(&db, [int_ty, str_ty]);
         let expanded = expand_type(&db, tuple_type1);
         assert!(expanded.is_none());
 
         // All elements can be expanded.
-        let tuple_type2 = TupleType::from_elements(
+        let tuple_type2 = Type::heterogeneous_tuple(
             &db,
             [
                 bool_ty,
@@ -326,18 +326,18 @@ mod tests {
             ],
         );
         let expected_types = [
-            TupleType::from_elements(&db, [true_ty, int_ty]),
-            TupleType::from_elements(&db, [true_ty, str_ty]),
-            TupleType::from_elements(&db, [true_ty, bytes_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty]),
-            TupleType::from_elements(&db, [false_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, bytes_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, bytes_ty]),
         ];
         let expanded = expand_type(&db, tuple_type2).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Mixed set of elements where some can be expanded while others cannot be.
-        let tuple_type3 = TupleType::from_elements(
+        let tuple_type3 = Type::heterogeneous_tuple(
             &db,
             [
                 bool_ty,
@@ -347,21 +347,21 @@ mod tests {
             ],
         );
         let expected_types = [
-            TupleType::from_elements(&db, [true_ty, int_ty, str_ty, str_ty]),
-            TupleType::from_elements(&db, [true_ty, int_ty, bytes_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty, str_ty, str_ty]),
-            TupleType::from_elements(&db, [false_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [true_ty, int_ty, bytes_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty, str_ty, str_ty]),
+            Type::heterogeneous_tuple(&db, [false_ty, int_ty, bytes_ty, str_ty]),
         ];
         let expanded = expand_type(&db, tuple_type3).unwrap();
         assert_eq!(expanded, expected_types);
 
         // Variable-length tuples are not expanded.
-        let variable_length_tuple = TupleType::mixed(
+        let variable_length_tuple = Type::tuple(TupleType::mixed(
             &db,
             [bool_ty],
             int_ty,
             [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
-        );
+        ));
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());
     }

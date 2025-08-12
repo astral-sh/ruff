@@ -9,12 +9,13 @@
 
 use ruff_db::files::File;
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast::Singleton;
+use ruff_python_ast::{Singleton, name::Name};
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::global_scope;
-use crate::semantic_index::place::{FileScopeId, ScopeId, ScopedPlaceId};
+use crate::semantic_index::scope::{FileScopeId, ScopeId};
+use crate::semantic_index::symbol::ScopedSymbolId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -116,7 +117,7 @@ pub(crate) enum PredicateNode<'db> {
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum ClassPatternKind {
     Irrefutable,
     Refutable,
@@ -129,16 +130,17 @@ impl ClassPatternKind {
 }
 
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
-#[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
+    As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Unsupported,
 }
 
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct PatternPredicate<'db> {
     pub(crate) file: File,
 
@@ -150,6 +152,9 @@ pub(crate) struct PatternPredicate<'db> {
     pub(crate) kind: PatternPredicateKind<'db>,
 
     pub(crate) guard: Option<Expression<'db>>,
+
+    /// A reference to the pattern of the previous match case
+    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -201,7 +206,7 @@ impl<'db> PatternPredicate<'db> {
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
 ///
 /// [Truthiness]: [crate::types::Truthiness]
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct StarImportPlaceholderPredicate<'db> {
     pub(crate) importing_file: File,
 
@@ -214,7 +219,7 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedPlaceId,
+    pub(crate) symbol_id: ScopedSymbolId,
 
     pub(crate) referenced_file: File,
 }

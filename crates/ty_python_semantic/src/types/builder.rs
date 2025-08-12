@@ -246,6 +246,7 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
+            Type::TypeAlias(alias) => self.add_in_place(alias.value_type(self.db)),
             // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
@@ -542,6 +543,10 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn add_positive(mut self, ty: Type<'db>) -> Self {
         match ty {
+            Type::TypeAlias(alias) => {
+                let value_type = alias.value_type(self.db);
+                self.add_positive(value_type)
+            }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
@@ -572,7 +577,8 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class.class_literal(self.db).0).is_some() =>
+                if enum_metadata(self.db, instance.class(self.db).class_literal(self.db).0)
+                    .is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
@@ -596,7 +602,7 @@ impl<'db> IntersectionBuilder<'db> {
                     let db = self.db;
                     self.add_positive(Type::Union(UnionType::new(
                         db,
-                        enum_member_literals(db, instance.class.class_literal(db).0, None)
+                        enum_member_literals(db, instance.class(db).class_literal(db).0, None)
                             .expect("Calling `enum_member_literals` on an enum class")
                             .collect::<Box<[_]>>(),
                     )))
@@ -628,6 +634,10 @@ impl<'db> IntersectionBuilder<'db> {
 
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
+            Type::TypeAlias(alias) => {
+                let value_type = alias.value_type(self.db);
+                self.add_negative(value_type)
+            }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
                     self = self.add_negative(*elem);
@@ -762,7 +772,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_nominal_instance()
-                    .and_then(|instance| instance.class.known(db));
+                    .and_then(|instance| instance.class(db).known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -782,7 +792,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::NominalInstance(instance)
-                            if instance.class.is_known(db, KnownClass::Bool) =>
+                            if instance.class(db).is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -876,7 +886,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_nominal_instance())
-                .filter_map(|instance| instance.class.known(db))
+                .filter_map(|instance| instance.class(db).known(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -892,7 +902,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::NominalInstance(instance) if instance.class.is_object(db) => {
+            Type::NominalInstance(instance) if instance.is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -973,11 +983,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
-            let Type::TypeVar(typevar) = ty else {
+            let Type::TypeVar(bound_typevar) = ty else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.bound_or_constraints(db)
+                bound_typevar.typevar(db).bound_or_constraints(db)
             else {
                 continue;
             };
@@ -1068,8 +1078,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{IntersectionBuilder, Type, UnionBuilder, UnionType};
 
-    use crate::KnownModule;
     use crate::db::tests::setup_db;
+    use crate::module_resolver::KnownModule;
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
     use crate::types::{KnownClass, Truthiness};

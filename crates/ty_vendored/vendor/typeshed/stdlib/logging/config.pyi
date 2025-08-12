@@ -83,7 +83,8 @@ if sys.version_info >= (3, 10):
         disable_existing_loggers: bool = True,
         encoding: str | None = None,
     ) -> None:
-        """Read the logging configuration from a ConfigParser-format file.
+        """
+        Read the logging configuration from a ConfigParser-format file.
 
         This can be called several times from an application, allowing an end user
         the ability to select from various pre-canned configurations (if the
@@ -97,7 +98,8 @@ else:
         defaults: Mapping[str, str] | None = None,
         disable_existing_loggers: bool = True,
     ) -> None:
-        """Read the logging configuration from a ConfigParser-format file.
+        """
+        Read the logging configuration from a ConfigParser-format file.
 
         This can be called several times from an application, allowing an end user
         the ability to select from various pre-canned configurations (if the
@@ -107,7 +109,8 @@ else:
 
 def valid_ident(s: str) -> Literal[True]: ...  # undocumented
 def listen(port: int = 9030, verify: Callable[[bytes], bytes | None] | None = None) -> Thread:
-    """Start up a socket server on the specified port, and listen for new
+    """
+    Start up a socket server on the specified port, and listen for new
     configurations.
 
     These will be sent as a file suitable for processing by fileConfig().
@@ -126,7 +129,9 @@ def listen(port: int = 9030, verify: Callable[[bytes], bytes | None] | None = No
     """
 
 def stopListening() -> None:
-    """Stop the listening server which was created with a call to listen()."""
+    """
+    Stop the listening server which was created with a call to listen().
+    """
 
 class ConvertingMixin:  # undocumented
     """For ConvertingXXX's, this mixin class provides common functions"""
@@ -159,7 +164,9 @@ class ConvertingTuple(tuple[Any, ...], ConvertingMixin):  # undocumented
     def __getitem__(self, key: slice) -> Any: ...
 
 class BaseConfigurator:  # undocumented
-    """The configurator base class which defines some useful defaults."""
+    """
+    The configurator base class which defines some useful defaults.
+    """
 
     CONVERT_PATTERN: Pattern[str]
     WORD_PATTERN: Pattern[str]
@@ -171,7 +178,8 @@ class BaseConfigurator:  # undocumented
 
     def __init__(self, config: _DictConfigArgs | dict[str, Any]) -> None: ...
     def resolve(self, s: str) -> Any:
-        """Resolve strings to objects using standard import and attribute
+        """
+        Resolve strings to objects using standard import and attribute
         syntax.
         """
 
@@ -182,7 +190,8 @@ class BaseConfigurator:  # undocumented
         """Default converter for the cfg:// protocol."""
 
     def convert(self, value: Any) -> Any:
-        """Convert values to an appropriate type. dicts, lists and tuples are
+        """
+        Convert values to an appropriate type. dicts, lists and tuples are
         replaced by their converting alternatives. Strings are checked to
         see if they have a conversion format and are converted if they do.
         """
@@ -194,7 +203,8 @@ class BaseConfigurator:  # undocumented
         """Utility function which converts lists to tuples."""
 
 class DictConfigurator(BaseConfigurator):
-    """Configure logging using a dictionary-like object to describe the
+    """
+    Configure logging using a dictionary-like object to describe the
     configuration.
     """
 
@@ -219,7 +229,9 @@ class DictConfigurator(BaseConfigurator):
     def common_logger_config(
         self, logger: Logger, config: _LoggerConfiguration, incremental: bool = False
     ) -> None:  # undocumented
-        """Perform configuration which is common to root and non-root loggers."""
+        """
+        Perform configuration which is common to root and non-root loggers.
+        """
 
     def configure_logger(self, name: str, config: _LoggerConfiguration, incremental: bool = False) -> None:  # undocumented
         """Configure a non-root logger from a dictionary."""

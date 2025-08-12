@@ -278,6 +278,7 @@ class Bdb:
         return string contains the canonical filename, the function name
         or '<lambda>', the input arguments, the return value, and the
         line of code (if it exists).
+
         """
 
     def run(self, cmd: str | CodeType, globals: dict[str, Any] | None = None, locals: Mapping[str, Any] | None = None) -> None:
@@ -374,6 +375,7 @@ class Breakpoint:
         The information includes the breakpoint number, temporary
         status, file:line position, break condition, number of times to
         ignore, and number of times hit.
+
         """
 
 def checkfuncname(b: Breakpoint, frame: FrameType) -> bool:

@@ -1,5 +1,6 @@
 use std::io::StdoutLock;
 
+use anyhow::Result;
 use indicatif::ProgressDrawTarget;
 
 use crate::logging::VerbosityLevel;
@@ -11,14 +12,6 @@ pub(crate) struct Printer {
 }
 
 impl Printer {
-    #[must_use]
-    pub(crate) fn with_no_progress(self) -> Self {
-        Self {
-            verbosity: self.verbosity,
-            no_progress: true,
-        }
-    }
-
     #[must_use]
     pub(crate) fn with_verbosity(self, verbosity: VerbosityLevel) -> Self {
         Self {
@@ -108,6 +101,11 @@ impl Printer {
     /// For example, in `ty check`, this would be used for the diagnostic output.
     pub(crate) fn stream_for_details(self) -> Stdout {
         self.stdout_general()
+    }
+
+    pub(crate) fn clear_screen() -> Result<()> {
+        clearscreen::clear()?;
+        Ok(())
     }
 }
 

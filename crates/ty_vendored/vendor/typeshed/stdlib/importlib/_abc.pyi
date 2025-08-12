@@ -20,6 +20,7 @@ if sys.version_info >= (3, 10):
             This method is deprecated in favor of loader.exec_module(). If
             exec_module() exists then it is used to provide a backwards-compatible
             functionality for this method.
+
             """
         if sys.version_info < (3, 12):
             def module_repr(self, module: types.ModuleType) -> str:
@@ -29,6 +30,7 @@ if sys.version_info >= (3, 10):
                 NotImplementedError.
 
                 This method is deprecated.
+
                 """
 
         def create_module(self, spec: ModuleSpec) -> types.ModuleType | None:

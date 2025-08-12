@@ -102,7 +102,7 @@ pub(crate) fn analyze_graph(
 
                 // Resolve the per-file settings.
                 let settings = resolver.resolve(path);
-                let string_imports = settings.analyze.detect_string_imports;
+                let string_imports = settings.analyze.string_imports;
                 let include_dependencies = settings.analyze.include_dependencies.get(path).cloned();
 
                 // Skip excluded files.

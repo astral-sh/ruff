@@ -30,7 +30,12 @@ ty_python_semantic = { path = "../crates/ty_python_semantic" }
 ty_vendored = { path = "../crates/ty_vendored" }
 
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { git = "https://github.com/salsa-rs/salsa", rev = "dba66f1a37acca014c2402f231ed5b361bd7d8fe" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "918d35d873b2b73a0237536144ef4d22e8d57f27", default-features = false, features = [
+    "compact_str",
+    "macros",
+    "salsa_unstable",
+    "inventory",
+] }
 similar = { version = "2.5.0" }
 tracing = { version = "0.1.40" }
 

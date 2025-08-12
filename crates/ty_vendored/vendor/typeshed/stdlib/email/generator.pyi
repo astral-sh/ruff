@@ -49,6 +49,7 @@ class Generator(Generic[_MessageT]):
         aspects of the generator's operation.  If no policy is specified,
         the policy associated with the Message object passed to the
         flatten method is used.
+
         """
 
     @overload
@@ -76,6 +77,7 @@ class Generator(Generic[_MessageT]):
         the output.  The default value is determined by the policy specified
         when the Generator instance was created or, if none was specified,
         from the policy associated with the msg.
+
         """
 
     def clone(self, fp: SupportsWrite[str]) -> Self:
@@ -123,6 +125,7 @@ class BytesGenerator(Generator[_MessageT]):
         aspects of the generator's operation.  If no policy is specified,
         the policy associated with the Message object passed to the
         flatten method is used.
+
         """
 
     @overload

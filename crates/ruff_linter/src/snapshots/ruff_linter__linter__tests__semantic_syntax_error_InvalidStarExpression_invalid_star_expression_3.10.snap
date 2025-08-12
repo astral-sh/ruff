@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-<filename>:3:12: SyntaxError: Starred expression cannot be used here
+invalid-syntax: Starred expression cannot be used here
+ --> <filename>:3:12
   |
 2 | def func():
 3 |     return *x

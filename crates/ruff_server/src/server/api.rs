@@ -33,7 +33,7 @@ use super::{Result, schedule::BackgroundSchedule};
 /// that is of type [`lsp_types::Url`].
 macro_rules! define_document_url {
     ($params:ident: &$p:ty) => {
-        fn document_url($params: &$p) -> std::borrow::Cow<lsp_types::Url> {
+        fn document_url($params: &$p) -> std::borrow::Cow<'_, lsp_types::Url> {
             std::borrow::Cow::Borrowed(&$params.text_document.uri)
         }
     };

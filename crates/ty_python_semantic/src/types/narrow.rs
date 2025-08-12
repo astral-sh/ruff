@@ -1,11 +1,12 @@
 use crate::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopeId, ScopedPlaceId};
+use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode,
 };
+use crate::semantic_index::scope::ScopeId;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
@@ -71,7 +72,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -84,7 +85,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     returns(as_ref),
     cycle_fn=constraints_for_expression_cycle_recover,
     cycle_initial=constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -99,7 +100,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     returns(as_ref),
     cycle_fn=negative_constraints_for_expression_cycle_recover,
     cycle_initial=negative_constraints_for_expression_cycle_initial,
-    heap_size=get_size2::GetSize::get_heap_size,
+    heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
@@ -110,7 +111,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
         .finish()
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
@@ -181,14 +182,7 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::Tuple(tuple) => UnionType::try_from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .copied()
-                    .map(|element| self.generate_constraint(db, element)),
-            ),
+            Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
@@ -221,7 +215,10 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+            Type::TypeVar(bound_typevar) => match bound_typevar
+                .typevar(db)
+                .bound_or_constraints(db)?
+            {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
                 TypeVarBoundOrConstraints::Constraints(constraints) => {
                     self.generate_constraint(db, Type::Union(constraints))
@@ -231,6 +228,15 @@ impl ClassInfoConstraintFunction {
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
+
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
+                UnionType::try_from_elements(
+                    db,
+                    tuple
+                        .all_elements()
+                        .map(|element| self.generate_constraint(db, *element)),
+                )
+            }),
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -248,14 +254,14 @@ impl ClassInfoConstraintFunction {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::SpecialForm(_)
-            | Type::NominalInstance(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_) => None,
+            | Type::DataclassTransformer(_)
+            | Type::TypedDict(_) => None,
         }
     }
 }
@@ -312,11 +318,8 @@ fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, 
 
 fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
-        ast::Expr::Name(name) => Some(PlaceExpr::name(name.id.clone())),
-        ast::Expr::Attribute(attr) => PlaceExpr::try_from(attr).ok(),
-        ast::Expr::Subscript(subscript) => PlaceExpr::try_from(subscript).ok(),
-        ast::Expr::Named(named) => PlaceExpr::try_from(named.target.as_ref()).ok(),
-        _ => None,
+        ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
+        _ => PlaceExpr::try_from_expr(expr),
     }
 }
 
@@ -412,6 +415,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
             PatternPredicateKind::Unsupported => None,
         }
     }
@@ -447,7 +453,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     #[track_caller]
     fn expect_place(&self, place_expr: &PlaceExpr) -> ScopedPlaceId {
         self.places()
-            .place_id_by_expr(place_expr)
+            .place_id(place_expr)
             .expect("We should always have a place for every `PlaceExpr`")
     }
 
@@ -555,7 +561,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class.is_known(db, KnownClass::Bool) =>
+                        if instance.class(db).is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -566,11 +572,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class.class_literal(db).0).is_some() =>
+                        if enum_metadata(db, instance.class(db).class_literal(db).0).is_some() =>
                     {
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class.class_literal(db).0, None)
+                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -597,7 +603,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class.is_known(self.db, KnownClass::Bool) =>
+                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -618,20 +624,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            match rhs_ty {
-                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
-                    self.db,
-                    rhs_tuple.tuple(self.db).all_elements(),
-                )),
-
-                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
+            if let Type::StringLiteral(string_literal) = rhs_ty {
+                Some(UnionType::from_elements(
                     self.db,
                     string_literal
                         .iter_each_char(self.db)
                         .map(Type::StringLiteral),
-                )),
-
-                _ => None,
+                ))
+            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
+                // N.B. Strictly speaking this is unsound, since a tuple subclass might override `__contains__`
+                // but we'd still apply the narrowing here. This seems unlikely, however, and narrowing is
+                // generally unsound in numerous ways anyway (attribute narrowing, subscript, narrowing,
+                // narrowing of globals, etc.). So this doesn't seem worth worrying about too much.
+                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
+            } else {
+                None
             }
         } else {
             None

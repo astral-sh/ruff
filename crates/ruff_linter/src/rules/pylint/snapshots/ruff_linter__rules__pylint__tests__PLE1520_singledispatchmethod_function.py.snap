@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
-snapshot_kind: text
 ---
-singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
+PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions
+ --> singledispatchmethod_function.py:4:1
   |
 4 | @singledispatchmethod  # [singledispatchmethod-function]
-  | ^^^^^^^^^^^^^^^^^^^^^ PLE1520
+  | ^^^^^^^^^^^^^^^^^^^^^
 5 | def convert_position(position):
 6 |     pass
   |
-  = help: Replace with `@singledispatch`
+help: Replace with `@singledispatch`
 
 ℹ Unsafe fix
 1   |-from functools import singledispatchmethod

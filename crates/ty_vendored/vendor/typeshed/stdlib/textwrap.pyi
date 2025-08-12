@@ -6,7 +6,8 @@ from re import Pattern
 __all__ = ["TextWrapper", "wrap", "fill", "dedent", "indent", "shorten"]
 
 class TextWrapper:
-    """Object for wrapping/filling text.  The public interface consists of
+    """
+    Object for wrapping/filling text.  The public interface consists of
     the wrap() and fill() methods; the other methods are just there for
     subclasses to override in order to tweak the default behaviour.
     If you want to completely replace the main wrapping algorithm,

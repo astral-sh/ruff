@@ -38,7 +38,9 @@ class Namespace:
 _Namespace: TypeAlias = Namespace
 
 class Token:
-    """Type to uniquely identify a shared object"""
+    """
+    Type to uniquely identify a shared object
+    """
 
     typeid: str | bytes | None
     address: _Address | None
@@ -48,7 +50,9 @@ class Token:
     def __setstate__(self, state: tuple[str | bytes | None, tuple[str | bytes, int], str | bytes | int | None]) -> None: ...
 
 class BaseProxy:
-    """A base for proxies of shared objects"""
+    """
+    A base for proxies of shared objects
+    """
 
     _address_to_local: dict[_Address, Any]
     _mutex: Any
@@ -64,10 +68,14 @@ class BaseProxy:
     ) -> None: ...
     def __deepcopy__(self, memo: Any | None) -> Any: ...
     def _callmethod(self, methodname: str, args: tuple[Any, ...] = (), kwds: dict[Any, Any] = {}) -> None:
-        """Try to call a method of the referent and return a copy of the result"""
+        """
+        Try to call a method of the referent and return a copy of the result
+        """
 
     def _getvalue(self) -> Any:
-        """Get a copy of the value of the referent"""
+        """
+        Get a copy of the value of the referent
+        """
 
     def __reduce__(self) -> tuple[Any, tuple[Any, Any, str, dict[Any, Any]]]: ...
 
@@ -230,7 +238,9 @@ _ServerConnection: TypeAlias = Connection[tuple[str, Any], tuple[str, str, Itera
 
 # Returned by BaseManager.get_server()
 class Server:
-    """Server class which runs in a process controlled by a manager object"""
+    """
+    Server class which runs in a process controlled by a manager object
+    """
 
     address: _Address | None
     id_to_obj: dict[str, tuple[Any, set[str], dict[str, str]]]
@@ -245,46 +255,68 @@ class Server:
         serializer: str,
     ) -> None: ...
     def serve_forever(self) -> None:
-        """Run the server forever"""
+        """
+        Run the server forever
+        """
 
     def accepter(self) -> None: ...
     if sys.version_info >= (3, 10):
         def handle_request(self, conn: _ServerConnection) -> None:
-            """Handle a new connection"""
+            """
+            Handle a new connection
+            """
     else:
         def handle_request(self, c: _ServerConnection) -> None:
-            """Handle a new connection"""
+            """
+            Handle a new connection
+            """
 
     def serve_client(self, conn: _ServerConnection) -> None:
-        """Handle requests from the proxies in a particular process/thread"""
+        """
+        Handle requests from the proxies in a particular process/thread
+        """
 
     def fallback_getvalue(self, conn: _ServerConnection, ident: str, obj: _T) -> _T: ...
     def fallback_str(self, conn: _ServerConnection, ident: str, obj: Any) -> str: ...
     def fallback_repr(self, conn: _ServerConnection, ident: str, obj: Any) -> str: ...
     def dummy(self, c: _ServerConnection) -> None: ...
     def debug_info(self, c: _ServerConnection) -> str:
-        """Return some info --- useful to spot problems with refcounting"""
+        """
+        Return some info --- useful to spot problems with refcounting
+        """
 
     def number_of_objects(self, c: _ServerConnection) -> int:
-        """Number of shared objects"""
+        """
+        Number of shared objects
+        """
 
     def shutdown(self, c: _ServerConnection) -> None:
-        """Shutdown this process"""
+        """
+        Shutdown this process
+        """
 
     def create(self, c: _ServerConnection, typeid: str, /, *args: Any, **kwds: Any) -> tuple[str, tuple[str, ...]]:
-        """Create a new shared object and return its id"""
+        """
+        Create a new shared object and return its id
+        """
 
     def get_methods(self, c: _ServerConnection, token: Token) -> set[str]:
-        """Return the methods of the shared object indicated by token"""
+        """
+        Return the methods of the shared object indicated by token
+        """
 
     def accept_connection(self, c: _ServerConnection, name: str) -> None:
-        """Spawn a new thread to serve this connection"""
+        """
+        Spawn a new thread to serve this connection
+        """
 
     def incref(self, c: _ServerConnection, ident: str) -> None: ...
     def decref(self, c: _ServerConnection, ident: str) -> None: ...
 
 class BaseManager:
-    """Base class for managers"""
+    """
+    Base class for managers
+    """
 
     if sys.version_info >= (3, 11):
         def __init__(
@@ -306,16 +338,24 @@ class BaseManager:
         ) -> None: ...
 
     def get_server(self) -> Server:
-        """Return server object with serve_forever() method and address attribute"""
+        """
+        Return server object with serve_forever() method and address attribute
+        """
 
     def connect(self) -> None:
-        """Connect manager object to the server process"""
+        """
+        Connect manager object to the server process
+        """
 
     def start(self, initializer: Callable[..., object] | None = None, initargs: Iterable[Any] = ()) -> None:
-        """Spawn a server process for this manager object"""
+        """
+        Spawn a server process for this manager object
+        """
     shutdown: _Finalize  # only available after start() was called
     def join(self, timeout: float | None = None) -> None:  # undocumented
-        """Join the manager process (if it has been spawned)"""
+        """
+        Join the manager process (if it has been spawned)
+        """
 
     @property
     def address(self) -> _Address | None: ...
@@ -329,7 +369,9 @@ class BaseManager:
         method_to_typeid: Mapping[str, str] | None = None,
         create_method: bool = True,
     ) -> None:
-        """Register a typeid with the manager type"""
+        """
+        Register a typeid with the manager type
+        """
 
     def __enter__(self) -> Self: ...
     def __exit__(
@@ -337,7 +379,8 @@ class BaseManager:
     ) -> None: ...
 
 class SyncManager(BaseManager):
-    """Subclass of `BaseManager` which supports a number of shared object types.
+    """
+    Subclass of `BaseManager` which supports a number of shared object types.
 
     The types registered are those intended for the synchronization
     of threads, plus `dict`, `list` and `Namespace`.

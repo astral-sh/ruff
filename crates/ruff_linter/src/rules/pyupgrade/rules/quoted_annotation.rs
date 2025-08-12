@@ -66,7 +66,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 ///
 /// The rule's fix is marked as safe, unless [preview] and
-/// [`lint.future_annotations`] are enabled and a `from __future__ import
+/// [`lint.future-annotations`] are enabled and a `from __future__ import
 /// annotations` import is added. Such an import may change the behavior of all annotations in the
 /// file.
 ///

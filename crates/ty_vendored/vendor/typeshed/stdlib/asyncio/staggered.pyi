@@ -58,4 +58,5 @@ async def staggered_race(
           ``len(exceptions)`` is equal to the number of coroutines actually
           started, and the order is the same as in ``coro_fns``. The winning
           coroutine's entry is ``None``.
+
     """

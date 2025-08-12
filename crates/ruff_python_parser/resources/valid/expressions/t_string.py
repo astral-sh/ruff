@@ -17,7 +17,7 @@ t"{  foo =  !s  }"
 t"{  1, 2  =  }"
 t'{t"{3.1415=:.1f}":*^20}'
 
-{"foo " t"bar {x + y} " "baz": 10}
+{t"foo " t"bar {x + y} " t"baz": 10}
 match foo:
     case "one":
         pass
@@ -44,31 +44,18 @@ t"{x=!a}"
 t"{x:.3f!r =}"
 t"{x = !r :.3f}"
 t"{x:.3f=!r}"
-"hello" t"{x}"
+t"hello" t"{x}"
 t"{x}" t"{y}"
-t"{x}" "world"
+t"{x}" t"world"
 t"Invalid args in command: {command, *args}"
-"foo" t"{x}" "bar"
+t"foo" t"{x}" t"bar"
 (
     t"a"
     t"b"
-    "c"
+    t"c"
     rt"d"
-    fr"e"
+    tr"e"
 )
-
-# With unicode strings
-u"foo" t"{bar}" "baz" " some"
-"foo" t"{bar}" u"baz" " some"
-"foo" t"{bar}" "baz" u" some"
-u"foo" t"bar {baz} really" u"bar" "no"
-
-
-# With f-strings
-f"{this}" t"{that}"
-t"{this}"f"{that}"
-t"{this}" "that" f"{other}"
-f"one {this} two" "that" t"three {other} four"
 
 # Nesting
 t"{f"{t"{this}"}"}"

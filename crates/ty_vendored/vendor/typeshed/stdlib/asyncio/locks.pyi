@@ -80,6 +80,7 @@ class Lock(_ContextManagerMixin, _LoopBoundMixin):
         else:
            # lock is acquired
            ...
+
     """
 
     _waiters: deque[Future[Any]] | None

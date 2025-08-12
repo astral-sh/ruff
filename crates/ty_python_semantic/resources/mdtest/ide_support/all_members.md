@@ -1,60 +1,65 @@
 # List all members
 
+This test suite acts as a set of unit tests for our `ide_support::all_members` routine, which lists
+all members available on a given type. This routine is used for autocomplete suggestions.
+
 ## Basic functionality
 
 <!-- snapshot-diagnostics -->
 
-The `ty_extensions.all_members` function allows access to a tuple of accessible members/attributes
-on a given object. For example, all member functions of `str` are available on `"a"`:
+The `ty_extensions.all_members` and `ty_extensions.has_member` functions expose a Python-level API
+that can be used to query which attributes `ide_support::all_members` understands as being available
+on a given object. For example, all member functions of `str` are available on `"a"`. The Python API
+`all_members` returns a tuple of all available members; `has_member` returns `Literal[True]` if a
+given member is present in that tuple, and `Literal[False]` if not:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import static_assert, has_member
 
-members_of_str = all_members("a")
-
-static_assert("replace" in members_of_str)
-static_assert("startswith" in members_of_str)
-static_assert("isupper" in members_of_str)
+static_assert(has_member("a", "replace"))
+static_assert(has_member("a", "startswith"))
+static_assert(has_member("a", "isupper"))
 ```
 
 Similarly, special members such as `__add__` are also available:
 
 ```py
-static_assert("__add__" in members_of_str)
-static_assert("__gt__" in members_of_str)
+static_assert(has_member("a", "__add__"))
+static_assert(has_member("a", "__gt__"))
 ```
 
 Members of base classes are also included (these dunder methods are defined on `object`):
 
 ```py
-static_assert("__doc__" in members_of_str)
-static_assert("__repr__" in members_of_str)
+static_assert(has_member("a", "__doc__"))
+static_assert(has_member("a", "__repr__"))
 ```
 
 Non-existent members are not included:
 
 ```py
-static_assert("non_existent" not in members_of_str)
+static_assert(not has_member("a", "non_existent"))
 ```
 
-Note: The full list of all members is relatively long, but `reveal_type` can theoretically be used
-to see them all:
+The full list of all members is relatively long, but `reveal_type` can be used in combination with
+`all_members` to see them all:
 
 ```py
 from typing_extensions import reveal_type
+from ty_extensions import all_members
 
-reveal_type(members_of_str)  # error: [revealed-type]
+reveal_type(all_members("a"))  # error: [revealed-type]
 ```
 
 ## Kinds of types
 
 ### Class instances
 
-For instances of classes, `all_members` returns class members and implicit instance members of all
-classes in the MRO:
+For instances of classes, class members and implicit instance members of all superclasses are
+understood as being available:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class Base:
     base_class_attr: int = 1
@@ -86,25 +91,23 @@ class C(Intermediate):
     def static_method() -> int:
         return 1
 
-members_of_instance = all_members(C())
+static_assert(has_member(C(), "base_class_attr"))
+static_assert(has_member(C(), "intermediate_attr"))
+static_assert(has_member(C(), "class_attr"))
 
-static_assert("base_class_attr" in members_of_instance)
-static_assert("intermediate_attr" in members_of_instance)
-static_assert("class_attr" in members_of_instance)
+static_assert(has_member(C(), "base_instance_attr"))
+static_assert(has_member(C(), "intermediate_instance_attr"))
+static_assert(has_member(C(), "instance_attr"))
 
-static_assert("base_instance_attr" in members_of_instance)
-static_assert("intermediate_instance_attr" in members_of_instance)
-static_assert("instance_attr" in members_of_instance)
+static_assert(has_member(C(), "f_base"))
+static_assert(has_member(C(), "f_intermediate"))
+static_assert(has_member(C(), "f_c"))
 
-static_assert("f_base" in members_of_instance)
-static_assert("f_intermediate" in members_of_instance)
-static_assert("f_c" in members_of_instance)
+static_assert(has_member(C(), "property_attr"))
+static_assert(has_member(C(), "class_method"))
+static_assert(has_member(C(), "static_method"))
 
-static_assert("property_attr" in members_of_instance)
-static_assert("class_method" in members_of_instance)
-static_assert("static_method" in members_of_instance)
-
-static_assert("non_existent" not in members_of_instance)
+static_assert(not has_member(C(), "non_existent"))
 ```
 
 ### Class objects
@@ -112,7 +115,7 @@ static_assert("non_existent" not in members_of_instance)
 Class-level attributes can also be accessed through the class itself:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class Base:
     base_attr: int = 1
@@ -123,18 +126,16 @@ class C(Base):
     def f(self):
         self.instance_attr = True
 
-members_of_class = all_members(C)
+static_assert(has_member(C, "class_attr"))
+static_assert(has_member(C, "base_attr"))
 
-static_assert("class_attr" in members_of_class)
-static_assert("base_attr" in members_of_class)
-
-static_assert("non_existent" not in members_of_class)
+static_assert(not has_member(C, "non_existent"))
 ```
 
 But instance attributes can not be accessed this way:
 
 ```py
-static_assert("instance_attr" not in members_of_class)
+static_assert(not has_member(C, "instance_attr"))
 ```
 
 When a class has a metaclass, members of that metaclass (and bases of that metaclass) are also
@@ -150,16 +151,16 @@ class Meta(MetaBase):
 class D(Base, metaclass=Meta):
     class_attr = 3
 
-static_assert("meta_base_attr" in all_members(D))
-static_assert("meta_attr" in all_members(D))
-static_assert("base_attr" in all_members(D))
-static_assert("class_attr" in all_members(D))
+static_assert(has_member(D, "meta_base_attr"))
+static_assert(has_member(D, "meta_attr"))
+static_assert(has_member(D, "base_attr"))
+static_assert(has_member(D, "class_attr"))
 ```
 
 ### Generic classes
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -167,52 +168,83 @@ T = TypeVar("T")
 class C(Generic[T]):
     base_attr: T
 
-static_assert("base_attr" in all_members(C[int]))
-static_assert("base_attr" in all_members(C[int]()))
+static_assert(has_member(C[int], "base_attr"))
+static_assert(has_member(C[int](), "base_attr"))
 ```
 
 ### Other instance-like types
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 from typing_extensions import LiteralString
 
-static_assert("__xor__" in all_members(True))
-static_assert("bit_length" in all_members(1))
-static_assert("startswith" in all_members("a"))
-static_assert("__buffer__" in all_members(b"a"))
-static_assert("is_integer" in all_members(3.14))
+static_assert(has_member(True, "__xor__"))
+static_assert(has_member(1, "bit_length"))
+static_assert(has_member("a", "startswith"))
+static_assert(has_member(b"a", "__buffer__"))
+static_assert(has_member(3.14, "is_integer"))
 
 def _(literal_string: LiteralString):
-    static_assert("startswith" in all_members(literal_string))
+    static_assert(has_member(literal_string, "startswith"))
 
-static_assert("count" in all_members(("some", "tuple", 1, 2)))
+static_assert(has_member(("some", "tuple", 1, 2), "count"))
 
-static_assert("__doc__" in all_members(len))
-static_assert("__doc__" in all_members("a".startswith))
+static_assert(has_member(len, "__doc__"))
+static_assert(has_member("a".startswith, "__doc__"))
 ```
 
 ### Enums
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 from enum import Enum
 
 class Answer(Enum):
     NO = 0
     YES = 1
 
-static_assert("NO" in all_members(Answer))
-static_assert("YES" in all_members(Answer))
-static_assert("__members__" in all_members(Answer))
+static_assert(has_member(Answer, "NO"))
+static_assert(has_member(Answer, "YES"))
+static_assert(has_member(Answer, "__members__"))
+```
+
+### TypedDicts
+
+```py
+from ty_extensions import has_member, static_assert
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+static_assert(not has_member(Person, "name"))
+static_assert(has_member(Person, "keys"))
+static_assert(has_member(Person, "__total__"))
+
+def _(person: Person):
+    static_assert(not has_member(person, "name"))
+    static_assert(not has_member(person, "__total__"))
+    static_assert(has_member(person, "keys"))
+
+    # type(person) is `dict` at runtime, so `__total__` is not available:
+    static_assert(not has_member(type(person), "name"))
+    static_assert(not has_member(type(person), "__total__"))
+    static_assert(has_member(type(person), "keys"))
+
+def _(t_person: type[Person]):
+    static_assert(not has_member(t_person, "name"))
+    static_assert(has_member(t_person, "__total__"))
+    static_assert(has_member(t_person, "keys"))
 ```
 
 ### Unions
 
-For unions, `all_members` will only return members that are available on all elements of the union.
+For unions, `ide_support::all_members` only returns members that are available on all elements of
+the union.
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class A:
     on_both: int = 1
@@ -223,20 +255,20 @@ class B:
     only_on_b: str = "b"
 
 def f(union: A | B):
-    static_assert("on_both" in all_members(union))
-    static_assert("only_on_a" not in all_members(union))
-    static_assert("only_on_b" not in all_members(union))
+    static_assert(has_member(union, "on_both"))
+    static_assert(not has_member(union, "only_on_a"))
+    static_assert(not has_member(union, "only_on_b"))
 ```
 
 ### Intersections
 
 #### Only positive types
 
-Conversely, for intersections, `all_members` will list members that are available on any of the
-elements:
+Conversely, for intersections, `ide_support::all_members` lists members that are available on any of
+the elements:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class A:
     on_both: int = 1
@@ -249,9 +281,9 @@ class B:
 def f(intersection: object):
     if isinstance(intersection, A):
         if isinstance(intersection, B):
-            static_assert("on_both" in all_members(intersection))
-            static_assert("only_on_a" in all_members(intersection))
-            static_assert("only_on_b" in all_members(intersection))
+            static_assert(has_member(intersection, "on_both"))
+            static_assert(has_member(intersection, "only_on_a"))
+            static_assert(has_member(intersection, "only_on_b"))
 ```
 
 #### With negative types
@@ -259,7 +291,7 @@ def f(intersection: object):
 It also works when negative types are introduced:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class A:
     on_all: int = 1
@@ -284,27 +316,27 @@ def f(intersection: object):
         if isinstance(intersection, B):
             if not isinstance(intersection, C):
                 reveal_type(intersection)  # revealed: A & B & ~C
-                static_assert("on_all" in all_members(intersection))
-                static_assert("only_on_a" in all_members(intersection))
-                static_assert("only_on_b" in all_members(intersection))
-                static_assert("only_on_c" not in all_members(intersection))
-                static_assert("only_on_ab" in all_members(intersection))
-                static_assert("only_on_ac" in all_members(intersection))
-                static_assert("only_on_bc" in all_members(intersection))
+                static_assert(has_member(intersection, "on_all"))
+                static_assert(has_member(intersection, "only_on_a"))
+                static_assert(has_member(intersection, "only_on_b"))
+                static_assert(not has_member(intersection, "only_on_c"))
+                static_assert(has_member(intersection, "only_on_ab"))
+                static_assert(has_member(intersection, "only_on_ac"))
+                static_assert(has_member(intersection, "only_on_bc"))
 ```
 
 ## Modules
 
 ### Basic support with sub-modules
 
-`all_members` can also list attributes on modules:
+`ide_support::all_members` can also list attributes on modules:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 import math
 
-static_assert("pi" in all_members(math))
-static_assert("cos" in all_members(math))
+static_assert(has_member(math, "pi"))
+static_assert(has_member(math, "cos"))
 ```
 
 This also works for submodules:
@@ -312,18 +344,18 @@ This also works for submodules:
 ```py
 import os
 
-static_assert("path" in all_members(os))
+static_assert(has_member(os, "path"))
 
 import os.path
 
-static_assert("join" in all_members(os.path))
+static_assert(has_member(os.path, "join"))
 ```
 
 Special members available on all modules are also included:
 
 ```py
-static_assert("__name__" in all_members(math))
-static_assert("__doc__" in all_members(math))
+static_assert(has_member(math, "__name__"))
+static_assert(has_member(math, "__doc__"))
 ```
 
 ### `__all__` is not respected for direct module access
@@ -331,12 +363,12 @@ static_assert("__doc__" in all_members(math))
 `foo.py`:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 import bar
 
-static_assert("lion" in all_members(bar))
-static_assert("tiger" in all_members(bar))
+static_assert(has_member(bar, "lion"))
+static_assert(has_member(bar, "tiger"))
 ```
 
 `bar.py`:
@@ -348,17 +380,17 @@ lion = 1
 tiger = 1
 ```
 
-### `__all__` is respected for glob imports
+### `__all__` is respected for `*` imports
 
 `foo.py`:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 import bar
 
-static_assert("lion" in all_members(bar))
-static_assert("tiger" not in all_members(bar))
+static_assert(has_member(bar, "lion"))
+static_assert(not has_member(bar, "tiger"))
 ```
 
 `bar.py`:
@@ -400,12 +432,12 @@ def evaluate(x: Optional[int] = None) -> int: ...
 `play.py`:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 import module
 
-static_assert("evaluate" in all_members(module))
-static_assert("Optional" not in all_members(module))
+static_assert(has_member(module, "evaluate"))
+static_assert(not has_member(module, "Optional"))
 ```
 
 ## Conditionally available members
@@ -421,9 +453,9 @@ python-version = "3.9"
 ```
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
-static_assert("bit_count" not in all_members(42))
+static_assert(not has_member(42, "bit_count"))
 ```
 
 ### 3.10
@@ -434,19 +466,19 @@ python-version = "3.10"
 ```
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
-static_assert("bit_count" in all_members(42))
+static_assert(has_member(42, "bit_count"))
 ```
 
-## Failures cases
+## Failure cases
 
 ### Dynamically added members
 
-Dynamically added members can not be accessed:
+Dynamically added members cannot be accessed:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 class C:
     static_attr = 1
@@ -460,8 +492,8 @@ class C:
 c = C()
 c.dynamic_attr = "a"
 
-static_assert("static_attr" in all_members(c))
-static_assert("dynamic_attr" not in all_members(c))
+static_assert(has_member(c, "static_attr"))
+static_assert(not has_member(c, "dynamic_attr"))
 ```
 
 ### Dataclasses
@@ -469,24 +501,24 @@ static_assert("dynamic_attr" not in all_members(c))
 So far, we do not include synthetic members of dataclasses.
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
 @dataclass(order=True)
 class Person:
-    name: str
     age: int
+    name: str
 
-static_assert("name" in all_members(Person))
-static_assert("age" in all_members(Person))
+static_assert(has_member(Person, "name"))
+static_assert(has_member(Person, "age"))
 
 # These are always available, since they are also defined on `object`:
-static_assert("__init__" in all_members(Person))
-static_assert("__repr__" in all_members(Person))
-static_assert("__eq__" in all_members(Person))
+static_assert(has_member(Person, "__init__"))
+static_assert(has_member(Person, "__repr__"))
+static_assert(has_member(Person, "__eq__"))
 
 # TODO: this should ideally be available:
-static_assert("__lt__" in all_members(Person))  # error: [static-assert-error]
+static_assert(has_member(Person, "__lt__"))  # error: [static-assert-error]
 ```
 
 ### Attributes not available at runtime
@@ -496,8 +528,8 @@ example, `__annotations__` does not exist on `int` at runtime, but it is availab
 on `object` in typeshed:
 
 ```py
-from ty_extensions import all_members, static_assert
+from ty_extensions import has_member, static_assert
 
 # TODO: this should ideally not be available:
-static_assert("__annotations__" not in all_members(3))  # error: [static-assert-error]
+static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-error]
 ```

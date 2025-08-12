@@ -332,6 +332,7 @@ class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
 
             rawparam = msg.get_param('foo')
             param = email.utils.collapse_rfc2231_value(rawparam)
+
         """
 
     @overload

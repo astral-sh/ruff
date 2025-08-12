@@ -676,6 +676,7 @@ class ElementInfo:
     This implementation is not expected to be used in practice; DOM
     builders should provide implementations which do the right thing
     using information available to it.
+
     """
 
     tagName: str

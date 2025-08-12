@@ -28,8 +28,6 @@ use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection}
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{add_inferred_python_version_hint_to_diagnostic, register_lints};
 
-pub mod combine;
-
 mod db;
 mod files;
 mod glob;
@@ -57,7 +55,7 @@ pub fn default_lints_registry() -> LintRegistry {
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input]
+#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
@@ -127,17 +125,46 @@ pub trait ProgressReporter: Send + Sync {
     /// Initialize the reporter with the number of files.
     fn set_files(&mut self, files: usize);
 
-    /// Report the completion of a given file.
-    fn report_file(&self, file: &File);
+    /// Report the completion of checking a given file along with its diagnostics.
+    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
+
+    /// Reports settings or IO related diagnostics. The diagnostics
+    /// can belong to different files or no file at all.
+    /// But it's never a file for which [`Self::report_checked_file`] gets called.
+    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>);
 }
 
-/// A no-op implementation of [`ProgressReporter`].
+/// Reporter that collects all diagnostics into a `Vec`.
 #[derive(Default)]
-pub struct DummyReporter;
+pub struct CollectReporter(std::sync::Mutex<Vec<Diagnostic>>);
 
-impl ProgressReporter for DummyReporter {
+impl CollectReporter {
+    pub fn into_sorted(self, db: &dyn Db) -> Vec<Diagnostic> {
+        let mut diagnostics = self.0.into_inner().unwrap();
+        diagnostics.sort_by(|left, right| {
+            left.rendering_sort_key(db)
+                .cmp(&right.rendering_sort_key(db))
+        });
+        diagnostics
+    }
+}
+
+impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_file(&self, _file: &File) {}
+    fn report_checked_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
+        if diagnostics.is_empty() {
+            return;
+        }
+
+        self.0
+            .lock()
+            .unwrap()
+            .extend(diagnostics.iter().map(Clone::clone));
+    }
+
+    fn report_diagnostics(&mut self, _db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+        self.0.get_mut().unwrap().extend(diagnostics);
+    }
 }
 
 #[salsa::tracked]
@@ -174,7 +201,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref), heap_size=get_size2::GetSize::get_heap_size)]
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -225,11 +252,7 @@ impl Project {
     }
 
     /// Checks the project and its dependencies according to the project's check mode.
-    pub(crate) fn check(
-        self,
-        db: &ProjectDatabase,
-        mut reporter: AssertUnwindSafe<&mut dyn ProgressReporter>,
-    ) -> Vec<Diagnostic> {
+    pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
@@ -239,12 +262,11 @@ impl Project {
             name = self.name(db)
         );
 
-        let mut diagnostics: Vec<Diagnostic> = Vec::new();
-        diagnostics.extend(
-            self.settings_diagnostics(db)
-                .iter()
-                .map(OptionDiagnostic::to_diagnostic),
-        );
+        let mut diagnostics: Vec<Diagnostic> = self
+            .settings_diagnostics(db)
+            .iter()
+            .map(OptionDiagnostic::to_diagnostic)
+            .collect();
 
         let files = ProjectFiles::new(db, self);
         reporter.set_files(files.len());
@@ -256,19 +278,19 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
+        reporter.report_diagnostics(db, diagnostics);
+
         let open_files = self.open_files(db);
         let check_start = ruff_db::Instant::now();
-        let file_diagnostics = std::sync::Mutex::new(vec![]);
 
         {
             let db = db.clone();
-            let file_diagnostics = &file_diagnostics;
             let project_span = &project_span;
-            let reporter = &reporter;
 
             rayon::scope(move |scope| {
                 for file in &files {
                     let db = db.clone();
+                    let reporter = &*reporter;
                     scope.spawn(move |_| {
                         let check_file_span =
                             tracing::debug_span!(parent: project_span, "check_file", ?file);
@@ -276,10 +298,7 @@ impl Project {
 
                         match check_file_impl(&db, file) {
                             Ok(diagnostics) => {
-                                file_diagnostics
-                                    .lock()
-                                    .unwrap()
-                                    .extend(diagnostics.iter().map(Clone::clone));
+                                reporter.report_checked_file(&db, file, diagnostics);
 
                                 // This is outside `check_file_impl` to avoid that opening or closing
                                 // a file invalidates the `check_file_impl` query of every file!
@@ -295,28 +314,22 @@ impl Project {
                                 }
                             }
                             Err(io_error) => {
-                                file_diagnostics.lock().unwrap().push(io_error.clone());
+                                reporter.report_checked_file(
+                                    &db,
+                                    file,
+                                    std::slice::from_ref(io_error),
+                                );
                             }
                         }
-
-                        reporter.report_file(&file);
                     });
                 }
             });
-        }
+        };
 
         tracing::debug!(
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
         );
-
-        let mut file_diagnostics = file_diagnostics.into_inner().unwrap();
-        file_diagnostics.sort_by(|left, right| {
-            left.rendering_sort_key(db)
-                .cmp(&right.rendering_sort_key(db))
-        });
-        diagnostics.extend(file_diagnostics);
-        diagnostics
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -511,7 +524,7 @@ impl Project {
     }
 }
 
-#[salsa::tracked(returns(ref), heap_size=get_size2::GetSize::get_heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn check_file_impl(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
@@ -623,7 +636,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, get_size2::GetSize)]
 pub struct IOErrorDiagnostic {
     file: Option<File>,
     error: IOErrorKind,
@@ -639,7 +652,7 @@ impl IOErrorDiagnostic {
     }
 }
 
-#[derive(Error, Debug, Clone)]
+#[derive(Error, Debug, Clone, get_size2::GetSize)]
 enum IOErrorKind {
     #[error(transparent)]
     Walk(#[from] walk::WalkError),

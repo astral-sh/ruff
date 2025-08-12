@@ -562,7 +562,7 @@ struct RemoveSoftLinebreaksSnapshot {
 pub trait BufferExtensions: Buffer + Sized {
     /// Returns a new buffer that calls the passed inspector for every element that gets written to the output
     #[must_use]
-    fn inspect<F>(&mut self, inspector: F) -> Inspect<Self::Context, F>
+    fn inspect<F>(&mut self, inspector: F) -> Inspect<'_, Self::Context, F>
     where
         F: FnMut(&FormatElement),
     {
@@ -607,7 +607,7 @@ pub trait BufferExtensions: Buffer + Sized {
     /// # }
     /// ```
     #[must_use]
-    fn start_recording(&mut self) -> Recording<Self> {
+    fn start_recording(&mut self) -> Recording<'_, Self> {
         Recording::new(self)
     }
 

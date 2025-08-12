@@ -119,6 +119,28 @@ def _(empty: EmptyTupleSubclass, single_element: SingleElementTupleSubclass, mix
     mixed.__class__()
 ```
 
+## Meta-type of tuple instances
+
+The type `tuple[str, int]` does not only have exact instances of `tuple` as its inhabitants: its
+inhabitants also include any instances of subclasses of `tuple[str, int]`. As such, the meta-type of
+`tuple[str, int]` should be `type[tuple[str, int]]` rather than `<class 'tuple[str, int]'>`. The
+former accurately reflects the fact that given an instance of `tuple[str, int]`, we do not know
+exactly what the `__class__` of that instance will be: we only know that it will be a subclass of
+`tuple[str, int]`. The latter would be incorrectly precise: it would imply that all instances of
+`tuple[str, int]` have the runtime object `tuple` as their `__class__`, which isn't true.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def f(x: tuple[int, ...], y: tuple[str, str], z: tuple[int, *tuple[str, ...], bytes]):
+    reveal_type(type(x))  # revealed: type[tuple[int, ...]]
+    reveal_type(type(y))  # revealed: type[tuple[str, str]]
+    reveal_type(type(z))  # revealed: type[tuple[int, *tuple[str, ...], bytes]]
+```
+
 ## Subtyping relationships
 
 The type `tuple[S1, S2]` is a subtype of `tuple[T1, T2]` if and only if `S1` is a subtype of `T1`
@@ -453,6 +475,54 @@ class NotAlwaysTruthyTuple(tuple[int]):
         return False
 
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
+```
+
+## Unspecialized
+
+An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ...]`.
+
+```py
+from typing_extensions import Any, assert_type
+from ty_extensions import Unknown, is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
+def f(x: tuple, y: tuple[Unknown, ...]):
+    reveal_type(x)  # revealed: tuple[Unknown, ...]
+    assert_type(x, tuple[Any, ...])
+    assert_type(x, tuple[Unknown, ...])
+    reveal_type(y)  # revealed: tuple[Unknown, ...]
+    assert_type(y, tuple[Any, ...])
+    assert_type(y, tuple[Unknown, ...])
+```
+
+## Converting a `tuple` to another `Sequence` type
+
+For covariant types, such as `frozenset`, the ideal behaviour would be to not promote `Literal`
+types to their instance supertypes: doing so causes more false positives than it fixes:
+
+```py
+# TODO: better here would be `frozenset[Literal[1, 2, 3]]`
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[int]
+# TODO: better here would be `frozenset[tuple[Literal[1], Literal[2], Literal[3]]]`
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[int, int, int]]
+```
+
+Literals are always promoted for invariant containers such as `list`, however, even though this can
+in some cases cause false positives:
+
+```py
+from typing import Literal
+
+reveal_type(list((1, 2, 3)))  # revealed: list[int]
+reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
+
+# TODO: we could bidirectionally infer that the user does not want literals to be promoted here,
+# and avoid this diagnostic
+#
+# error: [invalid-assignment] "`list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
+x: list[Literal[1, 2, 3]] = list((1, 2, 3))
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```
 
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

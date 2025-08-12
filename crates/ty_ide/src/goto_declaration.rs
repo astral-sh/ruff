@@ -3,6 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
+use ty_python_semantic::ImportAliasResolution;
 
 /// Navigate to the declaration of a symbol.
 ///
@@ -17,7 +18,12 @@ pub fn goto_declaration(
     let module = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&module, offset)?;
 
-    let declaration_targets = goto_target.get_definition_targets(file, db, None)?;
+    let declaration_targets = goto_target.get_definition_targets(
+        file,
+        db,
+        None,
+        ImportAliasResolution::ResolveAliases,
+    )?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -859,12 +865,50 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_nested_instance_attribute() {
+        let test = cursor_test(
+            "
+            class C:
+                def __init__(self):
+                    self.x: int = 1
+
+            class D:
+                def __init__(self):
+                    self.y: C = C()
+
+            d = D()
+            y = d.y.x<CURSOR>
+            ",
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> main.py:4:21
+          |
+        2 |             class C:
+        3 |                 def __init__(self):
+        4 |                     self.x: int = 1
+          |                     ^^^^^^
+        5 |
+        6 |             class D:
+          |
+        info: Source
+          --> main.py:11:21
+           |
+        10 |             d = D()
+        11 |             y = d.y.x
+           |                     ^
+           |
         ");
     }
 
@@ -893,11 +937,11 @@ def another_helper(path):
         6 |             c = C()
           |
         info: Source
-         --> main.py:7:17
+         --> main.py:7:19
           |
         6 |             c = C()
         7 |             y = c.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -925,11 +969,11 @@ def another_helper(path):
         4 |                     return 42
           |
         info: Source
-         --> main.py:7:19
+         --> main.py:7:21
           |
         6 |             c = C()
         7 |             res = c.foo()
-          |                   ^^^^^
+          |                     ^^^
           |
         ");
     }
@@ -1071,11 +1115,11 @@ def function():
         5 |             class B(A):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:19
           |
         8 |             b = B()
         9 |             y = b.x
-          |                 ^^^
+          |                   ^
           |
         ");
     }
@@ -1107,11 +1151,11 @@ def function():
         8 |                     return self._value
           |
         info: Source
-          --> main.py:11:13
+          --> main.py:11:15
            |
         10 |             c = C()
         11 |             c.value = 42
-           |             ^^^^^^^
+           |               ^^^^^
            |
         ");
     }
@@ -1182,11 +1226,11 @@ def function():
         8 |             def use_drawable(obj: Drawable):
           |
         info: Source
-         --> main.py:9:17
+         --> main.py:9:21
           |
         8 |             def use_drawable(obj: Drawable):
         9 |                 obj.name
-          |                 ^^^^^^^^
+          |                     ^^^^
           |
         ");
     }

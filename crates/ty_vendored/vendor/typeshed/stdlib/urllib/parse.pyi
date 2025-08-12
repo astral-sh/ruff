@@ -102,7 +102,8 @@ class _NetlocResultMixinStr(_NetlocResultMixinBase[str], _ResultMixinStr): ...
 class _NetlocResultMixinBytes(_NetlocResultMixinBase[bytes], _ResultMixinBytes): ...
 
 class _DefragResultBase(NamedTuple, Generic[AnyStr]):
-    """DefragResult(url, fragment)
+    """
+    DefragResult(url, fragment)
 
     A 2-tuple that contains the url without fragment identifier and the fragment
     identifier as a separate argument.
@@ -112,7 +113,8 @@ class _DefragResultBase(NamedTuple, Generic[AnyStr]):
     fragment: AnyStr
 
 class _SplitResultBase(NamedTuple, Generic[AnyStr]):
-    """SplitResult(scheme, netloc, path, query, fragment)
+    """
+    SplitResult(scheme, netloc, path, query, fragment)
 
     A 5-tuple that contains the different components of a URL. Similar to
     ParseResult, but does not split params.
@@ -125,7 +127,8 @@ class _SplitResultBase(NamedTuple, Generic[AnyStr]):
     fragment: AnyStr
 
 class _ParseResultBase(NamedTuple, Generic[AnyStr]):
-    """ParseResult(scheme, netloc, path, params, query, fragment)
+    """
+    ParseResult(scheme, netloc, path, params, query, fragment)
 
     A 6-tuple that contains components of a parsed URL.
     """

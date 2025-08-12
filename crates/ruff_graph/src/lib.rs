@@ -9,7 +9,7 @@ use ruff_python_parser::{Mode, ParseOptions, parse};
 use crate::collector::Collector;
 pub use crate::db::ModuleDb;
 use crate::resolver::Resolver;
-pub use crate::settings::{AnalyzeSettings, Direction};
+pub use crate::settings::{AnalyzeSettings, Direction, StringImports};
 
 mod collector;
 mod db;
@@ -26,7 +26,7 @@ impl ModuleImports {
         db: &ModuleDb,
         path: &SystemPath,
         package: Option<&SystemPath>,
-        string_imports: bool,
+        string_imports: StringImports,
     ) -> Result<Self> {
         // Read and parse the source code.
         let source = std::fs::read_to_string(path)?;
@@ -42,13 +42,11 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            let Some(resolved) = Resolver::new(db).resolve(import) else {
-                continue;
-            };
-            let Some(path) = resolved.as_system_path() else {
-                continue;
-            };
-            resolved_imports.insert(path.to_path_buf());
+            for resolved in Resolver::new(db).resolve(import) {
+                if let Some(path) = resolved.as_system_path() {
+                    resolved_imports.insert(path.to_path_buf());
+                }
+            }
         }
 
         Ok(resolved_imports)

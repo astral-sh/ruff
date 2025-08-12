@@ -20,7 +20,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: typing.TypeVar("T")
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -79,6 +79,8 @@ python-version = "3.13"
 from typing import TypeVar
 
 T = TypeVar("T", default=int)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar("T", default=int)
 reveal_type(T.__default__)  # revealed: int
 reveal_type(T.__bound__)  # revealed: None
 reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -113,6 +115,8 @@ class Invalid(Generic[U]): ...
 from typing import TypeVar
 
 T = TypeVar("T", bound=int)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar("T", bound=int)
 reveal_type(T.__bound__)  # revealed: int
 reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -126,6 +130,8 @@ reveal_type(S.__bound__)  # revealed: None
 from typing import TypeVar
 
 T = TypeVar("T", int, str)
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
+reveal_type(T)  # revealed: typing.TypeVar("T", int, str)
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 
 S = TypeVar("S")
@@ -182,7 +188,7 @@ from typing import Callable, TypeVar
 T = TypeVar("T", bound=Callable[[], int])
 
 def bound(f: T):
-    reveal_type(f)  # revealed: T
+    reveal_type(f)  # revealed: T@bound
     reveal_type(f())  # revealed: int
 ```
 
@@ -192,7 +198,7 @@ Same with a constrained typevar, as long as all constraints are callable:
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
-    reveal_type(f)  # revealed: T
+    reveal_type(f)  # revealed: T@constrained
     reveal_type(f())  # revealed: int | str
 ```
 

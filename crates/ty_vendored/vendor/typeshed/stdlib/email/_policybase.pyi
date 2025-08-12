@@ -41,6 +41,7 @@ class _PolicyBase(Generic[_MessageT_co]):
     The repr of an instance can be used to reconstruct the object
     if and only if the repr of the values can be used to reconstruct
     those values.
+
     """
 
     max_line_length: int | None
@@ -67,6 +68,7 @@ class _PolicyBase(Generic[_MessageT_co]):
         """Create new Policy, possibly overriding some defaults.
 
         See class docstring for a list of overridable attributes.
+
         """
 
     def clone(
@@ -85,12 +87,14 @@ class _PolicyBase(Generic[_MessageT_co]):
 
         The new instance has the same attribute values as the current object,
         except for the changes passed in as keyword arguments.
+
         """
 
     def __add__(self, other: Policy) -> Self:
         """Non-default values from right operand override those from left.
 
         The object returned is a new instance of the subclass.
+
         """
 
 class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
@@ -164,6 +168,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
 
         This method is intended to be called by parsers that discover defects.
         The email package parsers always call it with Defect instances.
+
         """
 
     def register_defect(self, obj: Message[Any, Any], defect: MessageDefect) -> None:
@@ -175,6 +180,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         the defects attribute of obj.  The objects used by the email package by
         default that get passed to this method will always have a defects
         attribute with an append method.
+
         """
 
     def header_max_count(self, name: str) -> int | None:
@@ -217,6 +223,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         header.  The value passed in by the email package may contain
         surrogateescaped binary data if the lines were parsed by a BytesParser.
         The returned value should not contain any surrogateescaped data.
+
         """
 
     @abstractmethod
@@ -227,6 +234,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         package may contain surrogateescaped binary data if the lines were
         parsed by a BytesParser.  The returned value should not contain any
         surrogateescaped data.
+
         """
 
     @abstractmethod
@@ -235,6 +243,7 @@ class Policy(_PolicyBase[_MessageT_co], metaclass=ABCMeta):
         data containing linesep characters that implement the folding of the
         header according to the policy controls.  The value passed in by the
         email package may contain surrogateescaped binary data.
+
         """
 
 class Compat32(Policy[_MessageT_co]):
@@ -305,6 +314,7 @@ class Compat32(Policy[_MessageT_co]):
         The value is determined by stripping leading whitespace off the
         remainder of the first line joined with all subsequent lines, and
         stripping any trailing carriage return or linefeed characters.
+
         """
 
     def header_store_parse(self, name: str, value: str) -> tuple[str, str]:
@@ -336,6 +346,7 @@ class Compat32(Policy[_MessageT_co]):
         existing line breaks in the value, and wraps each resulting line to the
         max_line_length.  Non-ASCII binary data are CTE encoded using the
         unknown-8bit charset.
+
         """
 
     def fold_binary(self, name: str, value: str) -> bytes:
@@ -349,6 +360,7 @@ class Compat32(Policy[_MessageT_co]):
         max_line_length.  If cte_type is 7bit, non-ascii binary data is CTE
         encoded using the unknown-8bit charset.  Otherwise the original source
         header is used, with its existing line breaks and/or binary data.
+
         """
 
 compat32: Compat32[Message[str, str]]
