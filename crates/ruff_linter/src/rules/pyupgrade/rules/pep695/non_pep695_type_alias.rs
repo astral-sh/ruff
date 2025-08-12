@@ -170,6 +170,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
+                    range: Some(name.range),
                 })
             })
         })

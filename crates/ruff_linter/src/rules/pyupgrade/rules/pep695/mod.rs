@@ -50,6 +50,11 @@ pub(crate) struct TypeVar<'a> {
     pub(crate) restriction: Option<TypeVarRestriction<'a>>,
     pub(crate) kind: TypeParamKind,
     pub(crate) default: Option<&'a Expr>,
+    /// The range of the type variable's definition for attaching to diagnostics.
+    ///
+    /// This should always be `Some` except for `AnyStr`, which we handle but won't appear in the
+    /// same source file.
+    pub(crate) range: Option<TextRange>,
 }
 
 /// Wrapper for formatting a sequence of [`TypeVar`]s for use as a generic type parameter (e.g. `[T,
@@ -133,6 +138,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
             name,
             restriction,
             kind,
+            range: _,
             default: _, // TODO(brent) see below
         }: &'a TypeVar<'a>,
     ) -> Self {
@@ -222,6 +228,7 @@ impl<'a> From<&'a TypeParam> for TypeVar<'a> {
             kind,
             restriction,
             default: param.default(),
+            range: Some(param.range()),
         }
     }
 }
@@ -259,6 +266,7 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                 restriction: Some(TypeVarRestriction::AnyStr),
                 kind: TypeParamKind::TypeVar,
                 default: None,
+                range: None,
             });
             return;
         }
@@ -280,7 +288,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
     semantic: &'a SemanticModel,
     name: &'a ExprName,
 ) -> Option<TypeVar<'a>> {
-    let StmtAssign { value, .. } = semantic
+    let assign @ StmtAssign { value, .. } = semantic
         .lookup_symbol(name.id.as_str())
         .and_then(|binding_id| semantic.binding(binding_id).source)
         .map(|node_id| semantic.statement(node_id))?
@@ -297,6 +305,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     restriction: None,
                     kind: TypeParamKind::TypeVar,
                     default: None,
+                    range: Some(assign.range()),
                 });
             }
         }
@@ -349,6 +358,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     restriction,
                     kind,
                     default,
+                    range: Some(assign.range()),
                 });
             }
         }

@@ -191,6 +191,15 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             return;
         };
 
+        for type_var in &type_vars {
+            if let Some(range) = type_var.range {
+                diagnostic.info(
+                    format_args!("Type variable `{}` defined here", type_var.name),
+                    range,
+                );
+            }
+        }
+
         // build the fix as a String to avoid removing comments from the entire function body
         let type_params = DisplayTypeVars {
             type_vars: &type_vars,
