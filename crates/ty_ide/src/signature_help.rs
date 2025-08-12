@@ -6,9 +6,9 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
-use crate::{
-    Db, docstring::get_parameter_documentation, find_node::covering_node, stub_mapping::StubMapper,
-};
+use crate::docstring::Docstring;
+use crate::goto::DefinitionsOrTargets;
+use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -42,7 +42,7 @@ pub struct SignatureDetails {
     /// Text representation of the full signature (including input parameters and return type).
     pub label: String,
     /// Documentation for the signature, typically from the function's docstring.
-    pub documentation: Option<String>,
+    pub documentation: Option<Docstring>,
     /// Information about each of the parameters in left-to-right order.
     pub parameters: Vec<ParameterDetails>,
     /// Index of the parameter that corresponds to the argument where the
@@ -174,67 +174,39 @@ fn create_signature_details_from_call_signature_details(
                 })
         };
 
+    let parameters = create_parameters_from_offsets(
+        &details.parameter_label_offsets,
+        &signature_label,
+        documentation.as_ref(),
+        &details.parameter_names,
+    );
     SignatureDetails {
-        label: signature_label.clone(),
-        documentation: Some(documentation),
-        parameters: create_parameters_from_offsets(
-            &details.parameter_label_offsets,
-            &signature_label,
-            db,
-            details.definition,
-            &details.parameter_names,
-        ),
+        label: signature_label,
+        documentation,
+        parameters,
         active_parameter,
     }
 }
 
 /// Determine appropriate documentation for a callable type based on its original type.
-fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>) -> String {
-    if let Some(definition) = definition {
-        // First try to get the docstring from the original definition
-        let original_docstring = definition.docstring(db);
-
-        // If we got a docstring from the original definition, use it
-        if let Some(docstring) = original_docstring {
-            return docstring;
-        }
-
-        // If the definition is located within a stub file and no docstring
-        // is present, try to map the symbol to an implementation file and extract
-        // the docstring from that location.
-        let stub_mapper = StubMapper::new(db);
-        let resolved_definition = ResolvedDefinition::Definition(definition);
-
-        // Try to find the corresponding implementation definition
-        for mapped_definition in stub_mapper.map_definition(resolved_definition) {
-            if let ResolvedDefinition::Definition(impl_definition) = mapped_definition {
-                if let Some(impl_docstring) = impl_definition.docstring(db) {
-                    return impl_docstring;
-                }
-            }
-        }
-
-        // Fall back to empty string if no docstring found anywhere
-        String::new()
-    } else {
-        String::new()
-    }
+fn get_callable_documentation(
+    db: &dyn crate::Db,
+    definition: Option<Definition>,
+) -> Option<Docstring> {
+    DefinitionsOrTargets::Definitions(vec![ResolvedDefinition::Definition(definition?)])
+        .docstring(db)
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.
 fn create_parameters_from_offsets(
     parameter_offsets: &[TextRange],
     signature_label: &str,
-    db: &dyn crate::Db,
-    definition: Option<Definition>,
+    docstring: Option<&Docstring>,
     parameter_names: &[String],
 ) -> Vec<ParameterDetails> {
     // Extract parameter documentation from the function's docstring if available.
-    let param_docs = if let Some(definition) = definition {
-        let docstring = definition.docstring(db);
-        docstring
-            .map(|doc| get_parameter_documentation(&doc))
-            .unwrap_or_default()
+    let param_docs = if let Some(docstring) = docstring {
+        docstring.parameter_documentation()
     } else {
         std::collections::HashMap::new()
     };
@@ -265,6 +237,7 @@ fn create_parameters_from_offsets(
 
 #[cfg(test)]
 mod tests {
+    use crate::docstring::Docstring;
     use crate::signature_help::SignatureHelpInfo;
     use crate::tests::{CursorTest, cursor_test};
 
@@ -298,17 +271,19 @@ mod tests {
         // Verify that the docstring is extracted and included in the documentation
         let expected_docstring = concat!(
             "This is a docstring for the example function.\n",
-            "            \n",
-            "            Args:\n",
-            "                param1: The first parameter as a string\n",
-            "                param2: The second parameter as an integer\n",
-            "            \n",
-            "            Returns:\n",
-            "                A formatted string combining both parameters\n",
-            "            "
+            "\n",
+            "Args:\n",
+            "    param1: The first parameter as a string\n",
+            "    param2: The second parameter as an integer\n",
+            "\n",
+            "Returns:\n",
+            "    A formatted string combining both parameters\n",
         );
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
 
@@ -518,9 +493,12 @@ mod tests {
         assert_eq!(param_y.documentation, Some("The y-coordinate".to_string()));
 
         // Should have the __init__ method docstring as documentation (not the class docstring)
-        let expected_docstring = "Initialize a point with x and y coordinates.\n                \n                Args:\n                    x: The x-coordinate\n                    y: The y-coordinate\n                ";
+        let expected_docstring = "Initialize a point with x and y coordinates.\n\nArgs:\n    x: The x-coordinate\n    y: The y-coordinate\n";
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
     }
@@ -566,7 +544,13 @@ mod tests {
         let signature = &result.signatures[0];
 
         // Should have empty documentation for now
-        assert_eq!(signature.documentation, Some(String::new()));
+        assert_eq!(
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
+            None
+        );
     }
 
     #[test]
@@ -756,9 +740,12 @@ def func() -> str:
         let signature = &result.signatures[0];
         assert_eq!(signature.label, "() -> str");
 
-        let expected_docstring = "This function does something.";
+        let expected_docstring = "This function does something.\n";
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
     }

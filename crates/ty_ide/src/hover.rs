@@ -1,3 +1,4 @@
+use crate::docstring::Docstring;
 use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
@@ -20,12 +21,17 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let model = SemanticModel::new(db, file);
     let ty = goto_target.inferred_type(&model)?;
-
+    let docs = goto_target
+        .get_definition_targets(
+            file,
+            db,
+            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+        )
+        .and_then(|definitions| definitions.docstring(db));
     tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
-    // TODO: Add documentation of the symbol (not the type's definition).
     // TODO: Render the symbol's signature instead of just its type.
-    let contents = vec![HoverContent::Type(ty)];
+    let contents = vec![HoverContent::Type(ty, docs)];
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -94,7 +100,7 @@ impl fmt::Display for DisplayHover<'_> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HoverContent<'db> {
-    Type(Type<'db>),
+    Type(Type<'db>, Option<Docstring>),
 }
 
 impl<'db> HoverContent<'db> {
@@ -116,11 +122,27 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
-            HoverContent::Type(ty) => self
-                .kind
-                .fenced_code_block(ty.display(self.db), "python")
-                .fmt(f),
+            HoverContent::Type(ty, docstring) => {
+                self.kind
+                    .fenced_code_block(ty.display(self.db), "python")
+                    .fmt(f)?;
+
+                if let Some(docstring) = docstring {
+                    self.kind.horizontal_line().fmt(f)?;
+
+                    match self.kind {
+                        MarkupKind::PlainText => docstring.render_plaintext().fmt(f)?,
+                        MarkupKind::Markdown => {
+                            // TODO: make render_markdown_documentation actually render to markdown.
+                            // For now we wrap everything in a plaintext code block
+                            let markdown = docstring.render_markdown();
+                            self.kind.fenced_code_block(markdown, "text").fmt(f)?;
+                        }
+                    }
+                }
+            }
         }
+        Ok(())
     }
 }
 
