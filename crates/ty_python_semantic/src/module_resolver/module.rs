@@ -72,6 +72,9 @@ impl<'db> Module<'db> {
     }
 
     /// The search path from which the module was resolved.
+    ///
+    /// It is guaranteed that if `None` is returned, then this is a namespace
+    /// package. Otherwise, this is a regular package or file module.
     pub(crate) fn search_path(self, db: &'db dyn Database) -> Option<&'db SearchPath> {
         match self {
             Module::File(module) => Some(module.search_path(db)),
@@ -214,12 +217,12 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
-    name: ModuleName,
-    kind: ModuleKind,
+    pub(super) name: ModuleName,
+    pub(super) kind: ModuleKind,
     #[returns(ref)]
-    search_path: SearchPath,
-    file: File,
-    known: Option<KnownModule>,
+    pub(super) search_path: SearchPath,
+    pub(super) file: File,
+    pub(super) known: Option<KnownModule>,
 }
 
 /// A namespace package.
@@ -229,7 +232,7 @@ pub struct FileModule<'db> {
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
-    name: ModuleName,
+    pub(super) name: ModuleName,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
