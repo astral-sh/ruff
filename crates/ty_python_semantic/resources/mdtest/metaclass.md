@@ -158,15 +158,13 @@ from nonexistent_module import UnknownClass  # error: [unresolved-import]
 
 class C(UnknownClass): ...
 
-# TODO: should be `type[type] & Unknown`
-reveal_type(C.__class__)  # revealed: <class 'type'>
+reveal_type(C.__class__)  # revealed: type[type] & Unknown
 
 class M(type): ...
 class A(metaclass=M): ...
 class B(A, UnknownClass): ...
 
-# TODO: should be `type[M] & Unknown`
-reveal_type(B.__class__)  # revealed: <class 'M'>
+reveal_type(B.__class__)  # revealed: type[M] & Unknown
 ```
 
 ## Duplicate
@@ -176,7 +174,7 @@ class M(type): ...
 class A(metaclass=M): ...
 class B(A, A): ...  # error: [duplicate-base] "Duplicate base class `A`"
 
-reveal_type(B.__class__)  # revealed: <class 'M'>
+reveal_type(B.__class__)  # revealed: type[M] & Unknown
 ```
 
 ## Non-class
