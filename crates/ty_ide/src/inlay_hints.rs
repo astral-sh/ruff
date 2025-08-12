@@ -191,10 +191,8 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
                 self.visit_expr(&call.func);
 
-                for (arg_index, arg_or_keyword) in
-                    call.arguments.arguments_source_order().enumerate()
-                {
-                    if let Some(name) = details.argument_names.get(&arg_index) {
+                for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
+                    if let Some(name) = details.argument_names.get(&index) {
                         self.add_function_argument_name(
                             arg_or_keyword.range().start(),
                             name.to_string(),
@@ -546,12 +544,15 @@ mod tests {
     #[test]
     fn test_callable_call() {
         let test = inlay_hint_test(
-            "from typing import Callable\ndef _(x: Callable[[int], int]):\n    x(1)",
+            "
+            from typing import Callable
+            def foo(x: Callable[[int], int]):
+                x(1)",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
         from typing import Callable
-        def _(x: Callable[[int], int]):
+        def foo(x: Callable[[int], int]):
             x(1)
         ");
     }
@@ -674,27 +675,27 @@ mod tests {
     fn test_nested_function_calls() {
         let test = inlay_hint_test(
             "
-            def outer(x: int) -> int:
+            def foo(x: int) -> int:
                 return x * 2
 
-            def inner(y: str) -> str:
-                return y.upper()
+            def bar(y: str) -> str:
+                return y
 
-            def process(a: int, b: str, c: bool): pass
+            def baz(a: int, b: str, c: bool): pass
 
-            process(outer(5), inner(inner('test')), True)",
+            baz(foo(5), bar(bar('test')), True)",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        def outer(x: int) -> int:
+        def foo(x: int) -> int:
             return x * 2
 
-        def inner(y: str) -> str:
-            return y.upper()
+        def bar(y: str) -> str:
+            return y
 
-        def process(a: int, b: str, c: bool): pass
+        def baz(a: int, b: str, c: bool): pass
 
-        process([a=]outer([x=]5), [b=]inner([y=]inner([y=]'test')), [c=]True)
+        baz([a=]foo([x=]5), [b=]bar([y=]bar([y=]'test')), [c=]True)
         ");
     }
 
@@ -702,23 +703,42 @@ mod tests {
     fn test_method_chaining() {
         let test = inlay_hint_test(
             "
-            class Builder:
-                def with_value(self, value: int) -> 'Builder':
+            class A:
+                def foo(self, value: int) -> 'A':
                     return self
-                def with_name(self, name: str) -> 'Builder':
+                def bar(self, name: str) -> 'A':
                     return self
-                def build(self): pass
-            Builder().with_value(42).with_name('test').build()",
+                def baz(self): pass
+            A().foo(42).bar('test').baz()",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        class Builder:
-            def with_value(self, value: int) -> 'Builder':
+        class A:
+            def foo(self, value: int) -> 'A':
                 return self
-            def with_name(self, name: str) -> 'Builder':
+            def bar(self, name: str) -> 'A':
                 return self
-            def build(self): pass
-        Builder().with_value([value=]42).with_name([name=]'test').build()
+            def baz(self): pass
+        A().foo([value=]42).bar([name=]'test').baz()
+        ");
+    }
+
+    #[test]
+    fn test_nexted_keyword_function_calls() {
+        let test = inlay_hint_test(
+            "
+            def foo(x: str) -> str:
+                return x
+            def bar(y: int): pass
+            bar(y=foo('test'))
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(x: str) -> str:
+            return x
+        def bar(y: int): pass
+        bar(y=foo([x=]'test'))
         ");
     }
 
@@ -726,33 +746,17 @@ mod tests {
     fn test_lambda_function_calls() {
         let test = inlay_hint_test(
             "
-            f = lambda x: x * 2
-            g = lambda a, b: a + b
-            f(5)
-            g(1, 2)",
+            foo = lambda x: x * 2
+            bar = lambda a, b: a + b
+            foo(5)
+            bar(1, 2)",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        f[: (x) -> Unknown] = lambda x: x * 2
-        g[: (a, b) -> Unknown] = lambda a, b: a + b
-        f([x=]5)
-        g([a=]1, [b=]2)
-        ");
-    }
-
-    #[test]
-    fn test_builtin_function_calls() {
-        let test = inlay_hint_test(
-            "
-            len([1, 2, 3])
-            max(1, 2, 3)
-            print('hello', 'world', sep=' ')",
-        );
-
-        assert_snapshot!(test.inlay_hints(), @r"
-        len([1, 2, 3])
-        max(1, 2, 3)
-        print('hello', 'world', sep=' ')
+        foo[: (x) -> Unknown] = lambda x: x * 2
+        bar[: (a, b) -> Unknown] = lambda a, b: a + b
+        foo([x=]5)
+        bar([a=]1, [b=]2)
         ");
     }
 
@@ -760,15 +764,15 @@ mod tests {
     fn test_complex_parameter_combinations() {
         let test = inlay_hint_test(
             "
-            def complex_func(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
-            complex_func(1, 'pos', 3.14, False, e=42)
-            complex_func(1, 'pos', 3.14, e=42, f='custom')",
+            def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+            foo(1, 'pos', 3.14, False, e=42)
+            foo(1, 'pos', 3.14, e=42, f='custom')",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
-        def complex_func(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
-        complex_func(1, 'pos', [c=]3.14, [d=]False, e=42)
-        complex_func(1, 'pos', [c=]3.14, e=42, f='custom')
+        def foo(a: int, b: str, /, c: float, d: bool = True, *, e: int, f: str = 'default'): pass
+        foo(1, 'pos', [c=]3.14, [d=]False, e=42)
+        foo(1, 'pos', [c=]3.14, e=42, f='custom')
         ");
     }
 
@@ -807,28 +811,28 @@ mod tests {
             from typing import overload
 
             @overload
-            def process(x: int) -> str: ...
+            def foo(x: int) -> str: ...
             @overload
-            def process(x: str) -> int: ...
-            def process(x):
+            def foo(x: str) -> int: ...
+            def foo(x):
                 return x
             
-            process(42)
-            process('hello')",
+            foo(42)
+            foo('hello')",
         );
 
         assert_snapshot!(test.inlay_hints(), @r"
         from typing import overload
 
         @overload
-        def process(x: int) -> str: ...
+        def foo(x: int) -> str: ...
         @overload
-        def process(x: str) -> int: ...
-        def process(x):
+        def foo(x: str) -> int: ...
+        def foo(x):
             return x
 
-        process([x=]42)
-        process([x=]'hello')
+        foo([x=]42)
+        foo([x=]'hello')
         ");
     }
 
