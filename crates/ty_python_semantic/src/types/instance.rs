@@ -11,9 +11,7 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
-use crate::types::{
-    ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer, TypedDictType, UnionType,
-};
+use crate::types::{ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer, UnionType};
 use crate::{Db, FxOrderSet, Program};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -34,7 +32,7 @@ impl<'db> Type<'db> {
             _ if class_literal.is_protocol(db) => {
                 Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
             }
-            _ if class_literal.is_typed_dict(db) => TypedDictType::from(db, class),
+            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
             _ => Type::non_tuple_instance(class),
         }
     }

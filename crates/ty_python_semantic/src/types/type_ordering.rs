@@ -236,7 +236,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
 
-        (Type::TypedDict(left), Type::TypedDict(right)) => left.cmp(right),
+        (Type::TypedDict(left), Type::TypedDict(right)) => {
+            left.defining_class.cmp(&right.defining_class)
+        }
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
     }
