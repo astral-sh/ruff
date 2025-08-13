@@ -12,9 +12,9 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{definition::Definition, use_def_map},
     types::{
-        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, KnownFunction,
-        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
-        TypeTransformer,
+        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, IsDisjoint, KnownFunction,
+        Normalized, PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers,
+        TypeRelation, TypeTransformer,
         cyclic::PairVisitor,
         signatures::{Parameter, Parameters},
     },
@@ -165,7 +165,11 @@ impl<'db> ProtocolInterface<'db> {
             .all(|member_name| other.inner(db).contains_key(member_name))
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeTransformer<'db, Normalized>,
+    ) -> Self {
         Self::new(
             db,
             self.inner(db)
@@ -252,7 +256,7 @@ impl<'db> ProtocolMemberData<'db> {
         self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db, Normalized>) -> Self {
         Self {
             kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
@@ -327,7 +331,7 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db, Normalized>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
                 ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
@@ -432,7 +436,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &PairVisitor<'db>,
+        visitor: &PairVisitor<'db, IsDisjoint>,
     ) -> bool {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members

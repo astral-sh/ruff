@@ -77,8 +77,8 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation,
-    TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, KnownClass, Normalized, Truthiness, Type, TypeMapping,
+    TypeRelation, TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -604,7 +604,7 @@ impl<'db> FunctionLiteral<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db, Normalized>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -923,7 +923,11 @@ impl<'db> FunctionType<'db> {
         self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeTransformer<'db, Normalized>,
+    ) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()

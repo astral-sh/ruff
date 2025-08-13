@@ -3,7 +3,7 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator,
-    SpecialFormType, Type, TypeMapping, TypeTransformer, todo_type,
+    Normalized, SpecialFormType, Type, TypeMapping, TypeTransformer, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -33,7 +33,11 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        visitor: &TypeTransformer<'db, Normalized>,
+    ) -> Self {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
@@ -269,7 +273,7 @@ impl<'db> ClassBase<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &TypeTransformer<'db, TypeMapping<'a, 'db>>,
     ) -> Self {
         match self {
             Self::Class(class) => {
