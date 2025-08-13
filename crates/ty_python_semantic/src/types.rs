@@ -9389,23 +9389,24 @@ impl<'db> BoundSuperType<'db> {
             ));
         }
 
-        // TODO: having to get a class-literal just to pass it in here is silly.
-        // `BoundSuperType` should probably not be using `ClassBase::try_from_type` here;
-        // this also leads to false negatives in some cases. See discussion in
-        // <https://github.com/astral-sh/ruff/pull/19560#discussion_r2271570071>.
-        let pivot_class = ClassBase::try_from_type(
-            db,
-            pivot_class_type,
-            KnownClass::Object
-                .to_class_literal(db)
-                .into_class_literal()
-                .expect("`object` should always exist in typeshed"),
-        )
-        .ok_or({
-            BoundSuperError::InvalidPivotClassType {
-                pivot_class: pivot_class_type,
+        // We don't use `Classbase::try_from_type` here because:
+        // - There are objects that may validly be present in a class's bases list
+        //   but are not valid as pivot classes, e.g. `typing.ChainMap`
+        // - There are objects that are not valid in a class's bases list
+        //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
+        let pivot_class = match pivot_class_type {
+            Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
+            Type::GenericAlias(class) => ClassBase::Class(ClassType::Generic(class)),
+            Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
+            Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
+            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
+            _ => {
+                return Err(BoundSuperError::InvalidPivotClassType {
+                    pivot_class: pivot_class_type,
+                });
             }
-        })?;
+        };
 
         let owner = SuperOwnerKind::try_from_type(db, owner_type)
             .and_then(|owner| {
