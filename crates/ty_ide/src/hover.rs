@@ -6,8 +6,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
+use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -135,7 +135,10 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Type(ty) => self
                 .kind
-                .fenced_code_block(ty.display(self.db), "python")
+                .fenced_code_block(
+                    ty.display_with(self.db, DisplaySettings { multiline: true }),
+                    "python",
+                )
                 .fmt(f),
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
@@ -201,7 +204,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -211,7 +217,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
@@ -519,7 +528,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        bound method MyClass.my_method(a, b) -> Unknown
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -529,7 +541,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        bound method MyClass.my_method(a, b) -> Unknown
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
@@ -601,10 +616,16 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def foo(a, b) -> Unknown
+        def foo(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         ```python
-        def foo(a, b) -> Unknown
+        def foo(
+            a,
+            b
+        ) -> Unknown
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -744,10 +765,22 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
+        (def foo(
+            a,
+            b
+        ) -> Unknown) | (def bar(
+            a,
+            b
+        ) -> Unknown)
         ---------------------------------------------
         ```python
-        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
+        (def foo(
+            a,
+            b
+        ) -> Unknown) | (def bar(
+            a,
+            b
+        ) -> Unknown)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
