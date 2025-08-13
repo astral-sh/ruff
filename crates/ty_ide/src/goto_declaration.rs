@@ -18,12 +18,9 @@ pub fn goto_declaration(
     let module = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&module, offset)?;
 
-    let declaration_targets = goto_target.get_definition_targets(
-        file,
-        db,
-        None,
-        ImportAliasResolution::ResolveAliases,
-    )?;
+    let declaration_targets = goto_target
+        .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?
+        .declaration_targets(db)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),

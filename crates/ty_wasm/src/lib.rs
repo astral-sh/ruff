@@ -532,7 +532,9 @@ impl Workspace {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }

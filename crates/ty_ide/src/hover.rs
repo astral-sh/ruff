@@ -1,3 +1,4 @@
+use crate::docstring::Docstring;
 use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
@@ -20,12 +21,19 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
     let model = SemanticModel::new(db, file);
     let ty = goto_target.inferred_type(&model)?;
-
+    let docs = goto_target
+        .get_definition_targets(
+            file,
+            db,
+            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+        )
+        .and_then(|definitions| definitions.docstring(db))
+        .map(HoverContent::Docstring);
     tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
-    // TODO: Add documentation of the symbol (not the type's definition).
     // TODO: Render the symbol's signature instead of just its type.
-    let contents = vec![HoverContent::Type(ty)];
+    let mut contents = vec![HoverContent::Type(ty)];
+    contents.extend(docs);
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -95,6 +103,7 @@ impl fmt::Display for DisplayHover<'_> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HoverContent<'db> {
     Type(Type<'db>),
+    Docstring(Docstring),
 }
 
 impl<'db> HoverContent<'db> {
@@ -120,6 +129,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                 .kind
                 .fenced_code_block(ty.display(self.db), "python")
                 .fmt(f),
+            HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
     }
 }
@@ -162,6 +172,261 @@ mod tests {
           |         |
           |         source
           |
+        ");
+    }
+
+    #[test]
+    fn hover_function() {
+        let test = cursor_test(
+            r#"
+        def my_func(a, b):
+            '''This is such a great func!!
+
+            Args:
+                a: first for a reason
+                b: coming for `a`'s title
+            '''
+            return 0
+
+        my_fu<CURSOR>nc(1, 2)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def my_func(a, b) -> Unknown
+        ---------------------------------------------
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ---------------------------------------------
+        ```python
+        def my_func(a, b) -> Unknown
+        ```
+        ---
+        ```text
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:9
+           |
+         9 |             return 0
+        10 |
+        11 |         my_func(1, 2)
+           |         ^^^^^-^
+           |         |    |
+           |         |    Cursor offset
+           |         source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                """initializes MyClass (perfectly)"""
+                self.val = val
+            
+            def my_method(self, a, b):
+                '''This is such a great func!!
+
+                Args:
+                    a: first for a reason
+                    b: coming for `a`'s title
+                '''
+                return 0
+
+        MyCla<CURSOR>ss
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        <class 'MyClass'>
+        ---------------------------------------------
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ---------------------------------------------
+        ```python
+        <class 'MyClass'>
+        ```
+        ---
+        ```text
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:24:9
+           |
+        22 |                 return 0
+        23 |
+        24 |         MyClass
+           |         ^^^^^-^
+           |         |    |
+           |         |    Cursor offset
+           |         source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class_init() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                """initializes MyClass (perfectly)"""
+                self.val = val
+            
+            def my_method(self, a, b):
+                '''This is such a great func!!
+
+                Args:
+                    a: first for a reason
+                    b: coming for `a`'s title
+                '''
+                return 0
+
+        x = MyCla<CURSOR>ss(0)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        <class 'MyClass'>
+        ---------------------------------------------
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ---------------------------------------------
+        ```python
+        <class 'MyClass'>
+        ```
+        ---
+        ```text
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:24:13
+           |
+        22 |                 return 0
+        23 |
+        24 |         x = MyClass(0)
+           |             ^^^^^-^
+           |             |    |
+           |             |    Cursor offset
+           |             source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_class_method() {
+        let test = cursor_test(
+            r#"
+        class MyClass:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                """initializes MyClass (perfectly)"""
+                self.val = val
+            
+            def my_method(self, a, b):
+                '''This is such a great func!!
+
+                Args:
+                    a: first for a reason
+                    b: coming for `a`'s title
+                '''
+                return 0
+
+        x = MyClass(0)
+        x.my_me<CURSOR>thod(2, 3)
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        bound method MyClass.my_method(a, b) -> Unknown
+        ---------------------------------------------
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ---------------------------------------------
+        ```python
+        bound method MyClass.my_method(a, b) -> Unknown
+        ```
+        ---
+        ```text
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:25:11
+           |
+        24 |         x = MyClass(0)
+        25 |         x.my_method(2, 3)
+           |           ^^^^^-^^^
+           |           |    |
+           |           |    Cursor offset
+           |           source
+           |
         ");
     }
 
@@ -264,9 +529,15 @@ mod tests {
     fn hover_keyword_parameter() {
         let test = cursor_test(
             r#"
-            def test(a: int): ...
+            def test(ab: int):
+                """my cool test
 
-            test(a<CURSOR>= 123)
+                Args:
+                    ab: a nice little integer
+                """
+                return 0
+
+            test(a<CURSOR>b= 123)
             "#,
         );
 
@@ -279,15 +550,16 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:4:18
-          |
-        2 |             def test(a: int): ...
-        3 |
-        4 |             test(a= 123)
-          |                  ^- Cursor offset
-          |                  |
-          |                  source
-          |
+          --> main.py:10:18
+           |
+         8 |                 return 0
+         9 |
+        10 |             test(ab= 123)
+           |                  ^-
+           |                  ||
+           |                  |Cursor offset
+           |                  source
+           |
         ");
     }
 
@@ -296,9 +568,13 @@ mod tests {
         let test = cursor_test(
             r#"
 
-            def foo(a, b): ...
+            def foo(a, b):
+                """The foo function"""
+                return 0
 
-            def bar(a, b): ...
+            def bar(a, b):
+                """The bar function"""
+                return 1
 
             if random.choice([True, False]):
                 a = foo
@@ -317,11 +593,11 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:12:13
+          --> main.py:16:13
            |
-        10 |                 a = bar
-        11 |
-        12 |             a
+        14 |                 a = bar
+        15 |
+        16 |             a
            |             ^- Cursor offset
            |             |
            |             source
@@ -339,7 +615,18 @@ mod tests {
             "#,
         );
 
-        test.write_file("lib.py", "a = 10").unwrap();
+        test.write_file(
+            "lib.py",
+            r"
+        '''
+        The cool lib_py module!
+
+        Wow this module rocks.
+        '''
+        a = 10
+        ",
+        )
+        .unwrap();
 
         assert_snapshot!(test.hover(), @r"
         <module 'lib'>
@@ -360,6 +647,32 @@ mod tests {
           |             source
           |
         ");
+    }
+
+    #[test]
+    fn hover_module_import() {
+        let mut test = cursor_test(
+            r#"
+            import li<CURSOR>b
+
+            lib
+            "#,
+        );
+
+        test.write_file(
+            "lib.py",
+            r"
+        '''
+        The cool lib_py module!
+
+        Wow this module rocks.
+        '''
+        a = 10
+        ",
+        )
+        .unwrap();
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
     #[test]
@@ -654,6 +967,12 @@ mod tests {
         let test = cursor_test(
             r#"
             def foo(a: str | None, b):
+                '''
+                    My cool func
+                
+                    Args:
+                        a: hopefully a string, right?!   
+                '''
                 if a is not None:
                     print(a<CURSOR>)
             "#,
@@ -667,15 +986,15 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:4:27
-          |
-        2 |             def foo(a: str | None, b):
-        3 |                 if a is not None:
-        4 |                     print(a)
-          |                           ^- Cursor offset
-          |                           |
-          |                           source
-          |
+          --> main.py:10:27
+           |
+         8 |                 '''
+         9 |                 if a is not None:
+        10 |                     print(a)
+           |                           ^- Cursor offset
+           |                           |
+           |                           source
+           |
         ");
     }
 

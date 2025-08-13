@@ -20,7 +20,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
@@ -1349,11 +1349,21 @@ impl<'db> ClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        class_stmt
-            .bases()
-            .iter()
-            .map(|base_node| definition_expression_type(db, class_definition, base_node))
-            .collect()
+        if self.is_known(db, KnownClass::VersionInfo) {
+            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
+                .expect("sys.version_info tuple spec should always be a valid tuple");
+
+            Box::new([
+                definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
+                Type::from(tuple_type.to_class_type(db)),
+            ])
+        } else {
+            class_stmt
+                .bases()
+                .iter()
+                .map(|base_node| definition_expression_type(db, class_definition, base_node))
+                .collect()
+        }
     }
 
     /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
@@ -2231,7 +2241,7 @@ impl<'db> ClassLiteral<'db> {
     ///     y: str = "a"
     /// ```
     /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
-    fn own_fields(
+    pub(super) fn own_fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
@@ -2266,35 +2276,33 @@ impl<'db> ClassLiteral<'db> {
 
             let symbol = table.symbol(symbol_id);
 
-            if let Ok(attr) = place_from_declarations(db, declarations) {
-                if attr.is_class_var() {
-                    continue;
+            let attr = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            if attr.is_class_var() {
+                continue;
+            }
+
+            if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                let mut default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                default_ty =
+                    default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
+
+                let mut init = true;
+                if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
+                    default_ty = Some(field.default_type(db));
+                    init = field.init(db);
                 }
 
-                if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let mut default_ty =
-                        place_from_bindings(db, bindings).ignore_possibly_unbound();
-
-                    default_ty =
-                        default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
-
-                    let mut init = true;
-                    if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
-                        default_ty = Some(field.default_type(db));
-                        init = field.init(db);
-                    }
-
-                    attributes.insert(
-                        symbol.name().clone(),
-                        Field {
-                            declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty,
-                            init_only: attr.is_init_var(),
-                            init,
-                        },
-                    );
-                }
+                attributes.insert(
+                    symbol.name().clone(),
+                    Field {
+                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                        default_ty,
+                        init_only: attr.is_init_var(),
+                        init,
+                    },
+                );
             }
         }
 
@@ -2726,13 +2734,14 @@ impl<'db> ClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, declarations);
+            let declared_and_qualifiers =
+                place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
             match declared_and_qualifiers {
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
                     qualifiers,
-                }) => {
+                } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
@@ -2816,18 +2825,14 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: Place::Unbound,
                     qualifiers: _,
-                }) => {
+                } => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
                     Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                }
-                Err((declared, _conflicting_declarations)) => {
-                    // There are conflicting declarations for this attribute in the class body.
-                    Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
                 }
             }
         } else {

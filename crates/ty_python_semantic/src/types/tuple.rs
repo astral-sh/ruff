@@ -16,7 +16,6 @@
 //! that adds that "collapse `Never`" behavior, whereas [`TupleSpec`] allows you to add any element
 //! types, including `Never`.)
 
-use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::hash::Hash;
 
@@ -30,7 +29,7 @@ use crate::types::{
     UnionBuilder, UnionType, cyclic::PairVisitor,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -145,44 +144,18 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 
-impl<'db> Type<'db> {
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
-        Type::tuple(TupleType::homogeneous(db, element))
-    }
-
-    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        Type::tuple(TupleType::from_elements(
-            db,
-            elements.into_iter().map(Into::into),
-        ))
-    }
-
-    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
-        Type::tuple(Some(TupleType::empty(db)))
-    }
-}
-
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
-    pub(crate) fn new<T>(db: &'db dyn Db, tuple_key: T) -> Option<Self>
-    where
-        T: Borrow<TupleSpec<'db>> + Hash + salsa::plumbing::interned::Lookup<TupleSpec<'db>>,
-        TupleSpec<'db>: salsa::plumbing::interned::HashEqLike<T>,
-    {
+    pub(crate) fn new(db: &'db dyn Db, spec: &TupleSpec<'db>) -> Option<Self> {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
-        let tuple = tuple_key.borrow();
-        if tuple.fixed_elements().any(Type::is_never) {
+        if spec.fixed_elements().any(Type::is_never) {
             return None;
         }
 
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
         // That means this isn't a variable-length tuple after all!
-        if let TupleSpec::Variable(tuple) = tuple {
+        if let TupleSpec::Variable(tuple) = spec {
             if tuple.variable.is_never() {
                 let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
                     tuple.prefix.iter().chain(&tuple.suffix).copied(),
@@ -191,19 +164,18 @@ impl<'db> TupleType<'db> {
             }
         }
 
-        Some(TupleType::new_internal(db, tuple_key))
+        Some(TupleType::new_internal(db, spec))
     }
 
     pub(crate) fn empty(db: &'db dyn Db) -> Self {
-        TupleType::new(db, TupleSpec::from(FixedLengthTuple::empty()))
-            .expect("TupleType::new() should always return `Some` for an empty `TupleSpec`")
+        TupleType::new_internal(db, TupleSpec::from(FixedLengthTuple::empty()))
     }
 
-    pub(crate) fn from_elements(
+    pub(crate) fn heterogeneous(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, TupleSpec::from_elements(types))
+        TupleType::new(db, &TupleSpec::heterogeneous(types))
     }
 
     #[cfg(test)]
@@ -213,11 +185,14 @@ impl<'db> TupleType<'db> {
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix))
+        TupleType::new(db, &VariableLengthTuple::mixed(prefix, variable, suffix))
     }
 
-    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Option<Self> {
-        TupleType::new(db, TupleSpec::homogeneous(element))
+    pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
+        match element {
+            Type::Never => TupleType::empty(db),
+            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+        }
     }
 
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
@@ -248,11 +223,11 @@ impl<'db> TupleType<'db> {
         db: &'db dyn Db,
         visitor: &TypeTransformer<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).normalized_impl(db, visitor))
+        TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
     }
 
     pub(crate) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Option<Self> {
-        TupleType::new(db, self.tuple(db).materialize(db, variance))
+        TupleType::new(db, &self.tuple(db).materialize(db, variance))
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -263,7 +238,8 @@ impl<'db> TupleType<'db> {
     ) -> Option<Self> {
         TupleType::new(
             db,
-            self.tuple(db)
+            &self
+                .tuple(db)
                 .apply_type_mapping_impl(db, type_mapping, visitor),
         )
     }
@@ -935,7 +911,7 @@ impl<T> Tuple<T> {
         VariableLengthTuple::homogeneous(element)
     }
 
-    pub(crate) fn from_elements(elements: impl IntoIterator<Item = T>) -> Self {
+    pub(crate) fn heterogeneous(elements: impl IntoIterator<Item = T>) -> Self {
         FixedLengthTuple::from_elements(elements).into()
     }
 
@@ -1161,6 +1137,34 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
         }
+    }
+
+    /// Return the `TupleSpec` for the singleton `sys.version_info`
+    pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
+        let python_version = Program::get(db).python_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db);
+
+        // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+        let release_level_ty = {
+            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                .iter()
+                .map(|level| Type::string_literal(db, level))
+                .collect();
+
+            // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+            // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+            // into other types where necessary. Here, however, we know that there are no duplicates
+            // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+            Type::Union(UnionType::new(db, elements))
+        };
+
+        TupleSpec::heterogeneous([
+            Type::IntLiteral(python_version.major.into()),
+            Type::IntLiteral(python_version.minor.into()),
+            int_instance_ty,
+            release_level_ty,
+            int_instance_ty,
+        ])
     }
 }
 

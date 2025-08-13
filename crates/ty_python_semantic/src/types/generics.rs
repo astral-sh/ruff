@@ -241,7 +241,7 @@ impl<'db> GenericContext<'db> {
                 db,
                 self,
                 partial.types(db),
-                TupleType::homogeneous(db, Type::unknown()),
+                Some(TupleType::homogeneous(db, Type::unknown())),
             )
         } else {
             partial

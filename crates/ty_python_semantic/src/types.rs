@@ -4861,7 +4861,7 @@ impl<'db> Type<'db> {
                 // with each individual character, instead of just an array of
                 // `LiteralString`, but there would be a cost and it's not clear that
                 // it's worth it.
-                return Ok(Cow::Owned(TupleSpec::from_elements(std::iter::repeat_n(
+                return Ok(Cow::Owned(TupleSpec::heterogeneous(std::iter::repeat_n(
                     Type::LiteralString,
                     string_literal_ty.python_len(db),
                 ))));
@@ -9526,7 +9526,19 @@ impl<'db> BoundSuperType<'db> {
             ));
         }
 
-        let pivot_class = ClassBase::try_from_type(db, pivot_class_type).ok_or({
+        // TODO: having to get a class-literal just to pass it in here is silly.
+        // `BoundSuperType` should probably not be using `ClassBase::try_from_type` here;
+        // this also leads to false negatives in some cases. See discussion in
+        // <https://github.com/astral-sh/ruff/pull/19560#discussion_r2271570071>.
+        let pivot_class = ClassBase::try_from_type(
+            db,
+            pivot_class_type,
+            KnownClass::Object
+                .to_class_literal(db)
+                .into_class_literal()
+                .expect("`object` should always exist in typeshed"),
+        )
+        .ok_or({
             BoundSuperError::InvalidPivotClassType {
                 pivot_class: pivot_class_type,
             }

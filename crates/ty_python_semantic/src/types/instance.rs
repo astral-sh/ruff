@@ -11,8 +11,8 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
-use crate::types::{ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer, UnionType};
-use crate::{Db, FxOrderSet, Program};
+use crate::types::{ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer};
+use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
@@ -41,6 +41,30 @@ impl<'db> Type<'db> {
         let Some(tuple) = tuple else {
             return Type::Never;
         };
+        Type::tuple_instance(tuple)
+    }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::tuple_instance(TupleType::homogeneous(db, element))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::heterogeneous(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::tuple_instance(TupleType::empty(db))
+    }
+
+    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
+    fn tuple_instance(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
@@ -115,47 +139,6 @@ impl<'db> NominalInstanceType<'db> {
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// For a subclass of `tuple[int, str]`, it will return the same tuple spec.
     pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
-        fn own_tuple_spec_of_class<'db>(
-            db: &'db dyn Db,
-            class: ClassType<'db>,
-        ) -> Option<Cow<'db, TupleSpec<'db>>> {
-            let (class_literal, specialization) = class.class_literal(db);
-            match class_literal.known(db)? {
-                KnownClass::Tuple => Some(
-                    specialization
-                        .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                        .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))),
-                ),
-                KnownClass::VersionInfo => {
-                    let python_version = Program::get(db).python_version(db);
-                    let int_instance_ty = KnownClass::Int.to_instance(db);
-
-                    // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
-                    let release_level_ty = {
-                        let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
-                            .iter()
-                            .map(|level| Type::string_literal(db, level))
-                            .collect();
-
-                        // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
-                        // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
-                        // into other types where necessary. Here, however, we know that there are no duplicates
-                        // in this union, so it's probably more efficient to use `UnionType::new()` directly.
-                        Type::Union(UnionType::new(db, elements))
-                    };
-
-                    Some(Cow::Owned(TupleSpec::from_elements([
-                        Type::IntLiteral(python_version.major.into()),
-                        Type::IntLiteral(python_version.minor.into()),
-                        int_instance_ty,
-                        release_level_ty,
-                        int_instance_ty,
-                    ])))
-                }
-                _ => None,
-            }
-        }
-
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
             NominalInstanceInner::NonTuple(class) => {
@@ -169,7 +152,26 @@ impl<'db> NominalInstanceType<'db> {
                 class
                     .iter_mro(db)
                     .filter_map(ClassBase::into_class)
-                    .find_map(|class| own_tuple_spec_of_class(db, class))
+                    .find_map(|class| match class.known(db)? {
+                        // N.B. this is a pure optimisation: iterating through the MRO would give us
+                        // the correct tuple spec for `sys._version_info`, since we special-case the class
+                        // in `ClassLiteral::explicit_bases()` so that it is inferred as inheriting from
+                        // a tuple type with the correct spec for the user's configured Python version and platform.
+                        KnownClass::VersionInfo => {
+                            Some(Cow::Owned(TupleSpec::version_info_spec(db)))
+                        }
+                        KnownClass::Tuple => Some(
+                            class
+                                .into_generic_alias()
+                                .and_then(|alias| {
+                                    Some(Cow::Borrowed(alias.specialization(db).tuple(db)?))
+                                })
+                                .unwrap_or_else(|| {
+                                    Cow::Owned(TupleSpec::homogeneous(Type::unknown()))
+                                }),
+                        ),
+                        _ => None,
+                    })
             }
         }
     }
@@ -297,11 +299,9 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         visitor: &PairVisitor<'db>,
     ) -> bool {
-        let self_spec = self.tuple_spec(db);
-        if let Some(self_spec) = self_spec.as_deref() {
-            let other_spec = other.tuple_spec(db);
-            if let Some(other_spec) = other_spec.as_deref() {
-                if self_spec.is_disjoint_from_impl(db, other_spec, visitor) {
+        if let Some(self_spec) = self.tuple_spec(db) {
+            if let Some(other_spec) = other.tuple_spec(db) {
+                if self_spec.is_disjoint_from_impl(db, &other_spec, visitor) {
                     return true;
                 }
             }
