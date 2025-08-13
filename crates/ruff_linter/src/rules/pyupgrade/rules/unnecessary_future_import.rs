@@ -4,7 +4,7 @@ use itertools::{Itertools, chain};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
-use ruff_python_semantic::{NameImport, NodeId, Scope};
+use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -128,57 +128,53 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
                     else {
                         continue;
                     };
-                    process_unused_future_import(checker, stmt, alias, node_id);
+
+                    if alias.asname.is_some() {
+                        continue;
+                    }
+
+                    if is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        alias,
+                    ) {
+                        continue;
+                    }
+
+                    let mut diagnostic = checker.report_diagnostic(
+                        UnnecessaryFutureImport {
+                            names: vec![alias.name.to_string()],
+                        },
+                        alias.range(),
+                    );
+
+                    diagnostic.try_set_fix(|| {
+                        let statement = checker.semantic().statement(node_id);
+                        let parent = checker.semantic().parent_statement(node_id);
+                        let edit = fix::edits::remove_unused_imports(
+                            std::iter::once(alias.name.as_str()),
+                            statement,
+                            parent,
+                            checker.locator(),
+                            checker.stylist(),
+                            checker.indexer(),
+                        )?;
+
+                        let range = edit.range();
+                        let applicability = if checker.comment_ranges().intersects(range) {
+                            Applicability::Unsafe
+                        } else {
+                            Applicability::Safe
+                        };
+
+                        Ok(
+                            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                                checker.semantic().current_statement_parent_id(),
+                            )),
+                        )
+                    });
                 }
             }
         }
     }
-}
-
-/// Process unused future import statements and generate diagnostics with fixes.
-/// Filters out required isort imports and creates removal fixes for unused aliases.
-fn process_unused_future_import(checker: &Checker, stmt: &Stmt, alias: &Alias, node_id: NodeId) {
-    if alias.asname.is_some() {
-        return;
-    }
-    if is_import_required_by_isort(
-        &checker.settings().isort.required_imports,
-        stmt.into(),
-        alias,
-    ) {
-        return;
-    }
-
-    let mut diagnostic = checker.report_diagnostic(
-        UnnecessaryFutureImport {
-            names: vec![alias.name.to_string()],
-        },
-        alias.range(),
-    );
-
-    diagnostic.try_set_fix(|| {
-        let statement = checker.semantic().statement(node_id);
-        let parent = checker.semantic().parent_statement(node_id);
-        let edit = fix::edits::remove_unused_imports(
-            vec![alias.name.as_str()].into_iter(),
-            statement,
-            parent,
-            checker.locator(),
-            checker.stylist(),
-            checker.indexer(),
-        )?;
-
-        let range = edit.range();
-        let applicability = if checker.comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
-
-        Ok(
-            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
-                checker.semantic().current_statement_parent_id(),
-            )),
-        )
-    });
 }
