@@ -35,15 +35,15 @@ pub(crate) fn all_declarations_and_bindings<'db>(
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
-                .ok()
-                .and_then(|result| {
-                    result.place.ignore_possibly_unbound().map(|ty| {
-                        let symbol = table.symbol(symbol_id);
-                        Member {
-                            name: symbol.name().clone(),
-                            ty,
-                        }
-                    })
+                .ignore_conflicting_declarations()
+                .place
+                .ignore_possibly_unbound()
+                .map(|ty| {
+                    let symbol = table.symbol(symbol_id);
+                    Member {
+                        name: symbol.name().clone(),
+                        ty,
+                    }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(

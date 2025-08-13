@@ -538,8 +538,11 @@ fn cached_protocol_interface<'db>(
         members.extend(
             use_def_map
                 .all_end_of_scope_symbol_declarations()
-                .flat_map(|(symbol_id, declarations)| {
-                    place_from_declarations(db, declarations).map(|place| (symbol_id, place))
+                .map(|(symbol_id, declarations)| {
+                    (
+                        symbol_id,
+                        place_from_declarations(db, declarations).ignore_conflicting_declarations(),
+                    )
                 })
                 .filter_map(|(symbol_id, place)| {
                     place

@@ -2275,35 +2275,33 @@ impl<'db> ClassLiteral<'db> {
 
             let symbol = table.symbol(symbol_id);
 
-            if let Ok(attr) = place_from_declarations(db, declarations) {
-                if attr.is_class_var() {
-                    continue;
+            let attr = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            if attr.is_class_var() {
+                continue;
+            }
+
+            if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
+                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                let mut default_ty = place_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                default_ty =
+                    default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
+
+                let mut init = true;
+                if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
+                    default_ty = Some(field.default_type(db));
+                    init = field.init(db);
                 }
 
-                if let Some(attr_ty) = attr.place.ignore_possibly_unbound() {
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let mut default_ty =
-                        place_from_bindings(db, bindings).ignore_possibly_unbound();
-
-                    default_ty =
-                        default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
-
-                    let mut init = true;
-                    if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
-                        default_ty = Some(field.default_type(db));
-                        init = field.init(db);
-                    }
-
-                    attributes.insert(
-                        symbol.name().clone(),
-                        Field {
-                            declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty,
-                            init_only: attr.is_init_var(),
-                            init,
-                        },
-                    );
-                }
+                attributes.insert(
+                    symbol.name().clone(),
+                    Field {
+                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                        default_ty,
+                        init_only: attr.is_init_var(),
+                        init,
+                    },
+                );
             }
         }
 
@@ -2735,13 +2733,14 @@ impl<'db> ClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, declarations);
+            let declared_and_qualifiers =
+                place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
             match declared_and_qualifiers {
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: mut declared @ Place::Type(declared_ty, declaredness),
                     qualifiers,
-                }) => {
+                } => {
                     // For the purpose of finding instance attributes, ignore `ClassVar`
                     // declarations:
                     if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
@@ -2825,18 +2824,14 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                Ok(PlaceAndQualifiers {
+                PlaceAndQualifiers {
                     place: Place::Unbound,
                     qualifiers: _,
-                }) => {
+                } => {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
                     Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                }
-                Err((declared, _conflicting_declarations)) => {
-                    // There are conflicting declarations for this attribute in the class body.
-                    Place::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
                 }
             }
         } else {

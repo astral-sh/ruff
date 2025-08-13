@@ -1921,85 +1921,75 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (use_def.declarations_at_binding(binding), true)
         };
 
-        let (declared_ty, is_modifiable) = place_from_declarations(self.db(), declarations)
-            .and_then(|place_and_quals| {
-                Ok(
-                    if matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
-                        place_and_quals
-                    } else if let PlaceExprRef::Symbol(symbol) = place {
-                        let symbol_id = place_id.expect_symbol();
+        let (mut place_and_quals, conflicting) = place_from_declarations(self.db(), declarations)
+            .into_place_and_conflicting_declarations();
 
-                        if self.skip_non_global_scopes(file_scope_id, symbol_id)
-                            || self.scope.file_scope_id(self.db()).is_global()
-                        {
-                            let module_type_declarations =
-                                module_type_implicit_global_declaration(self.db(), symbol.name())?;
-                            place_and_quals.or_fall_back_to(self.db(), || module_type_declarations)
-                        } else {
-                            place_and_quals
-                        }
-                    } else {
-                        place_and_quals
-                    },
-                )
-            })
-            .map(
-                |PlaceAndQualifiers {
-                     place: resolved_place,
-                     qualifiers,
-                 }| {
-                    let is_modifiable = !qualifiers.contains(TypeQualifiers::FINAL);
+        if let Some(conflicting) = conflicting {
+            // TODO point out the conflicting declarations in the diagnostic?
+            let place = place_table.place(binding.place(db));
+            if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
+                builder.into_diagnostic(format_args!(
+                    "Conflicting declared types for `{place}`: {}",
+                    format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
+                ));
+            }
+        }
 
-                    if resolved_place.is_unbound() && !place_table.place(place_id).is_symbol() {
-                        if let AnyNodeRef::ExprAttribute(ast::ExprAttribute {
-                            value, attr, ..
-                        }) = node
-                        {
-                            let value_type = self.infer_maybe_standalone_expression(value);
-                            if let Place::Type(ty, Boundness::Bound) =
-                                value_type.member(db, attr).place
-                            {
-                                // TODO: also consider qualifiers on the attribute
-                                return (ty, is_modifiable);
-                            }
-                        } else if let AnyNodeRef::ExprSubscript(
-                            subscript @ ast::ExprSubscript {
-                                value, slice, ctx, ..
-                            },
-                        ) = node
-                        {
-                            let value_ty = self.infer_expression(value);
-                            let slice_ty = self.infer_expression(slice);
-                            let result_ty = self.infer_subscript_expression_types(
-                                subscript, value_ty, slice_ty, *ctx,
-                            );
-                            return (result_ty, is_modifiable);
-                        }
-                    }
-                    (
-                        resolved_place
-                            .ignore_possibly_unbound()
-                            .unwrap_or(Type::unknown()),
-                        is_modifiable,
-                    )
-                },
-            )
-            .unwrap_or_else(|(ty, conflicting)| {
-                // TODO point out the conflicting declarations in the diagnostic?
-                let place = place_table.place(binding.place(db));
-                if let Some(builder) = self.context.report_lint(&CONFLICTING_DECLARATIONS, node) {
-                    builder.into_diagnostic(format_args!(
-                        "Conflicting declared types for `{place}`: {}",
-                        format_enumeration(conflicting.iter().map(|ty| ty.display(db)))
-                    ));
+        // Fall back to implicit module globals for (possibly) unbound names
+        if !matches!(place_and_quals.place, Place::Type(_, Boundness::Bound)) {
+            if let PlaceExprRef::Symbol(symbol) = place {
+                let symbol_id = place_id.expect_symbol();
+
+                if self.skip_non_global_scopes(file_scope_id, symbol_id)
+                    || self.scope.file_scope_id(self.db()).is_global()
+                {
+                    place_and_quals = place_and_quals.or_fall_back_to(self.db(), || {
+                        module_type_implicit_global_declaration(self.db(), symbol.name())
+                    });
                 }
-                (
-                    ty.inner_type(),
-                    !ty.qualifiers.contains(TypeQualifiers::FINAL),
-                )
-            });
+            }
+        }
 
-        if !is_modifiable {
+        let PlaceAndQualifiers {
+            place: resolved_place,
+            qualifiers,
+        } = place_and_quals;
+
+        let unwrap_declared_ty = || {
+            resolved_place
+                .ignore_possibly_unbound()
+                .unwrap_or(Type::unknown())
+        };
+
+        // If the place is unbound and its an attribute or subscript place, fall back to normal
+        // attribute/subscript inference on the root type.
+        let declared_ty = if resolved_place.is_unbound() && !place_table.place(place_id).is_symbol()
+        {
+            if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
+                let value_type = self.infer_maybe_standalone_expression(value);
+                if let Place::Type(ty, Boundness::Bound) = value_type.member(db, attr).place {
+                    // TODO: also consider qualifiers on the attribute
+                    ty
+                } else {
+                    unwrap_declared_ty()
+                }
+            } else if let AnyNodeRef::ExprSubscript(
+                subscript @ ast::ExprSubscript {
+                    value, slice, ctx, ..
+                },
+            ) = node
+            {
+                let value_ty = self.infer_expression(value);
+                let slice_ty = self.infer_expression(slice);
+                self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
+            } else {
+                unwrap_declared_ty()
+            }
+        } else {
+            unwrap_declared_ty()
+        };
+
+        if qualifiers.contains(TypeQualifiers::FINAL) {
             let mut previous_bindings = use_def.bindings_at_definition(binding);
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
