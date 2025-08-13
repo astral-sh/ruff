@@ -88,6 +88,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
+    registry.register_lint(&MISSING_REQUIRED_FIELD);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1659,6 +1660,20 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Detects missing required fields in `TypedDict` constructor calls.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` requires all non-optional fields to be provided during construction.
+    /// Missing required fields can lead to `KeyError` at runtime when accessing the field.
+    pub(crate) static MISSING_REQUIRED_FIELD = {
+        summary: "detects missing required fields in `TypedDict` constructors",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2573,18 +2588,18 @@ fn report_invalid_base<'ctx, 'db>(
 
 pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     context: &InferContext<'db, '_>,
-    value_node: AnyNodeRef,
-    slice_node: AnyNodeRef,
-    value_ty: Type<'db>,
-    slice_ty: Type<'db>,
+    typed_dict_node: AnyNodeRef,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    key_ty: Type<'db>,
     items: &FxOrderMap<Name, Field<'db>>,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&INVALID_KEY, slice_node) {
-        match slice_ty {
+    if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
+        match key_ty {
             Type::StringLiteral(key) => {
                 let key = key.value(db);
-                let typed_dict_name = value_ty.display(db);
+                let typed_dict_name = typed_dict_ty.display(db);
 
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Invalid key access on TypedDict `{typed_dict_name}`",
@@ -2592,7 +2607,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 diagnostic.annotate(
                     context
-                        .secondary(value_node)
+                        .secondary(typed_dict_node)
                         .message(format_args!("TypedDict `{typed_dict_name}`")),
                 );
 
@@ -2611,10 +2626,25 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
             }
             _ => builder.into_diagnostic(format_args!(
                 "TypedDict `{}` cannot be indexed with a key of type `{}`",
-                value_ty.display(db),
-                slice_ty.display(db),
+                typed_dict_ty.display(db),
+                key_ty.display(db),
             )),
         };
+    }
+}
+
+pub(crate) fn report_missing_required_field_on_typed_dict<'db>(
+    context: &InferContext<'db, '_>,
+    constructor_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    missing_field: &str,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&MISSING_REQUIRED_FIELD, constructor_node) {
+        let typed_dict_name = typed_dict_ty.display(db);
+        builder.into_diagnostic(format_args!(
+            "Missing required field '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
+        ));
     }
 }
 

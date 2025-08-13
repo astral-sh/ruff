@@ -530,6 +530,16 @@ impl<'db> PlaceAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::INIT_VAR)
     }
 
+    /// Returns `true` if the place has a `Required` type qualifier.
+    pub(crate) fn is_required(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::REQUIRED)
+    }
+
+    /// Returns `true` if the place has a `NotRequired` type qualifier.
+    pub(crate) fn is_not_required(&self) -> bool {
+        self.qualifiers.contains(TypeQualifiers::NOT_REQUIRED)
+    }
+
     /// Returns `Some(…)` if the place is qualified with `typing.Final` without a specified type.
     pub(crate) fn is_bare_final(&self) -> Option<TypeQualifiers> {
         match self {

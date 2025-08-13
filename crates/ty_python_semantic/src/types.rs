@@ -470,11 +470,33 @@ bitflags! {
     }
 }
 
+bitflags! {
+    /// Used for `TypedDict` class parameters.
+    /// Keeps track of the arguments that were passed in class definition.
+    /// (see https://typing.python.org/en/latest/spec/typeddict.html)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct TypedDictParams: u8 {
+        /// Whether fields are required by default (`total=True`)
+        const TOTAL = 1 << 0;
+        // https://peps.python.org/pep-0728/
+        // const EXTRA_ITEMS = 1 << 1;
+        // const CLOSED = 1 << 2;
+    }
+}
+
 impl get_size2::GetSize for DataclassParams {}
+
+impl get_size2::GetSize for TypedDictParams {}
 
 impl Default for DataclassParams {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
+    }
+}
+
+impl Default for TypedDictParams {
+    fn default() -> Self {
+        Self::TOTAL
     }
 }
 
@@ -6517,6 +6539,10 @@ bitflags! {
         const FINAL     = 1 << 1;
         /// `dataclasses.InitVar`
         const INIT_VAR  = 1 << 2;
+        /// `typing_extensions.Required`
+        const REQUIRED = 1 << 3;
+        /// `typing_extensions.NotRequired`
+        const NOT_REQUIRED = 1 << 4;
     }
 }
 
@@ -6532,6 +6558,8 @@ impl TypeQualifiers {
             Self::CLASS_VAR => "ClassVar",
             Self::FINAL => "Final",
             Self::INIT_VAR => "InitVar",
+            Self::REQUIRED => "Required",
+            Self::NOT_REQUIRED => "NotRequired",
             _ => {
                 unreachable!("Only a single bit should be set when calling `TypeQualifiers::name`")
             }
