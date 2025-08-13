@@ -4982,7 +4982,7 @@ impl<'db> Type<'db> {
             (Ok(enter), Ok(_)) => {
                 let ty = enter.return_type(db);
                 Ok(if mode.is_async() {
-                    ty.resolve_await(db)
+                    ty.try_await(db).unwrap_or(Type::unknown())
                 } else {
                     ty
                 })
@@ -4991,7 +4991,7 @@ impl<'db> Type<'db> {
                 let ty = enter.return_type(db);
                 Err(ContextManagerError::Exit {
                     enter_return_type: if mode.is_async() {
-                        ty.resolve_await(db)
+                        ty.try_await(db).unwrap_or(Type::unknown())
                     } else {
                         ty
                     },
