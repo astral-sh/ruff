@@ -187,8 +187,8 @@ from typing_extensions import reveal_type
 def f[T: (int, None)](x: T) -> T:
     return x
 
-reveal_type(f(1))  # revealed: Literal[1]
-reveal_type(f(True))  # revealed: Literal[True]
+reveal_type(f(1))  # revealed: int
+reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
 # error: [invalid-argument-type]
 reveal_type(f("string"))  # revealed: Unknown

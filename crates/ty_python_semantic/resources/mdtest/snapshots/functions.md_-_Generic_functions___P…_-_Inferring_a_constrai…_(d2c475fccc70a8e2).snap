@@ -17,8 +17,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/function
  3 | def f[T: (int, None)](x: T) -> T:
  4 |     return x
  5 | 
- 6 | reveal_type(f(1))  # revealed: Literal[1]
- 7 | reveal_type(f(True))  # revealed: Literal[True]
+ 6 | reveal_type(f(1))  # revealed: int
+ 7 | reveal_type(f(True))  # revealed: int
  8 | reveal_type(f(None))  # revealed: None
  9 | # error: [invalid-argument-type]
 10 | reveal_type(f("string"))  # revealed: Unknown
@@ -32,9 +32,9 @@ info[revealed-type]: Revealed type
   |
 4 |     return x
 5 |
-6 | reveal_type(f(1))  # revealed: Literal[1]
-  |             ^^^^ `Literal[1]`
-7 | reveal_type(f(True))  # revealed: Literal[True]
+6 | reveal_type(f(1))  # revealed: int
+  |             ^^^^ `int`
+7 | reveal_type(f(True))  # revealed: int
 8 | reveal_type(f(None))  # revealed: None
   |
 
@@ -44,9 +44,9 @@ info[revealed-type]: Revealed type
 info[revealed-type]: Revealed type
  --> src/mdtest_snippet.py:7:13
   |
-6 | reveal_type(f(1))  # revealed: Literal[1]
-7 | reveal_type(f(True))  # revealed: Literal[True]
-  |             ^^^^^^^ `Literal[True]`
+6 | reveal_type(f(1))  # revealed: int
+7 | reveal_type(f(True))  # revealed: int
+  |             ^^^^^^^ `int`
 8 | reveal_type(f(None))  # revealed: None
 9 | # error: [invalid-argument-type]
   |
@@ -57,8 +57,8 @@ info[revealed-type]: Revealed type
 info[revealed-type]: Revealed type
   --> src/mdtest_snippet.py:8:13
    |
- 6 | reveal_type(f(1))  # revealed: Literal[1]
- 7 | reveal_type(f(True))  # revealed: Literal[True]
+ 6 | reveal_type(f(1))  # revealed: int
+ 7 | reveal_type(f(True))  # revealed: int
  8 | reveal_type(f(None))  # revealed: None
    |             ^^^^^^^ `None`
  9 | # error: [invalid-argument-type]
