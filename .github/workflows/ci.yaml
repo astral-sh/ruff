@@ -38,7 +38,8 @@ jobs:
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
       # Flag that is set to "true" when code related to ty changes.
       ty: ${{ steps.check_ty.outputs.changed }}
-
+      # Flag that is set to "true" when code related to the py-fuzzer folder changes.
+      py-fuzzer: ${{ steps.check_py_fuzzer.outputs.changed }}
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
     steps:
@@ -68,7 +69,6 @@ jobs:
             ':crates/ruff_text_size/**' \
             ':crates/ruff_python_ast/**' \
             ':crates/ruff_python_parser/**' \
-            ':python/py-fuzzer/**' \
             ':.github/workflows/ci.yaml' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -132,6 +132,18 @@ jobs:
             ':Cargo.lock' \
             ':fuzz/fuzz_targets/**' \
             ':.github/workflows/ci.yaml' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the py-fuzzer code changed
+        id: check_py_fuzzer
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- 'python/py_fuzzer/**' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -443,7 +455,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.parser == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: 20
     env:
       FORCE_COLOR: 1
@@ -633,7 +645,7 @@ jobs:
       - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.ty == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
