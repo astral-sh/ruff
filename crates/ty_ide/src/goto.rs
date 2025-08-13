@@ -7,7 +7,6 @@ use std::borrow::Cow;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
-use ruff_db::files::FileRange;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
@@ -203,15 +202,8 @@ impl<'db> DefinitionsOrTargets<'db> {
             DefinitionsOrTargets::Targets(_) => return None,
         };
         for definition in &definitions {
-            // TODO: get docstrings for modules
-            let ResolvedDefinition::Definition(definition) = definition else {
-                continue;
-            };
-            // First try to get the docstring from the original definition
-            let original_docstring = definition.docstring(db);
-
             // If we got a docstring from the original definition, use it
-            if let Some(docstring) = original_docstring {
+            if let Some(docstring) = definition.docstring(db) {
                 return Some(Docstring::new(docstring));
             }
         }
@@ -222,12 +214,9 @@ impl<'db> DefinitionsOrTargets<'db> {
         let stub_mapper = StubMapper::new(db);
 
         // Try to find the corresponding implementation definition
-        for mapped_definition in stub_mapper.map_definitions(definitions) {
-            // TODO: get docstrings for modules
-            if let ResolvedDefinition::Definition(impl_definition) = mapped_definition {
-                if let Some(impl_docstring) = impl_definition.docstring(db) {
-                    return Some(Docstring::new(impl_docstring));
-                }
+        for definition in stub_mapper.map_definitions(definitions) {
+            if let Some(docstring) = definition.docstring(db) {
+                return Some(Docstring::new(docstring));
             }
         }
 
@@ -703,6 +692,10 @@ fn convert_resolved_definitions_to_targets(
                     full_range: full_range.range(),
                 }
             }
+            ty_python_semantic::ResolvedDefinition::Module(file) => {
+                // For modules, navigate to the start of the file
+                crate::NavigationTarget::new(file, TextRange::default())
+            }
             ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
                 crate::NavigationTarget::new(file_range.file(), file_range.range())
@@ -761,11 +754,9 @@ fn definitions_for_module<'db>(
     if let Some(module_name) = ModuleName::new(module_name_str) {
         if let Some(resolved_module) = resolve_module(db, &module_name) {
             if let Some(module_file) = resolved_module.file(db) {
-                let definitions = vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                    module_file,
-                    TextRange::default(),
-                ))];
-                return Some(DefinitionsOrTargets::Definitions(definitions));
+                return Some(DefinitionsOrTargets::Definitions(vec![
+                    ResolvedDefinition::Module(module_file),
+                ]));
             }
         }
     }

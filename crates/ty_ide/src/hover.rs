@@ -20,7 +20,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     let model = SemanticModel::new(db, file);
-    let ty = goto_target.inferred_type(&model)?;
+    let ty = goto_target.inferred_type(&model).map(HoverContent::Type);
     let docs = goto_target
         .get_definition_targets(
             file,
@@ -29,11 +29,19 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         )
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+
+    if let Some(HoverContent::Type(ty)) = ty {
+        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+    }
 
     // TODO: Render the symbol's signature instead of just its type.
-    let mut contents = vec![HoverContent::Type(ty)];
+    let mut contents = Vec::new();
+    contents.extend(ty);
     contents.extend(docs);
+
+    if contents.is_empty() {
+        return None;
+    }
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -631,8 +639,20 @@ mod tests {
         assert_snapshot!(test.hover(), @r"
         <module 'lib'>
         ---------------------------------------------
+        The cool lib_py module!
+
+        Wow this module rocks.
+
+        ---------------------------------------------
         ```python
         <module 'lib'>
+        ```
+        ---
+        ```text
+        The cool lib_py module!
+
+        Wow this module rocks.
+
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -672,7 +692,31 @@ mod tests {
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r"
+        The cool lib_py module!
+
+        Wow this module rocks.
+
+        ---------------------------------------------
+        ```text
+        The cool lib_py module!
+
+        Wow this module rocks.
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:20
+          |
+        2 |             import lib
+          |                    ^^-
+          |                    | |
+          |                    | Cursor offset
+          |                    source
+        3 |
+        4 |             lib
+          |
+        ");
     }
 
     #[test]

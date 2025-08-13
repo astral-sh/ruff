@@ -113,7 +113,14 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// Extract a docstring from a function or class body.
+/// Get the module-level docstring for the given file
+pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
+    let module = parsed_module(db, file).load(db);
+    docstring_from_body(module.suite())
+        .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+}
+
+/// Extract a docstring from a function, module, or class body.
 fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = body.first()?;
     // Require the docstring to be a standalone expression.
