@@ -534,7 +534,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pyupgrade, "007") => (RuleGroup::Stable, rules::pyupgrade::rules::NonPEP604AnnotationUnion),
         (Pyupgrade, "008") => (RuleGroup::Stable, rules::pyupgrade::rules::SuperCallWithParameters),
         (Pyupgrade, "009") => (RuleGroup::Stable, rules::pyupgrade::rules::UTF8EncodingDeclaration),
-        (Pyupgrade, "010") => (RuleGroup::Preview, rules::pyupgrade::rules::UnnecessaryFutureImport),
+        (Pyupgrade, "010") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryFutureImport),
         (Pyupgrade, "011") => (RuleGroup::Stable, rules::pyupgrade::rules::LRUCacheWithoutParameters),
         (Pyupgrade, "012") => (RuleGroup::Stable, rules::pyupgrade::rules::UnnecessaryEncodeUTF8),
         (Pyupgrade, "013") => (RuleGroup::Stable, rules::pyupgrade::rules::ConvertTypedDictFunctionalToClass),
