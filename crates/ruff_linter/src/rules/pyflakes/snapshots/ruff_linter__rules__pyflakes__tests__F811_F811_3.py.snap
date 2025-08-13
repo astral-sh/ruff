@@ -7,4 +7,10 @@ F811 Redefinition of unused `fu` from line 1
 1 | import fu; fu = 3
   |            ^^
   |
+info: previous definition of `fu` here
+ --> F811_3.py:1:8
+  |
+1 | import fu; fu = 3
+  |        ^^
+  |
 help: Remove definition: `fu`

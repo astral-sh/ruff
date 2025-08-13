@@ -8,4 +8,13 @@ F811 Redefinition of unused `foo` from line 3
 4 | import bar as foo
   |               ^^^
   |
+info: previous definition of `foo` here
+ --> F811_23.py:3:15
+  |
+1 | """Test that shadowing an explicit re-export produces a warning."""
+2 |
+3 | import foo as foo
+  |               ^^^
+4 | import bar as foo
+  |
 help: Remove definition: `foo`

@@ -9,4 +9,14 @@ F811 Redefinition of unused `Bar` from line 3
 8 | Bar = 1  # F811
   | ^^^
   |
+info: previous definition of `Bar` here
+ --> F811_29.pyi:3:24
+  |
+1 | """Regression test for: https://github.com/astral-sh/ruff/issues/10509"""
+2 |
+3 | from foo import Bar as Bar
+  |                        ^^^
+4 |
+5 | class Eggs:
+  |
 help: Remove definition: `Bar`

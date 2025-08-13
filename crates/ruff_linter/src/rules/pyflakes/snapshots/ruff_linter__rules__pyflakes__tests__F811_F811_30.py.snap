@@ -10,6 +10,16 @@ F811 Redefinition of unused `bar` from line 10
    |         ^^^
 13 |         """Bar."""
    |
+info: previous definition of `bar` here
+  --> F811_30.py:10:5
+   |
+ 8 |         """Foo."""
+ 9 |
+10 |     bar = foo
+   |     ^^^
+11 |
+12 |     def bar(self) -> None:
+   |
 help: Remove definition: `bar`
 
 F811 Redefinition of unused `baz` from line 18
@@ -20,6 +30,15 @@ F811 Redefinition of unused `baz` from line 18
 21 |     baz = 1
    |     ^^^
    |
+info: previous definition of `baz` here
+  --> F811_30.py:18:9
+   |
+16 | class B:
+17 |     """B."""
+18 |     def baz(self) -> None:
+   |         ^^^
+19 |         """Baz."""
+   |
 help: Remove definition: `baz`
 
 F811 Redefinition of unused `foo` from line 26
@@ -29,5 +48,14 @@ F811 Redefinition of unused `foo` from line 26
 28 |
 29 |     bar = (foo := 1)
    |            ^^^
+   |
+info: previous definition of `foo` here
+  --> F811_30.py:26:9
+   |
+24 | class C:
+25 |     """C."""
+26 |     def foo(self) -> None:
+   |         ^^^
+27 |         """Foo."""
    |
 help: Remove definition: `foo`

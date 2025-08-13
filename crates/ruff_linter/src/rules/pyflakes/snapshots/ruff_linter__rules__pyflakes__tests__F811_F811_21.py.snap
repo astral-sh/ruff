@@ -10,6 +10,15 @@ F811 [*] Redefinition of unused `Sequence` from line 26
    |     ^^^^^^^^
 33 | )
    |
+info: previous definition of `Sequence` here
+  --> F811_21.py:26:5
+   |
+24 | from typing import (
+25 |     List,  # noqa
+26 |     Sequence,  # noqa
+   |     ^^^^^^^^
+27 | )
+   |
 help: Remove definition: `Sequence`
 
 ℹ Safe fix

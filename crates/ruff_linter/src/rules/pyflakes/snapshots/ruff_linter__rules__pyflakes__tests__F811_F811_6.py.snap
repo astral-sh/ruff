@@ -10,6 +10,16 @@ F811 [*] Redefinition of unused `os` from line 5
   |            ^^
 7 | os.path
   |
+info: previous definition of `os` here
+ --> F811_6.py:5:12
+  |
+3 | i = 2
+4 | if i == 1:
+5 |     import os
+  |            ^^
+6 |     import os
+7 | os.path
+  |
 help: Remove definition: `os`
 
 ℹ Safe fix

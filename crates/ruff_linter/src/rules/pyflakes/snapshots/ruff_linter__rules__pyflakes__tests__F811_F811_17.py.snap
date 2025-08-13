@@ -10,6 +10,13 @@ F811 [*] Redefinition of unused `fu` from line 2
 7 |
 8 |     def baz():
   |
+info: previous definition of `fu` here
+ --> F811_17.py:2:8
+  |
+1 | """Test that shadowing a global name with a nested function generates a warning."""
+2 | import fu
+  |        ^^
+  |
 help: Remove definition: `fu`
 
 ℹ Safe fix
@@ -29,4 +36,13 @@ F811 Redefinition of unused `fu` from line 6
    |             ^^
 10 |             pass
    |
+info: previous definition of `fu` here
+ --> F811_17.py:6:12
+  |
+5 | def bar():
+6 |     import fu
+  |            ^^
+7 |
+8 |     def baz():
+  |
 help: Remove definition: `fu`

@@ -10,4 +10,13 @@ F811 Redefinition of unused `datetime` from line 3
 5 |
 6 | datetime(1, 2, 3)
   |
+info: previous definition of `datetime` here
+ --> F811_28.py:3:8
+  |
+1 | """Regression test for: https://github.com/astral-sh/ruff/issues/10384"""
+2 |
+3 | import datetime
+  |        ^^^^^^^^
+4 | from datetime import datetime
+  |
 help: Remove definition: `datetime`

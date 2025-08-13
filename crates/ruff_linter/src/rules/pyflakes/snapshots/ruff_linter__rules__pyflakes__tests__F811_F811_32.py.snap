@@ -10,6 +10,15 @@ F811 [*] Redefinition of unused `List` from line 4
   |     ^^^^
 6 | )
   |
+info: previous definition of `List` here
+ --> F811_32.py:4:5
+  |
+3 | from typing import (
+4 |     List,
+  |     ^^^^
+5 |     List,
+6 | )
+  |
 help: Remove definition: `List`
 
 ℹ Safe fix
