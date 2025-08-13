@@ -7004,7 +7004,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
         let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
@@ -7013,7 +7013,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
         let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
             .into_union()?;
         Some(TypeVarBoundOrConstraints::Constraints(ty))
@@ -7023,7 +7023,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
         Some(definition_expression_type(
             db,
             definition,

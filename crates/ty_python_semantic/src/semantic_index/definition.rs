@@ -702,7 +702,7 @@ impl DefinitionKind<'_> {
         )
     }
 
-    pub(crate) fn into_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
+    pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
         match self {
             DefinitionKind::TypeVar(type_var) => Some(type_var),
             _ => None,

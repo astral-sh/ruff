@@ -4558,7 +4558,7 @@ impl KnownClass {
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
-                        default.map(|ty| TypeVarDefault::Eager(ty)),
+                        default.map(TypeVarDefault::Eager),
                         TypeVarKind::Legacy,
                     ),
                 )));

@@ -3464,7 +3464,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_type_expression(expr);
             }
             None => {}
-        };
+        }
         self.infer_optional_type_expression(default.as_deref());
     }
 
