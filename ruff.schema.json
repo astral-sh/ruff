@@ -1165,7 +1165,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "$ref": "#/$defs/Name"
           }
         },
         "function-names": {
@@ -1175,7 +1175,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "$ref": "#/$defs/Name"
           }
         }
       },
@@ -1395,7 +1395,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "$ref": "#/$defs/Name"
           }
         },
         "ignore-names": {
@@ -1405,7 +1405,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/$defs/string"
+            "$ref": "#/$defs/Name"
           }
         }
       },
@@ -2447,8 +2447,11 @@
       },
       "additionalProperties": false
     },
+    "Name": {
+      "type": "string"
+    },
     "NameImports": {
-      "type": "String"
+      "type": "string"
     },
     "OutputFormat": {
       "type": "string",
@@ -4289,9 +4292,6 @@
           "const": "all"
         }
       ]
-    },
-    "string": {
-      "type": "string"
     }
   }
 }

@@ -207,10 +207,6 @@ impl schemars::JsonSchema for Name {
         String::schema_name()
     }
 
-    fn schema_id() -> std::borrow::Cow<'static, str> {
-        String::schema_id()
-    }
-
     fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
         String::json_schema(generator)
     }

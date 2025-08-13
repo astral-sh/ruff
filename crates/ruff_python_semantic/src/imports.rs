@@ -276,12 +276,10 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for NameImports {
     fn schema_name() -> Cow<'static, str> {
-        Cow::Borrowed("NameImports")
+        String::schema_name()
     }
 
-    fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::json_schema!({
-            "type": "String"
-        })
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        String::json_schema(generator)
     }
 }
