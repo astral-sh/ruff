@@ -4520,7 +4520,9 @@ impl KnownClass {
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
-                    (Some(bound), None) => Some(TypeVarBoundOrConstraints::UpperBound(*bound)),
+                    (Some(bound), None) => {
+                        Some(TypeVarBoundOrConstraints::UpperBound(*bound).into())
+                    }
 
                     (None, Some(_constraints)) => {
                         // We don't use UnionType::from_elements or UnionBuilder here,
@@ -4536,7 +4538,7 @@ impl KnownClass {
                                 .map(|(_, ty)| ty)
                                 .collect::<Box<_>>(),
                         );
-                        Some(TypeVarBoundOrConstraints::Constraints(elements))
+                        Some(TypeVarBoundOrConstraints::Constraints(elements).into())
                     }
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
@@ -4554,7 +4556,7 @@ impl KnownClass {
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
-                        *default,
+                        default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),
                 )));

@@ -225,7 +225,7 @@ impl<'db> GenericContext<'db> {
             }
             None => {}
         }
-        if let Some(default_ty) = bound_typevar.default_ty(db) {
+        if let Some(default_ty) = bound_typevar.default_type(db) {
             parameter = parameter.with_default_type(default_ty);
         }
         parameter
@@ -337,7 +337,7 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_ty(db) else {
+            let Some(default) = typevar.default_type(db) else {
                 continue;
             };
 
@@ -756,7 +756,7 @@ impl<'db> SpecializationBuilder<'db> {
                 self.types
                     .get(variable)
                     .copied()
-                    .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
+                    .unwrap_or(variable.default_type(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
         // TODO Infer the tuple spec for a tuple type

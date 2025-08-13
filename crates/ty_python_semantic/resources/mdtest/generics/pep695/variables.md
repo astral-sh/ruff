@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 [PEP 695] and Python 3.12 introduced new, more ergonomic syntax for type variables.
@@ -17,7 +17,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 ```py
 def f[T]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar("T")
+    reveal_type(T)  # revealed: typing.TypeVar
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -33,7 +33,7 @@ python-version = "3.13"
 ```py
 def f[T = int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar("T", default=int)
+    reveal_type(T)  # revealed: typing.TypeVar
     reveal_type(T.__default__)  # revealed: int
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -66,7 +66,7 @@ class Invalid[S = T]: ...
 ```py
 def f[T: int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar("T", bound=int)
+    reveal_type(T)  # revealed: typing.TypeVar
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -79,7 +79,7 @@ def g[S]():
 ```py
 def f[T: (int, str)]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar("T", int, str)
+    reveal_type(T)  # revealed: typing.TypeVar
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
 
@@ -743,6 +743,90 @@ def bound_int[T: int](x: T):
 
 def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[int] | type[str]
+```
+
+## Cycles
+
+### Bounds and constraints
+
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+
+```py
+from typing import Any
+
+# TODO: error
+def f[S, T: list[S]](x: S, y: T) -> S | T:
+    return x or y
+
+# TODO: error
+class C[S, T: list[S]]:
+    x: S
+    y: T
+
+reveal_type(C[int, list[Any]]().x)  # revealed: int
+reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
+
+# TODO: error
+def g[T: list[T]](x: T) -> T:
+    return x
+
+# TODO: error
+class D[T: list[T]]:
+    x: T
+
+reveal_type(D[list[Any]]().x)  # revealed: list[Any]
+
+# TODO: error
+def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
+    return x or y
+
+# TODO: error
+class E[S, T: (list[S], str)]:
+    x: S
+    y: T
+
+reveal_type(E[int, str]().x)  # revealed: int
+reveal_type(E[int, str]().y)  # revealed: str
+
+# TODO: error
+def i[T: (list[T], str)](x: T) -> T:
+    return x
+
+# TODO: error
+class F[T: (list[T], str)]:
+    x: T
+
+reveal_type(F[list[Any]]().x)  # revealed: list[Any]
+```
+
+However, they are lazily evaluated and can cyclically refer to their own type:
+
+```py
+class G[T: list[G]]:
+    x: T
+
+reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+### Defaults
+
+Defaults can be generic, but can only refer to earlier typevars:
+
+```py
+class C[T, U = T]:
+    x: T
+    y: U
+
+reveal_type(C[int, str]().x)  # revealed: int
+reveal_type(C[int, str]().y)  # revealed: str
+reveal_type(C[int]().x)  # revealed: int
+reveal_type(C[int]().y)  # revealed: int
+
+# TODO: error
+class D[T = T]:
+    x: T
+
+reveal_type(D().x)  # revealed: T@D
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

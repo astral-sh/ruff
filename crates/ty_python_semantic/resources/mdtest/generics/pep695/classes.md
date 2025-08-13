@@ -391,6 +391,7 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
+from __future__ import annotations
 from typing import overload
 
 class C[T]:
@@ -541,6 +542,23 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Scoping of typevars
+
+### No back-references
+
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+
+```py
+# TODO error
+class C[S: T, T]:
+    pass
+
+class D[S: X]:
+    pass
+
+X = int
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
@@ -591,7 +609,7 @@ class Derived[T](list[Derived[T]]): ...
 
 Inheritance that would result in a cyclic MRO is detected as an error.
 
-```py
+```pyi
 # error: [cyclic-class-definition]
 class C[T](C): ...
 

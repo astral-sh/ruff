@@ -1797,11 +1797,7 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // TODO resolution should not be deferred; we should see A, not A | B
-        assert_eq!(
-            a_annotated_ty.unwrap().display(&db).to_string(),
-            "Unknown | A | B"
-        );
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 

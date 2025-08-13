@@ -97,9 +97,12 @@ impl<'db> SubclassOfType<'db> {
                             db,
                             Name::new_static("T_all"),
                             None,
-                            Some(TypeVarBoundOrConstraints::UpperBound(
-                                KnownClass::Type.to_instance(db),
-                            )),
+                            Some(
+                                TypeVarBoundOrConstraints::UpperBound(
+                                    KnownClass::Type.to_instance(db),
+                                )
+                                .into(),
+                            ),
                             variance,
                             None,
                             TypeVarKind::Pep695,
