@@ -9390,7 +9390,9 @@ impl<'db> BoundSuperType<'db> {
         }
 
         // TODO: having to get a class-literal just to pass it in here is silly.
-        // `BoundSuperType` should use a different enum rather than reusing `ClassBase`.
+        // `BoundSuperType` should probably not be using `ClassBase::try_from_type` here;
+        // this also leads to false negatives in some cases. See discussion in
+        // <https://github.com/astral-sh/ruff/pull/19560#discussion_r2271570071>.
         let pivot_class = ClassBase::try_from_type(
             db,
             pivot_class_type,
