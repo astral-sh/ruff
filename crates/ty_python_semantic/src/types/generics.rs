@@ -850,7 +850,7 @@ impl<'db> SpecializationBuilder<'db> {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         for constraint in constraints.iter(self.db) {
                             if ty.is_assignable_to(self.db, *constraint) {
-                                self.add_type_mapping(bound_typevar, *constraint);
+                                self.add_type_mapping(bound_typevar, ty);
                                 return Ok(());
                             }
                         }
