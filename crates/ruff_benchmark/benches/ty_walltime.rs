@@ -218,6 +218,24 @@ static TANJUN: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::ne
     )
 });
 
+static STATIC_FRAME: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
+    Benchmark::new(
+        RealWorldProject {
+            name: "static-frame",
+            repository: "https://github.com/static-frame/static-frame",
+            commit: "34962b41baca5e7f98f5a758d530bff02748a421",
+            paths: vec![SystemPath::new("static_frame")],
+            // N.B. `arraykit` is installed as a dependency during mypy_primer runs,
+            // but it takes much longer to be installed in a Codspeed run than it does in a mypy_primer run
+            // (seems to be built from source on the Codspeed CI runners for some reason).
+            dependencies: vec!["numpy"],
+            max_dep_date: "2025-08-09",
+            python_version: PythonVersion::PY311,
+        },
+        500,
+    )
+});
+
 #[track_caller]
 fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
@@ -232,7 +250,7 @@ fn small(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }
 
-#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS], sample_size=1, sample_count=3)]
+#[bench(args=[&*COLOUR_SCIENCE, &*PANDAS, &*STATIC_FRAME], sample_size=1, sample_count=3)]
 fn medium(bencher: Bencher, benchmark: &Benchmark) {
     run_single_threaded(bencher, benchmark);
 }

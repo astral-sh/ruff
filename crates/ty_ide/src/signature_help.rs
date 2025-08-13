@@ -6,16 +6,19 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
-use crate::{
-    Db, docstring::get_parameter_documentation, find_node::covering_node, stub_mapping::StubMapper,
-};
+use crate::docstring::Docstring;
+use crate::goto::DefinitionsOrTargets;
+use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
+use ty_python_semantic::SemanticModel;
 use ty_python_semantic::semantic_index::definition::Definition;
-use ty_python_semantic::types::{CallSignatureDetails, call_signature_details};
+use ty_python_semantic::types::{
+    CallSignatureDetails, call_signature_details, find_active_signature_from_details,
+};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -39,7 +42,7 @@ pub struct SignatureDetails {
     /// Text representation of the full signature (including input parameters and return type).
     pub label: String,
     /// Documentation for the signature, typically from the function's docstring.
-    pub documentation: Option<String>,
+    pub documentation: Option<Docstring>,
     /// Information about each of the parameters in left-to-right order.
     pub parameters: Vec<ParameterDetails>,
     /// Index of the parameter that corresponds to the argument where the
@@ -66,9 +69,11 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     // Get the call expression at the given position.
     let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
 
+    let model = SemanticModel::new(db, file);
+
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
-        call_signature_details(db, file, call_expr);
+        call_signature_details(db, &model, call_expr);
 
     if signature_details.is_empty() {
         return None;
@@ -169,67 +174,39 @@ fn create_signature_details_from_call_signature_details(
                 })
         };
 
+    let parameters = create_parameters_from_offsets(
+        &details.parameter_label_offsets,
+        &signature_label,
+        documentation.as_ref(),
+        &details.parameter_names,
+    );
     SignatureDetails {
-        label: signature_label.clone(),
-        documentation: Some(documentation),
-        parameters: create_parameters_from_offsets(
-            &details.parameter_label_offsets,
-            &signature_label,
-            db,
-            details.definition,
-            &details.parameter_names,
-        ),
+        label: signature_label,
+        documentation,
+        parameters,
         active_parameter,
     }
 }
 
 /// Determine appropriate documentation for a callable type based on its original type.
-fn get_callable_documentation(db: &dyn crate::Db, definition: Option<Definition>) -> String {
-    if let Some(definition) = definition {
-        // First try to get the docstring from the original definition
-        let original_docstring = definition.docstring(db);
-
-        // If we got a docstring from the original definition, use it
-        if let Some(docstring) = original_docstring {
-            return docstring;
-        }
-
-        // If the definition is located within a stub file and no docstring
-        // is present, try to map the symbol to an implementation file and extract
-        // the docstring from that location.
-        let stub_mapper = StubMapper::new(db);
-        let resolved_definition = ResolvedDefinition::Definition(definition);
-
-        // Try to find the corresponding implementation definition
-        for mapped_definition in stub_mapper.map_definition(resolved_definition) {
-            if let ResolvedDefinition::Definition(impl_definition) = mapped_definition {
-                if let Some(impl_docstring) = impl_definition.docstring(db) {
-                    return impl_docstring;
-                }
-            }
-        }
-
-        // Fall back to empty string if no docstring found anywhere
-        String::new()
-    } else {
-        String::new()
-    }
+fn get_callable_documentation(
+    db: &dyn crate::Db,
+    definition: Option<Definition>,
+) -> Option<Docstring> {
+    DefinitionsOrTargets::Definitions(vec![ResolvedDefinition::Definition(definition?)])
+        .docstring(db)
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.
 fn create_parameters_from_offsets(
     parameter_offsets: &[TextRange],
     signature_label: &str,
-    db: &dyn crate::Db,
-    definition: Option<Definition>,
+    docstring: Option<&Docstring>,
     parameter_names: &[String],
 ) -> Vec<ParameterDetails> {
     // Extract parameter documentation from the function's docstring if available.
-    let param_docs = if let Some(definition) = definition {
-        let docstring = definition.docstring(db);
-        docstring
-            .map(|doc| get_parameter_documentation(&doc))
-            .unwrap_or_default()
+    let param_docs = if let Some(docstring) = docstring {
+        docstring.parameter_documentation()
     } else {
         std::collections::HashMap::new()
     };
@@ -258,47 +235,9 @@ fn create_parameters_from_offsets(
         .collect()
 }
 
-/// Find the active signature index from `CallSignatureDetails`.
-/// The active signature is the first signature where all arguments present in the call
-/// have valid mappings to parameters (i.e., none of the mappings are None).
-fn find_active_signature_from_details(signature_details: &[CallSignatureDetails]) -> Option<usize> {
-    let first = signature_details.first()?;
-
-    // If there are no arguments in the mapping, just return the first signature.
-    if first.argument_to_parameter_mapping.is_empty() {
-        return Some(0);
-    }
-
-    // First, try to find a signature where all arguments have valid parameter mappings.
-    let perfect_match = signature_details.iter().position(|details| {
-        // Check if all arguments have valid parameter mappings.
-        details
-            .argument_to_parameter_mapping
-            .iter()
-            .all(|mapping| mapping.matched)
-    });
-
-    if let Some(index) = perfect_match {
-        return Some(index);
-    }
-
-    // If no perfect match, find the signature with the most valid argument mappings.
-    let (best_index, _) = signature_details
-        .iter()
-        .enumerate()
-        .max_by_key(|(_, details)| {
-            details
-                .argument_to_parameter_mapping
-                .iter()
-                .filter(|mapping| mapping.matched)
-                .count()
-        })?;
-
-    Some(best_index)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::docstring::Docstring;
     use crate::signature_help::SignatureHelpInfo;
     use crate::tests::{CursorTest, cursor_test};
 
@@ -332,17 +271,19 @@ mod tests {
         // Verify that the docstring is extracted and included in the documentation
         let expected_docstring = concat!(
             "This is a docstring for the example function.\n",
-            "            \n",
-            "            Args:\n",
-            "                param1: The first parameter as a string\n",
-            "                param2: The second parameter as an integer\n",
-            "            \n",
-            "            Returns:\n",
-            "                A formatted string combining both parameters\n",
-            "            "
+            "\n",
+            "Args:\n",
+            "    param1: The first parameter as a string\n",
+            "    param2: The second parameter as an integer\n",
+            "\n",
+            "Returns:\n",
+            "    A formatted string combining both parameters\n",
         );
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
 
@@ -552,9 +493,12 @@ mod tests {
         assert_eq!(param_y.documentation, Some("The y-coordinate".to_string()));
 
         // Should have the __init__ method docstring as documentation (not the class docstring)
-        let expected_docstring = "Initialize a point with x and y coordinates.\n                \n                Args:\n                    x: The x-coordinate\n                    y: The y-coordinate\n                ";
+        let expected_docstring = "Initialize a point with x and y coordinates.\n\nArgs:\n    x: The x-coordinate\n    y: The y-coordinate\n";
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
     }
@@ -600,7 +544,13 @@ mod tests {
         let signature = &result.signatures[0];
 
         // Should have empty documentation for now
-        assert_eq!(signature.documentation, Some(String::new()));
+        assert_eq!(
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
+            None
+        );
     }
 
     #[test]
@@ -790,9 +740,12 @@ def func() -> str:
         let signature = &result.signatures[0];
         assert_eq!(signature.label, "() -> str");
 
-        let expected_docstring = "This function does something.";
+        let expected_docstring = "This function does something.\n";
         assert_eq!(
-            signature.documentation,
+            signature
+                .documentation
+                .as_ref()
+                .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
     }

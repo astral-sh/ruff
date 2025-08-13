@@ -1,7 +1,10 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
 ---
-whitespace.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+I002 [*] Missing required import: `from __future__ import annotations`
+--> whitespace.py:1:1
+help: Insert required import: `from __future__ import annotations`
+
 ℹ Safe fix
 1 1 | # This is a regression test for https://github.com/astral-sh/ruff/issues/19310
 2 2 | # there is a (potentially invisible) unicode formfeed character (000C) between "docstring" and the semicolon

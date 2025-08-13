@@ -20,17 +20,20 @@ impl RequestHandler for DocumentHighlightRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentHighlightRequestHandler {
-    fn document_url(params: &DocumentHighlightParams) -> Cow<Url> {
+    fn document_url(params: &DocumentHighlightParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: DocumentHighlightParams,
     ) -> crate::server::Result<Option<Vec<DocumentHighlight>>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

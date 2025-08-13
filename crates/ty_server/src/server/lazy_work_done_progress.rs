@@ -1,4 +1,4 @@
-use crate::session::ResolvedClientCapabilities;
+use crate::capabilities::ResolvedClientCapabilities;
 use crate::session::client::Client;
 use lsp_types::request::WorkDoneProgressCreate;
 use lsp_types::{

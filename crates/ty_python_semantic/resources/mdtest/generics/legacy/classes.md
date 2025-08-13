@@ -7,18 +7,30 @@ At its simplest, to define a generic class using the legacy syntax, you inherit 
 
 ```py
 from ty_extensions import generic_context
-from typing import Generic, TypeVar
+from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
 
 T = TypeVar("T")
 S = TypeVar("S")
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
 
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
+class SingleParamSpec(Generic[P]): ...
+class TypeVarAndParamSpec(Generic[P, T]): ...
+class SingleTypeVarTuple(Generic[Unpack[Ts]]): ...
+class TypeVarAndTypeVarTuple(Generic[T, Unpack[Ts]]): ...
 
 # revealed: tuple[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly (these should not reveal `None`)
+reveal_type(generic_context(SingleParamSpec))  # revealed: None
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: None
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -327,6 +339,83 @@ class D(C[V, int]):
     def __init__(self, x: V) -> None: ...
 
 reveal_type(D(1))  # revealed: D[int]
+```
+
+### Generic class inherits `__init__` from generic base class
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(Generic[T, U]):
+    def __init__(self, t: T, u: U) -> None: ...
+
+class D(C[T, U]):
+    pass
+
+reveal_type(C(1, "str"))  # revealed: C[int, str]
+reveal_type(D(1, "str"))  # revealed: D[int, str]
+```
+
+### Generic class inherits `__init__` from `dict`
+
+This is a specific example of the above, since it was reported specifically by a user.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class D(dict[T, U]):
+    pass
+
+reveal_type(D(key=1))  # revealed: D[str, int]
+```
+
+### Generic class inherits `__new__` from `tuple`
+
+(Technically, we synthesize a `__new__` method that is more precise than the one defined in typeshed
+for `tuple`, so we use a different mechanism to make sure it has the right inherited generic
+context. But from the user's point of view, this is another example of the above.)
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class C(tuple[T, U]): ...
+
+reveal_type(C((1, 2)))  # revealed: C[int, int]
+```
+
+### Upcasting a `tuple` to its `Sequence` supertype
+
+This test is taken from the
+[typing spec conformance suite](https://github.com/python/typing/blob/c141cdfb9d7085c1aafa76726c8ce08362837e8b/conformance/tests/tuples_type_compat.py#L133-L153)
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import TypeVar, Sequence, Never
+
+T = TypeVar("T")
+
+def test_seq(x: Sequence[T]) -> Sequence[T]:
+    return x
+
+def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
+    # TODO: this should be `Sequence[Never]`
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```
 
 ### `__init__` is itself generic

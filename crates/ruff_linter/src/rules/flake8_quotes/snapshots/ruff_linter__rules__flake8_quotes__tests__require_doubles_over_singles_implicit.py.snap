@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
-snapshot_kind: text
 ---
-singles_implicit.py:2:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+ --> singles_implicit.py:2:5
   |
 1 | x = (
 2 |     'This'
-  |     ^^^^^^ Q000
+  |     ^^^^^^
 3 |     'is'
 4 |     'not'
   |
-  = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 1 1 | x = (
@@ -20,16 +20,17 @@ singles_implicit.py:2:5: Q000 [*] Single quotes found but double quotes preferre
 4 4 |     'not'
 5 5 | )
 
-singles_implicit.py:3:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+ --> singles_implicit.py:3:5
   |
 1 | x = (
 2 |     'This'
 3 |     'is'
-  |     ^^^^ Q000
+  |     ^^^^
 4 |     'not'
 5 | )
   |
-  = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 1 1 | x = (
@@ -40,15 +41,16 @@ singles_implicit.py:3:5: Q000 [*] Single quotes found but double quotes preferre
 5 5 | )
 6 6 | 
 
-singles_implicit.py:4:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+ --> singles_implicit.py:4:5
   |
 2 |     'This'
 3 |     'is'
 4 |     'not'
-  |     ^^^^^ Q000
+  |     ^^^^^
 5 | )
   |
-  = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 1 1 | x = (
@@ -60,15 +62,16 @@ singles_implicit.py:4:5: Q000 [*] Single quotes found but double quotes preferre
 6 6 | 
 7 7 | x = (
 
-singles_implicit.py:8:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+  --> singles_implicit.py:8:5
    |
  7 | x = (
  8 |     'This' \
-   |     ^^^^^^ Q000
+   |     ^^^^^^
  9 |     'is' \
 10 |     'not'
    |
-   = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 5 5 | )
@@ -80,16 +83,17 @@ singles_implicit.py:8:5: Q000 [*] Single quotes found but double quotes preferre
 10 10 |     'not'
 11 11 | )
 
-singles_implicit.py:9:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+  --> singles_implicit.py:9:5
    |
  7 | x = (
  8 |     'This' \
  9 |     'is' \
-   |     ^^^^ Q000
+   |     ^^^^
 10 |     'not'
 11 | )
    |
-   = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 6  6  | 
@@ -101,15 +105,16 @@ singles_implicit.py:9:5: Q000 [*] Single quotes found but double quotes preferre
 11 11 | )
 12 12 | 
 
-singles_implicit.py:10:5: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+  --> singles_implicit.py:10:5
    |
  8 |     'This' \
  9 |     'is' \
 10 |     'not'
-   |     ^^^^^ Q000
+   |     ^^^^^
 11 | )
    |
-   = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 7  7  | x = (
@@ -121,14 +126,15 @@ singles_implicit.py:10:5: Q000 [*] Single quotes found but double quotes preferr
 12 12 | 
 13 13 | x = (
 
-singles_implicit.py:27:1: Q000 [*] Single quotes found but double quotes preferred
+Q000 [*] Single quotes found but double quotes preferred
+  --> singles_implicit.py:27:1
    |
 25 | if True:
 26 |     'This can use "single" quotes'
 27 | 'But this needs to be changed'
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q000
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Replace single quotes with double quotes
+help: Replace single quotes with double quotes
 
 ℹ Safe fix
 24 24 | 

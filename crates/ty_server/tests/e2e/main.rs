@@ -28,6 +28,7 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod initialize;
+mod inlay_hints;
 mod publish_diagnostics;
 mod pull_diagnostics;
 
@@ -48,24 +49,24 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, Initialize, Request, Shutdown, WorkspaceConfiguration,
-    WorkspaceDiagnosticRequest,
+    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
+    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, InitializeParams,
-    InitializeResult, InitializedParams, PartialResultParams, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Url,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceFolder,
+    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
+    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
-use serde::de::DeserializeOwned;
-use serde_json::json;
 use tempfile::TempDir;
 
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
@@ -149,14 +150,15 @@ pub(crate) struct TestServer {
     /// Workspace configurations for `workspace/configuration` requests
     workspace_configurations: HashMap<Url, ClientOptions>,
 
-    /// Capabilities registered by the server
-    registered_capabilities: Vec<String>,
+    /// Whether a Shutdown request has been sent by the test
+    /// and the exit sequence should be skipped during `Drop`
+    shutdown_requested: bool,
 }
 
 impl TestServer {
     /// Create a new test server with the given workspace configurations
     fn new(
-        workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
+        workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
@@ -174,7 +176,7 @@ impl TestServer {
             let worker_threads = NonZeroUsize::new(1).unwrap();
             let test_system = Arc::new(TestSystem::new(os_system));
 
-            match Server::new(worker_threads, server_connection, test_system, false) {
+            match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
@@ -193,7 +195,7 @@ impl TestServer {
 
         let workspace_configurations = workspaces
             .into_iter()
-            .map(|(folder, options)| (folder.uri, options))
+            .filter_map(|(folder, options)| Some((folder.uri, options?)))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -206,12 +208,16 @@ impl TestServer {
             requests: VecDeque::new(),
             initialize_response: None,
             workspace_configurations,
-            registered_capabilities: Vec::new(),
+            shutdown_requested: false,
         }
         .initialize(workspace_folders, capabilities, initialization_options)
     }
 
     /// Perform LSP initialization handshake
+    ///
+    /// # Panics
+    ///
+    /// If the `initialization_options` cannot be serialized to JSON
     fn initialize(
         mut self,
         workspace_folders: Vec<WorkspaceFolder>,
@@ -221,15 +227,16 @@ impl TestServer {
         let init_params = InitializeParams {
             capabilities,
             workspace_folders: Some(workspace_folders),
-            // TODO: This should be configurable by the test server builder. This might not be
-            // required after client settings are implemented in the server.
-            initialization_options: initialization_options
-                .map(|options| json!({ "settings": options})),
+            initialization_options: initialization_options.map(|options| {
+                serde_json::to_value(options)
+                    .context("Failed to serialize initialization options to `ClientOptions`")
+                    .unwrap()
+            }),
             ..Default::default()
         };
 
         let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<InitializeResult>(init_request_id)?);
+        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id)?);
         self.send_notification::<Initialized>(InitializedParams {});
 
         Ok(self)
@@ -270,6 +277,7 @@ impl TestServer {
     /// This should be called before the test server is dropped to ensure that all server messages
     /// have been properly consumed by the test. If there are any pending messages, this will panic
     /// with detailed information about what was left unconsumed.
+    #[track_caller]
     fn assert_no_pending_messages(&self) {
         let mut errors = Vec::new();
 
@@ -330,6 +338,11 @@ impl TestServer {
     where
         R: Request,
     {
+        // Track if an Exit notification is being sent
+        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+            self.shutdown_requested = true;
+        }
+
         let id = self.next_request_id();
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
@@ -354,16 +367,19 @@ impl TestServer {
     /// called once per request ID.
     ///
     /// [`send_request`]: TestServer::send_request
-    pub(crate) fn await_response<T: DeserializeOwned>(&mut self, id: RequestId) -> Result<T> {
+    pub(crate) fn await_response<R>(&mut self, id: &RequestId) -> Result<R::Result>
+    where
+        R: Request,
+    {
         loop {
-            if let Some(response) = self.responses.remove(&id) {
+            if let Some(response) = self.responses.remove(id) {
                 match response {
                     Response {
                         error: None,
                         result: Some(result),
                         ..
                     } => {
-                        return Ok(serde_json::from_value::<T>(result)?);
+                        return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
                     Response {
                         error: Some(err),
@@ -373,7 +389,11 @@ impl TestServer {
                         return Err(TestServerError::ResponseError(err).into());
                     }
                     response => {
-                        return Err(TestServerError::InvalidResponse(id, Box::new(response)).into());
+                        return Err(TestServerError::InvalidResponse(
+                            id.clone(),
+                            Box::new(response),
+                        )
+                        .into());
                     }
                 }
             }
@@ -491,20 +511,25 @@ impl TestServer {
     fn handle_message(&mut self, message: Message) -> Result<(), TestServerError> {
         match message {
             Message::Request(request) => {
+                tracing::debug!("Received server request {}", &request.method);
                 self.requests.push_back(request);
             }
-            Message::Response(response) => match self.responses.entry(response.id.clone()) {
-                Entry::Occupied(existing) => {
-                    return Err(TestServerError::DuplicateResponse(
-                        response.id,
-                        Box::new(existing.get().clone()),
-                    ));
+            Message::Response(response) => {
+                tracing::debug!("Received server response for request {}", &response.id);
+                match self.responses.entry(response.id.clone()) {
+                    Entry::Occupied(existing) => {
+                        return Err(TestServerError::DuplicateResponse(
+                            response.id,
+                            Box::new(existing.get().clone()),
+                        ));
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(response);
+                    }
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert(response);
-                }
-            },
+            }
             Message::Notification(notification) => {
+                tracing::debug!("Received notification {}", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
@@ -526,6 +551,16 @@ impl TestServer {
         panic!("Server dropped client receiver while still running");
     }
 
+    pub(crate) fn cancel(&mut self, request_id: &RequestId) {
+        let id_string = request_id.to_string();
+        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+            id: match id_string.parse() {
+                Ok(id) => NumberOrString::Number(id),
+                Err(_) => NumberOrString::String(id_string),
+            },
+        });
+    }
+
     /// Handle workspace configuration requests from the server.
     ///
     /// Use the [`get_request`] method to wait for the server to send this request.
@@ -544,19 +579,26 @@ impl TestServer {
             };
             let config_value = if let Some(options) = self.workspace_configurations.get(scope_uri) {
                 // Return the configuration for the specific workspace
+                //
+                // As per the spec:
+                //
+                // > If the client can't provide a configuration setting for a given scope
+                // > then null needs to be present in the returned array.
                 match item.section.as_deref() {
                     Some("ty") => serde_json::to_value(options)?,
-                    Some(_) | None => {
-                        // TODO: Handle `python` section once it's implemented in the server
-                        // As per the spec:
-                        //
-                        // > If the client can't provide a configuration setting for a given scope
-                        // > then null needs to be present in the returned array.
+                    Some(section) => {
+                        tracing::debug!("Unrecognized section `{section}` for {scope_uri}");
+                        serde_json::Value::Null
+                    }
+                    None => {
+                        tracing::debug!(
+                            "No section specified for workspace configuration of {scope_uri}",
+                        );
                         serde_json::Value::Null
                     }
                 }
             } else {
-                tracing::warn!("No workspace configuration found for {scope_uri}");
+                tracing::debug!("No workspace configuration provided for {scope_uri}");
                 serde_json::Value::Null
             };
             results.push(config_value);
@@ -647,27 +689,60 @@ impl TestServer {
             partial_result_params: PartialResultParams::default(),
         };
         let id = self.send_request::<DocumentDiagnosticRequest>(params);
-        self.await_response::<DocumentDiagnosticReportResult>(id)
+        self.await_response::<DocumentDiagnosticRequest>(&id)
     }
 
     /// Send a `workspace/diagnostic` request with optional previous result IDs.
     pub(crate) fn workspace_diagnostic_request(
         &mut self,
+        work_done_token: Option<lsp_types::NumberOrString>,
         previous_result_ids: Option<Vec<PreviousResultId>>,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         let params = WorkspaceDiagnosticParams {
             identifier: Some("ty".to_string()),
             previous_result_ids: previous_result_ids.unwrap_or_default(),
-            work_done_progress_params: WorkDoneProgressParams {
-                work_done_token: Some(lsp_types::NumberOrString::String(
-                    "test-progress-token".to_string(),
-                )),
-            },
+            work_done_progress_params: WorkDoneProgressParams { work_done_token },
             partial_result_params: PartialResultParams::default(),
         };
 
         let id = self.send_request::<WorkspaceDiagnosticRequest>(params);
-        self.await_response::<WorkspaceDiagnosticReportResult>(id)
+        self.await_response::<WorkspaceDiagnosticRequest>(&id)
+    }
+
+    /// Send a `textDocument/hover` request for the document at the given path and position.
+    pub(crate) fn hover_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        position: Position,
+    ) -> Result<Option<Hover>> {
+        let params = HoverParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
+                position,
+            },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        let id = self.send_request::<HoverRequest>(params);
+        self.await_response::<HoverRequest>(&id)
+    }
+
+    /// Sends a `textDocument/inlayHint` request for the document at the given path and range.
+    pub(crate) fn inlay_hints_request(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        range: Range,
+    ) -> Result<Option<Vec<InlayHint>>> {
+        let params = InlayHintParams {
+            text_document: TextDocumentIdentifier {
+                uri: self.file_uri(path),
+            },
+            range,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+        };
+        let id = self.send_request::<InlayHintRequest>(params);
+        self.await_response::<InlayHintRequest>(&id)
     }
 }
 
@@ -681,7 +756,6 @@ impl fmt::Debug for TestServer {
             .field("server_requests", &self.requests)
             .field("initialize_response", &self.initialize_response)
             .field("workspace_configurations", &self.workspace_configurations)
-            .field("registered_capabilities", &self.registered_capabilities)
             .finish_non_exhaustive()
     }
 }
@@ -694,9 +768,9 @@ impl Drop for TestServer {
         //
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
-        let shutdown_error = if self.server_thread.is_some() {
+        let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
             let shutdown_id = self.send_request::<Shutdown>(());
-            match self.await_response::<()>(shutdown_id) {
+            match self.await_response::<Shutdown>(&shutdown_id) {
                 Ok(()) => {
                     self.send_notification::<Exit>(());
                     None
@@ -734,7 +808,7 @@ impl Drop for TestServer {
 /// Builder for creating test servers with specific configurations
 pub(crate) struct TestServerBuilder {
     test_context: TestContext,
-    workspaces: Vec<(WorkspaceFolder, ClientOptions)>,
+    workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
 }
@@ -742,10 +816,13 @@ pub(crate) struct TestServerBuilder {
 impl TestServerBuilder {
     /// Create a new builder
     pub(crate) fn new() -> Result<Self> {
-        // Default client capabilities for the test server. These are assumptions made by the real
-        // server and are common for most clients:
+        // Default client capabilities for the test server:
         //
+        // These are common capabilities that all clients support:
         // - Supports publishing diagnostics
+        //
+        // These are enabled by default for convenience but can be disabled using the builder
+        // methods:
         // - Supports pulling workspace configuration
         let client_capabilities = ClientCapabilities {
             text_document: Some(TextDocumentClientCapabilities {
@@ -767,6 +844,7 @@ impl TestServerBuilder {
         })
     }
 
+    /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
         self
@@ -776,10 +854,13 @@ impl TestServerBuilder {
     ///
     /// This option will be used to respond to the `workspace/configuration` request that the
     /// server will send to the client.
+    ///
+    /// If `options` is `None`, the test server will respond with `null` for this workspace
+    /// when the server sends a `workspace/configuration` request.
     pub(crate) fn with_workspace(
         mut self,
         workspace_root: &SystemPath,
-        options: ClientOptions,
+        options: Option<ClientOptions>,
     ) -> Result<Self> {
         // TODO: Support multiple workspaces in the test server
         if self.workspaces.len() == 1 {
@@ -803,11 +884,10 @@ impl TestServerBuilder {
     }
 
     /// Enable or disable pull diagnostics capability
-    #[must_use]
     pub(crate) fn enable_pull_diagnostics(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .diagnostic = if enabled {
             Some(DiagnosticClientCapabilities::default())
         } else {
@@ -816,13 +896,56 @@ impl TestServerBuilder {
         self
     }
 
+    /// Enable or disable dynamic registration of diagnostics capability
+    pub(crate) fn enable_diagnostic_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .diagnostic
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable dynamic registration of rename capability
+    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .rename
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable workspace configuration capability
+    pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .workspace
+            .get_or_insert_default()
+            .configuration = Some(enabled);
+        self
+    }
+
+    /// Enable or disable inlay hints capability
+    pub(crate) fn enable_inlay_hints(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .inlay_hint = if enabled {
+            Some(InlayHintClientCapabilities::default())
+        } else {
+            None
+        };
+        self
+    }
+
     /// Enable or disable file watching capability
-    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn enable_did_change_watched_files(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .workspace
-            .get_or_insert_with(Default::default)
+            .get_or_insert_default()
             .did_change_watched_files = if enabled {
             Some(DidChangeWatchedFilesClientCapabilities::default())
         } else {
@@ -832,7 +955,6 @@ impl TestServerBuilder {
     }
 
     /// Set custom client capabilities (overrides any previously set capabilities)
-    #[must_use]
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;

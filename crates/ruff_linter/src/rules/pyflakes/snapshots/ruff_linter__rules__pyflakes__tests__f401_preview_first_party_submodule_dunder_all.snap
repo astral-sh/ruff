@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-__init__.py:2:8: F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+F401 [*] `submodule.a` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> __init__.py:2:8
   |
 2 | import submodule.a
-  |        ^^^^^^^^^^^ F401
+  |        ^^^^^^^^^^^
 3 | __all__ = ['FOO']
 4 | FOO = 42
   |
-  = help: Add `submodule` to __all__
+help: Add `submodule` to __all__
 
 ℹ Safe fix
 1 1 | 

@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
+use ty_combine::Combine;
 use ty_python_semantic::lint::RuleSelection;
 
 use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
-use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
+use crate::{Db, glob::IncludeExcludeFilter};
 
 /// The resolved [`super::Options`] for the project.
 ///
@@ -19,7 +20,7 @@ use crate::{Db, combine::Combine, glob::IncludeExcludeFilter};
 /// This can be achieved by adding a salsa query for the type checking specific settings.
 ///
 /// Settings that are part of [`ty_python_semantic::ProgramSettings`] are not included here.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct Settings {
     pub(super) rules: Arc<RuleSelection>,
     pub(super) terminal: TerminalSettings,
@@ -55,20 +56,20 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, get_size2::GetSize)]
 pub struct TerminalSettings {
     pub output_format: OutputFormat,
     pub error_on_warning: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SrcSettings {
     pub respect_ignore_files: bool,
     pub files: IncludeExcludeFilter,
 }
 
 /// A single configuration override that applies to files matching specific patterns.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct Override {
     /// File pattern filter to determine which files this override applies to.
     pub(super) files: IncludeExcludeFilter,
@@ -96,7 +97,7 @@ impl Override {
 }
 
 /// Resolves the settings for a given file.
-#[salsa::tracked(returns(ref), heap_size=get_size2::heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     let settings = db.project().settings(db);
 
@@ -155,7 +156,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();

@@ -20,17 +20,20 @@ impl RequestHandler for GotoDeclarationRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for GotoDeclarationRequestHandler {
-    fn document_url(params: &GotoDeclarationParams) -> Cow<Url> {
+    fn document_url(params: &GotoDeclarationParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
     fn run_with_snapshot(
         db: &ProjectDatabase,
-        snapshot: DocumentSnapshot,
+        snapshot: &DocumentSnapshot,
         _client: &Client,
         params: GotoDeclarationParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

@@ -9,6 +9,7 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
 
 class Person(NamedTuple):
     id: int
@@ -24,10 +25,45 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# TODO: These should reveal the types of the fields
-reveal_type(alice[0])  # revealed: Unknown
-reveal_type(alice[1])  # revealed: Unknown
-reveal_type(alice[2])  # revealed: Unknown
+# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(Person.__mro__)
+
+static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
+static_assert(is_subtype_of(Person, tuple[object, ...]))
+static_assert(not is_assignable_to(Person, tuple[int, str, int]))
+static_assert(not is_assignable_to(Person, tuple[int, str]))
+
+reveal_type(len(alice))  # revealed: Literal[3]
+reveal_type(bool(alice))  # revealed: Literal[True]
+
+reveal_type(alice[0])  # revealed: int
+reveal_type(alice[1])  # revealed: str
+reveal_type(alice[2])  # revealed: int | None
+
+# error: [index-out-of-bounds] "Index 3 is out of bounds for tuple `Person` with length 3"
+reveal_type(alice[3])  # revealed: Unknown
+
+reveal_type(alice[-1])  # revealed: int | None
+reveal_type(alice[-2])  # revealed: str
+reveal_type(alice[-3])  # revealed: int
+
+# error: [index-out-of-bounds] "Index -4 is out of bounds for tuple `Person` with length 3"
+reveal_type(alice[-4])  # revealed: Unknown
+
+reveal_type(alice[1:])  # revealed: tuple[str, int | None]
+reveal_type(alice[::-1])  # revealed: tuple[int | None, str, int]
+
+alice_id, alice_name, alice_age = alice
+reveal_type(alice_id)  # revealed: int
+reveal_type(alice_name)  # revealed: str
+reveal_type(alice_age)  # revealed: int | None
+
+# error: [invalid-assignment] "Not enough values to unpack: Expected 4"
+a, b, c, d = alice
+# error: [invalid-assignment] "Too many values to unpack: Expected 2"
+a, b = alice
+*_, age = alice
+reveal_type(age)  # revealed: int | None
 
 # error: [missing-argument]
 Person(3)
@@ -150,9 +186,9 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
-reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@NamedTupleFallback
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@_make
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@NamedTupleFallback
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
 # TODO: should be `Person` once we support `Self`
 reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown

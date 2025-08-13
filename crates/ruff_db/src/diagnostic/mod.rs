@@ -212,7 +212,7 @@ impl Diagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -364,6 +364,16 @@ impl Diagnostic {
     /// secondary codes (yet), but in Ruff the noqa code is used.
     pub fn secondary_code(&self) -> Option<&SecondaryCode> {
         self.inner.secondary_code.as_ref()
+    }
+
+    /// Returns the secondary code for the diagnostic if it exists, or the lint name otherwise.
+    ///
+    /// This is a common pattern for Ruff diagnostics, which want to use the noqa code in general,
+    /// but fall back on the `invalid-syntax` identifier for syntax errors, which don't have
+    /// secondary codes.
+    pub fn secondary_code_or_id(&self) -> &str {
+        self.secondary_code()
+            .map_or_else(|| self.inner.id.as_str(), SecondaryCode::as_str)
     }
 
     /// Set the secondary code for this diagnostic.
@@ -644,7 +654,7 @@ impl SubDiagnostic {
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
-    pub fn concise_message(&self) -> ConciseMessage {
+    pub fn concise_message(&self) -> ConciseMessage<'_> {
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
@@ -702,6 +712,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
+    /// Whether this annotation is a file-level or full-file annotation.
+    ///
+    /// When set, rendering will only include the file's name and (optional) range. Everything else
+    /// is omitted, including any file snippet or message.
+    is_file_level: bool,
 }
 
 impl Annotation {
@@ -720,6 +735,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -736,6 +752,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
+            is_file_level: false,
         }
     }
 
@@ -800,6 +817,21 @@ impl Annotation {
     /// Attaches an additional tag to this annotation.
     pub fn push_tag(&mut self, tag: DiagnosticTag) {
         self.tags.push(tag);
+    }
+
+    /// Set whether or not this annotation is file-level.
+    ///
+    /// File-level annotations are only rendered with their file name and range, if available. This
+    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
+    /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
+    /// documentation.
+    ///
+    /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
+    /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
+    /// details.
+    pub fn set_file_level(&mut self, yes: bool) {
+        self.is_file_level = yes;
     }
 }
 
@@ -1067,7 +1099,7 @@ enum DiagnosticSource {
 
 impl DiagnosticSource {
     /// Returns this input as a `SourceCode` for convenient querying.
-    fn as_source_code(&self) -> SourceCode {
+    fn as_source_code(&self) -> SourceCode<'_, '_> {
         match self {
             DiagnosticSource::Ty(input) => SourceCode::new(input.text.as_str(), &input.line_index),
             DiagnosticSource::Ruff(source) => SourceCode::new(source.source_text(), source.index()),

@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked(debug)]
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -249,6 +249,10 @@ impl ScopeKind {
 
     pub(crate) const fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
+    }
+
+    pub(crate) const fn is_module(self) -> bool {
+        matches!(self, ScopeKind::Module)
     }
 
     pub(crate) const fn is_type_parameter(self) -> bool {

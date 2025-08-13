@@ -33,10 +33,10 @@
 //! See the `./requests` and `./notifications` directories for concrete implementations of these
 //! traits in action.
 
-use std::borrow::Cow;
-
 use crate::session::client::Client;
 use crate::session::{DocumentSnapshot, Session, SessionSnapshot};
+use lsp_server::RequestId;
+use std::borrow::Cow;
 
 use lsp_types::Url;
 use lsp_types::notification::Notification;
@@ -89,14 +89,38 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
     /// Returns the URL of the document that this request handler operates on.
     fn document_url(
         params: &<<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> Cow<Url>;
+    ) -> Cow<'_, Url>;
 
+    /// Processes the request parameters and returns the LSP request result.
+    ///
+    /// This is the main method that handlers implement. It takes the request parameters
+    /// from the client and computes the appropriate response data for the LSP request.
     fn run_with_snapshot(
+        db: &ProjectDatabase,
+        snapshot: &DocumentSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+
+    /// Handles the entire request lifecycle and sends the response to the client.
+    ///
+    /// It allows handlers to customize how the server sends the response to the client.
+    fn handle_request(
+        id: &RequestId,
         db: &ProjectDatabase,
         snapshot: DocumentSnapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
-    ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+    ) {
+        let result = Self::run_with_snapshot(db, &snapshot, client, params);
+
+        if let Err(err) = &result {
+            tracing::error!("An error occurred with request ID {id}: {err}");
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        }
+
+        client.respond(id, result);
+    }
 }
 
 /// A request handler that can be run on a background thread.
@@ -106,11 +130,34 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
 /// operations that require access to the entire session state, such as fetching workspace
 /// diagnostics.
 pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
+    /// Processes the request parameters and returns the LSP request result.
+    ///
+    /// This is the main method that handlers implement. It takes the request parameters
+    /// from the client and computes the appropriate response data for the LSP request.
     fn run(
-        snapshot: SessionSnapshot,
+        snapshot: &SessionSnapshot,
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) -> super::Result<<<Self as RequestHandler>::RequestType as Request>::Result>;
+
+    /// Handles the request lifecycle and sends the response to the client.
+    ///
+    /// It allows handlers to customize how the server sends the response to the client.
+    fn handle_request(
+        id: &RequestId,
+        snapshot: SessionSnapshot,
+        client: &Client,
+        params: <<Self as RequestHandler>::RequestType as Request>::Params,
+    ) {
+        let result = Self::run(&snapshot, client, params);
+
+        if let Err(err) = &result {
+            tracing::error!("An error occurred with request ID {id}: {err}");
+            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        }
+
+        client.respond(id, result);
+    }
 }
 
 /// A supertrait for any server notification handler.
@@ -137,7 +184,7 @@ pub(super) trait BackgroundDocumentNotificationHandler: NotificationHandler {
     /// Returns the URL of the document that this notification handler operates on.
     fn document_url(
         params: &<<Self as NotificationHandler>::NotificationType as Notification>::Params,
-    ) -> Cow<Url>;
+    ) -> Cow<'_, Url>;
 
     fn run_with_snapshot(
         snapshot: DocumentSnapshot,

@@ -130,3 +130,39 @@ print(" x ".rsplit(maxsplit=0))
 print(" x ".rsplit(sep=None, maxsplit=0))
 print("  x  ".rsplit(maxsplit=0))
 print("  x  ".rsplit(sep=None, maxsplit=0))
+
+# https://github.com/astral-sh/ruff/issues/19581 - embedded quotes in raw strings
+r"""simple@example.com
+very.common@example.com
+FirstName.LastName@EasierReading.org
+x@example.com
+long.email-address-with-hyphens@and.subdomains.example.com
+user.name+tag+sorting@example.com
+name/surname@example.com
+xample@s.example
+" "@example.org
+"john..doe"@example.org
+mailhost!username@example.org
+"very.(),:;<>[]\".VERY.\"very@\\ \"very\".unusual"@strange.example.com
+user%example.com@example.org
+user-@example.org
+I❤️CHOCOLATE@example.com
+this\ still\"not\\allowed@example.com
+stellyamburrr985@example.com
+Abc.123@example.com
+user+mailbox/department=shipping@example.com
+!#$%&'*+-/=?^_`.{|}~@example.com
+"Abc@def"@example.com
+"Fred\ Bloggs"@example.com
+"Joe.\\Blow"@example.com""".split("\n")
+
+
+r"""first
+'no need' to escape
+"swap" quote style
+"use' ugly triple quotes""".split("\n")
+
+# https://github.com/astral-sh/ruff/issues/19845
+print("S\x1cP\x1dL\x1eI\x1fT".split())
+print("\x1c\x1d\x1e\x1f>".split(maxsplit=0))
+print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))

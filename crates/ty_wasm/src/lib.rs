@@ -16,8 +16,8 @@ use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    MarkupKind, RangedValue, document_highlights, goto_declaration, goto_definition,
-    goto_references, goto_type_definition, hover, inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
+    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
 };
 use ty_ide::{NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
@@ -435,6 +435,11 @@ impl Workspace {
             &self.db,
             file_id.file,
             range.to_text_range(&index, &source, self.position_encoding)?,
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+                function_argument_names: true,
+            },
         );
 
         Ok(result
@@ -527,7 +532,9 @@ impl Workspace {
 
                 SignatureInformation {
                     label: sig.label,
-                    documentation: sig.documentation,
+                    documentation: sig
+                        .documentation
+                        .map(|docstring| docstring.render_plaintext()),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }

@@ -5,7 +5,6 @@ use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use rustc_hash::FxHashMap;
 
-use crate::session::settings::ClientSettings;
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentKey, DocumentVersion, NotebookDocument},
@@ -20,17 +19,13 @@ pub(crate) struct Index {
 
     /// Maps opaque cell URLs to a notebook path (document)
     notebook_cells: FxHashMap<Url, AnySystemPath>,
-
-    /// Global settings provided by the client.
-    global_settings: Arc<ClientSettings>,
 }
 
 impl Index {
-    pub(super) fn new(global_settings: ClientSettings) -> Self {
+    pub(super) fn new() -> Self {
         Self {
             documents: FxHashMap::default(),
             notebook_cells: FxHashMap::default(),
-            global_settings: Arc::new(global_settings),
         }
     }
 
@@ -186,10 +181,6 @@ impl Index {
             anyhow::bail!("tried to close document that didn't exist at {}", key)
         };
         Ok(())
-    }
-
-    pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
-        self.global_settings.clone()
     }
 
     fn document_controller_for_key(

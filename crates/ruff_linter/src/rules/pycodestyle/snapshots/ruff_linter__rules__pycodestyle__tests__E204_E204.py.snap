@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E204.py:14:2: E204 [*] Whitespace after decorator
+E204 [*] Whitespace after decorator
+  --> E204.py:14:2
    |
 13 | # E204
 14 | @ foo
-   |  ^ E204
+   |  ^
 15 | def baz():
 16 |     print('baz')
    |
-   = help: Remove whitespace
+help: Remove whitespace
 
 ℹ Safe fix
 11 11 |     print('bar')
@@ -21,15 +22,16 @@ E204.py:14:2: E204 [*] Whitespace after decorator
 16 16 |     print('baz')
 17 17 | 
 
-E204.py:25:6: E204 [*] Whitespace after decorator
+E204 [*] Whitespace after decorator
+  --> E204.py:25:6
    |
 24 |     # E204
 25 |     @ foo
-   |      ^ E204
+   |      ^
 26 |     def baz(self):
 27 |         print('baz')
    |
-   = help: Remove whitespace
+help: Remove whitespace
 
 ℹ Safe fix
 22 22 |         print('bar')
@@ -41,16 +43,16 @@ E204.py:25:6: E204 [*] Whitespace after decorator
 27 27 |         print('baz')
 28 28 | 
 
-E204.py:31:2: E204 [*] Whitespace after decorator
+E204 [*] Whitespace after decorator
+  --> E204.py:31:2
    |
 30 | # E204
 31 | @ \
-   |  ^^ E204
+   |  ^^
 32 | foo
 33 | def baz():
-34 |     print('baz')
    |
-   = help: Remove whitespace
+help: Remove whitespace
 
 ℹ Safe fix
 28 28 | 

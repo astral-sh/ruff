@@ -275,7 +275,49 @@ def f(a: A):
     a.x = None
 ```
 
-Narrowing is invalidated if a `nonlocal` declaration is made within a lazy scope.
+The opposite is not true, that is, if a root expression is reassigned, narrowing on the member are
+no longer valid in the inner lazy scope.
+
+```py
+def f(l: list[str | None]):
+    if l[0] is not None:
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+        l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        reveal_type(l[0])  # revealed: str | None
+    l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        l: list[str | None] = [None]
+        def _():
+            # TODO: should be `str | None`
+            reveal_type(l[0])  # revealed: Unknown
+
+    def _():
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+        l: list[str | None] = [None]
+
+def f(a: A):
+    if a.x is not None:
+        def _():
+            reveal_type(a.x)  # revealed: str | None
+    a = A()
+
+def f(a: A):
+    a.x = "a"
+    def _():
+        reveal_type(a.x)  # revealed: str | None
+    a = A()
+```
+
+Narrowing is also invalidated if a `nonlocal` declaration is made within a lazy scope.
 
 ```py
 def f(non_local: str | None):
@@ -346,7 +388,10 @@ l: list[str | Literal[1] | None] = [None]
 
 def f(x: str | Literal[1] | None):
     class C:
-        if x is not None:  # TODO: should be an unresolved-reference error
+        # If we try to access a variable in a class before it has been defined,
+        # the lookup will fall back to global.
+        # error: [unresolved-reference]
+        if x is not None:
             def _():
                 if x != 1:
                     reveal_type(x)  # revealed: str | None
@@ -360,11 +405,12 @@ def f(x: str | Literal[1] | None):
         x = None
 
     def _():
+        # No narrowing is performed on unresolved references.
         # error: [unresolved-reference]
         if x is not None:
             def _():
                 if x != 1:
-                    reveal_type(x)  # revealed: Never
+                    reveal_type(x)  # revealed: None
         x = None
 
 def f(const: str | Literal[1] | None):
@@ -372,8 +418,7 @@ def f(const: str | Literal[1] | None):
         if const is not None:
             def _():
                 if const != 1:
-                    # TODO: should be `str`
-                    reveal_type(const)  # revealed: str | None
+                    reveal_type(const)  # revealed: str
 
             class D:
                 if const != 1:

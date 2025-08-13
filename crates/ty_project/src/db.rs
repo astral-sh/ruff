@@ -5,15 +5,14 @@ use std::{cmp, fmt};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
-use crate::{DEFAULT_LINT_REGISTRY, DummyReporter};
+use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
-use salsa::plumbing::ZalsaDatabase;
-use salsa::{Event, Setter};
+use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -34,7 +33,7 @@ pub struct ProjectDatabase {
     // or the "trick" to get a mutable `Arc` in `Self::system_mut` is no longer guaranteed to work.
     system: Arc<dyn System + Send + Sync + RefUnwindSafe>,
 
-    // IMPORTANT: This field must be the last because we use `zalsa_mut` (drops all other storage references)
+    // IMPORTANT: This field must be the last because we use `trigger_cancellation` (drops all other storage references)
     // to drop all other references to the database, which gives us exclusive access to other `Arc`s stored on this db.
     // However, for this to work it's important that the `storage` is dropped AFTER any `Arc` that
     // we try to mutably borrow using `Arc::get_mut` (like `system`).
@@ -87,7 +86,9 @@ impl ProjectDatabase {
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
     pub fn check(&self) -> Vec<Diagnostic> {
-        self.project().check(self, &mut DummyReporter)
+        let mut collector = CollectReporter::default();
+        self.project().check(self, &mut collector);
+        collector.into_sorted(self)
     }
 
     /// Checks the files in the project and its dependencies, using the given reporter.
@@ -95,8 +96,8 @@ impl ProjectDatabase {
     /// Use [`set_check_mode`] to update the check mode.
     ///
     /// [`set_check_mode`]: ProjectDatabase::set_check_mode
-    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) -> Vec<Diagnostic> {
-        self.project().check(self, reporter)
+    pub fn check_with_reporter(&self, reporter: &mut dyn ProgressReporter) {
+        self.project().check(self, reporter);
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -106,44 +107,77 @@ impl ProjectDatabase {
 
     /// Set the check mode for the project.
     pub fn set_check_mode(&mut self, mode: CheckMode) {
-        tracing::debug!("Updating project to check {mode}");
-        self.project().set_check_mode(self).to(mode);
+        if self.project().check_mode(self) != mode {
+            tracing::debug!("Updating project to check {mode}");
+            self.project().set_check_mode(self).to(mode);
+        }
     }
 
     /// Returns a mutable reference to the system.
     ///
     /// WARNING: Triggers a new revision, canceling other database handles. This can lead to deadlock.
     pub fn system_mut(&mut self) -> &mut dyn System {
-        // TODO: Use a more official method to cancel other queries.
-        // https://salsa.zulipchat.com/#narrow/stream/333573-salsa-3.2E0/topic/Expose.20an.20API.20to.20cancel.20other.20queries
-        let _ = self.zalsa_mut();
+        self.trigger_cancellation();
 
-        Arc::get_mut(&mut self.system)
-            .expect("ref count should be 1 because `zalsa_mut` drops all other DB references.")
+        Arc::get_mut(&mut self.system).expect(
+            "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
+        )
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let salsa_db = self as &dyn salsa::Database;
+        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let mut ingredients = memory_usage
+            .structs
+            .into_iter()
+            .filter(|ingredient| ingredient.count() > 0)
+            .collect::<Vec<_>>();
+        let mut memos = memory_usage
+            .queries
+            .into_iter()
+            .filter(|(_, memos)| memos.count() > 0)
+            .collect::<Vec<_>>();
 
-        let mut ingredients = salsa_db.structs_info();
-        let mut memos = salsa_db.queries_info().into_iter().collect::<Vec<_>>();
+        ingredients.sort_by_key(|ingredient| {
+            let heap_size = ingredient.heap_size_of_fields().unwrap_or_else(|| {
+                // Salsa currently does not expose a way to track the heap size of interned
+                // query arguments.
+                if !ingredient.debug_name().contains("interned_arguments") {
+                    tracing::warn!(
+                        "expected `heap_size` to be provided by Salsa struct `{}`",
+                        ingredient.debug_name()
+                    );
+                }
 
-        ingredients.sort_by_key(|ingredient| cmp::Reverse(ingredient.size_of_fields()));
-        memos.sort_by_key(|(_, memo)| cmp::Reverse(memo.size_of_fields()));
+                0
+            });
+
+            cmp::Reverse(ingredient.size_of_fields() + heap_size)
+        });
+
+        memos.sort_by_key(|(query, memo)| {
+            let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
+                tracing::warn!("expected `heap_size` to be provided by Salsa query `{query}`");
+                0
+            });
+
+            cmp::Reverse(memo.size_of_fields() + heap_size)
+        });
 
         let mut total_fields = 0;
         let mut total_metadata = 0;
         for ingredient in &ingredients {
-            total_metadata += ingredient.size_of_metadata();
             total_fields += ingredient.size_of_fields();
+            total_fields += ingredient.heap_size_of_fields().unwrap_or(0);
+            total_metadata += ingredient.size_of_metadata();
         }
 
         let mut total_memo_fields = 0;
         let mut total_memo_metadata = 0;
         for (_, memo) in &memos {
             total_memo_fields += memo.size_of_fields();
+            total_memo_fields += memo.heap_size_of_fields().unwrap_or(0);
             total_memo_metadata += memo.size_of_metadata();
         }
 
@@ -168,7 +202,7 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub enum CheckMode {
     /// Checks the open files in the project.
@@ -278,12 +312,15 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA STRUCTS=======")?;
 
                 for ingredient in ingredients {
+                    let size_of_fields =
+                        ingredient.size_of_fields() + ingredient.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(
                         f,
                         "{:<50} metadata={:<8} fields={:<8} count={}",
                         format!("`{}`", ingredient.debug_name()),
                         format!("{:.2}MB", bytes_to_mb(ingredient.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(ingredient.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         ingredient.count()
                     )?;
                 }
@@ -291,13 +328,16 @@ impl SalsaMemoryDump {
                 writeln!(f, "=======SALSA QUERIES=======")?;
 
                 for (query_fn, memo) in memos {
+                    let size_of_fields =
+                        memo.size_of_fields() + memo.heap_size_of_fields().unwrap_or(0);
+
                     writeln!(f, "`{query_fn} -> {}`", memo.debug_name())?;
 
                     writeln!(
                         f,
                         "    metadata={:<8} fields={:<8} count={}",
                         format!("{:.2}MB", bytes_to_mb(memo.size_of_metadata())),
-                        format!("{:.2}MB", bytes_to_mb(memo.size_of_fields())),
+                        format!("{:.2}MB", bytes_to_mb(size_of_fields)),
                         memo.count()
                     )?;
                 }

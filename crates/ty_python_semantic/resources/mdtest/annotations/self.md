@@ -16,7 +16,7 @@ from typing import Self
 
 class Shape:
     def set_scale(self: Self, scale: float) -> Self:
-        reveal_type(self)  # revealed: Self@Shape
+        reveal_type(self)  # revealed: Self@set_scale
         return self
 
     def nested_type(self: Self) -> list[Self]:
@@ -24,9 +24,16 @@ class Shape:
 
     def nested_func(self: Self) -> Self:
         def inner() -> Self:
-            reveal_type(self)  # revealed: Self@Shape
+            reveal_type(self)  # revealed: Self@nested_func
             return self
         return inner()
+
+    def nested_func_without_enclosing_binding(self):
+        def inner(x: Self):
+            # TODO: revealed: Self@nested_func_without_enclosing_binding
+            # (The outer method binds an implicit `Self`)
+            reveal_type(x)  # revealed: Self@inner
+        inner(self)
 
     def implicit_self(self) -> Self:
         # TODO: first argument in a method should be considered as "typing.Self"
@@ -38,13 +45,13 @@ reveal_type(Shape().nested_func())  # revealed: Shape
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
-        reveal_type(self)  # revealed: Self@Circle
+        reveal_type(self)  # revealed: Self@set_scale
         return self
 
 class Outer:
     class Inner:
         def foo(self: Self) -> Self:
-            reveal_type(self)  # revealed: Self@Inner
+            reveal_type(self)  # revealed: Self@foo
             return self
 ```
 
@@ -99,6 +106,9 @@ reveal_type(Shape.bar())  # revealed: Unknown
 python-version = "3.11"
 ```
 
+TODO: The use of `Self` to annotate the `next_node` attribute should be
+[modeled as a property][self attribute], using `Self` in its parameter and return type.
+
 ```py
 from typing import Self
 
@@ -108,6 +118,8 @@ class LinkedList:
 
     def next(self: Self) -> Self:
         reveal_type(self.value)  # revealed: int
+        # TODO: no error
+        # error: [invalid-return-type]
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
@@ -151,7 +163,7 @@ from typing import Self
 
 class Shape:
     def union(self: Self, other: Self | None):
-        reveal_type(other)  # revealed: Self@Shape | None
+        reveal_type(other)  # revealed: Self@union | None
         return self
 ```
 
@@ -205,3 +217,5 @@ class MyMetaclass(type):
     def __new__(cls) -> Self:
         return super().__new__(cls)
 ```
+
+[self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations

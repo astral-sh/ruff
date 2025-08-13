@@ -1,0 +1,18 @@
+[package]
+name = "ruff_memory_usage"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+get-size2 = { workspace = true }
+ordermap = { workspace = true }
+
+[lints]
+workspace = true

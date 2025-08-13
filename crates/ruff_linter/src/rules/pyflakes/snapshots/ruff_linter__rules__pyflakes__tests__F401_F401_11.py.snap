@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
-snapshot_kind: text
 ---
-F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
+F401 [*] `pathlib.PurePath` imported but unused
+ --> F401_11.py:4:27
   |
 3 | from typing import List
 4 | from pathlib import Path, PurePath
-  |                           ^^^^^^^^ F401
+  |                           ^^^^^^^^
   |
-  = help: Remove unused import: `pathlib.PurePath`
+help: Remove unused import: `pathlib.PurePath`
 
 ℹ Safe fix
 1 1 | """Test: parsing of nested string annotations."""
