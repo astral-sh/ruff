@@ -722,7 +722,8 @@ impl<'db> ClassType<'db> {
                             //    __getitem__(self, index: Literal[-3], /) -> float | str
                             //
                             TupleSpec::Variable(variable_length_tuple) => {
-                                for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
+                                for (index, ty) in variable_length_tuple.prefix().iter().enumerate()
+                                {
                                     if let Ok(index) = i64::try_from(index) {
                                         element_type_to_indices.entry(*ty).or_default().push(index);
                                     }
@@ -730,18 +731,18 @@ impl<'db> ClassType<'db> {
                                     let one_based_index = index + 1;
 
                                     if let Ok(i) = i64::try_from(
-                                        variable_length_tuple.suffix.len() + one_based_index,
+                                        variable_length_tuple.suffix().len() + one_based_index,
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .prefix
-                                                    .iter()
-                                                    .rev()
-                                                    .take(one_based_index)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .prefix()
+                                                        .iter()
+                                                        .rev()
+                                                        .take(one_based_index),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -751,7 +752,7 @@ impl<'db> ClassType<'db> {
                                 }
 
                                 for (index, ty) in
-                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                    variable_length_tuple.suffix().iter().rev().enumerate()
                                 {
                                     if let Some(index) =
                                         index.checked_add(1).and_then(|i| i64::try_from(i).ok())
@@ -763,17 +764,17 @@ impl<'db> ClassType<'db> {
                                     }
 
                                     if let Ok(i) =
-                                        i64::try_from(variable_length_tuple.prefix.len() + index)
+                                        i64::try_from(variable_length_tuple.prefix().len() + index)
                                     {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .suffix
-                                                    .iter()
-                                                    .take(index + 1)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .suffix()
+                                                        .iter()
+                                                        .take(index + 1),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)

@@ -185,7 +185,7 @@ impl<'db> TupleType<'db> {
         if let TupleSpec::Variable(tuple) = tuple {
             if tuple.variable.is_never() {
                 let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
-                    tuple.prefix.iter().chain(&tuple.suffix).copied(),
+                    tuple.prefix().iter().chain(tuple.suffix()).copied(),
                 ));
                 return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
             }
@@ -209,9 +209,9 @@ impl<'db> TupleType<'db> {
     #[cfg(test)]
     pub(crate) fn mixed(
         db: &'db dyn Db,
-        prefix: impl IntoIterator<Item = Type<'db>>,
+        prefix: impl ExactSizeIterator<Item = Type<'db>>,
         variable: Type<'db>,
-        suffix: impl IntoIterator<Item = Type<'db>>,
+        suffix: impl ExactSizeIterator<Item = Type<'db>>,
     ) -> Option<Self> {
         TupleType::new(db, VariableLengthTuple::mixed(prefix, variable, suffix))
     }
@@ -380,6 +380,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             },
 
             TupleLength::Variable(prefix, suffix) => {
+                if prefix == 0 && suffix == 0 {
+                    // Avoid allocating for the common case
+                    return Ok(VariableLengthTuple::homogeneous(
+                        self.0.first().copied().unwrap_or(Type::Never),
+                    ));
+                }
+
                 // The number of rhs values that will be consumed by the starred target.
                 let Some(variable) = self.len().checked_sub(prefix + suffix) else {
                     return Err(ResizeTupleError::TooFewValues);
@@ -388,9 +395,10 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // Extract rhs values into the prefix, then into the starred target, then into the
                 // suffix.
                 let mut elements = self.elements().copied();
-                let prefix = elements.by_ref().take(prefix).collect();
+                let prefix = Some(elements.by_ref().take(prefix).collect());
                 let variable = UnionType::from_elements(db, elements.by_ref().take(variable));
-                let suffix = elements.by_ref().take(suffix).collect();
+                let suffix = Some(elements.by_ref().take(suffix).collect());
+
                 Ok(Tuple::Variable(VariableLengthTuple {
                     prefix,
                     variable,
@@ -452,7 +460,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut self_iter = self.0.iter();
-                for other_ty in &other.prefix {
+                for other_ty in other.prefix() {
                     let Some(self_ty) = self_iter.next() else {
                         return false;
                     };
@@ -460,7 +468,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                         return false;
                     }
                 }
-                for other_ty in other.suffix.iter().rev() {
+                for other_ty in other.suffix().iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
                         return false;
                     };
@@ -519,38 +527,57 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 ///
 /// Our tuple representation can hold instances of any Rust type. For tuples containing Python
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
+///
+/// Conceptually, the `prefix` and `suffix` fields could be `Box<[T]>`, but using an `Option` here
+/// allows us to avoid allocating a `Box<[T]>` for the common case of a tuple with no prefix or suffix.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct VariableLengthTuple<T> {
-    pub(crate) prefix: Box<[T]>,
-    pub(crate) variable: T,
-    pub(crate) suffix: Box<[T]>,
+    prefix: Option<Box<[T]>>,
+    variable: T,
+    suffix: Option<Box<[T]>>,
 }
 
 impl<T> VariableLengthTuple<T> {
+    pub(crate) fn prefix(&self) -> &[T] {
+        self.prefix.as_deref().unwrap_or_default()
+    }
+
+    pub(crate) fn variable(&self) -> &T {
+        &self.variable
+    }
+
+    pub(crate) fn suffix(&self) -> &[T] {
+        self.suffix.as_deref().unwrap_or_default()
+    }
+
     /// Creates a new tuple spec containing zero or more elements of a given type, with no prefix
     /// or suffix.
     fn homogeneous(ty: T) -> Tuple<T> {
-        Self::mixed([], ty, [])
+        Tuple::Variable(Self {
+            prefix: None,
+            variable: ty,
+            suffix: None,
+        })
     }
 
     fn mixed(
-        prefix: impl IntoIterator<Item = T>,
+        prefix: impl ExactSizeIterator<Item = T>,
         variable: T,
-        suffix: impl IntoIterator<Item = T>,
+        suffix: impl ExactSizeIterator<Item = T>,
     ) -> Tuple<T> {
         Tuple::Variable(Self {
-            prefix: prefix.into_iter().collect(),
+            prefix: (prefix.len() != 0).then(|| prefix.collect()),
             variable,
-            suffix: suffix.into_iter().collect(),
+            suffix: (suffix.len() != 0).then(|| suffix.collect()),
         })
     }
 
     fn prefix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
-        self.prefix.iter()
+        self.prefix().iter()
     }
 
     fn suffix_elements(&self) -> impl DoubleEndedIterator<Item = &T> + ExactSizeIterator + '_ {
-        self.suffix.iter()
+        self.suffix().iter()
     }
 
     fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
@@ -564,13 +591,22 @@ impl<T> VariableLengthTuple<T> {
     }
 
     fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
-        (self.prefix.into_iter().map(TupleElement::Prefix))
+        (self.prefix.into_iter().flatten().map(TupleElement::Prefix))
             .chain(std::iter::once(TupleElement::Variable(self.variable)))
-            .chain(self.suffix.into_iter().map(TupleElement::Suffix))
+            .chain(self.suffix.into_iter().flatten().map(TupleElement::Suffix))
     }
 
     fn len(&self) -> TupleLength {
-        TupleLength::Variable(self.prefix.len(), self.suffix.len())
+        TupleLength::Variable(
+            self.prefix
+                .as_ref()
+                .map(|slice| slice.len())
+                .unwrap_or_default(),
+            self.suffix
+                .as_ref()
+                .map(|slice| slice.len())
+                .unwrap_or_default(),
+        )
     }
 }
 
@@ -661,22 +697,52 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // "Overflow" are elements of our prefix/suffix that will be folded into the
                 // result's variable-length portion. "Underflow" are elements of the result
                 // prefix/suffix that will come from our variable-length portion.
-                let self_prefix_length = self.prefix.len();
+                let self_prefix_length = self.prefix().len();
                 let prefix_underflow = prefix_length.saturating_sub(self_prefix_length);
-                let self_suffix_length = self.suffix.len();
+                let self_suffix_length = self.suffix().len();
                 let suffix_overflow = self_suffix_length.saturating_sub(suffix_length);
                 let suffix_underflow = suffix_length.saturating_sub(self_suffix_length);
-                let prefix = (self.prefix_elements().copied().take(prefix_length))
-                    .chain(std::iter::repeat_n(self.variable, prefix_underflow));
-                let variable = UnionType::from_elements(
-                    db,
-                    (self.prefix_elements().copied().skip(prefix_length))
-                        .chain(std::iter::once(self.variable))
-                        .chain(self.suffix_elements().copied().take(suffix_overflow)),
-                );
-                let suffix = std::iter::repeat_n(self.variable, suffix_underflow)
-                    .chain(self.suffix_elements().copied().skip(suffix_overflow));
-                Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
+
+                let prefix = if prefix_length == 0 && prefix_underflow == 0 {
+                    None
+                } else {
+                    Some(
+                        self.prefix_elements()
+                            .copied()
+                            .take(prefix_length)
+                            .chain(std::iter::repeat_n(self.variable, prefix_underflow))
+                            .collect(),
+                    )
+                };
+
+                // Avoid creating a `UnionBuilder` for the common case
+                // of a variable-length tuple with no prefix or suffix.
+                let variable = if self.prefix.is_none() && self.suffix.is_none() {
+                    self.variable
+                } else {
+                    UnionType::from_elements(
+                        db,
+                        (self.prefix_elements().copied().skip(prefix_length))
+                            .chain(std::iter::once(self.variable))
+                            .chain(self.suffix_elements().copied().take(suffix_overflow)),
+                    )
+                };
+
+                let suffix = if suffix_underflow == 0 && suffix_length == 0 {
+                    None
+                } else {
+                    Some(
+                        std::iter::repeat_n(self.variable, suffix_underflow)
+                            .chain(self.suffix_elements().copied().skip(suffix_overflow))
+                            .collect(),
+                    )
+                };
+
+                Ok(TupleSpec::Variable(Self {
+                    prefix,
+                    variable,
+                    suffix,
+                }))
             }
         }
     }
@@ -693,17 +759,17 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             .collect::<Box<_>>();
         let variable = self.variable.normalized_impl(db, visitor);
         TupleSpec::Variable(Self {
-            prefix,
+            prefix: (!prefix.is_empty()).then_some(prefix),
             variable,
-            suffix,
+            suffix: (!suffix.is_empty()).then_some(suffix),
         })
     }
 
     fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> TupleSpec<'db> {
         Self::mixed(
-            self.prefix.iter().map(|ty| ty.materialize(db, variance)),
+            self.prefix().iter().map(|ty| ty.materialize(db, variance)),
             self.variable.materialize(db, variance),
-            self.suffix.iter().map(|ty| ty.materialize(db, variance)),
+            self.suffix().iter().map(|ty| ty.materialize(db, variance)),
         )
     }
 
@@ -714,12 +780,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         visitor: &TypeTransformer<'db>,
     ) -> TupleSpec<'db> {
         Self::mixed(
-            self.prefix
+            self.prefix()
                 .iter()
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
             self.variable
                 .apply_type_mapping_impl(db, type_mapping, visitor),
-            self.suffix
+            self.suffix()
                 .iter()
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor)),
         )
@@ -731,12 +797,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
-        for ty in &self.prefix {
+        for ty in self.prefix() {
             ty.find_legacy_typevars(db, binding_context, typevars);
         }
         self.variable
             .find_legacy_typevars(db, binding_context, typevars);
-        for ty in &self.suffix {
+        for ty in self.suffix() {
             ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
@@ -882,7 +948,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
     fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(index) => {
-                if let Some(element) = self.prefix.get(index) {
+                if let Some(element) = self.prefix().get(index) {
                     // index is small enough that it lands in the prefix of the tuple.
                     return Ok(*element);
                 }
@@ -890,7 +956,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
                 // index is large enough that it lands past the prefix. The tuple can always be
                 // large enough that it lands in the variable-length portion. It might also be
                 // small enough to land in the suffix.
-                let index_past_prefix = index - self.prefix.len() + 1;
+                let index_past_prefix = index - self.prefix().len() + 1;
                 Ok(UnionType::from_elements(
                     db,
                     std::iter::once(self.variable)
@@ -899,15 +965,15 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
             }
 
             Nth::FromEnd(index_from_end) => {
-                if index_from_end < self.suffix.len() {
+                if index_from_end < self.suffix().len() {
                     // index is small enough that it lands in the suffix of the tuple.
-                    return Ok(self.suffix[self.suffix.len() - index_from_end - 1]);
+                    return Ok(self.suffix()[self.suffix().len() - index_from_end - 1]);
                 }
 
                 // index is large enough that it lands past the suffix. The tuple can always be
                 // large enough that it lands in the variable-length portion. It might also be
                 // small enough to land in the prefix.
-                let index_past_suffix = index_from_end - self.suffix.len() + 1;
+                let index_past_suffix = index_from_end - self.suffix().len() + 1;
                 Ok(UnionType::from_elements(
                     db,
                     (self.prefix_elements().rev().copied())
@@ -985,7 +1051,20 @@ impl<T> Tuple<T> {
 
 impl<'db> Tuple<Type<'db>> {
     pub(crate) fn homogeneous_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(db, self.all_elements())
+        match self {
+            Tuple::Fixed(tuple) => match tuple.elements_slice() {
+                [] => Type::Never,
+                [element] => *element,
+                elements => UnionType::from_elements(db, elements),
+            },
+            Tuple::Variable(tuple) => {
+                if tuple.prefix.is_some() || tuple.suffix.is_some() {
+                    UnionType::from_elements(db, tuple.all_elements())
+                } else {
+                    tuple.variable
+                }
+            }
+        }
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
@@ -1278,12 +1357,25 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
 impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
     fn unpack_tuple(&mut self, db: &'db dyn Db, values: &VariableLengthTuple<Type<'db>>) {
         // We have already verified above that the two tuples have the same length.
-        for (target, value) in (self.prefix.iter_mut()).zip(values.prefix_elements().copied()) {
+        for (target, value) in self
+            .prefix
+            .as_mut()
+            .into_iter()
+            .flatten()
+            .zip(values.prefix_elements().copied())
+        {
             target.add_in_place(value);
         }
         self.variable
             .add_in_place(KnownClass::List.to_specialized_instance(db, [values.variable]));
-        for (target, value) in (self.suffix.iter_mut()).zip(values.suffix_elements().copied()) {
+
+        for (target, value) in self
+            .suffix
+            .as_mut()
+            .into_iter()
+            .flatten()
+            .zip(values.suffix_elements().copied())
+        {
             target.add_in_place(value);
         }
     }
@@ -1325,19 +1417,12 @@ impl<'db> TupleSpecBuilder<'db> {
                 self
             }
 
-            (
-                TupleSpecBuilder::Fixed(left_tuple),
-                TupleSpec::Variable(VariableLengthTuple {
-                    prefix,
-                    variable,
-                    suffix,
-                }),
-            ) => {
-                left_tuple.extend_from_slice(prefix);
+            (TupleSpecBuilder::Fixed(left_tuple), TupleSpec::Variable(right_tuple)) => {
+                left_tuple.extend_from_slice(right_tuple.prefix());
                 TupleSpecBuilder::Variable {
                     prefix: std::mem::take(left_tuple),
-                    variable: *variable,
-                    suffix: suffix.to_vec(),
+                    variable: right_tuple.variable,
+                    suffix: right_tuple.suffix().to_vec(),
                 }
             }
 
@@ -1359,23 +1444,20 @@ impl<'db> TupleSpecBuilder<'db> {
                     variable: left_variable,
                     suffix: left_suffix,
                 },
-                TupleSpec::Variable(VariableLengthTuple {
-                    prefix: right_prefix,
-                    variable: right_variable,
-                    suffix: right_suffix,
-                }),
+                TupleSpec::Variable(right_tuple),
             ) => {
                 let variable = UnionType::from_elements(
                     db,
                     left_suffix
                         .iter()
-                        .chain([left_variable, right_variable])
-                        .chain(right_prefix),
+                        .copied()
+                        .chain([*left_variable, right_tuple.variable])
+                        .chain(right_tuple.prefix().iter().copied()),
                 );
                 TupleSpecBuilder::Variable {
                     prefix: std::mem::take(left_prefix),
                     variable,
-                    suffix: right_suffix.to_vec(),
+                    suffix: right_tuple.suffix().to_vec(),
                 }
             }
         }
@@ -1391,9 +1473,9 @@ impl<'db> TupleSpecBuilder<'db> {
                 variable,
                 suffix,
             } => TupleSpec::Variable(VariableLengthTuple {
-                prefix: prefix.into_boxed_slice(),
+                prefix: (!prefix.is_empty()).then(|| prefix.into_boxed_slice()),
                 variable,
-                suffix: suffix.into_boxed_slice(),
+                suffix: (!suffix.is_empty()).then(|| suffix.into_boxed_slice()),
             }),
         }
     }
@@ -1404,9 +1486,9 @@ impl<'db> From<&TupleSpec<'db>> for TupleSpecBuilder<'db> {
         match tuple {
             TupleSpec::Fixed(fixed) => TupleSpecBuilder::Fixed(fixed.0.to_vec()),
             TupleSpec::Variable(variable) => TupleSpecBuilder::Variable {
-                prefix: variable.prefix.to_vec(),
+                prefix: variable.prefix().to_vec(),
                 variable: variable.variable,
-                suffix: variable.suffix.to_vec(),
+                suffix: variable.suffix().to_vec(),
             },
         }
     }

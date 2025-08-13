@@ -358,9 +358,9 @@ mod tests {
         // Variable-length tuples are not expanded.
         let variable_length_tuple = Type::tuple(TupleType::mixed(
             &db,
-            [bool_ty],
+            std::iter::once(bool_ty),
             int_ty,
-            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty],
+            [UnionType::from_elements(&db, [str_ty, bytes_ty]), str_ty].into_iter(),
         ));
         let expanded = expand_type(&db, variable_length_tuple);
         assert!(expanded.is_none());

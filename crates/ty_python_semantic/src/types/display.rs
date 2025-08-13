@@ -287,21 +287,21 @@ impl Display for DisplayTuple<'_> {
             // S is included if there is either a prefix or a suffix. The initial `tuple[` and
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
-                if !tuple.prefix.is_empty() {
-                    tuple.prefix.display(self.db).fmt(f)?;
+                if !tuple.prefix().is_empty() {
+                    tuple.prefix().display(self.db).fmt(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix().is_empty() || !tuple.suffix().is_empty() {
                     f.write_str("*tuple[")?;
                 }
-                tuple.variable.display(self.db).fmt(f)?;
+                tuple.variable().display(self.db).fmt(f)?;
                 f.write_str(", ...")?;
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix().is_empty() || !tuple.suffix().is_empty() {
                     f.write_str("]")?;
                 }
-                if !tuple.suffix.is_empty() {
+                if !tuple.suffix().is_empty() {
                     f.write_str(", ")?;
-                    tuple.suffix.display(self.db).fmt(f)?;
+                    tuple.suffix().display(self.db).fmt(f)?;
                 }
             }
         }
