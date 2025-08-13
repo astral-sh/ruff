@@ -380,6 +380,9 @@ reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 # Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
 # but it *is* valid as the first argument to `super()`.
 reveal_type(super(typing.Generic, typing.SupportsInt))  # revealed: <super: typing.Generic, <class 'SupportsInt'>>
+
+def _(x: type[typing.Any], y: typing.Any):
+    reveal_type(super(x, y))  # revealed: <super: Any, Any>
 ```
 
 ### Instance Member Access via `super`

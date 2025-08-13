@@ -9397,6 +9397,14 @@ impl<'db> BoundSuperType<'db> {
         let pivot_class = match pivot_class_type {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::GenericAlias(class) => ClassBase::Class(ClassType::Generic(class)),
+            Type::SubclassOf(subclass_of) if subclass_of.subclass_of().is_dynamic() => {
+                ClassBase::Dynamic(
+                    subclass_of
+                        .subclass_of()
+                        .into_dynamic()
+                        .expect("Checked in branch arm"),
+                )
+            }
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
             Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
