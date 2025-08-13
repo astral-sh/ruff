@@ -22,7 +22,6 @@ mod workspace_symbols;
 
 pub use completion::completion;
 pub use doc_highlights::document_highlights;
-pub use docstring::get_parameter_documentation;
 pub use document_symbols::{document_symbols, document_symbols_with_options};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use goto_references::goto_references;

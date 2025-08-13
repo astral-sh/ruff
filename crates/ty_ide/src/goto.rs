@@ -1,3 +1,4 @@
+use crate::docstring::Docstring;
 pub use crate::goto_declaration::goto_declaration;
 pub use crate::goto_definition::goto_definition;
 pub use crate::goto_type_definition::goto_type_definition;
@@ -146,6 +147,94 @@ pub(crate) enum GotoTarget<'a> {
     },
 }
 
+/// The resolved definitions for a `GotoTarget`
+#[derive(Debug, Clone)]
+pub(crate) enum DefinitionsOrTargets<'db> {
+    /// We computed actual Definitions we can do followup queries on.
+    Definitions(Vec<ResolvedDefinition<'db>>),
+    /// We directly computed a navigation.
+    ///
+    /// We can't get docs or usefully compute goto-definition for this.
+    Targets(crate::NavigationTargets),
+}
+
+impl<'db> DefinitionsOrTargets<'db> {
+    /// Get the "goto-declaration" interpretation of this definition
+    ///
+    /// In this case it basically returns exactly what was found.
+    pub(crate) fn declaration_targets(
+        self,
+        db: &'db dyn crate::Db,
+    ) -> Option<crate::NavigationTargets> {
+        match self {
+            DefinitionsOrTargets::Definitions(definitions) => {
+                definitions_to_navigation_targets(db, None, definitions)
+            }
+            DefinitionsOrTargets::Targets(targets) => Some(targets),
+        }
+    }
+
+    /// Get the "goto-definition" interpretation of this definition
+    ///
+    /// In this case we apply stub-mapping to try to find the "real" implementation
+    /// if the definition we have is found in a stub file.
+    pub(crate) fn definition_targets(
+        self,
+        db: &'db dyn crate::Db,
+    ) -> Option<crate::NavigationTargets> {
+        match self {
+            DefinitionsOrTargets::Definitions(definitions) => {
+                definitions_to_navigation_targets(db, Some(&StubMapper::new(db)), definitions)
+            }
+            DefinitionsOrTargets::Targets(targets) => Some(targets),
+        }
+    }
+
+    /// Get the docstring for this definition
+    ///
+    /// Typically documentation only appears on implementations and not stubs,
+    /// so this will check both the goto-declarations and goto-definitions (in that order)
+    /// and return the first one found.
+    pub(crate) fn docstring(self, db: &'db dyn crate::Db) -> Option<Docstring> {
+        let definitions = match self {
+            DefinitionsOrTargets::Definitions(definitions) => definitions,
+            // Can't find docs for these
+            // (make more cases DefinitionOrTargets::Definitions to get more docs!)
+            DefinitionsOrTargets::Targets(_) => return None,
+        };
+        for definition in &definitions {
+            // TODO: get docstrings for modules
+            let ResolvedDefinition::Definition(definition) = definition else {
+                continue;
+            };
+            // First try to get the docstring from the original definition
+            let original_docstring = definition.docstring(db);
+
+            // If we got a docstring from the original definition, use it
+            if let Some(docstring) = original_docstring {
+                return Some(Docstring::new(docstring));
+            }
+        }
+
+        // If the definition is located within a stub file and no docstring
+        // is present, try to map the symbol to an implementation file and extract
+        // the docstring from that location.
+        let stub_mapper = StubMapper::new(db);
+
+        // Try to find the corresponding implementation definition
+        for mapped_definition in stub_mapper.map_definitions(definitions) {
+            // TODO: get docstrings for modules
+            if let ResolvedDefinition::Definition(impl_definition) = mapped_definition {
+                if let Some(impl_docstring) = impl_definition.docstring(db) {
+                    return Some(Docstring::new(impl_docstring));
+                }
+            }
+        }
+
+        None
+    }
+}
+
 impl GotoTarget<'_> {
     pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let ty = match self {
@@ -173,63 +262,70 @@ impl GotoTarget<'_> {
         Some(ty)
     }
 
-    /// Gets the navigation ranges for this goto target.
-    /// If a stub mapper is provided, definitions from stub files will be mapped to
-    /// their corresponding source file implementations. The `alias_resolution`
-    /// parameter controls whether import aliases (i.e. "x" in "from a import b as x") are
-    /// resolved or returned as is. We want to resolve them in some cases (like
-    /// "goto declaration") but not in others (like find references or rename).
-    pub(crate) fn get_definition_targets(
+    /// Gets the definitions for this goto target.
+    ///
+    /// The `alias_resolution` parameter controls whether import aliases
+    /// (i.e. "x" in "from a import b as x") are resolved or returned as is.
+    /// We want to resolve them in some cases (like "goto declaration") but not in others
+    /// (like find references or rename).
+    ///
+    ///
+    /// Ideally this would always return `DefinitionsOrTargets::Definitions`
+    /// as this is more useful for doing stub mapping (goto-definition) and
+    /// retrieving docstrings. However for now some cases are stubbed out
+    /// as just returning a raw `NavigationTarget`.
+    pub(crate) fn get_definition_targets<'db>(
         &self,
         file: ruff_db::files::File,
-        db: &dyn crate::Db,
-        stub_mapper: Option<&StubMapper>,
+        db: &'db dyn crate::Db,
         alias_resolution: ImportAliasResolution,
-    ) -> Option<crate::NavigationTargets> {
+    ) -> Option<DefinitionsOrTargets<'db>> {
         use crate::NavigationTarget;
         use ruff_python_ast as ast;
 
         match self {
             GotoTarget::Expression(expression) => match expression {
-                ast::ExprRef::Name(name) => definitions_to_navigation_targets(
-                    db,
-                    stub_mapper,
+                ast::ExprRef::Name(name) => Some(DefinitionsOrTargets::Definitions(
                     definitions_for_name(db, file, name),
-                ),
-                ast::ExprRef::Attribute(attribute) => definitions_to_navigation_targets(
-                    db,
-                    stub_mapper,
+                )),
+                ast::ExprRef::Attribute(attribute) => Some(DefinitionsOrTargets::Definitions(
                     ty_python_semantic::definitions_for_attribute(db, file, attribute),
-                ),
+                )),
                 _ => None,
             },
 
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => {
                 let range = function.name.range;
-                Some(crate::NavigationTargets::single(NavigationTarget {
-                    file,
-                    focus_range: range,
-                    full_range: function.range(),
-                }))
+                Some(DefinitionsOrTargets::Targets(
+                    crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: function.range(),
+                    }),
+                ))
             }
 
             GotoTarget::ClassDef(class) => {
                 let range = class.name.range;
-                Some(crate::NavigationTargets::single(NavigationTarget {
-                    file,
-                    focus_range: range,
-                    full_range: class.range(),
-                }))
+                Some(DefinitionsOrTargets::Targets(
+                    crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: class.range(),
+                    }),
+                ))
             }
 
             GotoTarget::Parameter(parameter) => {
                 let range = parameter.name.range;
-                Some(crate::NavigationTargets::single(NavigationTarget {
-                    file,
-                    focus_range: range,
-                    full_range: parameter.range(),
-                }))
+                Some(DefinitionsOrTargets::Targets(
+                    crate::NavigationTargets::single(NavigationTarget {
+                        file,
+                        focus_range: range,
+                        full_range: parameter.range(),
+                    }),
+                ))
             }
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
@@ -237,15 +333,15 @@ impl GotoTarget<'_> {
                 alias, import_from, ..
             } => {
                 let symbol_name = alias.name.as_str();
-                let definitions = definitions_for_imported_symbol(
-                    db,
-                    file,
-                    import_from,
-                    symbol_name,
-                    alias_resolution,
-                );
-
-                definitions_to_navigation_targets(db, stub_mapper, definitions)
+                Some(DefinitionsOrTargets::Definitions(
+                    definitions_for_imported_symbol(
+                        db,
+                        file,
+                        import_from,
+                        symbol_name,
+                        alias_resolution,
+                    ),
+                ))
             }
 
             GotoTarget::ImportModuleComponent {
@@ -260,7 +356,7 @@ impl GotoTarget<'_> {
                 let target_module_name = components[..=*component_index].join(".");
 
                 // Try to resolve the module
-                resolve_module_to_navigation_target(db, stub_mapper, &target_module_name)
+                definitions_for_module(db, &target_module_name)
             }
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
@@ -268,14 +364,16 @@ impl GotoTarget<'_> {
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
                     let full_module_name = alias.name.as_str();
                     // Try to resolve the module
-                    resolve_module_to_navigation_target(db, stub_mapper, full_module_name)
+                    definitions_for_module(db, full_module_name)
                 } else {
                     let alias_range = alias.asname.as_ref().unwrap().range;
-                    Some(crate::NavigationTargets::single(NavigationTarget {
-                        file,
-                        focus_range: alias_range,
-                        full_range: alias.range(),
-                    }))
+                    Some(DefinitionsOrTargets::Targets(
+                        crate::NavigationTargets::single(NavigationTarget {
+                            file,
+                            focus_range: alias_range,
+                            full_range: alias.range(),
+                        }),
+                    ))
                 }
             }
 
@@ -283,19 +381,17 @@ impl GotoTarget<'_> {
             GotoTarget::KeywordArgument {
                 keyword,
                 call_expression,
-            } => {
-                let definitions =
-                    definitions_for_keyword_argument(db, file, keyword, call_expression);
-                definitions_to_navigation_targets(db, stub_mapper, definitions)
-            }
+            } => Some(DefinitionsOrTargets::Definitions(
+                definitions_for_keyword_argument(db, file, keyword, call_expression),
+            )),
 
             // For exception variables, they are their own definitions (like parameters)
             GotoTarget::ExceptVariable(except_handler) => {
                 if let Some(name) = &except_handler.name {
                     let range = name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget::new(
-                        file, range,
-                    )))
+                    Some(DefinitionsOrTargets::Targets(
+                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
+                    ))
                 } else {
                     None
                 }
@@ -305,9 +401,9 @@ impl GotoTarget<'_> {
             GotoTarget::PatternMatchRest(pattern_mapping) => {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     let range = rest_name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget::new(
-                        file, range,
-                    )))
+                    Some(DefinitionsOrTargets::Targets(
+                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
+                    ))
                 } else {
                     None
                 }
@@ -317,9 +413,9 @@ impl GotoTarget<'_> {
             GotoTarget::PatternMatchAsName(pattern_as) => {
                 if let Some(name) = &pattern_as.name {
                     let range = name.range;
-                    Some(crate::NavigationTargets::single(NavigationTarget::new(
-                        file, range,
-                    )))
+                    Some(DefinitionsOrTargets::Targets(
+                        crate::NavigationTargets::single(NavigationTarget::new(file, range)),
+                    ))
                 } else {
                     None
                 }
@@ -656,11 +752,10 @@ pub(crate) fn find_goto_target(
 }
 
 /// Helper function to resolve a module name and create a navigation target.
-fn resolve_module_to_navigation_target(
-    db: &dyn crate::Db,
-    stub_mapper: Option<&StubMapper>,
+fn definitions_for_module<'db>(
+    db: &'db dyn crate::Db,
     module_name_str: &str,
-) -> Option<crate::NavigationTargets> {
+) -> Option<DefinitionsOrTargets<'db>> {
     use ty_python_semantic::{ModuleName, resolve_module};
 
     if let Some(module_name) = ModuleName::new(module_name_str) {
@@ -670,7 +765,7 @@ fn resolve_module_to_navigation_target(
                     module_file,
                     TextRange::default(),
                 ))];
-                return definitions_to_navigation_targets(db, stub_mapper, definitions);
+                return Some(DefinitionsOrTargets::Definitions(definitions));
             }
         }
     }
