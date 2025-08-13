@@ -56,6 +56,7 @@ def _(
 def bar() -> None:
     return None
 
+async def baz(): ...
 async def outer():  # avoid unrelated syntax errors on yield, yield from, and await
     def _(
         a: 1,  # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
@@ -69,7 +70,7 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
         i: not 1,  # error: [invalid-type-form] "Unary operations are not allowed in type expressions"
         j: lambda: 1,  # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
         k: 1 if True else 2,  # error: [invalid-type-form] "`if` expressions are not allowed in type expressions"
-        l: await 1,  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
+        l: await baz(),  # error: [invalid-type-form] "`await` expressions are not allowed in type expressions"
         m: (yield 1),  # error: [invalid-type-form] "`yield` expressions are not allowed in type expressions"
         n: (yield from [1]),  # error: [invalid-type-form] "`yield from` expressions are not allowed in type expressions"
         o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"

@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
 ---
-PIE808.py:2:7: PIE808 [*] Unnecessary `start` argument in `range`
+PIE808 [*] Unnecessary `start` argument in `range`
+ --> PIE808.py:2:7
   |
 1 | # PIE808
 2 | range(0, 10)
-  |       ^ PIE808
+  |       ^
 3 |
 4 | import builtins
   |
-  = help: Remove `start` argument
+help: Remove `start` argument
 
 ℹ Safe fix
 1 1 | # PIE808
@@ -19,15 +20,16 @@ PIE808.py:2:7: PIE808 [*] Unnecessary `start` argument in `range`
 4 4 | import builtins
 5 5 | builtins.range(0, 10)
 
-PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
+PIE808 [*] Unnecessary `start` argument in `range`
+ --> PIE808.py:5:16
   |
 4 | import builtins
 5 | builtins.range(0, 10)
-  |                ^ PIE808
+  |                ^
 6 |
 7 | # OK
   |
-  = help: Remove `start` argument
+help: Remove `start` argument
 
 ℹ Safe fix
 2 2 | range(0, 10)
@@ -39,13 +41,14 @@ PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
 7 7 | # OK
 8 8 | range(x, 10)
 
-PIE808.py:19:8: PIE808 [*] Unnecessary `start` argument in `range`
+PIE808 [*] Unnecessary `start` argument in `range`
+  --> PIE808.py:19:8
    |
 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
 19 | range((0), 42)
-   |        ^ PIE808
+   |        ^
    |
-   = help: Remove `start` argument
+help: Remove `start` argument
 
 ℹ Safe fix
 16 16 | range(0, stop=10)

@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E27.py:4:9: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+ --> E27.py:4:9
   |
 2 | True and False
 3 | #: E271
 4 | True and  False
-  |         ^^ E271
+  |         ^^
 5 | #: E272
 6 | True  and False
   |
-  = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 1 1 | #: Okay
@@ -22,16 +23,17 @@ E27.py:4:9: E271 [*] Multiple spaces after keyword
 6 6 | True  and False
 7 7 | #: E271
 
-E27.py:6:5: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+ --> E27.py:6:5
   |
 4 | True and  False
 5 | #: E272
 6 | True  and False
-  |     ^^ E271
+  |     ^^
 7 | #: E271
 8 | if   1:
   |
-  = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 3 3 | #: E271
@@ -43,16 +45,17 @@ E27.py:6:5: E271 [*] Multiple spaces after keyword
 8 8 | if   1:
 9 9 |     pass
 
-E27.py:8:3: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:8:3
    |
  6 | True  and False
  7 | #: E271
  8 | if   1:
-   |   ^^^ E271
+   |   ^^^
  9 |     pass
 10 | #: E273
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 5 5 | #: E272
@@ -64,16 +67,17 @@ E27.py:8:3: E271 [*] Multiple spaces after keyword
 10 10 | #: E273
 11 11 | True and		False
 
-E27.py:15:6: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:15:6
    |
 13 | True        and    False
 14 | #: E271
 15 | a and  b
-   |      ^^ E271
+   |      ^^
 16 | #: E271
 17 | 1 and  b
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 12 12 | #: E273 E274
@@ -85,16 +89,17 @@ E27.py:15:6: E271 [*] Multiple spaces after keyword
 17 17 | 1 and  b
 18 18 | #: E271
 
-E27.py:17:6: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:17:6
    |
 15 | a and  b
 16 | #: E271
 17 | 1 and  b
-   |      ^^ E271
+   |      ^^
 18 | #: E271
 19 | a and  2
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 14 14 | #: E271
@@ -106,16 +111,17 @@ E27.py:17:6: E271 [*] Multiple spaces after keyword
 19 19 | a and  2
 20 20 | #: E271 E272
 
-E27.py:19:6: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:19:6
    |
 17 | 1 and  b
 18 | #: E271
 19 | a and  2
-   |      ^^ E271
+   |      ^^
 20 | #: E271 E272
 21 | 1  and  b
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 16 16 | #: E271
@@ -127,16 +133,17 @@ E27.py:19:6: E271 [*] Multiple spaces after keyword
 21 21 | 1  and  b
 22 22 | #: E271 E272
 
-E27.py:21:7: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:21:7
    |
 19 | a and  2
 20 | #: E271 E272
 21 | 1  and  b
-   |       ^^ E271
+   |       ^^
 22 | #: E271 E272
 23 | a  and  2
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 18 18 | #: E271
@@ -148,16 +155,17 @@ E27.py:21:7: E271 [*] Multiple spaces after keyword
 23 23 | a  and  2
 24 24 | #: E272
 
-E27.py:23:7: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:23:7
    |
 21 | 1  and  b
 22 | #: E271 E272
 23 | a  and  2
-   |       ^^ E271
+   |       ^^
 24 | #: E272
 25 | this  and False
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 20 20 | #: E271 E272
@@ -169,16 +177,17 @@ E27.py:23:7: E271 [*] Multiple spaces after keyword
 25 25 | this  and False
 26 26 | #: E273
 
-E27.py:36:14: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:36:14
    |
 34 | from v import c, d
 35 | #: E271
 36 | from w import  (e, f)
-   |              ^^ E271
+   |              ^^
 37 | #: E275
 38 | from w import(e, f)
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 33 33 | from u import (a, b)
@@ -190,15 +199,16 @@ E27.py:36:14: E271 [*] Multiple spaces after keyword
 38 38 | from w import(e, f)
 39 39 | #: E275
 
-E27.py:71:5: E271 [*] Multiple spaces after keyword
+E271 [*] Multiple spaces after keyword
+  --> E27.py:71:5
    |
 70 | #: E271
 71 | type  Number = int
-   |     ^^ E271
+   |     ^^
 72 |
 73 | #: E273
    |
-   = help: Replace with single space
+help: Replace with single space
 
 ℹ Safe fix
 68 68 | # Soft keywords

@@ -77,8 +77,11 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                 b.iter_batched(
                     || parsed.clone(),
                     |parsed| {
+                        // Assert that file contains no parse errors
+                        assert!(parsed.has_valid_syntax());
+
                         let path = case.path();
-                        let result = lint_only(
+                        lint_only(
                             &path,
                             None,
                             settings,
@@ -86,10 +89,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                             &SourceKind::Python(case.code().to_string()),
                             PySourceType::from(path.as_path()),
                             ParseSource::Precomputed(parsed),
-                        );
-
-                        // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_errors());
+                        )
                     },
                     criterion::BatchSize::SmallInput,
                 );

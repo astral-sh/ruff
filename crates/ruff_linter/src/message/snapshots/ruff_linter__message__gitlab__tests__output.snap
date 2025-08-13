@@ -5,7 +5,7 @@ expression: redact_fingerprint(&content)
 [
   {
     "check_name": "F401",
-    "description": "`os` imported but unused",
+    "description": "F401: `os` imported but unused",
     "fingerprint": "<redacted>",
     "location": {
       "path": "fib.py",
@@ -24,7 +24,7 @@ expression: redact_fingerprint(&content)
   },
   {
     "check_name": "F841",
-    "description": "Local variable `x` is assigned to but never used",
+    "description": "F841: Local variable `x` is assigned to but never used",
     "fingerprint": "<redacted>",
     "location": {
       "path": "fib.py",
@@ -43,7 +43,7 @@ expression: redact_fingerprint(&content)
   },
   {
     "check_name": "F821",
-    "description": "Undefined name `a`",
+    "description": "F821: Undefined name `a`",
     "fingerprint": "<redacted>",
     "location": {
       "path": "undef.py",

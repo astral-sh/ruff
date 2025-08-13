@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
 ---
-doubles_all.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+Q002 [*] Double quote docstring found but single quotes preferred
+ --> doubles_all.py:1:1
   |
 1 | """This is a docstring."""
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 2 |
 3 | this_is_an_inline_string = "double quote string"
   |
-  = help: Replace double quotes docstring with single quotes
+help: Replace double quotes docstring with single quotes
 
 ℹ Safe fix
 1   |-"""This is a docstring."""

@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
+D215 [*] Section underline is over-indented ("Returns")
+   --> sections.py:159:9
     |
 158 |     Returns
 159 |         -------
-    |         ^^^^^^^ D215
+    |         ^^^^^^^
 160 |     A value of some sort.
     |
-    = help: Remove over-indentation from "Returns" underline
+help: Remove over-indentation from "Returns" underline
 
 ℹ Safe fix
 156 156 |     """Toggle the gizmo.
@@ -21,14 +21,15 @@ sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
 161 161 | 
 162 162 |     """
 
-sections.py:173:9: D215 [*] Section underline is over-indented ("Returns")
+D215 [*] Section underline is over-indented ("Returns")
+   --> sections.py:173:9
     |
 172 |     Returns
 173 |         -------
-    |         ^^^^^^^ D215
+    |         ^^^^^^^
 174 |     """
     |
-    = help: Remove over-indentation from "Returns" underline
+help: Remove over-indentation from "Returns" underline
 
 ℹ Safe fix
 170 170 |     """Toggle the gizmo.

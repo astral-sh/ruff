@@ -47,12 +47,9 @@ pub(crate) fn references(
     // Get the definitions for the symbol at the cursor position
 
     // When finding references, do not resolve any local aliases.
-    let target_definitions_nav = goto_target.get_definition_targets(
-        file,
-        db,
-        None,
-        ImportAliasResolution::PreserveAliases,
-    )?;
+    let target_definitions_nav = goto_target
+        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)?
+        .definition_targets(db)?;
     let target_definitions: Vec<NavigationTarget> = target_definitions_nav.into_iter().collect();
 
     // Extract the target text from the goto target for fast comparison
@@ -287,12 +284,10 @@ impl LocalReferencesFinder<'_> {
 
         if let Some(goto_target) = GotoTarget::from_covering_node(covering_node, offset) {
             // Get the definitions for this goto target
-            if let Some(current_definitions_nav) = goto_target.get_definition_targets(
-                self.file,
-                self.db,
-                None,
-                ImportAliasResolution::PreserveAliases,
-            ) {
+            if let Some(current_definitions_nav) = goto_target
+                .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)
+                .and_then(|definitions| definitions.declaration_targets(self.db))
+            {
                 let current_definitions: Vec<NavigationTarget> =
                     current_definitions_nav.into_iter().collect();
                 // Check if any of the current definitions match our target definitions

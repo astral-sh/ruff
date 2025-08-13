@@ -332,24 +332,31 @@ mod tests {
             },
         );
         assert_diagnostics!(diagnostics, @r"
-        <filename>:1:1: UP035 [*] Import from `shlex` instead: `quote`
+        UP035 [*] Import from `shlex` instead: `quote`
+         --> <filename>:1:1
           |
         1 | from pipes import quote, Template
-          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
-          = help: Import from `shlex`
+        help: Import from `shlex`
 
         ℹ Safe fix
         1   |-from pipes import quote, Template
           1 |+from pipes import Template
           2 |+from shlex import quote
 
-        <filename>:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+        I002 [*] Missing required import: `from __future__ import generator_stop`
+        --> <filename>:1:1
+        help: Insert required import: `from __future__ import generator_stop`
+
         ℹ Safe fix
           1 |+from __future__ import generator_stop
         1 2 | from pipes import quote, Template
 
-        <filename>:1:1: I002 [*] Missing required import: `from collections import Sequence`
+        I002 [*] Missing required import: `from collections import Sequence`
+        --> <filename>:1:1
+        help: Insert required import: `from collections import Sequence`
+
         ℹ Safe fix
           1 |+from collections import Sequence
         1 2 | from pipes import quote, Template

@@ -71,6 +71,18 @@ type ListOrSet[T] = list[T] | set[T]
 reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
 ```
 
+## In unions and intersections
+
+We can "break apart" a type alias by e.g. adding it to a union:
+
+```py
+type IntOrStr = int | str
+
+def f(x: IntOrStr, y: str | bytes):
+    z = x or y
+    reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
+```
+
 ## `TypeAliasType` properties
 
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
@@ -137,4 +149,51 @@ def get_name() -> str:
 
 # error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
+```
+
+## Cyclic aliases
+
+### Self-referential
+
+```py
+type OptNestedInt = int | tuple[OptNestedInt, ...] | None
+
+def f(x: OptNestedInt) -> None:
+    reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
+    if x is not None:
+        reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
+```
+
+### Invalid self-referential
+
+```py
+# TODO emit a diagnostic here
+type IntOr = int | IntOr
+
+def f(x: IntOr):
+    reveal_type(x)  # revealed: int
+    if not isinstance(x, int):
+        reveal_type(x)  # revealed: Never
+```
+
+### Mutually recursive
+
+```py
+type A = tuple[B] | None
+type B = tuple[A] | None
+
+def f(x: A):
+    if x is not None:
+        reveal_type(x)  # revealed: tuple[B]
+        y = x[0]
+        if y is not None:
+            reveal_type(y)  # revealed: tuple[A]
+
+def g(x: A | B):
+    reveal_type(x)  # revealed: tuple[B] | None
+
+from ty_extensions import Intersection
+
+def h(x: Intersection[A, B]):
+    reveal_type(x)  # revealed: tuple[B] | None
 ```

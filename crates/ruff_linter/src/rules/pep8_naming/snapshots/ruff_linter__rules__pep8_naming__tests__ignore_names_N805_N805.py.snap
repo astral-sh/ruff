@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
 ---
-N805.py:7:20: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+ --> N805.py:7:20
   |
 6 | class Class:
 7 |     def badAllowed(this):
-  |                    ^^^^ N805
+  |                    ^^^^
 8 |         pass
   |
-  = help: Rename `this` to `self`
+help: Rename `this` to `self`
 
 ℹ Unsafe fix
 4 4 | 
@@ -20,15 +21,16 @@ N805.py:7:20: N805 [*] First argument of a method should be named `self`
 9 9 | 
 10 10 |     def stillBad(this):
 
-N805.py:10:18: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:10:18
    |
  8 |         pass
  9 |
 10 |     def stillBad(this):
-   |                  ^^^^ N805
+   |                  ^^^^
 11 |         pass
    |
-   = help: Rename `this` to `self`
+help: Rename `this` to `self`
 
 ℹ Unsafe fix
 7  7  |     def badAllowed(this):
@@ -40,15 +42,16 @@ N805.py:10:18: N805 [*] First argument of a method should be named `self`
 12 12 | 
 13 13 |     if False:
 
-N805.py:15:24: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:15:24
    |
 13 |     if False:
 14 |
 15 |         def badAllowed(this):
-   |                        ^^^^ N805
+   |                        ^^^^
 16 |             pass
    |
-   = help: Rename `this` to `self`
+help: Rename `this` to `self`
 
 ℹ Unsafe fix
 12 12 | 
@@ -60,15 +63,16 @@ N805.py:15:24: N805 [*] First argument of a method should be named `self`
 17 17 | 
 18 18 |         def stillBad(this):
 
-N805.py:18:22: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:18:22
    |
 16 |             pass
 17 |
 18 |         def stillBad(this):
-   |                      ^^^^ N805
+   |                      ^^^^
 19 |             pass
    |
-   = help: Rename `this` to `self`
+help: Rename `this` to `self`
 
 ℹ Unsafe fix
 15 15 |         def badAllowed(this):
@@ -80,14 +84,15 @@ N805.py:18:22: N805 [*] First argument of a method should be named `self`
 20 20 | 
 21 21 |     @pydantic.validator
 
-N805.py:22:20: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:22:20
    |
 21 |     @pydantic.validator
 22 |     def badAllowed(cls, my_field: str) -> str:
-   |                    ^^^ N805
+   |                    ^^^
 23 |         pass
    |
-   = help: Rename `cls` to `self`
+help: Rename `cls` to `self`
 
 ℹ Unsafe fix
 19 19 |             pass
@@ -99,14 +104,15 @@ N805.py:22:20: N805 [*] First argument of a method should be named `self`
 24 24 | 
 25 25 |     @pydantic.validator
 
-N805.py:26:18: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:26:18
    |
 25 |     @pydantic.validator
 26 |     def stillBad(cls, my_field: str) -> str:
-   |                  ^^^ N805
+   |                  ^^^
 27 |         pass
    |
-   = help: Rename `cls` to `self`
+help: Rename `cls` to `self`
 
 ℹ Unsafe fix
 23 23 |         pass
@@ -118,14 +124,15 @@ N805.py:26:18: N805 [*] First argument of a method should be named `self`
 28 28 | 
 29 29 |     @pydantic.validator("my_field")
 
-N805.py:30:20: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:30:20
    |
 29 |     @pydantic.validator("my_field")
 30 |     def badAllowed(cls, my_field: str) -> str:
-   |                    ^^^ N805
+   |                    ^^^
 31 |         pass
    |
-   = help: Rename `cls` to `self`
+help: Rename `cls` to `self`
 
 ℹ Unsafe fix
 27 27 |         pass
@@ -137,14 +144,15 @@ N805.py:30:20: N805 [*] First argument of a method should be named `self`
 32 32 | 
 33 33 |     @pydantic.validator("my_field")
 
-N805.py:34:18: N805 [*] First argument of a method should be named `self`
+N805 [*] First argument of a method should be named `self`
+  --> N805.py:34:18
    |
 33 |     @pydantic.validator("my_field")
 34 |     def stillBad(cls, my_field: str) -> str:
-   |                  ^^^ N805
+   |                  ^^^
 35 |         pass
    |
-   = help: Rename `cls` to `self`
+help: Rename `cls` to `self`
 
 ℹ Unsafe fix
 31 31 |         pass
@@ -156,21 +164,23 @@ N805.py:34:18: N805 [*] First argument of a method should be named `self`
 36 36 | 
 37 37 |     @classmethod
 
-N805.py:55:20: N805 First argument of a method should be named `self`
+N805 First argument of a method should be named `self`
+  --> N805.py:55:20
    |
 54 | class PosOnlyClass:
 55 |     def badAllowed(this, blah, /, self, something: str):
-   |                    ^^^^ N805
+   |                    ^^^^
 56 |         pass
    |
-   = help: Rename `this` to `self`
+help: Rename `this` to `self`
 
-N805.py:58:18: N805 First argument of a method should be named `self`
+N805 First argument of a method should be named `self`
+  --> N805.py:58:18
    |
 56 |         pass
 57 |
 58 |     def stillBad(this, blah, /, self, something: str):
-   |                  ^^^^ N805
+   |                  ^^^^
 59 |         pass
    |
-   = help: Rename `this` to `self`
+help: Rename `this` to `self`

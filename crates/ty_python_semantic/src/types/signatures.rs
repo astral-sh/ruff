@@ -64,11 +64,7 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -256,7 +252,7 @@ pub struct Signature<'db> {
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
@@ -334,11 +330,14 @@ impl<'db> Signature<'db> {
         function_node: &ast::StmtFunctionDef,
         is_generator: bool,
     ) -> Self {
-        let mut parameters =
+        let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
-        let mut return_ty = function_node.returns.as_ref().map(|returns| {
-            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
-
+        let return_ty = function_node.returns.as_ref().map(|returns| {
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
+                .apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
@@ -352,18 +351,6 @@ impl<'db> Signature<'db> {
         if generic_context.is_some() && legacy_generic_context.is_some() {
             // TODO: Raise a diagnostic!
         }
-
-        // Mark any of the typevars bound by this function as inferable.
-        parameters = parameters.apply_type_mapping(
-            db,
-            &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
-        );
-        return_ty = return_ty.map(|ty| {
-            ty.apply_type_mapping(
-                db,
-                &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
-            )
-        });
 
         Self {
             generic_context: generic_context.or(legacy_generic_context),
@@ -407,11 +394,7 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self {
             generic_context: self
                 .generic_context
@@ -1138,9 +1121,12 @@ impl<'db> Parameters<'db> {
             node_index: _,
         } = parameters;
         let default_type = |param: &ast::ParameterWithDefault| {
-            param
-                .default()
-                .map(|default| definition_expression_type(db, definition, default))
+            param.default().map(|default| {
+                definition_expression_type(db, definition, default).apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                )
+            })
         };
         let positional_only = posonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
@@ -1402,11 +1388,7 @@ impl<'db> Parameter<'db> {
     /// Normalize nested unions and intersections in the annotated type, if any.
     ///
     /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         let Parameter {
             annotated_type,
             kind,
@@ -1464,9 +1446,12 @@ impl<'db> Parameter<'db> {
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
+            annotated_type: parameter.annotation().map(|annotation| {
+                definition_expression_type(db, definition, annotation).apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                )
+            }),
             kind,
             form: ParameterForm::Value,
         }

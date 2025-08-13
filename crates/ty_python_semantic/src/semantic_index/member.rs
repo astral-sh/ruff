@@ -507,6 +507,7 @@ enum Segments {
 }
 
 static_assertions::assert_eq_size!(SmallSegments, u64);
+#[cfg(target_pointer_width = "64")]
 static_assertions::assert_eq_size!(Segments, [u64; 2]);
 
 impl Segments {

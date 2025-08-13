@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30_syntax_error.py:4:15: invalid-syntax: Expected ']', found '('
+invalid-syntax: Expected ']', found '('
+ --> E30_syntax_error.py:4:15
   |
 2 | # parenthesis.
 3 |
@@ -10,42 +11,41 @@ E30_syntax_error.py:4:15: invalid-syntax: Expected ']', found '('
 5 |     pass
   |
 
-E30_syntax_error.py:7:1: E302 Expected 2 blank lines, found 1
+E302 Expected 2 blank lines, found 1
+ --> E30_syntax_error.py:7:1
   |
 5 |     pass
 6 |
 7 | def bar():
-  | ^^^ E302
+  | ^^^
 8 |     pass
   |
-  = help: Add missing blank line(s)
+help: Add missing blank line(s)
 
-E30_syntax_error.py:13:18: invalid-syntax: Expected ')', found newline
+invalid-syntax: Expected ')', found newline
+  --> E30_syntax_error.py:13:18
    |
 12 | class Foo:
 13 |     def __init__(
    |                  ^
 14 |         pass
 15 |     def method():
-16 |         pass
    |
 
-E30_syntax_error.py:18:11: invalid-syntax: Expected ')', found newline
+invalid-syntax: Expected ')', found newline
+  --> E30_syntax_error.py:18:11
    |
 16 |         pass
 17 |
 18 | foo = Foo(
    |           ^
-19 |
-20 |
-21 | def top(
    |
 
-E30_syntax_error.py:21:9: invalid-syntax: Expected ')', found newline
+invalid-syntax: Expected ')', found newline
+  --> E30_syntax_error.py:21:9
    |
 21 | def top(
    |         ^
 22 |     def nested1():
 23 |         pass
-24 |     def nested2():
    |

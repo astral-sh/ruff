@@ -5,7 +5,7 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance,
+    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
 };
 use crate::{Db, FxOrderSet};
 
@@ -21,7 +21,7 @@ pub struct SubclassOfType<'db> {
 pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     subclass_of: SubclassOfType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     visitor.visit_type(db, Type::from(subclass_of.subclass_of));
 }
@@ -113,14 +113,19 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        visitor: &TypeTransformer<'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
-                subclass_of: SubclassOfInner::Class(class.apply_type_mapping(db, type_mapping)),
+                subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    visitor,
+                )),
             },
             SubclassOfInner::Dynamic(_) => self,
         }
@@ -150,11 +155,12 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to<C: Constraints<'db>>(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
+        visitor: &PairVisitor<'db, C>,
     ) -> C {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
@@ -171,7 +177,7 @@ impl<'db> SubclassOfType<'db> {
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                self_class.has_relation_to(db, other_class, relation)
+                self_class.has_relation_to_impl(db, other_class, relation, visitor)
             }
         }
     }
@@ -192,11 +198,7 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -259,11 +261,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),

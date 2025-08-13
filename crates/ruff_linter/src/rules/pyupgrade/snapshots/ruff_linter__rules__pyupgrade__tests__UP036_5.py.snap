@@ -1,16 +1,17 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+ --> UP036_5.py:3:4
   |
 1 | import sys
 2 |
 3 | if sys.version_info < (3, 8):
-  |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^
 4 |
 5 |     def a():
   |
-  = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 1  1  | import sys
@@ -31,15 +32,16 @@ UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
 15 5  | 
 16 6  | import sys
 
-UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:18:4
    |
 16 | import sys
 17 |
 18 | if sys.version_info < (3, 8):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^
 19 |     pass
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 15 15 | 
@@ -70,14 +72,15 @@ UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
 32 27 | 
 33 28 | # https://github.com/astral-sh/ruff/issues/16082
 
-UP036_5.py:36:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:36:4
    |
 35 | ## Errors
 36 | if sys.version_info < (3, 12, 0):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 37 |     print()
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 33 33 | # https://github.com/astral-sh/ruff/issues/16082
@@ -89,15 +92,16 @@ UP036_5.py:36:4: UP036 [*] Version block is outdated for minimum Python version
 39 37 | if sys.version_info <= (3, 12, 0):
 40 38 |     print()
 
-UP036_5.py:39:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:39:4
    |
 37 |     print()
 38 |
 39 | if sys.version_info <= (3, 12, 0):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 40 |     print()
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 36 36 | if sys.version_info < (3, 12, 0):
@@ -109,15 +113,16 @@ UP036_5.py:39:4: UP036 [*] Version block is outdated for minimum Python version
 42 40 | if sys.version_info < (3, 12, 11):
 43 41 |     print()
 
-UP036_5.py:42:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:42:4
    |
 40 |     print()
 41 |
 42 | if sys.version_info < (3, 12, 11):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 43 |     print()
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 39 39 | if sys.version_info <= (3, 12, 0):
@@ -129,15 +134,16 @@ UP036_5.py:42:4: UP036 [*] Version block is outdated for minimum Python version
 45 43 | if sys.version_info < (3, 13, 0):
 46 44 |     print()
 
-UP036_5.py:45:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:45:4
    |
 43 |     print()
 44 |
 45 | if sys.version_info < (3, 13, 0):
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 46 |     print()
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 42 42 | if sys.version_info < (3, 12, 11):
@@ -149,25 +155,27 @@ UP036_5.py:45:4: UP036 [*] Version block is outdated for minimum Python version
 48 46 | if sys.version_info <= (3, 13, 100000):
 49 47 |     print()
 
-UP036_5.py:48:24: UP036 Version specifier is invalid
+UP036 Version specifier is invalid
+  --> UP036_5.py:48:24
    |
 46 |     print()
 47 |
 48 | if sys.version_info <= (3, 13, 100000):
-   |                        ^^^^^^^^^^^^^^^ UP036
+   |                        ^^^^^^^^^^^^^^^
 49 |     print()
    |
 
-UP036_5.py:77:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:77:4
    |
 75 | # https://github.com/astral-sh/ruff/issues/18165
 76 |
 77 | if sys.version_info.major >= 3:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 78 |     print("3")
 79 | else:
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 74 74 | 
@@ -182,16 +190,17 @@ UP036_5.py:77:4: UP036 [*] Version block is outdated for minimum Python version
 82 79 | if sys.version_info.major > 3:
 83 80 |     print("3")
 
-UP036_5.py:82:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:82:4
    |
 80 |     print("2")
 81 |
 82 | if sys.version_info.major > 3:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
 83 |     print("3")
 84 | else:
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 79 79 | else:
@@ -206,16 +215,17 @@ UP036_5.py:82:4: UP036 [*] Version block is outdated for minimum Python version
 87 84 | if sys.version_info.major <= 3:
 88 85 |     print("3")
 
-UP036_5.py:87:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:87:4
    |
 85 |     print("2")
 86 |
 87 | if sys.version_info.major <= 3:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 88 |     print("3")
 89 | else:
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 84 84 | else:
@@ -230,16 +240,17 @@ UP036_5.py:87:4: UP036 [*] Version block is outdated for minimum Python version
 92 89 | if sys.version_info.major < 3:
 93 90 |     print("3")
 
-UP036_5.py:92:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:92:4
    |
 90 |     print("2")
 91 |
 92 | if sys.version_info.major < 3:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
 93 |     print("3")
 94 | else:
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 89 89 | else:
@@ -254,16 +265,17 @@ UP036_5.py:92:4: UP036 [*] Version block is outdated for minimum Python version
 97 94 | if sys.version_info.major == 3:
 98 95 |     print("3")
 
-UP036_5.py:97:4: UP036 [*] Version block is outdated for minimum Python version
+UP036 [*] Version block is outdated for minimum Python version
+  --> UP036_5.py:97:4
    |
 95 |     print("2")
 96 |
 97 | if sys.version_info.major == 3:
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 98 |     print("3")
 99 | else:
    |
-   = help: Remove outdated version block
+help: Remove outdated version block
 
 ℹ Unsafe fix
 94  94  | else:

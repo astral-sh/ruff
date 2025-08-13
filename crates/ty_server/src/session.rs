@@ -570,8 +570,7 @@ impl Session {
             self.global_settings = Arc::new(global_settings);
         }
 
-        self.register_diagnostic_capability(client);
-        self.register_rename_capability(client);
+        self.register_capabilities(client);
 
         assert!(
             self.workspaces.all_initialized(),
@@ -587,134 +586,137 @@ impl Session {
         }
     }
 
-    // TODO: Merge the following two methods as `register_capability` and `unregister_capability`
-
-    /// Sends a registration notification to the client to enable / disable workspace diagnostics
-    /// as per the `ty.diagnosticMode` global setting.
+    /// Registers the dynamic capabilities with the client as per the resolved global settings.
     ///
-    /// This method is a no-op if the client doesn't support dynamic registration of diagnostic
-    /// capability.
-    fn register_diagnostic_capability(&mut self, client: &Client) {
+    /// ## Diagnostic capability
+    ///
+    /// This capability is used to enable / disable workspace diagnostics as per the
+    /// `ty.diagnosticMode` global setting.
+    ///
+    /// ## Rename capability
+    ///
+    /// This capability is used to enable / disable rename functionality as per the
+    /// `ty.experimental.rename` global setting.
+    fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
 
-        if !self
+        let mut registrations = vec![];
+        let mut unregistrations = vec![];
+
+        if self
             .resolved_client_capabilities
             .supports_diagnostic_dynamic_registration()
         {
-            return;
-        }
+            if self
+                .registrations
+                .contains(DocumentDiagnosticRequest::METHOD)
+            {
+                unregistrations.push(Unregistration {
+                    id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                    method: DocumentDiagnosticRequest::METHOD.into(),
+                });
+            }
 
-        let registered = self
-            .registrations
-            .contains(DocumentDiagnosticRequest::METHOD);
+            let diagnostic_mode = self.global_settings.diagnostic_mode;
 
-        if registered {
-            client.send_request::<UnregisterCapability>(
-                self,
-                UnregistrationParams {
-                    unregisterations: vec![Unregistration {
-                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
-                        method: DocumentDiagnosticRequest::METHOD.into(),
-                    }],
-                },
-                |_: &Client, ()| {
-                    tracing::debug!("Unregistered diagnostic capability");
-                },
+            tracing::debug!(
+                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
             );
+            registrations.push(Registration {
+                id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                method: DocumentDiagnosticRequest::METHOD.into(),
+                register_options: Some(
+                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
+                        DiagnosticRegistrationOptions {
+                            diagnostic_options: server_diagnostic_options(
+                                diagnostic_mode.is_workspace(),
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                    .unwrap(),
+                ),
+            });
         }
 
-        let diagnostic_mode = self.global_settings.diagnostic_mode;
-
-        let registration = Registration {
-            id: DIAGNOSTIC_REGISTRATION_ID.into(),
-            method: DocumentDiagnosticRequest::METHOD.into(),
-            register_options: Some(
-                serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
-                    DiagnosticRegistrationOptions {
-                        diagnostic_options: server_diagnostic_options(
-                            diagnostic_mode.is_workspace(),
-                        ),
-                        ..Default::default()
-                    },
-                ))
-                .unwrap(),
-            ),
-        };
-
-        client.send_request::<RegisterCapability>(
-            self,
-            RegistrationParams {
-                registrations: vec![registration],
-            },
-            move |_: &Client, ()| {
-                tracing::debug!(
-                    "Registered diagnostic capability in {diagnostic_mode:?} diagnostic mode"
-                );
-            },
-        );
-
-        if !registered {
-            self.registrations
-                .insert(DocumentDiagnosticRequest::METHOD.to_string());
-        }
-    }
-
-    /// Sends a registration notification to the client to enable / disable rename capability as
-    /// per the `ty.experimental.rename` global setting.
-    ///
-    /// This method is a no-op if the client doesn't support dynamic registration of rename
-    /// capability.
-    fn register_rename_capability(&mut self, client: &Client) {
-        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
-
-        if !self
+        if self
             .resolved_client_capabilities
             .supports_rename_dynamic_registration()
         {
-            return;
-        }
+            let is_rename_enabled = self.global_settings.is_rename_enabled();
 
-        let registered = self.registrations.contains(Rename::METHOD);
-
-        if registered {
-            client.send_request::<UnregisterCapability>(
-                self,
-                UnregistrationParams {
-                    unregisterations: vec![Unregistration {
+            if !is_rename_enabled {
+                tracing::debug!("Rename capability is disabled in the resolved global settings");
+                if self.registrations.contains(Rename::METHOD) {
+                    unregistrations.push(Unregistration {
                         id: RENAME_REGISTRATION_ID.into(),
                         method: Rename::METHOD.into(),
-                    }],
-                },
-                move |_: &Client, ()| {
-                    tracing::debug!("Unregistered rename capability");
-                },
-            );
+                    });
+                }
+            }
+
+            if is_rename_enabled {
+                registrations.push(Registration {
+                    id: RENAME_REGISTRATION_ID.into(),
+                    method: Rename::METHOD.into(),
+                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+                });
+            }
         }
 
-        if !self.global_settings.experimental.rename {
-            tracing::debug!("Rename capability is disabled in the client settings");
+        // First, unregister any existing capabilities and then register or re-register them.
+        self.unregister_dynamic_capability(client, unregistrations);
+        self.register_dynamic_capability(client, registrations);
+    }
+
+    /// Registers a list of dynamic capabilities with the client.
+    fn register_dynamic_capability(&mut self, client: &Client, registrations: Vec<Registration>) {
+        if registrations.is_empty() {
             return;
         }
 
-        let registration = Registration {
-            id: RENAME_REGISTRATION_ID.into(),
-            method: Rename::METHOD.into(),
-            register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
-        };
+        for registration in &registrations {
+            self.registrations.insert(registration.method.clone());
+        }
 
         client.send_request::<RegisterCapability>(
             self,
-            RegistrationParams {
-                registrations: vec![registration],
-            },
-            move |_: &Client, ()| {
-                tracing::debug!("Registered rename capability");
+            RegistrationParams { registrations },
+            |_: &Client, ()| {
+                tracing::debug!("Registered dynamic capabilities");
             },
         );
+    }
 
-        if !registered {
-            self.registrations.insert(Rename::METHOD.to_string());
+    /// Unregisters a list of dynamic capabilities with the client.
+    fn unregister_dynamic_capability(
+        &mut self,
+        client: &Client,
+        unregistrations: Vec<Unregistration>,
+    ) {
+        if unregistrations.is_empty() {
+            return;
         }
+
+        for unregistration in &unregistrations {
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
+        }
+
+        client.send_request::<UnregisterCapability>(
+            self,
+            UnregistrationParams {
+                unregisterations: unregistrations,
+            },
+            |_: &Client, ()| {
+                tracing::debug!("Unregistered dynamic capabilities");
+            },
+        );
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.

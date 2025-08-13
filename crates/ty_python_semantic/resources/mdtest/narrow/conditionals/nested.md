@@ -275,7 +275,49 @@ def f(a: A):
     a.x = None
 ```
 
-Narrowing is invalidated if a `nonlocal` declaration is made within a lazy scope.
+The opposite is not true, that is, if a root expression is reassigned, narrowing on the member are
+no longer valid in the inner lazy scope.
+
+```py
+def f(l: list[str | None]):
+    if l[0] is not None:
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+        l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        reveal_type(l[0])  # revealed: str | None
+    l = [None]
+
+def f(l: list[str | None]):
+    l[0] = "a"
+    def _():
+        l: list[str | None] = [None]
+        def _():
+            # TODO: should be `str | None`
+            reveal_type(l[0])  # revealed: Unknown
+
+    def _():
+        def _():
+            reveal_type(l[0])  # revealed: str | None
+        l: list[str | None] = [None]
+
+def f(a: A):
+    if a.x is not None:
+        def _():
+            reveal_type(a.x)  # revealed: str | None
+    a = A()
+
+def f(a: A):
+    a.x = "a"
+    def _():
+        reveal_type(a.x)  # revealed: str | None
+    a = A()
+```
+
+Narrowing is also invalidated if a `nonlocal` declaration is made within a lazy scope.
 
 ```py
 def f(non_local: str | None):

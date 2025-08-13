@@ -23,8 +23,9 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    if let Some(definition_targets) =
-        goto_target.get_definition_targets(file, db, None, ImportAliasResolution::PreserveAliases)
+    if let Some(definition_targets) = goto_target
+        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)
+        .and_then(|definitions| definitions.declaration_targets(db))
     {
         for target in &definition_targets {
             let target_file = target.file();
