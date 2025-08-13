@@ -3,8 +3,9 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
+    HasRelationToVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor, Type, TypeMapping,
+    TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -116,7 +117,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.subclass_of {
             SubclassOfInner::Class(class) => Self {
@@ -159,7 +160,7 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
@@ -191,7 +192,7 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
             subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
@@ -254,7 +255,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),

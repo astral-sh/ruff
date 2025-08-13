@@ -22,10 +22,11 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    declaration_type, infer_definition_types, todo_type,
+    ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
+    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
+    NormalizedVisitor, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -231,7 +232,7 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
@@ -255,7 +256,7 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -319,7 +320,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
@@ -406,7 +407,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
@@ -469,7 +470,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {

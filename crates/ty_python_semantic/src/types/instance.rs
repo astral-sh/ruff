@@ -7,11 +7,13 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
-use crate::types::{ClassBase, DynamicType, TypeMapping, TypeRelation, TypeTransformer};
+use crate::types::{
+    ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
+    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer,
+};
 use crate::{Db, FxOrderSet};
 
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -241,7 +243,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -267,7 +269,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         match (self.0, other.0) {
             (
@@ -297,7 +299,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &PairVisitor<'db>,
+        visitor: &IsDisjointVisitor<'db>,
     ) -> bool {
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
@@ -345,7 +347,7 @@ impl<'db> NominalInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -480,7 +482,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
         if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
@@ -532,7 +534,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
-        _visitor: &PairVisitor<'db>,
+        _visitor: &IsDisjointVisitor<'db>,
     ) -> bool {
         false
     }
@@ -558,7 +560,7 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -619,7 +621,10 @@ impl<'db> Protocol<'db> {
 mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
-    use crate::types::{BoundTypeVarInstance, TypeMapping, TypeTransformer, TypeVarVariance};
+    use crate::types::{
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, NormalizedVisitor, TypeMapping,
+        TypeVarVariance,
+    };
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -640,7 +645,7 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
-            visitor: &TypeTransformer<'db>,
+            visitor: &NormalizedVisitor<'db>,
         ) -> Self {
             Self(interface.normalized_impl(db, visitor))
         }
@@ -653,7 +658,7 @@ mod synthesized_protocol {
             self,
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
-            _visitor: &TypeTransformer<'db>,
+            _visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
             Self(self.0.specialized_and_normalized(db, type_mapping))
         }
