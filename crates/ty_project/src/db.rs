@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
-use std::{cmp, fmt};
+use std::{cmp, fmt, io};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
@@ -9,7 +9,7 @@ use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_db::files::{File, Files};
+use ruff_db::files::{File, FileRoot, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
@@ -64,13 +64,18 @@ impl ProjectDatabase {
             system: Arc::new(system),
         };
 
+        // Load the database from the persistent cache.
+        //
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //   cache and load the cache if it exists.
         //   we may want to have a dedicated method for this?
+        if let Err(err) = db.deserialize() {
+            tracing::warn!("failed to read from persistent cache: {err:?}");
+        }
 
-        // Initialize the `Program` singleton
+        // Initialize the `Program` singleton.
         let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
-        Program::from_settings(&db, program_settings);
+        Program::init_or_update(&mut db, program_settings);
 
         db.project = Some(
             Project::from_metadata(&db, project_metadata)
@@ -122,6 +127,48 @@ impl ProjectDatabase {
         Arc::get_mut(&mut self.system).expect(
             "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
         )
+    }
+
+    /// Deserialize the database from the persistent cache.
+    pub fn deserialize(&mut self) -> anyhow::Result<()> {
+        let Some(cache_dir) = self.system().cache_dir() else {
+            return Ok(());
+        };
+
+        // Read from the persistent cache.
+        let contents = match std::fs::read(cache_dir.join("db").as_path()) {
+            Ok(contents) => contents,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(err) => return Err(err.into()),
+        };
+
+        // Deserialize the database.
+        let mut deserializer = serde_json::Deserializer::from_slice(&contents);
+        <dyn salsa::Database>::deserialize(self, &mut deserializer)?;
+
+        // Sync any deserialized inputs.
+        for file in File::load_all(self) {
+            file.sync(self);
+            self.files.seed(file, self);
+        }
+
+        for root in FileRoot::load_all(self) {
+            self.files.seed_root(root, self);
+        }
+
+        Ok(())
+    }
+
+    /// Persist the current state of the database to disk.
+    pub fn persist(&mut self) -> anyhow::Result<()> {
+        if let Some(cache_dir) = self.system().cache_dir() {
+            std::fs::create_dir_all(cache_dir.as_path())?;
+
+            let contents = serde_json::to_vec(&<dyn salsa::Database>::as_serialize(self))?;
+            std::fs::write(cache_dir.join("db").as_path(), contents)?;
+        }
+
+        Ok(())
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information

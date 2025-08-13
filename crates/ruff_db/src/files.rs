@@ -14,7 +14,7 @@ use crate::diagnostic::{Span, UnifiedFile};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
-use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::system::{FileType, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
 
@@ -138,6 +138,7 @@ impl Files {
                 };
 
                 tracing::trace!("Adding vendored file `{}`", path);
+
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -199,7 +200,12 @@ impl Files {
         let mut roots = self.inner.roots.write().unwrap();
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        roots.try_add(db, absolute, kind)
+        roots.try_add(db, absolute, |absolute| {
+            FileRoot::builder(absolute, kind, FileRevision::now())
+                .durability(Durability::HIGH)
+                .revision_durability(kind.durability())
+                .new(db)
+        })
     }
 
     /// Updates the revision of the root for `path`.
@@ -257,6 +263,29 @@ impl Files {
         for root in roots.all() {
             root.set_revision(db).to(FileRevision::now());
         }
+    }
+
+    /// Seed the files with an existing [`File`] instance.
+    pub fn seed(&self, file: File, db: &dyn Db) {
+        match file.path(db) {
+            FilePath::System(path) => {
+                self.inner.system_by_path.insert(path.clone(), file);
+            }
+            FilePath::SystemVirtual(path) => {
+                self.inner
+                    .system_virtual_by_path
+                    .insert(path.clone(), VirtualFile(file));
+            }
+            FilePath::Vendored(path) => {
+                self.inner.vendored_by_path.insert(path.clone(), file);
+            }
+        }
+    }
+
+    /// Seed the files with an existing [`FileRoot`] instance.
+    pub fn seed_root(&self, root: FileRoot, db: &dyn Db) {
+        let mut roots = self.inner.roots.write().unwrap();
+        roots.try_add(db, root.path(db).to_path_buf(), |_| root);
     }
 }
 
@@ -413,6 +442,14 @@ impl File {
         }
     }
 
+    /// Loads all existing [`File`]s in the database.
+    pub fn load_all(db: &dyn Db) -> Vec<File> {
+        File::ingredient(db)
+            .entries(db.zalsa())
+            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .collect()
+    }
+
     /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`] for
     /// system paths.
     fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
@@ -542,6 +579,16 @@ mod private {
 
         /// The path doesn't exist, isn't accessible, or no longer exists.
         NotFound,
+    }
+}
+
+impl From<FileType> for FileStatus {
+    fn from(value: FileType) -> Self {
+        match value {
+            FileType::File => FileStatus::Exists,
+            FileType::Symlink => FileStatus::Exists,
+            FileType::Directory => FileStatus::IsADirectory,
+        }
     }
 }
 

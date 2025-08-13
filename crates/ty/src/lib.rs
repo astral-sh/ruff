@@ -167,6 +167,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Err(_) => {}
     }
 
+    // Write the database to the persistent cache.
+    if let Err(err) = db.persist() {
+        tracing::warn!("failed to write to persistent cache: {err:?}");
+    }
+
     std::mem::forget(db);
 
     if exit_zero {
