@@ -12,6 +12,8 @@ use ruff_source_file::UniversalNewlines;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use crate::MarkupKind;
+
 // Static regex instances to avoid recompilation
 static GOOGLE_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\s*(Args|Arguments|Parameters)\s*:\s*$")
@@ -45,6 +47,14 @@ impl Docstring {
     /// Create a new docstring from the raw string literal contents
     pub fn new(raw: String) -> Self {
         Docstring(raw)
+    }
+
+    /// Render the docstring to the given markup format
+    pub fn render(&self, kind: MarkupKind) -> String {
+        match kind {
+            MarkupKind::PlainText => self.render_plaintext(),
+            MarkupKind::Markdown => self.render_markdown(),
+        }
     }
 
     /// Render the docstring for plaintext display
@@ -121,7 +131,7 @@ fn documentation_trim(docs: &str) -> String {
     let mut lines = expanded.universal_newlines();
 
     // If the first line is non-blank then we need to include it *fully* trimmed
-    // As its indentation is ignored (effectively treated as having min-indent).
+    // As its indentation is ignored (effectively treated as having min_indent).
     if leading_blank_lines == 0 {
         if let Some(first_line) = lines.next() {
             output.push_str(first_line.as_str().trim_whitespace());
@@ -129,8 +139,10 @@ fn documentation_trim(docs: &str) -> String {
         }
     }
 
-    // For the rest of the lines remove the minimum indent (if possible) and trailing whitespace
-    // (all python whitespace is ascii so we can just remove that many bytes from the front).
+    // For the rest of the lines remove the minimum indent (if possible) and trailing whitespace.
+    //
+    // We computed min_indent by only counting python whitespace, and all python whitespace
+    // is ascii, so we can just remove that many bytes from the front.
     for line_obj in lines.skip(leading_blank_lines) {
         let line = line_obj.as_str();
         let trimmed_line = line[min_indent.min(line.len())..].trim_whitespace_end();

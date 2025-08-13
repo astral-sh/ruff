@@ -27,11 +27,13 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             db,
             ty_python_semantic::ImportAliasResolution::ResolveAliases,
         )
-        .and_then(|definitions| definitions.docstring(db));
+        .and_then(|definitions| definitions.docstring(db))
+        .map(HoverContent::Docstring);
     tracing::debug!("Inferred type of covering node is {}", ty.display(db));
 
     // TODO: Render the symbol's signature instead of just its type.
-    let contents = vec![HoverContent::Type(ty, docs)];
+    let mut contents = vec![HoverContent::Type(ty)];
+    contents.extend(docs);
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -100,7 +102,8 @@ impl fmt::Display for DisplayHover<'_> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum HoverContent<'db> {
-    Type(Type<'db>, Option<Docstring>),
+    Type(Type<'db>),
+    Docstring(Docstring),
 }
 
 impl<'db> HoverContent<'db> {
@@ -122,22 +125,12 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
 impl fmt::Display for DisplayHoverContent<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.content {
-            HoverContent::Type(ty, docstring) => {
-                self.kind
-                    .fenced_code_block(ty.display(self.db), "python")
-                    .fmt(f)?;
-
-                if let Some(docstring) = docstring {
-                    self.kind.horizontal_line().fmt(f)?;
-
-                    match self.kind {
-                        MarkupKind::PlainText => docstring.render_plaintext().fmt(f)?,
-                        MarkupKind::Markdown => docstring.render_markdown().fmt(f)?,
-                    }
-                }
-            }
+            HoverContent::Type(ty) => self
+                .kind
+                .fenced_code_block(ty.display(self.db), "python")
+                .fmt(f),
+            HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
-        Ok(())
     }
 }
 

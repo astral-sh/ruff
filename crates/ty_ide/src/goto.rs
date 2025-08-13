@@ -150,7 +150,11 @@ pub(crate) enum GotoTarget<'a> {
 /// The resolved definitions for a `GotoTarget`
 #[derive(Debug, Clone)]
 pub(crate) enum DefinitionsOrTargets<'db> {
+    /// We computed actual Definitions we can do followup queries on.
     Definitions(Vec<ResolvedDefinition<'db>>),
+    /// We directly computed a navigation.
+    ///
+    /// We can't get docs or usefully compute goto-definition for this.
     Targets(crate::NavigationTargets),
 }
 
