@@ -74,8 +74,16 @@ Person(3, "Eve", 99, "extra")
 # error: [invalid-argument-type]
 Person(id="3", name="Eve")
 
-# TODO: over-writing NamedTuple fields should be an error
+reveal_type(Person.id)  # revealed: property
+reveal_type(Person.name)  # revealed: property
+reveal_type(Person.age)  # revealed: property
+
+# TODO... the error is correct, but this is not the friendliest error message
+# for assigning to a read-only property :-)
+#
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `id` on type `Person` with custom `__set__` method"
 alice.id = 42
+# error: [invalid-assignment]
 bob.age = None
 ```
 
@@ -151,9 +159,42 @@ from typing import NamedTuple
 class User(NamedTuple):
     id: int
     name: str
+    age: int | None
+    nickname: str
 
 class SuperUser(User):
-    id: int  # this should be an error
+    # this should be an error because it implies that the `id` attribute on
+    # `SuperUser` is mutable, but the read-only `id` property from the superclass
+    # has not been overridden in the class body
+    id: int
+
+    # this is fine; overriding a read-only attribute with a mutable one
+    # does not conflict with the Liskov Substitution Principle
+    name: str = "foo"
+
+    # this is also fine
+    @property
+    def age(self) -> int:
+        return super().age or 42
+
+    def now_called_robert(self):
+        self.name = "Robert"  # fine because overridden with a mutable attribute
+
+        # TODO: this should cause us to emit an error as we're assigning to a read-only property
+        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        self.nickname = "Bob"
+
+james = SuperUser(0, "James", 42, "Jimmy")
+
+# fine because the property on the superclass was overridden with a mutable attribute
+# on the subclass
+james.name = "Robert"
+
+# TODO: the error is correct (can't assign to the read-only property inherited from the superclass)
+# but the error message could be friendlier :-)
+#
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `SuperUser` with custom `__set__` method"
+james.nickname = "Bob"
 ```
 
 ### Generic named tuples
