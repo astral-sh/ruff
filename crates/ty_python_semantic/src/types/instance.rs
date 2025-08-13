@@ -41,6 +41,30 @@ impl<'db> Type<'db> {
         let Some(tuple) = tuple else {
             return Type::Never;
         };
+        Type::tuple_instance(tuple)
+    }
+
+    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+        Type::tuple_instance(TupleType::homogeneous(db, element))
+    }
+
+    pub(crate) fn heterogeneous_tuple<I, T>(db: &'db dyn Db, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Type::tuple(TupleType::heterogeneous(
+            db,
+            elements.into_iter().map(Into::into),
+        ))
+    }
+
+    pub(crate) fn empty_tuple(db: &'db dyn Db) -> Self {
+        Type::tuple_instance(TupleType::empty(db))
+    }
+
+    /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
+    fn tuple_instance(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
@@ -275,11 +299,9 @@ impl<'db> NominalInstanceType<'db> {
         other: Self,
         visitor: &PairVisitor<'db>,
     ) -> bool {
-        let self_spec = self.tuple_spec(db);
-        if let Some(self_spec) = self_spec.as_deref() {
-            let other_spec = other.tuple_spec(db);
-            if let Some(other_spec) = other_spec.as_deref() {
-                if self_spec.is_disjoint_from_impl(db, other_spec, visitor) {
+        if let Some(self_spec) = self.tuple_spec(db) {
+            if let Some(other_spec) = other.tuple_spec(db) {
+                if self_spec.is_disjoint_from_impl(db, &other_spec, visitor) {
                     return true;
                 }
             }

@@ -8561,8 +8561,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let tuple_generic_alias = |db: &'db dyn Db, tuple: Option<TupleType<'db>>| {
-            let tuple =
-                tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()).unwrap());
+            let tuple = tuple.unwrap_or_else(|| TupleType::homogeneous(db, Type::unknown()));
             Type::from(tuple.to_class_type(db))
         };
 
@@ -10075,8 +10074,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(ellipsis);
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
-                    self.store_expression_type(tuple_slice, Type::tuple(result));
-                    return result;
+                    self.store_expression_type(tuple_slice, Type::tuple(Some(result)));
+                    return Some(result);
                 }
 
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
@@ -10102,9 +10101,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let ty = if return_todo {
-                    TupleType::homogeneous(self.db(), todo_type!("PEP 646"))
+                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
                 } else {
-                    TupleType::new(self.db(), element_types.build())
+                    TupleType::new(self.db(), &element_types.build())
                 };
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
@@ -10118,9 +10117,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    TupleType::homogeneous(self.db(), todo_type!("PEP 646"))
+                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
                 } else {
-                    TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
+                    TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
             }
         }
