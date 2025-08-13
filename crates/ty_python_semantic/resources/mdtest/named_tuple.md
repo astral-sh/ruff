@@ -205,13 +205,29 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Generic, TypeVar
 
 class Property[T](NamedTuple):
     name: str
     value: T
 
 reveal_type(Property("height", 3.4))  # revealed: Property[float]
+reveal_type(Property.value)  # revealed: property
+reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
+reveal_type(Property("height", 3.4).value)  # revealed: float
+
+T = TypeVar("T")
+
+class LegacyProperty(NamedTuple, Generic[T]):
+    name: str
+    value: T
+
+reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
+reveal_type(LegacyProperty.value)  # revealed: property
+reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
 ## Attributes on `NamedTuple`
