@@ -33,6 +33,9 @@ static_assert(is_subtype_of(Person, tuple[object, ...]))
 static_assert(not is_assignable_to(Person, tuple[int, str, int]))
 static_assert(not is_assignable_to(Person, tuple[int, str]))
 
+reveal_type(len(alice))  # revealed: Literal[3]
+reveal_type(bool(alice))  # revealed: Literal[True]
+
 reveal_type(alice[0])  # revealed: int
 reveal_type(alice[1])  # revealed: str
 reveal_type(alice[2])  # revealed: int | None
