@@ -1,8 +1,9 @@
+use crate::semantic_index::scope::FileScopeId;
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHasher;
+use rustc_hash::{FxHashMap, FxHasher};
 use std::hash::{Hash as _, Hasher as _};
 use std::ops::{Deref, DerefMut};
 
@@ -156,6 +157,12 @@ pub(super) struct SymbolTable {
     ///
     /// Uses a hash table to avoid storing the name twice.
     map: hashbrown::HashTable<ScopedSymbolId>,
+
+    // Variables defined in this scope, and not marked `global` or `nonlocal` here, which are also
+    // bound in nested scopes (by being marked `global` or `nonlocal` there). These (keys) are
+    // similar to what CPython calls "cell" variables, except that this scope may also be the
+    // global scope.
+    pub(super) nested_scopes_with_bindings: FxHashMap<ScopedSymbolId, Vec<FileScopeId>>,
 }
 
 impl SymbolTable {
@@ -245,12 +252,30 @@ impl SymbolTableBuilder {
         }
     }
 
+    pub(super) fn add_nested_scope_with_binding(
+        &mut self,
+        this_scope_symbol_id: ScopedSymbolId,
+        nested_scope: FileScopeId,
+    ) {
+        let bindings = self
+            .table
+            .nested_scopes_with_bindings
+            .entry(this_scope_symbol_id)
+            .or_default();
+        debug_assert!(
+            !bindings.contains(&nested_scope),
+            "the same scoped symbol shouldn't get added more than once",
+        );
+        bindings.push(nested_scope);
+    }
+
     pub(super) fn build(self) -> SymbolTable {
         let mut table = self.table;
         table.symbols.shrink_to_fit();
         table
             .map
             .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
+        table.nested_scopes_with_bindings.shrink_to_fit();
         table
     }
 }

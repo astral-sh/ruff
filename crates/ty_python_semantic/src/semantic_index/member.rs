@@ -39,11 +39,6 @@ impl Member {
         self.flags.contains(MemberFlags::IS_BOUND)
     }
 
-    /// Is the place declared in its containing scope?
-    pub(crate) fn is_declared(&self) -> bool {
-        self.flags.contains(MemberFlags::IS_DECLARED)
-    }
-
     pub(super) fn mark_bound(&mut self) {
         self.insert_flags(MemberFlags::IS_BOUND);
     }
