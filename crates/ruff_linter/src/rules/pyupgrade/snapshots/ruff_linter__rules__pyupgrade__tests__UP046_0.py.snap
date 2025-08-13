@@ -9,7 +9,6 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
 12 |     # Comments in a class body are preserved
 13 |     var: T
    |
-help: Use type parameters
 info: Type variable `T` defined here
  --> UP046_0.py:6:1
   |
@@ -19,6 +18,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 8  8  | P = ParamSpec("P")
@@ -37,7 +37,6 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |         ^^^^^^^^^^^^
 17 |     var: tuple[*Ts]
    |
-help: Use type parameters
 info: Type variable `Ts` defined here
  --> UP046_0.py:7:1
   |
@@ -47,6 +46,7 @@ info: Type variable `Ts` defined here
   | ^^^^^^^^^^^^^^^^^^^^^^^
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 13 13 |     var: T
@@ -65,7 +65,6 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |         ^^^^^^^^^^
 21 |     var: P
    |
-help: Use type parameters
 info: Type variable `P` defined here
  --> UP046_0.py:8:1
   |
@@ -74,6 +73,7 @@ info: Type variable `P` defined here
 8 | P = ParamSpec("P")
   | ^^^^^^^^^^^^^^^^^^
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 17 17 |     var: tuple[*Ts]
@@ -92,7 +92,6 @@ UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type pa
    |                   ^^^^^^^^^^
 25 |     var: S
    |
-help: Use type parameters
 info: Type variable `S` defined here
  --> UP046_0.py:5:1
   |
@@ -103,6 +102,7 @@ info: Type variable `S` defined here
 6 | T = TypeVar("T", bound=float)
 7 | Ts = TypeVarTuple("Ts")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 21 21 |     var: P
@@ -155,7 +155,6 @@ UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of ty
 42 |     var: S
 43 |     typ: T
    |
-help: Use type parameters
 info: Type variable `S` defined here
  --> UP046_0.py:5:1
   |
@@ -192,6 +191,7 @@ info: Type variable `P` defined here
 8 | P = ParamSpec("P")
   | ^^^^^^^^^^^^^^^^^^
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 38 38 |     s: AnyStr
@@ -210,7 +210,6 @@ UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of
    |                                 ^^^^^^^^^^
 49 |     var: T
    |
-help: Use type parameters
 info: Type variable `T` defined here
  --> UP046_0.py:6:1
   |
@@ -220,6 +219,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 45 45 |     pep: P
@@ -238,7 +238,6 @@ UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of typ
    |                                            ^^^^^^^^^^
 63 |     var: T
    |
-help: Use type parameters
 info: Type variable `T` defined here
  --> UP046_0.py:6:1
   |
@@ -248,6 +247,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 59 59 | class Base3: ...
@@ -267,7 +267,6 @@ UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instea
 67 |     var: S
 68 |     typ: T
    |
-help: Use type parameters
 info: Type variable `S` defined here
  --> UP046_0.py:5:1
   |
@@ -304,6 +303,7 @@ info: Type variable `P` defined here
 8 | P = ParamSpec("P")
   | ^^^^^^^^^^^^^^^^^^
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 63 63 |     var: T
@@ -321,7 +321,6 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
 73 | class A(Generic[T]): ...
    |         ^^^^^^^^^^
    |
-help: Use type parameters
 info: Type variable `T` defined here
  --> UP046_0.py:6:1
   |
@@ -331,6 +330,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 70 70 |     pep: P
@@ -349,7 +349,6 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |               ^^^^^^^^^^
 77 |     var: S
    |
-help: Use type parameters
 info: Type variable `S` defined here
  --> UP046_0.py:5:1
   |
@@ -360,6 +359,7 @@ info: Type variable `S` defined here
 6 | T = TypeVar("T", bound=float)
 7 | Ts = TypeVarTuple("Ts")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 73 73 | class A(Generic[T]): ...
@@ -378,7 +378,6 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |               ^^^^^^^^^^^^^
 81 |     var: tuple[S, T]
    |
-help: Use type parameters
 info: Type variable `S` defined here
  --> UP046_0.py:5:1
   |
@@ -398,6 +397,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 77 77 |     var: S
@@ -416,7 +416,6 @@ UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
    |                 ^^^^^^^^^^
 85 |     var: T
    |
-help: Use type parameters
 info: Type variable `T` defined here
  --> UP046_0.py:6:1
   |
@@ -426,6 +425,7 @@ info: Type variable `T` defined here
 7 | Ts = TypeVarTuple("Ts")
 8 | P = ParamSpec("P")
   |
+help: Use type parameters
 
 ℹ Unsafe fix
 81 81 |     var: tuple[S, T]

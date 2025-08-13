@@ -497,6 +497,16 @@ impl Diagnostic {
             other.expect_range().start(),
         ))
     }
+
+    /// Sort this diagnostic's sub-diagnostics by descending severity.
+    ///
+    /// This is particularly helpful to move `help`-level sub-diagnostics to the end, after any
+    /// longer, `info`-level diagnostics.
+    pub fn sort_sub_diagnostics(&mut self) {
+        Arc::make_mut(&mut self.inner)
+            .subs
+            .sort_by_key(|sub| std::cmp::Reverse(sub.inner.severity));
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
