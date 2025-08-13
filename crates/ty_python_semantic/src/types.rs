@@ -4826,7 +4826,7 @@ impl<'db> Type<'db> {
                 // with each individual character, instead of just an array of
                 // `LiteralString`, but there would be a cost and it's not clear that
                 // it's worth it.
-                return Ok(Cow::Owned(TupleSpec::from_elements(std::iter::repeat_n(
+                return Ok(Cow::Owned(TupleSpec::heterogeneous(std::iter::repeat_n(
                     Type::LiteralString,
                     string_literal_ty.python_len(db),
                 ))));

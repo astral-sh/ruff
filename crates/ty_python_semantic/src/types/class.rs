@@ -1349,7 +1349,7 @@ impl<'db> ClassLiteral<'db> {
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
         if self.is_known(db, KnownClass::VersionInfo) {
-            let tuple_type = TupleType::new(db, TupleSpec::version_info_spec(db))
+            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
                 .expect("sys.version_info tuple spec should always be a valid tuple");
 
             Box::new([
