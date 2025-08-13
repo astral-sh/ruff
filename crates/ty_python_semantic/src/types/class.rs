@@ -168,7 +168,7 @@ fn try_metaclass_cycle_initial<'db>(
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike,
@@ -180,31 +180,58 @@ pub(crate) enum CodeGeneratorKind {
 
 impl CodeGeneratorKind {
     pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
-        if CodeGeneratorKind::DataclassLike.matches(db, class) {
-            Some(CodeGeneratorKind::DataclassLike)
-        } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
-            Some(CodeGeneratorKind::NamedTuple)
-        } else if CodeGeneratorKind::TypedDict.matches(db, class) {
-            Some(CodeGeneratorKind::TypedDict)
-        } else {
+        #[salsa::tracked(
+            cycle_fn=code_generator_of_class_recover,
+            cycle_initial=code_generator_of_class_initial,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn code_generator_of_class<'db>(
+            db: &'db dyn Db,
+            class: ClassLiteral<'db>,
+        ) -> Option<CodeGeneratorKind> {
+            if class.dataclass_params(db).is_some()
+                || class
+                    .try_metaclass(db)
+                    .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+            {
+                Some(CodeGeneratorKind::DataclassLike)
+            } else if class
+                .explicit_bases(db)
+                .iter()
+                .copied()
+                .filter_map(Type::into_class_literal)
+                .any(|class| class.is_known(db, KnownClass::NamedTuple))
+            {
+                Some(CodeGeneratorKind::NamedTuple)
+            } else if class.is_typed_dict(db) {
+                Some(CodeGeneratorKind::TypedDict)
+            } else {
+                None
+            }
+        }
+
+        fn code_generator_of_class_initial(
+            _db: &dyn Db,
+            _class: ClassLiteral<'_>,
+        ) -> Option<CodeGeneratorKind> {
             None
         }
+
+        #[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+        fn code_generator_of_class_recover(
+            _db: &dyn Db,
+            _value: &Option<CodeGeneratorKind>,
+            _count: u32,
+            _class: ClassLiteral<'_>,
+        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind>> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        code_generator_of_class(db, class)
     }
 
-    fn matches<'db>(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-        match self {
-            Self::DataclassLike => {
-                class.dataclass_params(db).is_some()
-                    || class
-                        .try_metaclass(db)
-                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-            }
-            Self::NamedTuple => class.explicit_bases(db).iter().any(|base| {
-                base.into_class_literal()
-                    .is_some_and(|c| c.is_known(db, KnownClass::NamedTuple))
-            }),
-            Self::TypedDict => class.is_typed_dict(db),
-        }
+    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+        CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }
 
