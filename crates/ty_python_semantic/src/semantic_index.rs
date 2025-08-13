@@ -167,7 +167,7 @@ pub(crate) fn attribute_scopes<'db, 's>(
 
     ChildrenIter::new(index, class_scope_id).filter_map(move |(child_scope_id, scope)| {
         let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::Annotation {
+            if scope.node().scope_kind() == ScopeKind::TypeParams {
                 // This could be a generic method with a type-params scope.
                 // Go one level deeper to find the function scope. The first
                 // descendant is the (potential) function scope.
@@ -597,8 +597,8 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
             // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
             // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
             if scope.kind() == ScopeKind::Class {
-                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
-                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                // Allow annotation scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_annotation() && self.yielded_count == 2 {
                     return Some((scope_id, scope));
                 }
                 continue;
@@ -1317,7 +1317,7 @@ def func[T]():
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(
             ann_scope_id.to_scope_id(&db, file).name(&db, &module),
             "func"
@@ -1361,7 +1361,7 @@ class C[T]:
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);

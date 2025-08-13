@@ -2243,6 +2243,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
+            let in_stub = self.in_stub();
+            let previous_deferred_state =
+                std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
                 CallArguments::from_arguments(self.db(), arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value);
@@ -2251,6 +2254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
+            self.deferred_state = previous_deferred_state;
         }
 
         self.typevar_binding_context = previous_typevar_binding_context;
@@ -2271,7 +2275,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.typevar_binding_context.replace(binding_context);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
-            DeferredExpressionState::None,
+            self.defer_annotations().into(),
         );
         self.infer_type_parameters(type_params);
         self.infer_parameters(&function.parameters);
@@ -2316,7 +2320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_scope = match parent_scope.kind() {
             ScopeKind::Class => parent_scope,
-            ScopeKind::Annotation => {
+            ScopeKind::TypeParams => {
                 let class_scope_id = parent_scope.parent()?;
                 let potentially_class_scope = self.index.scope(class_scope_id);
 
@@ -2757,7 +2761,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let annotated = self.infer_optional_annotation_expression(
             parameter.annotation.as_deref(),
-            DeferredExpressionState::None,
+            self.defer_annotations().into(),
         );
 
         if let Some(qualifiers) = annotated.map(|annotated| annotated.qualifiers) {
@@ -2792,7 +2796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_optional_annotation_expression(
             annotation.as_deref(),
-            DeferredExpressionState::None,
+            self.defer_annotations().into(),
         );
     }
 
@@ -3413,7 +3417,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let elements = UnionType::new(
                         self.db(),
                         elts.iter()
-                            .map(|expr| self.infer_type_expression(expr))
+                            .map(|expr| {
+                                self.infer_type_expression_with_state(
+                                    expr,
+                                    DeferredExpressionState::Deferred,
+                                )
+                            })
                             .collect::<Box<[_]>>(),
                     );
                     let constraints = TypeVarBoundOrConstraints::Constraints(elements);
@@ -3428,11 +3437,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
-                self.infer_type_expression(expr),
+                self.infer_type_expression_with_state(expr, DeferredExpressionState::Deferred),
             )),
             None => None,
         };
-        let default_ty = self.infer_optional_type_expression(default.as_deref());
+        let default_ty = self.infer_optional_type_expression_with_state(
+            default.as_deref(),
+            DeferredExpressionState::Deferred,
+        );
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             &name.id,
@@ -6573,7 +6585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
-        // If we're inferring types of deferred expressions, always treat them as public symbols
+        // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
                 place_from_bindings(db, use_def.all_reachable_bindings(place_id))
@@ -6684,11 +6696,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
-                // There is one exception to this rule: type parameter scopes can see
+                // There is one exception to this rule: annotation scopes can see
                 // names defined in an immediately-enclosing class scope.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
 
-                let is_immediately_enclosing_scope = scope.is_type_parameter(db)
+                let is_immediately_enclosing_scope = scope.is_annotation(db)
                     && scope
                         .scope(db)
                         .parent()
@@ -9535,17 +9547,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         ty
     }
 
-    /// Similar to [`infer_type_expression`], but accepts an optional type expression and returns
-    /// [`None`] if the expression is [`None`].
-    ///
-    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
-    fn infer_optional_type_expression(
-        &mut self,
-        expression: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expression.map(|expr| self.infer_type_expression(expr))
-    }
-
     /// Similar to [`infer_type_expression`], but accepts a [`DeferredExpressionState`].
     ///
     /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression
@@ -9558,6 +9559,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
         annotation_ty
+    }
+
+    /// Similar to [`infer_type_expression_with_state`], but accepts an optional expression.
+    ///
+    /// [`infer_type_expression_with_state`]: TypeInferenceBuilder::infer_type_expression_with_state
+    fn infer_optional_type_expression_with_state(
+        &mut self,
+        expression: Option<&ast::Expr>,
+        deferred_state: DeferredExpressionState,
+    ) -> Option<Type<'db>> {
+        expression.map(|expr| self.infer_type_expression_with_state(expr, deferred_state))
     }
 
     fn report_invalid_type_expression(

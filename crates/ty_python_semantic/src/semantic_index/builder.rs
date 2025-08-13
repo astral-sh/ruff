@@ -199,7 +199,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         match self.scopes[parent.file_scope_id].kind() {
             ScopeKind::Class => Some(parent.file_scope_id),
-            ScopeKind::Annotation => {
+            ScopeKind::TypeParams => {
                 // If the function is generic, the parent scope is an annotation scope.
                 // In this case, we need to go up one level higher to find the class scope.
                 let grandparent = scopes_rev.next()?;
@@ -2637,7 +2637,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::Annotation => {}
+                | ScopeKind::TypeParams => {}
             }
         }
         false
@@ -2652,7 +2652,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
-                | ScopeKind::Annotation => {}
+                | ScopeKind::TypeParams => {}
             }
         }
         false
@@ -2664,7 +2664,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
             match scope.kind() {
                 ScopeKind::Class | ScopeKind::Comprehension => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
-                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::Annotation => {}
+                ScopeKind::Module | ScopeKind::TypeAlias | ScopeKind::TypeParams => {}
             }
         }
         false
