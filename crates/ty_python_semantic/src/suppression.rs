@@ -466,7 +466,17 @@ impl Suppression {
 /// The wrapped `TextRange` is the suppression's range.
 /// This is unique enough because it is its exact
 /// location in the source.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub(crate) struct FileSuppressionId(TextRange);
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]

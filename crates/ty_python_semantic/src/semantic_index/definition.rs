@@ -22,7 +22,7 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -652,7 +652,7 @@ impl DefinitionCategory {
 /// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
 /// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
 /// for an in-depth explanation of why this is necessary.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
@@ -852,7 +852,9 @@ impl DefinitionKind<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub(crate) enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
     /// Name, attribute, or subscript.
@@ -868,7 +870,7 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
@@ -898,7 +900,7 @@ impl StarImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
@@ -920,7 +922,7 @@ impl MatchPatternDefinitionKind {
 /// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
 /// it is in the scope in which the root variable is bound.
 /// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ComprehensionDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -951,7 +953,7 @@ impl<'db> ComprehensionDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ImportDefinitionKind {
     node: AstNodeRef<ast::StmtImport>,
     alias_index: usize,
@@ -972,7 +974,7 @@ impl ImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ImportFromDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
@@ -993,7 +995,7 @@ impl ImportFromDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
@@ -1014,7 +1016,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct AnnotatedAssignmentDefinitionKind {
     annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
@@ -1035,7 +1037,7 @@ impl AnnotatedAssignmentDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct WithItemDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     context_expr: AstNodeRef<ast::Expr>,
@@ -1061,7 +1063,7 @@ impl<'db> WithItemDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ForStmtDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
@@ -1087,7 +1089,7 @@ impl<'db> ForStmtDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ExceptHandlerDefinitionKind {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,

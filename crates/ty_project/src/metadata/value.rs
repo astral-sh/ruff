@@ -57,14 +57,14 @@ thread_local! {
     static VALUE_SOURCE: RefCell<Option<(ValueSource, bool)>> = const { RefCell::new(None) };
 }
 
-/// Guard to safely change the [`VALUE_SOURCE`] for the current thread.
+/// Guard to safely change the [`ValueSource`] for the current thread.
 #[must_use]
-pub(super) struct ValueSourceGuard {
+pub struct ValueSourceGuard {
     prev_value: Option<(ValueSource, bool)>,
 }
 
 impl ValueSourceGuard {
-    pub(super) fn new(source: ValueSource, is_toml: bool) -> Self {
+    pub fn new(source: ValueSource, is_toml: bool) -> Self {
         let prev = VALUE_SOURCE.replace(Some((source, is_toml)));
         Self { prev_value: prev }
     }

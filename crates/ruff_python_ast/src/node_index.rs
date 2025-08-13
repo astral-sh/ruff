@@ -19,6 +19,7 @@ where
 /// A unique index for a node within an AST.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeIndex(NonZeroU32);
 
 impl NodeIndex {

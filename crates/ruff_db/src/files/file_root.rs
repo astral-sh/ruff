@@ -16,7 +16,7 @@ use crate::system::{SystemPath, SystemPathBuf};
 /// The main usage of file roots is to determine a file's durability. But it can also be used
 /// to make a salsa query dependent on whether a file in a root has changed without writing any
 /// manual invalidation logic.
-#[salsa::input(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileRoot {
     /// The path of a root is guaranteed to never change.
     #[returns(deref)]
@@ -35,9 +35,19 @@ impl FileRoot {
     pub fn durability(self, db: &dyn Db) -> salsa::Durability {
         self.kind_at_time_of_creation(db).durability()
     }
+
+    /// Loads all existing [`FileRoot`]s in the database.
+    pub fn load_all(db: &dyn Db) -> Vec<FileRoot> {
+        FileRoot::ingredient(db)
+            .entries(db.zalsa())
+            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .collect()
+    }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub enum FileRootKind {
     /// The root of a project.
     Project,
@@ -47,7 +57,7 @@ pub enum FileRootKind {
 }
 
 impl FileRootKind {
-    const fn durability(self) -> Durability {
+    pub const fn durability(self) -> Durability {
         match self {
             FileRootKind::Project => Durability::LOW,
             FileRootKind::LibrarySearchPath => Durability::HIGH,
@@ -69,7 +79,7 @@ impl FileRoots {
         &mut self,
         db: &dyn Db,
         path: SystemPathBuf,
-        kind: FileRootKind,
+        create_root: impl FnOnce(SystemPathBuf) -> FileRoot,
     ) -> FileRoot {
         // SAFETY: Guaranteed to succeed because `path` is a UTF-8 that only contains Unicode characters.
         let normalized_path = path.as_std_path().to_slash().unwrap();
@@ -81,15 +91,12 @@ impl FileRoots {
             }
         }
 
-        // normalize the path to use `/` separators and escape the '{' and '}' characters,
-        // which matchit uses for routing parameters
+        // Normalize the path to use `/` separators and escape the '{' and '}' characters,
+        // which `matchit` uses for routing parameters.
         let mut route = normalized_path.replace('{', "{{").replace('}', "}}");
 
         // Insert a new source root
-        let root = FileRoot::builder(path, kind, FileRevision::now())
-            .durability(Durability::HIGH)
-            .revision_durability(kind.durability())
-            .new(db);
+        let root = create_root(path);
 
         // Insert a path that matches the root itself
         self.by_path.insert(route.clone(), root).unwrap();

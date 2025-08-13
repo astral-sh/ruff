@@ -19,8 +19,7 @@ pub mod pyproject;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ProjectMetadata {
     pub(super) name: Name,
 
@@ -35,7 +34,6 @@ pub struct ProjectMetadata {
     /// knowing which files to watch for changes.
     ///
     /// The path ordering doesn't imply precedence.
-    #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
     pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
 }
 
@@ -375,7 +373,14 @@ mod tests {
             ProjectMetadata(
               name: Name("app"),
               root: "/app",
-              options: Options(),
+              options: Options(
+                environment: None,
+                src: None,
+                rules: None,
+                terminal: None,
+                overrides: None,
+              ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -413,7 +418,14 @@ mod tests {
             ProjectMetadata(
               name: Name("backend"),
               root: "/app",
-              options: Options(),
+              options: Options(
+                environment: None,
+                src: None,
+                rules: None,
+                terminal: None,
+                overrides: None,
+              ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -506,10 +518,18 @@ unclosed table, expected `]`
               name: Name("nested-project"),
               root: "/app/packages/a",
               options: Options(
+                environment: None,
                 src: Some(SrcOptions(
                   root: Some("src"),
+                  r#respect-ignore-files: None,
+                  include: None,
+                  exclude: None,
                 )),
+                rules: None,
+                terminal: None,
+                overrides: None,
               ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -556,10 +576,18 @@ unclosed table, expected `]`
               name: Name("project-root"),
               root: "/app",
               options: Options(
+                environment: None,
                 src: Some(SrcOptions(
                   root: Some("src"),
+                  r#respect-ignore-files: None,
+                  include: None,
+                  exclude: None,
                 )),
+                rules: None,
+                terminal: None,
+                overrides: None,
               ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -599,7 +627,14 @@ unclosed table, expected `]`
             ProjectMetadata(
               name: Name("nested-project"),
               root: "/app/packages/a",
-              options: Options(),
+              options: Options(
+                environment: None,
+                src: None,
+                rules: None,
+                terminal: None,
+                overrides: None,
+              ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -644,9 +679,19 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
+                  root: None,
                   r#python-version: Some("3.10"),
+                  r#python-platform: None,
+                  r#extra-paths: None,
+                  typeshed: None,
+                  python: None,
                 )),
+                src: None,
+                rules: None,
+                terminal: None,
+                overrides: None,
               ),
+              extra_configuration_paths: [],
             )
             "#);
         });
@@ -696,12 +741,24 @@ unclosed table, expected `]`
               root: "/app",
               options: Options(
                 environment: Some(EnvironmentOptions(
+                  root: None,
                   r#python-version: Some("3.12"),
+                  r#python-platform: None,
+                  r#extra-paths: None,
+                  typeshed: None,
+                  python: None,
                 )),
                 src: Some(SrcOptions(
                   root: Some("src"),
+                  r#respect-ignore-files: None,
+                  include: None,
+                  exclude: None,
                 )),
+                rules: None,
+                terminal: None,
+                overrides: None,
               ),
+              extra_configuration_paths: [],
             )
             "#);
         });

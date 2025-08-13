@@ -8,7 +8,8 @@ use std::ops::{Deref, DerefMut};
 
 /// Uniquely identifies a symbol in a given scope.
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.

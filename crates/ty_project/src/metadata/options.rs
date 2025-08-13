@@ -52,10 +52,8 @@ use ty_python_semantic::{
 pub struct Options {
     /// Configures the type checking environment.
     #[option_group]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<EnvironmentOptions>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub src: Option<SrcOptions>,
 
@@ -69,7 +67,6 @@ pub struct Options {
     /// * `warn`: Enable the rule and create a warning diagnostic.
     /// * `error`: Enable the rule and create an error diagnostic.
     ///   ty will exit with a non-zero code if any error diagnostics are emitted.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
         value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
@@ -81,7 +78,6 @@ pub struct Options {
     )]
     pub rules: Option<Rules>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
 
@@ -90,7 +86,6 @@ pub struct Options {
     /// Each override specifies include/exclude patterns and rule configurations
     /// that apply to matching files. Multiple overrides can match the same file,
     /// with later overrides taking precedence.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub overrides: Option<OverridesOptions>,
 }
@@ -430,7 +425,6 @@ pub struct EnvironmentOptions {
     ///
     /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
     /// it will also be included in the first party search path.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "list[str]",
@@ -458,7 +452,6 @@ pub struct EnvironmentOptions {
     /// For some language features, ty can also understand conditionals based on comparisons
     /// with `sys.version_info`. These are commonly found in typeshed, for example,
     /// to reflect the differing contents of the standard library across Python versions.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#""3.13""#,
         value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>"#,
@@ -479,7 +472,6 @@ pub struct EnvironmentOptions {
     /// - `android` for Android
     /// - `ios` for iOS
     /// - `linux` for everything else
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"<current-platform>"#,
         value_type = r#""win32" | "darwin" | "android" | "ios" | "linux" | "all" | str"#,
@@ -493,7 +485,6 @@ pub struct EnvironmentOptions {
     /// List of user-provided paths that should take first priority in the module resolution.
     /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
     /// or pyright's `stubPath` configuration setting.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -506,7 +497,6 @@ pub struct EnvironmentOptions {
     /// Optional path to a "typeshed" directory on disk for us to use for standard-library types.
     /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
     /// bundled as a zip file in the binary
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
@@ -522,7 +512,6 @@ pub struct EnvironmentOptions {
     /// third-party imports.
     ///
     /// This option is commonly used to specify the path to a virtual environment.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
@@ -558,7 +547,6 @@ pub struct SrcOptions {
     ///
     /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
     /// it will also be included in the first party search path.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
@@ -579,7 +567,6 @@ pub struct SrcOptions {
             respect-ignore-files = false
         "#
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub respect_ignore_files: Option<bool>,
 
     /// A list of files and directories to check. The `include` option
@@ -602,7 +589,6 @@ pub struct SrcOptions {
     /// matches `<project_root>/src` and not `<project_root>/test/src`).
     ///
     /// `exclude` takes precedence over `include`.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = r#"list[str]"#,
@@ -672,7 +658,6 @@ pub struct SrcOptions {
             ]
         "#
     )]
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub exclude: Option<RangedValue<Vec<RelativeGlobPattern>>>,
 }
 
@@ -1084,7 +1069,6 @@ pub struct TerminalOptions {
     /// The format to use for printing diagnostic messages.
     ///
     /// Defaults to `full`.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
         value_type = "full | concise",
@@ -1192,7 +1176,6 @@ pub struct OverrideOptions {
     /// are affected by this override.
     ///
     /// If not specified, defaults to `["**"]` (matches all files).
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = r#"list[str]"#,
@@ -1212,7 +1195,6 @@ pub struct OverrideOptions {
     /// Exclude patterns take precedence over include patterns within the same override.
     ///
     /// If not specified, defaults to `[]` (excludes no files).
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = r#"list[str]"#,
@@ -1233,7 +1215,6 @@ pub struct OverrideOptions {
     /// These rules will be merged with the global rules, with override rules
     /// taking precedence for matching files. You can set rules to different
     /// severity levels or disable them entirely.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
         value_type = r#"dict[RuleName, "ignore" | "warn" | "error"]"#,
@@ -1400,7 +1381,17 @@ impl RangedValue<OverrideOptions> {
 }
 
 /// The options for an override but without the include/exclude patterns.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Combine,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.

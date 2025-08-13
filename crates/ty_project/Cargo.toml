@@ -21,10 +21,12 @@ ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
-ty_python_semantic = { workspace = true, features = ["serde"] }
+ty_python_semantic = { workspace = true }
+ty_static = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+bincode = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
@@ -32,7 +34,7 @@ get-size2 = { workspace = true }
 globset = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
-ordermap = { workspace = true, features = ["serde"] }
+ordermap = { workspace = true }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }

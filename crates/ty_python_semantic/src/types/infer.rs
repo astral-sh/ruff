@@ -135,7 +135,7 @@ use crate::{Db, FxOrderSet, Program};
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
-#[salsa::tracked(returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(persist, returns(ref), cycle_fn=scope_cycle_recover, cycle_initial=scope_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_scope_types<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeInference<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
@@ -421,7 +421,9 @@ struct TypeAndRange<'db> {
 }
 
 /// The inferred types for a scope region.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(
+    Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
@@ -430,7 +432,16 @@ pub(crate) struct ScopeInference<'db> {
     extra: Option<Box<ScopeInferenceExtra>>,
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
+#[derive(
+    Debug,
+    Eq,
+    PartialEq,
+    get_size2::GetSize,
+    salsa::Update,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 struct ScopeInferenceExtra {
     /// The fallback type for missing expressions/bindings/declarations.
     ///

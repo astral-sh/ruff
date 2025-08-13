@@ -1,20 +1,22 @@
 use std::fmt::Formatter;
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
-use std::{cmp, fmt};
+use std::{cmp, fmt, io};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
-use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
+use crate::metadata::value::{ValueSource, ValueSourceGuard};
+use crate::{CollectReporter, DEFAULT_LINT_REGISTRY, default_lints_registry};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
-use ruff_db::diagnostic::Diagnostic;
-use ruff_db::files::{File, Files};
+use ruff_db::diagnostic::{Diagnostic, LintRegistryGuard};
+use ruff_db::files::{File, FileRoot, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_static::EnvVars;
 
 mod changes;
 
@@ -66,18 +68,27 @@ impl ProjectDatabase {
             system: Arc::new(system),
         };
 
+        // Load the database from the persistent cache.
+        //
         // TODO: Use the `program_settings` to compute the key for the database's persistent
-        //   cache and load the cache if it exists.
-        //   we may want to have a dedicated method for this?
+        //       cache, to support multiple persistent caches for different configurations.
+        if let Ok(path) = std::env::var(EnvVars::TY_PERSIST) {
+            if let Err(err) = db.deserialize(&path, &project_metadata) {
+                tracing::warn!("failed to read from persistent cache: {err:?}");
+            }
+        }
 
-        // Initialize the `Program` singleton
+        // Initialize the `Program` singleton.
         let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
-        Program::from_settings(&db, program_settings);
+        Program::init_or_update(&mut db, program_settings);
 
-        db.project = Some(
-            Project::from_metadata(&db, project_metadata)
-                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
-        );
+        // Initialize the `Project`, unless it was persisted.
+        if db.project.is_none() {
+            db.project = Some(
+                Project::from_metadata(&db, project_metadata)
+                    .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+            );
+        }
 
         Ok(db)
     }
@@ -124,6 +135,65 @@ impl ProjectDatabase {
         Arc::get_mut(&mut self.system).expect(
             "ref count should be 1 because `trigger_cancellation` drops all other DB references.",
         )
+    }
+
+    /// Deserialize the database from the persistent cache.
+    pub fn deserialize(&mut self, path: &str, metadata: &ProjectMetadata) -> anyhow::Result<()> {
+        // Read from the persistent cache.
+        let contents = match std::fs::read(path) {
+            Ok(contents) => contents,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(err) => return Err(err.into()),
+        };
+
+        let _value_source = ValueSourceGuard::new(ValueSource::Cli, false);
+        let _lint_registry = LintRegistryGuard::new(|name| {
+            default_lints_registry()
+                .get(name)
+                .map(|lint| lint.name())
+                .ok()
+        });
+
+        // Deserialize the database.
+        let mut decoder = bincode::serde::BorrowedSerdeDecoder::from_slice(
+            &contents,
+            bincode::config::standard(),
+            (),
+        );
+
+        <dyn salsa::Database>::deserialize(self, decoder.as_deserializer())?;
+
+        // Sync any deserialized inputs.
+        for file in File::load_all(self) {
+            file.sync(self);
+            self.files.seed(file, self);
+        }
+
+        for root in FileRoot::load_all(self) {
+            self.files.seed_root(root, self);
+        }
+
+        for project in Project::load_all(self) {
+            if project.metadata(self) == metadata {
+                project.resolve_settings(self)?;
+                self.project = Some(project);
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Persist the current state of the database to disk.
+    pub fn persist(&mut self, path: &str) -> anyhow::Result<()> {
+        let contents = bincode::serde::encode_to_vec(
+            <dyn salsa::Database>::as_serialize(self),
+            bincode::config::standard(),
+        )?;
+
+        std::fs::write(path, contents)?;
+
+        Ok(())
     }
 
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
@@ -204,8 +274,17 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum CheckMode {
     /// Checks the open files in the project.
     OpenFiles,

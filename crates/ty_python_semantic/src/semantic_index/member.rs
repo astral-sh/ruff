@@ -347,7 +347,8 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(get_size2::GetSize, salsa::Update)]
+#[allow(clippy::unsafe_derive_deserialize)]
+#[derive(get_size2::GetSize, salsa::Update, serde::Serialize, serde::Deserialize)]
 pub struct ScopedMemberId;
 
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].

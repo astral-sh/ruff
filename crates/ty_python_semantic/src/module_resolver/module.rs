@@ -13,7 +13,17 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::path::SystemOrVendoredPathRef;
 
 /// Representation of a Python module.
-#[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
+#[derive(
+    Clone,
+    Copy,
+    Eq,
+    Hash,
+    PartialEq,
+    salsa::Supertype,
+    salsa::Update,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum Module<'db> {
     File(FileModule<'db>),
     Namespace(NamespacePackage<'db>),
@@ -214,7 +224,7 @@ fn all_submodule_names_for_package(db: &dyn Db, file: File) -> Option<Vec<Name>>
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`)
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
@@ -229,13 +239,23 @@ pub struct FileModule<'db> {
 ///
 /// Namespace packages are special because there are
 /// multiple possible paths and they have no corresponding code file.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    Eq,
+    PartialEq,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum ModuleKind {
     /// A single-file module (e.g. `foo.py` or `foo.pyi`)
     Module,
@@ -254,7 +274,18 @@ impl ModuleKind {
 }
 
 /// Enumeration of various core stdlib modules in which important types are located
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {

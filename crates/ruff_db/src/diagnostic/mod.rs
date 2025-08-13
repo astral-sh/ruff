@@ -22,6 +22,7 @@ mod stylesheet;
 /// a characteristic is a deficiency. An example of a characteristic that is
 /// _not_ a deficiency is the `reveal_type` diagnostic for our type checker.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Diagnostic {
     /// The actual diagnostic.
     ///
@@ -500,6 +501,7 @@ impl Diagnostic {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct DiagnosticInner {
     id: DiagnosticId,
     severity: Severity,
@@ -576,6 +578,7 @@ impl Eq for RenderingSortKey<'_> {}
 /// another (for a single parent diagnostic) is the order in which they were
 /// attached to the diagnostic.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct SubDiagnostic {
     /// Like with `Diagnostic`, we box the `SubDiagnostic` to make it
     /// pointer-sized.
@@ -685,6 +688,7 @@ impl SubDiagnostic {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
@@ -713,6 +717,7 @@ struct SubDiagnosticInner {
 /// Messages attached to annotations should also be as brief and specific as
 /// possible. Long messages could negative impact the quality of rendering.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Annotation {
     /// The span of this annotation, corresponding to some subsequence of the
     /// user's input that we want to highlight.
@@ -855,6 +860,7 @@ impl Annotation {
 /// These tags are used to provide additional information about the annotation.
 /// and are passed through to the language server protocol.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum DiagnosticTag {
     /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
     Unnecessary,
@@ -869,6 +875,7 @@ pub enum DiagnosticTag {
 ///
 /// Rules use kebab case, e.g. `no-foo`.
 #[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
 pub struct LintName(&'static str);
 
 impl LintName {
@@ -878,6 +885,64 @@ impl LintName {
 
     pub const fn as_str(&self) -> &'static str {
         self.0
+    }
+}
+
+#[cfg(feature = "serde")]
+pub use lint_name_serde::LintRegistryGuard;
+
+#[cfg(feature = "serde")]
+mod lint_name_serde {
+    use super::LintName;
+
+    use std::cell::RefCell;
+
+    thread_local! {
+        /// Serde doesn't provide any easy means to pass a value to a [`Deserialize`] implementation,
+        /// but we need a way to retrieve static [`LintName`]s from the lint registry when deserializing.
+        ///
+        /// Use the [`LintRegistryGuard`] to initialize the thread local before calling into any
+        /// deserialization code. It ensures that the thread local variable gets cleaned up
+        /// once deserialization is done (once the guard gets dropped).
+        static LINT_REGISTRY: RefCell<Option<LintRegistry>> = const { RefCell::new(None) };
+    }
+
+    type LintRegistry = fn(&str) -> Option<LintName>;
+
+    /// Guard to safely change the lint registry for the current thread.
+    #[must_use]
+    pub struct LintRegistryGuard {
+        prev_value: Option<LintRegistry>,
+    }
+
+    impl LintRegistryGuard {
+        pub fn new(registry: LintRegistry) -> Self {
+            let prev = LINT_REGISTRY.replace(Some(registry));
+            Self { prev_value: prev }
+        }
+    }
+
+    impl Drop for LintRegistryGuard {
+        fn drop(&mut self) {
+            LINT_REGISTRY.set(self.prev_value.take());
+        }
+    }
+
+    #[cfg(feature = "serde")]
+    impl<'de> serde::Deserialize<'de> for LintName {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let name: &str = serde::Deserialize::deserialize(deserializer)?;
+
+            LINT_REGISTRY.with_borrow(|registry| {
+                let registry = registry
+                    .expect("must set the `LintRegistryGuard` when deserializing a `LintName`");
+
+                registry(name).ok_or(serde::de::Error::custom("invalid `LintName`"))
+            })
+        }
     }
 }
 
@@ -909,6 +974,7 @@ impl PartialEq<&str> for LintName {
 
 /// Uniquely identifies the kind of a diagnostic.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum DiagnosticId {
     Panic,
 
@@ -1097,6 +1163,30 @@ impl UnifiedFile {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for UnifiedFile {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            UnifiedFile::Ty(file) => serde::Serialize::serialize(file, serializer),
+            // Persistent caching is only used in ty.
+            UnifiedFile::Ruff(..) => panic!("Ruff files are not persistable"),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for UnifiedFile {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde::Deserialize::deserialize(deserializer).map(UnifiedFile::Ty)
+    }
+}
+
 /// A unified wrapper for types that can be converted to a [`SourceCode`].
 ///
 /// As with [`UnifiedFile`], ruff and ty use slightly different representations for source code.
@@ -1128,6 +1218,7 @@ impl DiagnosticSource {
 /// range isn't present, it semantically implies that the diagnostic refers to
 /// the entire file. For example, when the file should be executable but isn't.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Span {
     file: UnifiedFile,
     range: Option<TextRange>,
@@ -1206,6 +1297,7 @@ impl From<crate::files::FileRange> for Span {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Severity {
     Info,
     Warning,
@@ -1241,6 +1333,7 @@ impl Severity {
 /// used for main diagnostics. If we want to add `Severity::Help` in the future, this type could be
 /// deleted and the two combined again.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SubDiagnosticSeverity {
     Help,
     Info,
@@ -1489,6 +1582,7 @@ impl std::fmt::Display for ConciseMessage<'_> {
 /// a blanket trait implementation for `IntoDiagnosticMessage` for
 /// anything that implements `std::fmt::Display`.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct DiagnosticMessage(Box<str>);
 
 impl DiagnosticMessage {
@@ -1552,7 +1646,11 @@ impl<T: std::fmt::Display> IntoDiagnosticMessage for T {
 ///
 /// For Ruff rules this means the noqa code.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash, get_size2::GetSize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize), serde(transparent))]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(transparent)
+)]
 pub struct SecondaryCode(String);
 
 impl SecondaryCode {
