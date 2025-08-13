@@ -11565,32 +11565,14 @@ mod tests {
             );
         };
 
-        check_typevar("T", "typing.TypeVar(\"T\")", None, None, None);
-        check_typevar("U", "typing.TypeVar(\"U\", bound=A)", Some("A"), None, None);
-        check_typevar(
-            "V",
-            "typing.TypeVar(\"V\", A, B)",
-            None,
-            Some(&["A", "B"]),
-            None,
-        );
-        check_typevar(
-            "W",
-            "typing.TypeVar(\"W\", default=A)",
-            None,
-            None,
-            Some("A"),
-        );
-        check_typevar(
-            "X",
-            "typing.TypeVar(\"X\", bound=A, default=A1)",
-            Some("A"),
-            None,
-            Some("A1"),
-        );
+        check_typevar("T", "typing.TypeVar", None, None, None);
+        check_typevar("U", "typing.TypeVar", Some("A"), None, None);
+        check_typevar("V", "typing.TypeVar", None, Some(&["A", "B"]), None);
+        check_typevar("W", "typing.TypeVar", None, None, Some("A"));
+        check_typevar("X", "typing.TypeVar", Some("A"), None, Some("A1"));
 
         // a typevar with less than two constraints is treated as unconstrained
-        check_typevar("Y", "typing.TypeVar(\"Y\")", None, None, None);
+        check_typevar("Y", "typing.TypeVar", None, None, None);
     }
 
     /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
