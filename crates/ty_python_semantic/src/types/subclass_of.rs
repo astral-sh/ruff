@@ -4,8 +4,8 @@ use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
-    HasRelationToVisitor, KnownClass, LazyTypeVarBoundOrConstraints, MemberLookupPolicy,
-    NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarInstance,
+    HasRelationToVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor, Type, TypeMapping,
+    TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -97,11 +97,12 @@ impl<'db> SubclassOfType<'db> {
                             db,
                             Name::new_static("T_all"),
                             None,
-                            Some(LazyTypeVarBoundOrConstraints::Eager(
+                            Some(
                                 TypeVarBoundOrConstraints::UpperBound(
                                     KnownClass::Type.to_instance(db),
-                                ),
-                            )),
+                                )
+                                .into(),
+                            ),
                             variance,
                             None,
                             TypeVarKind::Pep695,

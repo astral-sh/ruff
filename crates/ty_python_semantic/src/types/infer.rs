@@ -118,12 +118,12 @@ use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LazyTypeVarBoundOrConstraints, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarDefault,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
-    todo_type,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
+    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -3412,10 +3412,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     None
                 } else {
-                    Some(LazyTypeVarBoundOrConstraints::LazyConstraints)
+                    Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints)
                 }
             }
-            Some(_) => Some(LazyTypeVarBoundOrConstraints::LazyUpperBound),
+            Some(_) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
             None => None,
         };
         if bound_or_constraint.is_some() || default.is_some() {
@@ -3427,7 +3427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
-            default.as_deref().map(|_| TypeVarDefault::Lazy),
+            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
             TypeVarKind::Pep695,
         )));
         self.add_declaration_with_binding(

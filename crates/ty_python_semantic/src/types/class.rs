@@ -24,9 +24,9 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    LazyTypeVarBoundOrConstraints, NormalizedVisitor, StringLiteralType, TypeAliasType,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarDefault, TypeVarInstance,
-    TypeVarKind, declaration_type, infer_definition_types, todo_type,
+    NormalizedVisitor, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -4520,9 +4520,9 @@ impl KnownClass {
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
-                    (Some(bound), None) => Some(LazyTypeVarBoundOrConstraints::Eager(
-                        TypeVarBoundOrConstraints::UpperBound(*bound),
-                    )),
+                    (Some(bound), None) => {
+                        Some(TypeVarBoundOrConstraints::UpperBound(*bound).into())
+                    }
 
                     (None, Some(_constraints)) => {
                         // We don't use UnionType::from_elements or UnionBuilder here,
@@ -4538,9 +4538,7 @@ impl KnownClass {
                                 .map(|(_, ty)| ty)
                                 .collect::<Box<_>>(),
                         );
-                        Some(LazyTypeVarBoundOrConstraints::Eager(
-                            TypeVarBoundOrConstraints::Constraints(elements),
-                        ))
+                        Some(TypeVarBoundOrConstraints::Constraints(elements).into())
                     }
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
@@ -4558,7 +4556,7 @@ impl KnownClass {
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
-                        default.map(TypeVarDefault::Eager),
+                        default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),
                 )));
