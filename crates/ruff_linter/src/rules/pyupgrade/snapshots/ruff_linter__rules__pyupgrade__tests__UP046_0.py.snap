@@ -11,7 +11,7 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -39,7 +39,7 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `Ts` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:7:1
+ --> UP046_0.py:7:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -67,7 +67,7 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `P` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:8:1
+ --> UP046_0.py:8:1
   |
 6 | T = TypeVar("T", bound=float)
 7 | Ts = TypeVarTuple("Ts")
@@ -94,7 +94,7 @@ UP046 [*] Generic class `Constrained` uses `Generic` subclass instead of type pa
    |
 help: Use type parameters
 info: Type variable `S` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:5:1
+ --> UP046_0.py:5:1
   |
 3 | from somewhere import SupportsRichComparisonT
 4 |
@@ -157,7 +157,7 @@ UP046 [*] Generic class `MultipleGenerics` uses `Generic` subclass instead of ty
    |
 help: Use type parameters
 info: Type variable `S` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:5:1
+ --> UP046_0.py:5:1
   |
 3 | from somewhere import SupportsRichComparisonT
 4 |
@@ -167,7 +167,7 @@ info: Type variable `S` defined here
 7 | Ts = TypeVarTuple("Ts")
   |
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -176,7 +176,7 @@ info: Type variable `T` defined here
 8 | P = ParamSpec("P")
   |
 info: Type variable `Ts` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:7:1
+ --> UP046_0.py:7:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -185,7 +185,7 @@ info: Type variable `Ts` defined here
 8 | P = ParamSpec("P")
   |
 info: Type variable `P` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:8:1
+ --> UP046_0.py:8:1
   |
 6 | T = TypeVar("T", bound=float)
 7 | Ts = TypeVarTuple("Ts")
@@ -212,7 +212,7 @@ UP046 [*] Generic class `MultipleBaseClasses` uses `Generic` subclass instead of
    |
 help: Use type parameters
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -240,7 +240,7 @@ UP046 [*] Generic class `MoreBaseClasses` uses `Generic` subclass instead of typ
    |
 help: Use type parameters
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -269,7 +269,7 @@ UP046 [*] Generic class `MultipleBaseAndGenerics` uses `Generic` subclass instea
    |
 help: Use type parameters
 info: Type variable `S` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:5:1
+ --> UP046_0.py:5:1
   |
 3 | from somewhere import SupportsRichComparisonT
 4 |
@@ -279,7 +279,7 @@ info: Type variable `S` defined here
 7 | Ts = TypeVarTuple("Ts")
   |
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -288,7 +288,7 @@ info: Type variable `T` defined here
 8 | P = ParamSpec("P")
   |
 info: Type variable `Ts` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:7:1
+ --> UP046_0.py:7:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -297,7 +297,7 @@ info: Type variable `Ts` defined here
 8 | P = ParamSpec("P")
   |
 info: Type variable `P` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:8:1
+ --> UP046_0.py:8:1
   |
 6 | T = TypeVar("T", bound=float)
 7 | Ts = TypeVarTuple("Ts")
@@ -323,7 +323,7 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -351,7 +351,7 @@ UP046 [*] Generic class `B` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `S` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:5:1
+ --> UP046_0.py:5:1
   |
 3 | from somewhere import SupportsRichComparisonT
 4 |
@@ -380,7 +380,7 @@ UP046 [*] Generic class `C` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `S` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:5:1
+ --> UP046_0.py:5:1
   |
 3 | from somewhere import SupportsRichComparisonT
 4 |
@@ -390,7 +390,7 @@ info: Type variable `S` defined here
 7 | Ts = TypeVarTuple("Ts")
   |
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
@@ -418,7 +418,7 @@ UP046 [*] Generic class `D` uses `Generic` subclass instead of type parameters
    |
 help: Use type parameters
 info: Type variable `T` defined here
- --> ./resources/test/fixtures/pyupgrade/UP046_0.py:6:1
+ --> UP046_0.py:6:1
   |
 5 | S = TypeVar("S", str, bytes)  # constrained type variable
 6 | T = TypeVar("T", bound=float)
