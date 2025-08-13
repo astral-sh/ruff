@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.13"
 ```
 
 [PEP 695] and Python 3.12 introduced new, more ergonomic syntax for type variables.
@@ -752,6 +752,8 @@ def constrained[T: (int, str)](x: T):
 A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 
 ```py
+from typing import Any
+
 # TODO: error
 def f[S, T: list[S]](x: S, y: T) -> S | T:
     return x or y
@@ -761,8 +763,8 @@ class C[S, T: list[S]]:
     x: S
     y: T
 
-reveal_type(C[int, str]().x)  # revealed: int
-reveal_type(C[int, str]().y)  # revealed: str
+reveal_type(C[int, list[Any]]().x)  # revealed: int
+reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
 
 # TODO: error
 def g[T: list[T]](x: T) -> T:
@@ -772,7 +774,7 @@ def g[T: list[T]](x: T) -> T:
 class D[T: list[T]]:
     x: T
 
-reveal_type(D[int]().x)  # revealed: int
+reveal_type(D[list[Any]]().x)  # revealed: list[Any]
 
 # TODO: error
 def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
@@ -794,7 +796,7 @@ def i[T: (list[T], str)](x: T) -> T:
 class F[T: (list[T], str)]:
     x: T
 
-reveal_type(F[int]().x)  # revealed: int
+reveal_type(F[list[Any]]().x)  # revealed: list[Any]
 ```
 
 However, they are lazily evaluated and can cyclically refer to their own type:
@@ -803,7 +805,7 @@ However, they are lazily evaluated and can cyclically refer to their own type:
 class G[T: list[G]]:
     x: T
 
-reveal_type(G[list[G]]().x)  # revealed: list[G[list[G[Unknown]]]
+reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
 ### Defaults
@@ -824,7 +826,7 @@ reveal_type(C[int]().y)  # revealed: int
 class D[T = T]:
     x: T
 
-reveal_type(D().x)  # revealed: Unknown
+reveal_type(D().x)  # revealed: T@D
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/
