@@ -11,7 +11,9 @@ use std::fmt::{Display, Formatter};
 /// * a file stored on the [host system](crate::system::System).
 /// * a virtual file stored on the [host system](crate::system::System).
 /// * a vendored file stored in the [vendored file system](crate::vendored::VendoredFileSystem).
-#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
+#[derive(
+    Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize,
+)]
 pub enum FilePath {
     /// Path to a file on the [host system](crate::system::System).
     System(SystemPathBuf),

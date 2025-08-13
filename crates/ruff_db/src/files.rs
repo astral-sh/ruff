@@ -289,7 +289,7 @@ impl std::panic::RefUnwindSafe for Files {}
 /// # Ordering
 /// Ordering is based on the file's salsa-assigned id and not on its values.
 /// The id may change between runs.
-#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(persist, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct File {
     /// The path of the file (immutable).
@@ -521,7 +521,17 @@ impl VirtualFile {
 // The types in here need to be public because they're salsa ingredients but we
 // don't want them to be publicly accessible. That's why we put them into a private module.
 mod private {
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, get_size2::GetSize)]
+    #[derive(
+        Copy,
+        Clone,
+        Debug,
+        Eq,
+        PartialEq,
+        Default,
+        get_size2::GetSize,
+        serde::Serialize,
+        serde::Deserialize,
+    )]
     pub enum FileStatus {
         /// The file exists.
         #[default]

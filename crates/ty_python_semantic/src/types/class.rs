@@ -212,7 +212,7 @@ impl CodeGeneratorKind {
 /// # Ordering
 /// Ordering is based on the generic aliases's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericAlias<'db> {
     pub(crate) origin: ClassLiteral<'db>,
@@ -300,6 +300,8 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     salsa::Supertype,
     salsa::Update,
     get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub enum ClassType<'db> {
     NonGeneric(ClassLiteral<'db>),
@@ -1154,7 +1156,7 @@ pub(crate) struct Field<'db> {
 /// # Ordering
 /// Ordering is based on the class's id assigned by salsa and not on the class literal's values.
 /// The id may change between runs, or when the class literal was garbage collected and recreated.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct ClassLiteral<'db> {
     /// Name of the class at definition
@@ -3011,7 +3013,17 @@ pub(super) enum SolidBaseKind {
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
 /// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`

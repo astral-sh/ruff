@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(persist, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     pub file: File,
 
@@ -70,7 +70,7 @@ impl<'db> ScopeId<'db> {
 
 /// ID that uniquely identifies a scope inside of a module.
 #[newtype_index]
-#[derive(salsa::Update, get_size2::GetSize)]
+#[derive(salsa::Update, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct FileScopeId;
 
 impl FileScopeId {

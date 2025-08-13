@@ -58,7 +58,7 @@ arc-swap = { version = "1.7.1" }
 assert_fs = { version = "1.1.0" }
 argfile = { version = "0.2.0" }
 bincode = { version = "2.0.0" }
-bitflags = { version = "2.5.0" }
+bitflags = { version = "2.5.0", features = ["serde"] }
 bitvec = { version = "1.0.1", default-features = false, features = [
     "alloc",
 ] }
@@ -143,11 +143,12 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "918d35d873b2b73a0237536144ef4d22e8d57f27", default-features = false, features = [
+salsa = { path = "../salsa", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
     "inventory",
+    "persistence",
 ] }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
@@ -160,7 +161,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
-smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
+smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new", "serde"] }
 snapbox = { version = "0.6.0", features = [
     "diff",
     "term-svg",

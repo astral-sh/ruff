@@ -762,7 +762,17 @@ impl SystemVirtualPath {
 }
 
 /// An owned, virtual path on [`System`](`super::System`) (akin to [`String`]).
-#[derive(Eq, PartialEq, Clone, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(
+    Eq,
+    PartialEq,
+    Clone,
+    Hash,
+    PartialOrd,
+    Ord,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct SystemVirtualPathBuf(String);
 
 impl SystemVirtualPathBuf {
