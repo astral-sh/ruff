@@ -14,9 +14,10 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    BoundTypeVarInstance, KnownClass, KnownInstanceType, Normalized, Type, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance,
-    UnionType, binding_type, cyclic::PairVisitor, declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, KnownClass,
+    KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeTransformer,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
+    declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -355,11 +356,7 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, expanded.into_boxed_slice(), None)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let variables: FxOrderSet<_> = self
             .variables(db)
             .iter()
@@ -475,7 +472,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db, TypeMapping<'a, 'db>>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let types: Box<[_]> = self
             .types(db)
@@ -526,11 +523,7 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
@@ -571,7 +564,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db, TypeRelation>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
@@ -724,7 +717,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> PartialSpecialization<'db, 'db> {
         let generic_context = self.generic_context.normalized_impl(db, visitor);
         let types: Cow<_> = self

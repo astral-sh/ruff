@@ -15,11 +15,11 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BoundTypeVarInstance, KnownClass, Normalized, TypeMapping, TypeRelation, todo_type,
+    BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -66,7 +66,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -389,7 +389,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -1373,7 +1373,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &TypeTransformer<'db, Normalized>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
             annotated_type,
