@@ -1128,21 +1128,49 @@ impl MethodDecorator {
     }
 }
 
+/// Kind-specific metadata for different types of fields
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum FieldKind<'db> {
+    /// `NamedTuple` field metadata (no special properties)
+    NamedTuple { default_ty: Option<Type<'db>> },
+    /// dataclass field metadata
+    Dataclass {
+        /// The type of the default value for this field
+        default_ty: Option<Type<'db>>,
+        /// Whether or not this field is "init-only". If this is true, it only appears in the
+        /// `__init__` signature, but is not accessible as a real field
+        init_only: bool,
+        /// Whether or not this field should appear in the signature of `__init__`.
+        init: bool,
+    },
+    /// `TypedDict` field metadata
+    TypedDict {
+        /// Whether this field is required
+        is_required: bool,
+    },
+}
+
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
+    /// Kind-specific metadata for this field
+    pub(crate) kind: FieldKind<'db>,
+}
 
-    /// The type of the default value for this field
-    pub(crate) default_ty: Option<Type<'db>>,
-
-    /// Whether or not this field is "init-only". If this is true, it only appears in the
-    /// `__init__` signature, but is not accessible as a real field
-    pub(crate) init_only: bool,
-
-    /// Whether or not this field should appear in the signature of `__init__`.
-    pub(crate) init: bool,
+impl Field<'_> {
+    pub(crate) const fn is_required(&self) -> bool {
+        match &self.kind {
+            FieldKind::NamedTuple { default_ty } => default_ty.is_none(),
+            // A dataclass field is NOT required if `default` (or `default_factory`) is set
+            // or if `init` has been set to `False`.
+            FieldKind::Dataclass {
+                init, default_ty, ..
+            } => default_ty.is_none() && *init,
+            FieldKind::TypedDict { is_required } => *is_required,
+        }
+    }
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1529,6 +1557,43 @@ impl<'db> ClassLiteral<'db> {
             .any(|base| matches!(base, ClassBase::TypedDict))
     }
 
+    /// Returns whether fields are *type-required* by default for this class.
+    ///
+    /// This does **not** consider Python default values on parameters—only whether
+    /// the type system marks them as required keys.
+    ///
+    /// Rules:
+    /// - `NamedTuple` / dataclass: Always `true` (all fields are required in the type system).
+    /// - `TypedDict`: Defaults to `true` unless `total=False` or `NotRequired` is used.
+    ///
+    /// `false` → explicitly marked as not required via `total=False`.
+    /// `true`  → otherwise.
+    fn are_fields_type_required(self, db: &'db dyn Db) -> bool {
+        if !self.is_typed_dict(db) {
+            return true;
+        }
+
+        let module = parsed_module(db, self.file(db)).load(db);
+        let class_stmt = self.node(db, &module);
+
+        // Look for `total=False` in class keyword arguments
+        if let Some(arguments) = &class_stmt.arguments {
+            for keyword in &arguments.keywords {
+                if keyword
+                    .arg
+                    .as_ref()
+                    .is_some_and(|name| name.as_str() == "total")
+                {
+                    if let ruff_python_ast::Expr::BooleanLiteral(bool_lit) = &keyword.value {
+                        return bool_lit.value; // False => fields not required
+                    }
+                }
+            }
+        }
+
+        true // Default is `total=True`
+    }
+
     /// Return the explicit `metaclass` of this class, if one is defined.
     ///
     /// ## Note
@@ -1887,16 +1952,16 @@ impl<'db> ClassLiteral<'db> {
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
             let mut kw_only_field_seen = false;
-            for (
-                field_name,
-                Field {
-                    declared_ty: mut field_ty,
-                    mut default_ty,
-                    init_only: _,
-                    init,
-                },
-            ) in self.fields(db, specialization, field_policy)
-            {
+            for (field_name, field) in self.fields(db, specialization, field_policy) {
+                let (init, mut default_ty) = match field.kind {
+                    FieldKind::NamedTuple { default_ty } => (true, default_ty),
+                    FieldKind::Dataclass {
+                        init, default_ty, ..
+                    } => (init, default_ty),
+                    FieldKind::TypedDict { .. } => continue,
+                };
+                let mut field_ty = field.declared_ty;
+
                 if name == "__init__" && !init {
                     // Skip fields with `init=False`
                     continue;
@@ -2201,7 +2266,7 @@ impl<'db> ClassLiteral<'db> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
-            return self.own_fields(db, specialization);
+            return self.own_fields(db, specialization, field_policy);
         }
 
         let matching_classes_in_mro: Vec<_> = self
@@ -2224,7 +2289,7 @@ impl<'db> ClassLiteral<'db> {
         matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|(class, specialization)| class.own_fields(db, specialization))
+            .flat_map(|(class, specialization)| class.own_fields(db, specialization, field_policy))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -2244,6 +2309,7 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind,
     ) -> FxOrderMap<Name, Field<'db>> {
         let mut attributes = FxOrderMap::default();
 
@@ -2251,6 +2317,8 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+        let are_fields_type_required = self.are_fields_type_required(db);
+
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2294,13 +2362,23 @@ impl<'db> ClassLiteral<'db> {
                         init = field.init(db);
                     }
 
+                    let kind = match field_policy {
+                        CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
+                        CodeGeneratorKind::DataclassLike => FieldKind::Dataclass {
+                            default_ty,
+                            init_only: attr.is_init_var(),
+                            init,
+                        },
+                        CodeGeneratorKind::TypedDict => FieldKind::TypedDict {
+                            is_required: are_fields_type_required,
+                        },
+                    };
+
                     attributes.insert(
                         symbol.name().clone(),
                         Field {
                             declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                            default_ty,
-                            init_only: attr.is_init_var(),
-                            init,
+                            kind,
                         },
                     );
                 }
