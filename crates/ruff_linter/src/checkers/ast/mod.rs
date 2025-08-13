@@ -3349,7 +3349,8 @@ impl Drop for DiagnosticGuard<'_, '_> {
             return;
         }
 
-        if let Some(diagnostic) = self.diagnostic.take() {
+        if let Some(mut diagnostic) = self.diagnostic.take() {
+            diagnostic.sort_sub_diagnostics();
             self.context.diagnostics.borrow_mut().push(diagnostic);
         }
     }
