@@ -793,17 +793,17 @@ mod tests {
             identity('hello')",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r###"
         from typing import TypeVar, Generic
 
-        T[: typing.TypeVar("T")] = TypeVar([name=]'T')
+        T[: typing.TypeVar] = TypeVar([name=]'T')
 
         def identity(x: T) -> T:
             return x
 
         identity([x=]42)
         identity([x=]'hello')
-        "#);
+        "###);
     }
 
     #[test]
