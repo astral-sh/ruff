@@ -16,7 +16,7 @@ pub fn goto_references(
     let module = parsed.load(db);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(db, file, &module, offset)?;
 
     let mode = if include_declaration {
         ReferencesMode::References

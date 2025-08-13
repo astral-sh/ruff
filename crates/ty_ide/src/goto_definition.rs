@@ -17,7 +17,7 @@ pub fn goto_definition(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(db, file, &module, offset)?;
 
     let definition_targets = goto_target
         .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?

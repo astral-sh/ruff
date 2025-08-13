@@ -15,7 +15,7 @@ pub fn document_highlights(
     let module = parsed.load(db);
 
     // Get the definitions for the symbol at the cursor position
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(db, file, &module, offset)?;
 
     // Use DocumentHighlights mode which limits search to current file only
     references(db, file, &goto_target, ReferencesMode::DocumentHighlights)
