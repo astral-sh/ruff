@@ -6949,24 +6949,14 @@ impl<'db> TypeVarInstance<'db> {
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
-                        Some(TypeVarBoundOrConstraintsEvaluation::Eager(
-                            bound_or_constraints.normalized_impl(db, visitor),
-                        ))
+                        Some(bound_or_constraints.normalized_impl(db, visitor).into())
                     }
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
-                        self.lazy_bound(db).map(|bound| {
-                            TypeVarBoundOrConstraintsEvaluation::Eager(
-                                bound.normalized_impl(db, visitor),
-                            )
-                        })
-                    }
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db).map(|constraints| {
-                            TypeVarBoundOrConstraintsEvaluation::Eager(
-                                constraints.normalized_impl(db, visitor),
-                            )
-                        })
-                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                        .lazy_bound(db)
+                        .map(|bound| bound.normalized_impl(db, visitor).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                        .lazy_constraints(db)
+                        .map(|constraints| constraints.normalized_impl(db, visitor).into()),
                 }),
             self.variance(db),
             self._default(db).and_then(|default| match default {
@@ -6987,24 +6977,14 @@ impl<'db> TypeVarInstance<'db> {
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
                     TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
-                        Some(TypeVarBoundOrConstraintsEvaluation::Eager(
-                            bound_or_constraints.materialize(db, variance),
-                        ))
+                        Some(bound_or_constraints.materialize(db, variance).into())
                     }
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
-                        self.lazy_bound(db).map(|bound| {
-                            TypeVarBoundOrConstraintsEvaluation::Eager(
-                                bound.materialize(db, variance),
-                            )
-                        })
-                    }
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db).map(|constraints| {
-                            TypeVarBoundOrConstraintsEvaluation::Eager(
-                                constraints.materialize(db, variance),
-                            )
-                        })
-                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                        .lazy_bound(db)
+                        .map(|bound| bound.materialize(db, variance).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                        .lazy_constraints(db)
+                        .map(|constraints| constraints.materialize(db, variance).into()),
                 }),
             self.variance(db),
             self._default(db).and_then(|default| match default {
