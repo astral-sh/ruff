@@ -202,7 +202,7 @@ enum ReduceResult<'db> {
 
 // TODO increase this once we extend `UnionElement` throughout all union/intersection
 // representations, so that we can make large unions of literals fast in all operations.
-const MAX_UNION_LITERALS: usize = 200;
+const MAX_UNION_LITERALS: usize = 100;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
