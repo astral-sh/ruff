@@ -498,7 +498,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
         self.place_and_quals
     }
 
-    pub(crate) fn with_conflicting_declarations(
+    pub(crate) fn into_place_and_conflicting_declarations(
         self,
     ) -> (
         PlaceAndQualifiers<'db>,
