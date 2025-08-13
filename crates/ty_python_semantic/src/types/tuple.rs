@@ -30,7 +30,7 @@ use crate::types::{
     UnionBuilder, UnionType, cyclic::PairVisitor,
 };
 use crate::util::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -1161,6 +1161,34 @@ impl<'db> Tuple<Type<'db>> {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
             Tuple::Variable(_) => false,
         }
+    }
+
+    /// Return the `TupleSpec` for the singleton `sys.version_info`
+    pub(crate) fn version_info_spec(db: &'db dyn Db) -> TupleSpec<'db> {
+        let python_version = Program::get(db).python_version(db);
+        let int_instance_ty = KnownClass::Int.to_instance(db);
+
+        // TODO: just grab this type from typeshed (it's a `sys._ReleaseLevel` type alias there)
+        let release_level_ty = {
+            let elements: Box<[Type<'db>]> = ["alpha", "beta", "candidate", "final"]
+                .iter()
+                .map(|level| Type::string_literal(db, level))
+                .collect();
+
+            // For most unions, it's better to go via `UnionType::from_elements` or use `UnionBuilder`;
+            // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
+            // into other types where necessary. Here, however, we know that there are no duplicates
+            // in this union, so it's probably more efficient to use `UnionType::new()` directly.
+            Type::Union(UnionType::new(db, elements))
+        };
+
+        TupleSpec::from_elements([
+            Type::IntLiteral(python_version.major.into()),
+            Type::IntLiteral(python_version.minor.into()),
+            int_instance_ty,
+            release_level_ty,
+            int_instance_ty,
+        ])
     }
 }
 

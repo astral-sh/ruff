@@ -20,7 +20,7 @@ use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
     DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
@@ -1348,11 +1348,21 @@ impl<'db> ClassLiteral<'db> {
         let class_definition =
             semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
 
-        class_stmt
-            .bases()
-            .iter()
-            .map(|base_node| definition_expression_type(db, class_definition, base_node))
-            .collect()
+        if self.is_known(db, KnownClass::VersionInfo) {
+            let tuple_type = TupleType::new(db, TupleSpec::version_info_spec(db))
+                .expect("sys.version_info tuple spec should always be a valid tuple");
+
+            Box::new([
+                definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
+                Type::from(tuple_type.to_class_type(db)),
+            ])
+        } else {
+            class_stmt
+                .bases()
+                .iter()
+                .map(|base_node| definition_expression_type(db, class_definition, base_node))
+                .collect()
+        }
     }
 
     /// Return `Some()` if this class is known to be a [`SolidBase`], or `None` if it is not.
