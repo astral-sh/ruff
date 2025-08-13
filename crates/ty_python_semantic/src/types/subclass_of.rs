@@ -3,8 +3,9 @@ use ruff_python_ast::name::Name;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
-    Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
+    BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass,
+    LazyTypeVarBoundOrConstraints, MemberLookupPolicy, Type, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
 };
 use crate::{Db, FxOrderSet};
 
@@ -96,8 +97,10 @@ impl<'db> SubclassOfType<'db> {
                             db,
                             Name::new_static("T_all"),
                             None,
-                            Some(TypeVarBoundOrConstraints::UpperBound(
-                                KnownClass::Type.to_instance(db),
+                            Some(LazyTypeVarBoundOrConstraints::Eager(
+                                TypeVarBoundOrConstraints::UpperBound(
+                                    KnownClass::Type.to_instance(db),
+                                ),
                             )),
                             variance,
                             None,

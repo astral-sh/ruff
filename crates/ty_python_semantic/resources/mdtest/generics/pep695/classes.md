@@ -549,7 +549,7 @@ reveal_type(WithOverloadedMethod[int].method)
 Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
 
 ```py
-# error: [unresolved-reference]
+# TODO error
 class C[S: T, T]:
     pass
 

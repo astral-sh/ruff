@@ -442,7 +442,7 @@ impl Display for DisplayTypeVarInstance<'_> {
             }
             None => {}
         }
-        if let Some(default_type) = self.typevar.default_ty(self.db) {
+        if let Some(default_type) = self.typevar.default_type(self.db) {
             write!(f, ", default={}", default_type.display(self.db))?;
         }
         Ok(())
@@ -487,7 +487,7 @@ impl Display for DisplayBoundTypeVarInstance<'_> {
             }
             None => {}
         }
-        if let Some(default_type) = self.bound_typevar.default_ty(self.db) {
+        if let Some(default_type) = self.bound_typevar.default_type(self.db) {
             write!(f, " = {}", default_type.display(self.db))?;
         }
         Ok(())

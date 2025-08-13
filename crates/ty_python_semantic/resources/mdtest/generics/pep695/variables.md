@@ -745,4 +745,86 @@ def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[int] | type[str]
 ```
 
+## Cycles
+
+### Bounds and constraints
+
+A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
+
+```py
+# TODO: error
+def f[S, T: list[S]](x: S, y: T) -> S | T:
+    return x or y
+
+# TODO: error
+class C[S, T: list[S]]:
+    x: S
+    y: T
+
+reveal_type(C[int, str]().x)  # revealed: int
+reveal_type(C[int, str]().y)  # revealed: str
+
+# TODO: error
+def g[T: list[T]](x: T) -> T:
+    return x
+
+# TODO: error
+class D[T: list[T]]:
+    x: T
+
+reveal_type(D[int]().x)  # revealed: int
+
+# TODO: error
+def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
+    return x or y
+
+# TODO: error
+class E[S, T: (list[S], str)]:
+    x: S
+    y: T
+
+reveal_type(E[int, str]().x)  # revealed: int
+reveal_type(E[int, str]().y)  # revealed: str
+
+# TODO: error
+def i[T: (list[T], str)](x: T) -> T:
+    return x
+
+# TODO: error
+class F[T: (list[T], str)]:
+    x: T
+
+reveal_type(F[int]().x)  # revealed: int
+```
+
+However, they are lazily evaluated and can cyclically refer to their own type:
+
+```py
+class G[T: list[G]]:
+    x: T
+
+reveal_type(G[list[G]]().x)  # revealed: list[G[list[G[Unknown]]]
+```
+
+### Defaults
+
+Defaults can be generic, but can only refer to earlier typevars:
+
+```py
+class C[T, U = T]:
+    x: T
+    y: U
+
+reveal_type(C[int, str]().x)  # revealed: int
+reveal_type(C[int, str]().y)  # revealed: str
+reveal_type(C[int]().x)  # revealed: int
+reveal_type(C[int]().y)  # revealed: int
+
+# TODO: error
+class D[T = T]:
+    x: T
+
+reveal_type(D().x)  # revealed: Unknown
+```
+
 [pep 695]: https://peps.python.org/pep-0695/

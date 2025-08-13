@@ -702,6 +702,13 @@ impl DefinitionKind<'_> {
         )
     }
 
+    pub(crate) fn into_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
+        match self {
+            DefinitionKind::TypeVar(type_var) => Some(type_var),
+            _ => None,
+        }
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,

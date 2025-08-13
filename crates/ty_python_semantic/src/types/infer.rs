@@ -118,11 +118,12 @@ use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
-    Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    LazyTypeVarBoundOrConstraints, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarDefault,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType, binding_type,
+    todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -1747,6 +1748,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::Class(class) => {
                 self.infer_class_deferred(definition, class.node(self.module()));
+            }
+            DefinitionKind::TypeVar(typevar) => {
+                self.infer_typevar_deferred(typevar.node(self.module()));
             }
             _ => {}
         }
@@ -3406,52 +3410,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         builder.into_diagnostic("TypeVar must have at least two constrained types");
                     }
-                    self.infer_expression(expr);
                     None
                 } else {
-                    // We don't use UnionType::from_elements or UnionBuilder here, because we don't
-                    // want to simplify the list of constraints like we do with the elements of an
-                    // actual union type.
-                    // TODO: Consider using a new `OneOfType` connective here instead, since that
-                    // more accurately represents the actual semantics of typevar constraints.
-                    let elements = UnionType::new(
-                        self.db(),
-                        elts.iter()
-                            .map(|expr| {
-                                self.infer_type_expression_with_state(
-                                    expr,
-                                    DeferredExpressionState::Deferred,
-                                )
-                            })
-                            .collect::<Box<[_]>>(),
-                    );
-                    let constraints = TypeVarBoundOrConstraints::Constraints(elements);
-                    // But when we construct an actual union type for the constraint expression as
-                    // a whole, we do use UnionType::from_elements to maintain the invariant that
-                    // all union types are simplified.
-                    self.store_expression_type(
-                        expr,
-                        UnionType::from_elements(self.db(), elements.elements(self.db())),
-                    );
-                    Some(constraints)
+                    Some(LazyTypeVarBoundOrConstraints::LazyConstraints)
                 }
             }
-            Some(expr) => Some(TypeVarBoundOrConstraints::UpperBound(
-                self.infer_type_expression_with_state(expr, DeferredExpressionState::Deferred),
-            )),
+            Some(_) => Some(LazyTypeVarBoundOrConstraints::LazyUpperBound),
             None => None,
         };
-        let default_ty = self.infer_optional_type_expression_with_state(
-            default.as_deref(),
-            DeferredExpressionState::Deferred,
-        );
+        if bound_or_constraint.is_some() || default.is_some() {
+            self.deferred.insert(definition);
+        }
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             &name.id,
             Some(definition),
             bound_or_constraint,
             TypeVarVariance::Invariant, // TODO: infer this
-            default_ty,
+            default.as_deref().map(|_| TypeVarDefault::Lazy),
             TypeVarKind::Pep695,
         )));
         self.add_declaration_with_binding(
@@ -3459,6 +3435,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(ty),
         );
+    }
+
+    fn infer_typevar_deferred(&mut self, node: &ast::TypeParamTypeVar) {
+        let ast::TypeParamTypeVar {
+            range: _,
+            node_index: _,
+            name: _,
+            bound,
+            default,
+        } = node;
+        match bound.as_deref() {
+            Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
+                // We don't use UnionType::from_elements or UnionBuilder here, because we don't
+                // want to simplify the list of constraints like we do with the elements of an
+                // actual union type.
+                // TODO: Consider using a new `OneOfType` connective here instead, since that
+                // more accurately represents the actual semantics of typevar constraints.
+                let ty = Type::Union(UnionType::new(
+                    self.db(),
+                    elts.iter()
+                        .map(|expr| self.infer_type_expression(expr))
+                        .collect::<Box<[_]>>(),
+                ));
+                self.store_expression_type(expr, ty);
+            }
+            Some(expr) => {
+                self.infer_type_expression(expr);
+            }
+            None => {}
+        };
+        self.infer_optional_type_expression(default.as_deref());
     }
 
     fn infer_paramspec_definition(
@@ -9561,15 +9568,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation_ty
     }
 
-    /// Similar to [`infer_type_expression_with_state`], but accepts an optional expression.
+    /// Similar to [`infer_type_expression`], but accepts an optional expression.
     ///
-    /// [`infer_type_expression_with_state`]: TypeInferenceBuilder::infer_type_expression_with_state
-    fn infer_optional_type_expression_with_state(
+    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression_with_state
+    fn infer_optional_type_expression(
         &mut self,
         expression: Option<&ast::Expr>,
-        deferred_state: DeferredExpressionState,
     ) -> Option<Type<'db>> {
-        expression.map(|expr| self.infer_type_expression_with_state(expr, deferred_state))
+        expression.map(|expr| self.infer_type_expression(expr))
     }
 
     fn report_invalid_type_expression(
@@ -11553,7 +11559,7 @@ mod tests {
             );
             assert_eq!(
                 typevar
-                    .default_ty(&db)
+                    .default_type(&db)
                     .map(|ty| ty.display(&db).to_string()),
                 default.map(std::borrow::ToOwned::to_owned)
             );

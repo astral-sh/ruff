@@ -38,6 +38,7 @@ impl Default for TypeTransformer<'_> {
     }
 }
 
+pub(crate) type TypeVisitor<'db> = CycleDetector<Type<'db>, bool>;
 pub(crate) type PairVisitor<'db> = CycleDetector<(Type<'db>, Type<'db>), bool>;
 
 #[derive(Debug)]

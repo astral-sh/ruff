@@ -33,10 +33,6 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_annotation()
     }
 
-    pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
-        self.node(db).scope_kind().is_type_parameter()
-    }
-
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
     }
@@ -261,10 +257,6 @@ impl ScopeKind {
 
     pub(crate) const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
-    }
-
-    pub(crate) const fn is_type_parameter(self) -> bool {
-        matches!(self, ScopeKind::TypeParams)
     }
 
     pub(crate) const fn is_non_lambda_function(self) -> bool {

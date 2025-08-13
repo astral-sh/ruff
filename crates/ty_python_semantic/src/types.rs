@@ -5273,7 +5273,7 @@ impl<'db> Type<'db> {
                         db,
                         Name::new(format!("{}'instance", typevar.name(db))),
                         None,
-                        Some(bound_or_constraints),
+                        Some(LazyTypeVarBoundOrConstraints::Eager(bound_or_constraints)),
                         typevar.variance(db),
                         None,
                         typevar.kind(db),
@@ -5464,7 +5464,9 @@ impl<'db> Type<'db> {
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(instance)),
+                        Some(LazyTypeVarBoundOrConstraints::Eager(
+                            TypeVarBoundOrConstraints::UpperBound(instance),
+                        )),
                         TypeVarVariance::Invariant,
                         None,
                         TypeVarKind::Implicit,
@@ -6844,14 +6846,14 @@ pub struct TypeVarInstance<'db> {
     /// The type var's definition (None if synthesized)
     pub definition: Option<Definition<'db>>,
 
-    /// The upper bound or constraint on the type of this TypeVar
-    bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
+    /// The upper bound or constraint on the type of this TypeVar, if any
+    maybe_bound_or_constraints: Option<LazyTypeVarBoundOrConstraints<'db>>,
 
     /// The variance of the TypeVar
     variance: TypeVarVariance,
 
-    /// The default type for this TypeVar
-    default_ty: Option<Type<'db>>,
+    /// The default type for this TypeVar, if any
+    maybe_default: Option<TypeVarDefault<'db>>,
 
     pub kind: TypeVarKind,
 }
@@ -6867,11 +6869,12 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     if let Some(bounds) = typevar.bound_or_constraints(db) {
         walk_type_var_bounds(db, bounds, visitor);
     }
-    if let Some(default_type) = typevar.default_ty(db) {
+    if let Some(default_type) = typevar.default_type(db) {
         visitor.visit_type(db, default_type);
     }
 }
 
+#[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn with_binding_context(
         self,
@@ -6901,15 +6904,60 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
+    pub(crate) fn bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<TypeVarBoundOrConstraints<'db>> {
+        self.maybe_bound_or_constraints(db).and_then(|w| match w {
+            LazyTypeVarBoundOrConstraints::Eager(bound_or_constraints) => {
+                Some(bound_or_constraints)
+            }
+            LazyTypeVarBoundOrConstraints::LazyUpperBound => self.lazy_bound(db),
+            LazyTypeVarBoundOrConstraints::LazyConstraints => self.lazy_constraints(db),
+        })
+    }
+
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.maybe_default(db).and_then(|d| match d {
+            TypeVarDefault::Eager(ty) => Some(ty),
+            TypeVarDefault::Lazy => self.lazy_default(db),
+        })
+    }
+
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.bound_or_constraints(db)
-                .map(|b| b.normalized_impl(db, visitor)),
+            self.maybe_bound_or_constraints(db)
+                .and_then(|bound_or_constraints| match bound_or_constraints {
+                    LazyTypeVarBoundOrConstraints::Eager(bound_or_constraints) => {
+                        Some(LazyTypeVarBoundOrConstraints::Eager(
+                            bound_or_constraints.normalized_impl(db, visitor),
+                        ))
+                    }
+                    LazyTypeVarBoundOrConstraints::LazyUpperBound => {
+                        self.lazy_bound(db).map(|bound| {
+                            LazyTypeVarBoundOrConstraints::Eager(bound.normalized_impl(db, visitor))
+                        })
+                    }
+                    LazyTypeVarBoundOrConstraints::LazyConstraints => {
+                        self.lazy_constraints(db).map(|constraints| {
+                            LazyTypeVarBoundOrConstraints::Eager(
+                                constraints.normalized_impl(db, visitor),
+                            )
+                        })
+                    }
+                }),
             self.variance(db),
-            self.default_ty(db).map(|d| d.normalized_impl(db, visitor)),
+            self.maybe_default(db).and_then(|default| match default {
+                TypeVarDefault::Eager(ty) => {
+                    Some(TypeVarDefault::Eager(ty.normalized_impl(db, visitor)))
+                }
+                TypeVarDefault::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| TypeVarDefault::Eager(ty.normalized_impl(db, visitor))),
+            }),
             self.kind(db),
         )
     }
@@ -6919,12 +6967,68 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
-            self.bound_or_constraints(db)
-                .map(|b| b.materialize(db, variance)),
+            self.maybe_bound_or_constraints(db)
+                .and_then(|bound_or_constraints| match bound_or_constraints {
+                    LazyTypeVarBoundOrConstraints::Eager(bound_or_constraints) => {
+                        Some(LazyTypeVarBoundOrConstraints::Eager(
+                            bound_or_constraints.materialize(db, variance),
+                        ))
+                    }
+                    LazyTypeVarBoundOrConstraints::LazyUpperBound => {
+                        self.lazy_bound(db).map(|bound| {
+                            LazyTypeVarBoundOrConstraints::Eager(bound.materialize(db, variance))
+                        })
+                    }
+                    LazyTypeVarBoundOrConstraints::LazyConstraints => {
+                        self.lazy_constraints(db).map(|constraints| {
+                            LazyTypeVarBoundOrConstraints::Eager(
+                                constraints.materialize(db, variance),
+                            )
+                        })
+                    }
+                }),
             self.variance(db),
-            self.default_ty(db),
+            self.maybe_default(db).and_then(|default| match default {
+                TypeVarDefault::Eager(ty) => {
+                    Some(TypeVarDefault::Eager(ty.materialize(db, variance)))
+                }
+                TypeVarDefault::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| TypeVarDefault::Eager(ty.materialize(db, variance))),
+            }),
             self.kind(db),
         )
+    }
+
+    #[salsa::tracked]
+    fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+        Some(TypeVarBoundOrConstraints::UpperBound(ty))
+    }
+
+    #[salsa::tracked]
+    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+            .into_union()?;
+        Some(TypeVarBoundOrConstraints::Constraints(ty))
+    }
+
+    #[salsa::tracked]
+    fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).into_typevar()?.node(&module);
+        Some(definition_expression_type(
+            db,
+            definition,
+            typevar_node.default.as_ref()?,
+        ))
     }
 }
 
@@ -6990,10 +7094,10 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// By using `U` in the generic class, it becomes bound, and so we have a
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
-    pub(crate) fn default_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let binding_context = self.binding_context(db);
         self.typevar(db)
-            .default_ty(db)
+            .default_type(db)
             .map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context)))
     }
 
@@ -7034,6 +7138,24 @@ impl TypeVarVariance {
             TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum TypeVarDefault<'db> {
+    /// The default type is lazily evaluated.
+    Lazy,
+    /// The default type is eagerly specified.
+    Eager(Type<'db>),
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum LazyTypeVarBoundOrConstraints<'db> {
+    /// There is a lazily-evaluated upper bound.
+    LazyUpperBound,
+    /// There is a lazily-evaluated set of constraints.
+    LazyConstraints,
+    /// The upper bound/constraints are eagerly specified.
+    Eager(TypeVarBoundOrConstraints<'db>),
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
