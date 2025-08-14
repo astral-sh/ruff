@@ -211,6 +211,70 @@ alice = Person(1, "Alice", 42)
 bob = Person(2, "Bob")
 ```
 
+## The symbol `NamedTuple` itself
+
+At runtime, `NamedTuple` is a function, and we understand this:
+
+```py
+import types
+import typing
+
+def f(x: types.FunctionType): ...
+
+f(typing.NamedTuple)
+```
+
+This means we also understand that all attributes on function objects are available on the symbol
+`typing.NamedTuple`:
+
+```py
+reveal_type(typing.NamedTuple.__name__)  # revealed: str
+reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
+reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
+```
+
+But `NamedTuple` and `type[NamedTuple]` are not valid in type expressions -- there is no object at
+runtime that is an "instance of `NamedTuple`", nor is there any class at runtime that is a "subclass
+of `NamedTuple`" -- these are both impossible, since `NamedTuple` is a function and not a class:
+
+```py
+# error: [invalid-type-form] "The special form `typing.NamedTuple` is not allowed in type expressions. Consider using a `tuple[]` type, a concrete NamedTuple type, or a protocol that specifies the methods you require."
+def f(x: typing.NamedTuple):
+    reveal_type(x)  # revealed: Unknown
+
+# TODO: we should emit `invalid-type-form` here and reveal `Unknown`
+def g(y: type[typing.NamedTuple]):
+    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+
+# TODO: this should cause us to emit a diagnostic and reveal `Unknown` (function objects don't have an `__mro__` attribute),
+# but the fact that we don't isn't actually a `NamedTuple` bug (https://github.com/astral-sh/ty/issues/986)
+reveal_type(typing.NamedTuple.__mro__)  # revealed: tuple[<class 'FunctionType'>, <class 'object'>]
+```
+
+Custom protocols can be used to specify "any class with a `_make` method", or "any class with a
+`_replace` method:
+
+```py
+from typing import NamedTuple, Protocol, Iterable, Any
+from ty_extensions import static_assert, is_assignable_to
+
+class Point(NamedTuple):
+    x: int
+    y: int
+
+reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Self@_make
+reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+
+class NamedTupleLike(Protocol):
+    @classmethod
+    def _make(cls, iterable: Iterable[Any]): ...
+    def _asdict(self) -> dict[str, Any]: ...
+    def _replace(self, **kwargs): ...
+
+static_assert(is_assignable_to(Point, NamedTupleLike))
+```
+
 ## NamedTuple with custom `__getattr__`
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/322>. Make sure that the
