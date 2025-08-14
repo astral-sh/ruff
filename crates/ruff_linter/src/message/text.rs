@@ -78,7 +78,7 @@ impl Emitter for TextEmitter {
         for message in diagnostics {
             write!(writer, "{}", message.display(context, &self.config))?;
 
-            if self.show_fix_diff {
+            if self.show_fix_diff && message.fix_applies(&self.config) {
                 if let Some(diff) = Diff::from_message(message) {
                     writeln!(writer, "{diff}")?;
                 }
