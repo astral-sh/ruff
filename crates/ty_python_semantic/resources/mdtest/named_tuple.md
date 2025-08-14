@@ -163,7 +163,7 @@ class User(NamedTuple):
     nickname: str
 
 class SuperUser(User):
-    # this should be an error because it implies that the `id` attribute on
+    # TODO: this should be an error because it implies that the `id` attribute on
     # `SuperUser` is mutable, but the read-only `id` property from the superclass
     # has not been overridden in the class body
     id: int
