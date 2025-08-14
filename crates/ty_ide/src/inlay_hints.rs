@@ -67,7 +67,7 @@ pub fn inlay_hints<'db>(
 }
 
 /// Settings to control the behavior of inlay hints.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct InlayHintSettings {
     /// Whether to show variable type hints.
     ///
@@ -76,6 +76,7 @@ pub struct InlayHintSettings {
     /// x": Literal[1]" = 1
     /// ```
     pub variable_types: bool,
+
     /// Whether to show function argument names.
     ///
     /// For example, this would enable / disable hints like the ones quoted below:
@@ -84,6 +85,15 @@ pub struct InlayHintSettings {
     /// foo("x="1)
     /// ```
     pub function_argument_names: bool,
+}
+
+impl Default for InlayHintSettings {
+    fn default() -> Self {
+        Self {
+            variable_types: true,
+            function_argument_names: true,
+        }
+    }
 }
 
 struct InlayHintVisitor<'a, 'db> {
@@ -818,7 +828,7 @@ mod tests {
             def foo(x: str) -> int: ...
             def foo(x):
                 return x
-            
+
             foo(42)
             foo('hello')",
         );
