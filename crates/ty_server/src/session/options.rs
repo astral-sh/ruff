@@ -243,8 +243,8 @@ struct InlayHintOptions {
 impl InlayHintOptions {
     fn into_settings(self) -> InlayHintSettings {
         InlayHintSettings {
-            variable_types: self.variable_types.unwrap_or_default(),
-            function_argument_names: self.function_argument_names.unwrap_or_default(),
+            variable_types: self.variable_types.unwrap_or(true),
+            function_argument_names: self.function_argument_names.unwrap_or(true),
         }
     }
 }
