@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.12.9
+
+### Preview features
+
+- \[`airflow`\] Add check for `airflow.secrets.cache.SecretCache` (`AIR301`) ([#17707](https://github.com/astral-sh/ruff/pull/17707))
+- \[`ruff`\] Offer a safe fix for multi-digit zeros (`RUF064`) ([#19847](https://github.com/astral-sh/ruff/pull/19847))
+
+### Bug fixes
+
+- \[`flake8-blind-except`\] Fix `BLE001` false-positive on `raise ... from None` ([#19755](https://github.com/astral-sh/ruff/pull/19755))
+- \[`flake8-comprehensions`\] Fix false positive for `C420` with attribute, subscript, or slice assignment targets ([#19513](https://github.com/astral-sh/ruff/pull/19513))
+- \[`flake8-simplify`\] Fix handling of U+001C..U+001F whitespace (`SIM905`) ([#19849](https://github.com/astral-sh/ruff/pull/19849))
+
+### Rule changes
+
+- \[`pylint`\] Use lowercase hex characters to match the formatter (`PLE2513`) ([#19808](https://github.com/astral-sh/ruff/pull/19808))
+
+### Documentation
+
+- Fix `lint.future-annotations` link ([#19876](https://github.com/astral-sh/ruff/pull/19876))
+
+### Other changes
+
+- Build `riscv64` binaries for release ([#19819](https://github.com/astral-sh/ruff/pull/19819))
+- Add rule code to error description in GitLab output([#19896](https://github.com/astral-sh/ruff/pull/19896))
+
 ## 0.12.8
 
 ### Preview features
