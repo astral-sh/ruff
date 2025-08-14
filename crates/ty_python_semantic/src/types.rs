@@ -4264,10 +4264,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownClass::NamedTuple) => {
-                    Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
-                }
-
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
@@ -4581,6 +4577,10 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into()
+            }
+
+            Type::SpecialForm(SpecialFormType::NamedTuple) => {
+                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
             }
 
             Type::GenericAlias(_) => {
@@ -5502,6 +5502,13 @@ impl<'db> Type<'db> {
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
+                    ],
+                    fallback_type: Type::unknown(),
+                }),
+
+                SpecialFormType::NamedTuple => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![
+                        InvalidTypeExpression::NamedTuple
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -6658,6 +6665,8 @@ enum InvalidTypeExpression<'db> {
     Field,
     /// Same for `typing.TypedDict`
     TypedDict,
+    /// Same for `typing.NamedTuple`
+    NamedTuple,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6709,6 +6718,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str(
                             "The special form `typing.TypedDict` is not allowed in type expressions. \
                             Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
+                    }
+                    InvalidTypeExpression::NamedTuple => {
+                        f.write_str(
+                            "The special form `typing.NamedTuple` is not allowed in type expressions. \
+                            Consider using a `tuple[]` type, a concrete NamedTuple type, or a protocol that \
+                            specifies the methods you require.")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,

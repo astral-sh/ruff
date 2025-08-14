@@ -198,9 +198,7 @@ impl CodeGeneratorKind {
             } else if class
                 .explicit_bases(db)
                 .iter()
-                .copied()
-                .filter_map(Type::into_class_literal)
-                .any(|class| class.is_known(db, KnownClass::NamedTuple))
+                .any(|base| matches!(base, Type::SpecialForm(SpecialFormType::NamedTuple)))
             {
                 Some(CodeGeneratorKind::NamedTuple)
             } else if class.is_typed_dict(db) {
@@ -3109,7 +3107,6 @@ pub enum KnownClass {
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
-    NamedTuple,
     NewType,
     SupportsIndex,
     Iterable,
@@ -3217,8 +3214,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
-            // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
-            | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -3314,7 +3309,6 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Field
             | Self::SupportsIndex
-            | Self::NamedTuple
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
             | Self::Counter
@@ -3384,7 +3378,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3461,7 +3454,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3538,7 +3530,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3620,7 +3611,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::NoDefaultType
-            | Self::NamedTuple
             | Self::NewType
             | Self::ChainMap
             | Self::Counter
@@ -3685,7 +3675,6 @@ impl KnownClass {
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
-            Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
@@ -3956,7 +3945,6 @@ impl KnownClass {
             | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
-            | Self::NamedTuple
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
@@ -4067,7 +4055,6 @@ impl KnownClass {
             | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4149,7 +4136,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4206,7 +4192,6 @@ impl KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
-            "NamedTuple" => Self::NamedTuple,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -4325,7 +4310,6 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::NamedTuple
             | Self::Iterable
             | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
