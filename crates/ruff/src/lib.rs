@@ -299,7 +299,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
     if !(cli.diff || fix_only) {
-        printer_flags |= PrinterFlags::SHOW_VIOLATIONS | PrinterFlags::SHOW_FIX_DIFF;
+        printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
     }
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIX_SUMMARY;
