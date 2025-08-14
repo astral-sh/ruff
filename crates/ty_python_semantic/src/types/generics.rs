@@ -353,12 +353,17 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
-        assert_eq!(self.variables(db).len(), types.len());
-        debug_assert!(
-            matches!(self.inner(db), GenericContextInner::NonTuple(_)),
-            "Should never call `GenericContext::specialize` on a tuple context"
-        );
-        Specialization::new(db, self, SpecializationInner::NonTuple(types))
+        match self.inner(db) {
+            GenericContextInner::Tuple { .. } => {
+                assert_eq!(types.len(), 1);
+                let tuple = TupleType::homogeneous(db, types[0]);
+                Specialization::new(db, self, SpecializationInner::Tuple(tuple))
+            }
+            GenericContextInner::NonTuple(variables) => {
+                assert_eq!(variables.len(), types.len());
+                Specialization::new(db, self, SpecializationInner::NonTuple(types))
+            }
+        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
