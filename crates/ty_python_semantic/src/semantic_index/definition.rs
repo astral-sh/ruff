@@ -709,6 +709,13 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) fn as_annotated_assignment(&self) -> Option<&AnnotatedAssignmentDefinitionKind> {
+        match self {
+            DefinitionKind::AnnotatedAssignment(annassign) => Some(annassign),
+            _ => None,
+        }
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,

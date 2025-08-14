@@ -126,6 +126,15 @@ class E:
     x: int = field(default=3)
     # error: [dataclass-field-order]
     y: str
+
+import sys
+
+@dataclass
+class F:
+    x: int = 1
+    if sys.version_info > (3, 7):
+        # error: [dataclass-field-order]
+        y: str
 ```
 
 Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:

@@ -1416,24 +1416,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                // Report field ordering violations
-                for name in required_after_default_field_names {
-                    if let Some(field_node) = class_node.body.iter().find_map(|stmt| {
-                        if let ast::Stmt::AnnAssign(ann_assign) = stmt {
-                            if let ast::Expr::Name(name_expr) = ann_assign.target.as_ref() {
-                                if name_expr.id == *name {
-                                    return Some(ann_assign.target.as_ref());
-                                }
-                            }
-                        }
-                        None
-                    }) {
-                        if let Some(builder) =
-                            self.context.report_lint(&DATACLASS_FIELD_ORDER, field_node)
+                if !required_after_default_field_names.is_empty() {
+                    // Report field ordering violations
+                    let body_scope = class.body_scope(self.db()).file_scope_id(self.db());
+                    let use_def_map = self.index.use_def_map(body_scope);
+                    let place_table = self.index.place_table(body_scope);
+
+                    for name in required_after_default_field_names {
+                        let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
+                            continue;
+                        };
+                        if let Some(ann_assign) = use_def_map
+                            .end_of_scope_symbol_declarations(symbol_id)
+                            .find_map(|decl_with_constraints| {
+                                decl_with_constraints
+                                    .declaration
+                                    .definition()?
+                                    .kind(self.db())
+                                    .as_annotated_assignment()
+                            })
                         {
-                            builder.into_diagnostic(format_args!(
+                            if let Some(builder) = self.context.report_lint(
+                                &DATACLASS_FIELD_ORDER,
+                                ann_assign.target(self.module()),
+                            ) {
+                                builder.into_diagnostic(format_args!(
                                 "Required field `{name}` cannot be defined after fields with default values",
                             ));
+                            }
                         }
                     }
                 }
