@@ -391,6 +391,12 @@ impl std::fmt::Display for LegacyGenericBase {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+enum SpecializationInner<'db> {
+    Tuple(TupleType<'db>),
+    NonTuple(Box<[Type<'db>]>),
+}
+
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
@@ -398,12 +404,8 @@ impl std::fmt::Display for LegacyGenericBase {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
-    #[returns(deref)]
-    pub(crate) types: Box<[Type<'db>]>,
-
-    /// For specializations of `tuple`, we also store more detailed information about the tuple's
-    /// elements, above what the class's (single) typevar can represent.
-    tuple_inner: Option<TupleType<'db>>,
+    #[returns(ref)]
+    inner: SpecializationInner<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -418,15 +420,29 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
     }
-    if let Some(tuple) = specialization.tuple_inner(db) {
-        walk_tuple_type(db, tuple, visitor);
-    }
 }
 
 impl<'db> Specialization<'db> {
+    pub(crate) fn types(self, db: &'db dyn Db) -> &[Type<'db>] {
+        #[salsa::tracked(returns(ref))]
+        fn homogeneous_element_type<'db>(db: &'db dyn Db, tuple: TupleType<'db>) -> Type<'db> {
+            tuple.tuple(db).homogeneous_element_type(db)
+        }
+
+        match self.inner(db) {
+            SpecializationInner::Tuple(tuple) => {
+                std::slice::from_ref(homogeneous_element_type(db, *tuple))
+            }
+            SpecializationInner::NonTuple(types) => types,
+        }
+    }
+
     /// Returns the tuple spec for a specialization of the `tuple` class.
     pub(crate) fn tuple(self, db: &'db dyn Db) -> Option<&'db TupleSpec<'db>> {
-        self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
+        match self.inner(db) {
+            SpecializationInner::Tuple(tuple) => Some(tuple.tuple(db)),
+            SpecializationInner::NonTuple(_) => None,
+        }
     }
 
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
@@ -474,15 +490,20 @@ impl<'db> Specialization<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
-            .collect();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .and_then(|tuple| tuple.apply_type_mapping_impl(db, type_mapping, visitor));
-        Specialization::new(db, self.generic_context(db), types, tuple_inner)
+        let inner = match self.inner(db) {
+            SpecializationInner::Tuple(tuple) => tuple
+                .apply_type_mapping_impl(db, type_mapping, visitor)
+                .map(SpecializationInner::Tuple)
+                .unwrap_or_else(|| SpecializationInner::NonTuple(Box::from([Type::Never]))),
+            SpecializationInner::NonTuple(types) => {
+                let types = types
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, visitor))
+                    .collect();
+                SpecializationInner::NonTuple(types)
+            }
+        };
+        Specialization::new(db, self.generic_context(db), inner)
     }
 
     /// Applies an optional specialization to this specialization.
@@ -524,16 +545,22 @@ impl<'db> Specialization<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .and_then(|tuple| tuple.normalized_impl(db, visitor));
+        let inner = match self.inner(db) {
+            SpecializationInner::Tuple(tuple) => tuple
+                .normalized_impl(db, visitor)
+                .map(SpecializationInner::Tuple)
+                .unwrap_or_else(|| SpecializationInner::NonTuple(Box::from([Type::Never]))),
+            SpecializationInner::NonTuple(types) => {
+                let types: Box<[_]> = types
+                    .iter()
+                    .map(|ty| ty.normalized_impl(db, visitor))
+                    .collect();
+                SpecializationInner::NonTuple(types)
+            }
+        };
+
         let context = self.generic_context(db).normalized_impl(db, visitor);
-        Self::new(db, context, types, tuple_inner)
+        Self::new(db, context, inner)
     }
 
     pub(super) fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
@@ -644,17 +671,14 @@ impl<'db> Specialization<'db> {
             }
         }
 
-        match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return false,
-            (None, None) => {}
-            (Some(self_tuple), Some(other_tuple)) => {
-                if !self_tuple.is_equivalent_to(db, other_tuple) {
-                    return false;
-                }
+        match (self.inner(db), other.inner(db)) {
+            (SpecializationInner::Tuple(_), SpecializationInner::NonTuple(_))
+            | (SpecializationInner::NonTuple(_), SpecializationInner::Tuple(_)) => false,
+            (SpecializationInner::NonTuple(_), SpecializationInner::NonTuple(_)) => true,
+            (SpecializationInner::Tuple(self_tuple), SpecializationInner::Tuple(other_tuple)) => {
+                self_tuple.is_equivalent_to(db, *other_tuple)
             }
         }
-
-        true
     }
 
     pub(crate) fn find_legacy_typevars(
