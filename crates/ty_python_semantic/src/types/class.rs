@@ -24,8 +24,8 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    NormalizedVisitor, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
     infer_definition_types, todo_type,
 };
 use crate::{
@@ -1860,6 +1860,18 @@ impl<'db> ClassLiteral<'db> {
                 ],
             ))
             .with_qualifiers(TypeQualifiers::CLASS_VAR);
+        }
+
+        if CodeGeneratorKind::NamedTuple.matches(db, self) {
+            if let Some(field) = self.own_fields(db, specialization).get(name) {
+                let property_getter_signature = Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Some(field.declared_ty),
+                );
+                let property_getter = CallableType::single(db, property_getter_signature);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                return Place::bound(Type::PropertyInstance(property)).into();
+            }
         }
 
         let body_scope = self.body_scope(db);
