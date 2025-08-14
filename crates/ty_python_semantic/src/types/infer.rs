@@ -6380,7 +6380,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = await_expression;
-        self.infer_expression(value).resolve_await(self.db())
+        let expr_type = self.infer_expression(value);
+        expr_type.try_await(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
+            Type::unknown()
+        })
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.

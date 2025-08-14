@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Invalid union return type
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | import typing
+ 2 | from datetime import datetime
+ 3 | 
+ 4 | class UnawaitableUnion:
+ 5 |     if datetime.today().weekday() == 6:
+ 6 | 
+ 7 |         def __await__(self) -> typing.Generator[typing.Any, None, None]:
+ 8 |             yield
+ 9 |     else:
+10 | 
+11 |         def __await__(self) -> int:
+12 |             return 5
+13 | 
+14 | async def main() -> None:
+15 |     await UnawaitableUnion()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `UnawaitableUnion` is not awaitable
+  --> src/mdtest_snippet.py:15:11
+   |
+14 | async def main() -> None:
+15 |     await UnawaitableUnion()  # error: [invalid-await]
+   |           ^^^^^^^^^^^^^^^^^^
+   |
+info: `__await__` returns `Generator[Any, None, None] | int`, which is not a valid iterator
+info: rule `invalid-await` is enabled by default
+
+```

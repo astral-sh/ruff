@@ -41,7 +41,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
-use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
+use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::function::{
     DataclassTransformerParams, FunctionSpans, FunctionType, KnownFunction,
@@ -4778,20 +4778,24 @@ impl<'db> Type<'db> {
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         if mode.is_async() {
-            let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| {
+            let try_call_dunder_anext_on_iterator = |iterator: Type<'db>| -> Result<
+                Result<Type<'db>, AwaitError<'db>>,
+                CallDunderError<'db>,
+            > {
                 iterator
                     .try_call_dunder(db, "__anext__", CallArguments::none())
-                    .map(|dunder_anext_outcome| {
-                        dunder_anext_outcome.return_type(db).resolve_await(db)
-                    })
+                    .map(|dunder_anext_outcome| dunder_anext_outcome.return_type(db).try_await(db))
             };
 
             return match self.try_call_dunder(db, "__aiter__", CallArguments::none()) {
                 Ok(dunder_aiter_bindings) => {
                     let iterator = dunder_aiter_bindings.return_type(db);
                     match try_call_dunder_anext_on_iterator(iterator) {
-                        Ok(result) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
-                        Err(dunder_anext_error) => {
+                        Ok(Ok(result)) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
+                        Ok(Err(AwaitError::InvalidReturnType(..))) => {
+                            Err(IterationError::UnboundAiterError)
+                        } // TODO: __anext__ is bound, but is not properly awaitable
+                        Err(dunder_anext_error) | Ok(Err(AwaitError::Call(dunder_anext_error))) => {
                             Err(IterationError::IterReturnsInvalidIterator {
                                 iterator,
                                 dunder_error: dunder_anext_error,
@@ -4996,7 +5000,7 @@ impl<'db> Type<'db> {
             (Ok(enter), Ok(_)) => {
                 let ty = enter.return_type(db);
                 Ok(if mode.is_async() {
-                    ty.resolve_await(db)
+                    ty.try_await(db).unwrap_or(Type::unknown())
                 } else {
                     ty
                 })
@@ -5005,7 +5009,7 @@ impl<'db> Type<'db> {
                 let ty = enter.return_type(db);
                 Err(ContextManagerError::Exit {
                     enter_return_type: if mode.is_async() {
-                        ty.resolve_await(db)
+                        ty.try_await(db).unwrap_or(Type::unknown())
                     } else {
                         ty
                     },
@@ -5024,15 +5028,17 @@ impl<'db> Type<'db> {
     }
 
     /// Resolve the type of an `await …` expression where `self` is the type of the awaitable.
-    fn resolve_await(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add proper error handling and rename this method to `try_await`.
-        self.try_call_dunder(db, "__await__", CallArguments::none())
-            .map_or(Type::unknown(), |result| {
-                result
-                    .return_type(db)
-                    .generator_return_type(db)
-                    .unwrap_or_else(Type::unknown)
-            })
+    fn try_await(self, db: &'db dyn Db) -> Result<Type<'db>, AwaitError<'db>> {
+        let await_result = self.try_call_dunder(db, "__await__", CallArguments::none());
+        match await_result {
+            Ok(bindings) => {
+                let return_type = bindings.return_type(db);
+                Ok(return_type.generator_return_type(db).ok_or_else(|| {
+                    AwaitError::InvalidReturnType(return_type, Box::new(bindings))
+                })?)
+            }
+            Err(call_error) => Err(AwaitError::Call(call_error)),
+        }
     }
 
     /// Get the return type of a `yield from …` expression where `self` is the type of the generator.
@@ -5068,6 +5074,8 @@ impl<'db> Type<'db> {
                     None
                 }
             }
+            Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
+            ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
             _ => None,
         }
     }
@@ -7224,6 +7232,97 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     }
 }
 
+/// Error returned if a type is not awaitable.
+#[derive(Debug)]
+enum AwaitError<'db> {
+    /// `__await__` is either missing, potentially unbound or cannot be called with provided
+    /// arguments.
+    Call(CallDunderError<'db>),
+    /// `__await__` resolved successfully, but its return type is known not to be a generator.
+    InvalidReturnType(Type<'db>, Box<Bindings<'db>>),
+}
+
+impl<'db> AwaitError<'db> {
+    fn report_diagnostic(
+        &self,
+        context: &InferContext<'db, '_>,
+        context_expression_type: Type<'db>,
+        context_expression_node: ast::AnyNodeRef,
+    ) {
+        let Some(builder) = context.report_lint(&INVALID_AWAIT, context_expression_node) else {
+            return;
+        };
+
+        let db = context.db();
+
+        let mut diag = builder.into_diagnostic(
+            format_args!("`{type}` is not awaitable", type = context_expression_type.display(db)),
+        );
+        match self {
+            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                diag.info("`__await__` requires arguments and cannot be called implicitly");
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.parameters)
+                            .message("parameters here"),
+                    );
+                }
+            }
+            Self::Call(CallDunderError::CallError(
+                kind @ (CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable),
+                bindings,
+            )) => {
+                let possibly = if matches!(kind, CallErrorKind::PossiblyNotCallable) {
+                    " possibly"
+                } else {
+                    ""
+                };
+                diag.info(format_args!("`__await__` is{possibly} not callable"));
+                if let Some(definition) = bindings.callable_type().definition(db) {
+                    if let Some(definition_range) = definition.focus_range(db) {
+                        diag.annotate(
+                            Annotation::secondary(definition_range.into())
+                                .message("attribute defined here"),
+                        );
+                    }
+                }
+            }
+            Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
+                diag.info("`__await__` is possibly unbound");
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.signature)
+                            .message("method defined here"),
+                    );
+                }
+            }
+            Self::Call(CallDunderError::MethodNotAvailable) => {
+                diag.info("`__await__` is missing");
+                if let Some(type_definition) = context_expression_type.definition(db) {
+                    if let Some(definition_range) = type_definition.focus_range(db) {
+                        diag.annotate(
+                            Annotation::secondary(definition_range.into())
+                                .message("type defined here"),
+                        );
+                    }
+                }
+            }
+            Self::InvalidReturnType(return_type, bindings) => {
+                diag.info(format_args!(
+                    "`__await__` returns `{return_type}`, which is not a valid iterator",
+                    return_type = return_type.display(db)
+                ));
+                if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
+                    diag.annotate(
+                        Annotation::secondary(definition_spans.signature)
+                            .message("method defined here"),
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// Error returned if a type is not (or may not be) a context manager.
 #[derive(Debug)]
 enum ContextManagerError<'db> {
@@ -7447,11 +7546,11 @@ impl<'db> IterationError<'db> {
         match self {
             Self::IterReturnsInvalidIterator {
                 dunder_error, mode, ..
-            } => dunder_error.return_type(db).map(|ty| {
+            } => dunder_error.return_type(db).and_then(|ty| {
                 if mode.is_async() {
-                    ty.resolve_await(db)
+                    ty.try_await(db).ok()
                 } else {
-                    ty
+                    Some(ty)
                 }
             }),
 
@@ -7466,7 +7565,7 @@ impl<'db> IterationError<'db> {
                         "__anext__",
                         CallArguments::none(),
                     ))
-                    .map(|ty| ty.resolve_await(db))
+                    .and_then(|ty| ty.try_await(db).ok())
                 } else {
                     return_type(dunder_iter_bindings.return_type(db).try_call_dunder(
                         db,

@@ -45,6 +45,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ARGUMENT_TYPE);
     registry.register_lint(&INVALID_RETURN_TYPE);
     registry.register_lint(&INVALID_ASSIGNMENT);
+    registry.register_lint(&INVALID_AWAIT);
     registry.register_lint(&INVALID_BASE);
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
@@ -573,6 +574,36 @@ declare_lint! {
     /// [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
     pub(crate) static INVALID_ASSIGNMENT = {
         summary: "detects invalid assignments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `await` being used with types that are not [Awaitable].
+    ///
+    /// ## Why is this bad?
+    /// Such expressions will lead to `TypeError` being raised at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// import asyncio
+    ///
+    /// class InvalidAwait:
+    ///     def __await__(self) -> int:
+    ///         return 5
+    ///
+    /// async def main() -> None:
+    ///     await InvalidAwait()  # error: [invalid-await]
+    ///     await 42  # error: [invalid-await]
+    ///
+    /// asyncio.run(main())
+    /// ```
+    ///
+    /// [Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable
+    pub(crate) static INVALID_AWAIT = {
+        summary: "detects awaiting on types that don't support it",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
