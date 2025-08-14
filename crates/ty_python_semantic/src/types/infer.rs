@@ -110,7 +110,7 @@ use crate::types::enums::is_enum_class;
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
 };
-use crate::types::generics::{GenericContext, bind_typevar};
+use crate::types::generics::{GenericContext, GenericContextInner, bind_typevar};
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -9061,7 +9061,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             })
             .collect();
-        typevars.map(|typevars| GenericContext::new(self.db(), typevars))
+        typevars
+            .map(|typevars| GenericContext::new(self.db(), GenericContextInner::NonTuple(typevars)))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {

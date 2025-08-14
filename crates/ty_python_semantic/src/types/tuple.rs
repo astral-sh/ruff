@@ -131,16 +131,6 @@ pub struct TupleType<'db> {
     pub(crate) tuple: TupleSpec<'db>,
 }
 
-pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    tuple: TupleType<'db>,
-    visitor: &V,
-) {
-    for element in tuple.tuple(db).all_elements() {
-        visitor.visit_type(db, *element);
-    }
-}
-
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TupleType<'_> {}
 
@@ -206,10 +196,9 @@ impl<'db> TupleType<'db> {
 
         tuple_class.apply_specialization(db, |generic_context| {
             if generic_context.variables(db).len() == 1 {
-                let element_type = self.tuple(db).homogeneous_element_type(db);
-                generic_context.specialize_tuple(db, element_type, self)
+                generic_context.specialize_tuple(db, self)
             } else {
-                generic_context.default_specialization(db, Some(KnownClass::Tuple))
+                generic_context.default_specialization(db)
             }
         })
     }
@@ -290,9 +279,9 @@ fn to_class_type_cycle_initial<'db>(db: &'db dyn Db, self_: TupleType<'db>) -> C
 
     tuple_class.apply_specialization(db, |generic_context| {
         if generic_context.variables(db).len() == 1 {
-            generic_context.specialize_tuple(db, Type::Never, self_)
+            generic_context.specialize_tuple(db, self_)
         } else {
-            generic_context.default_specialization(db, Some(KnownClass::Tuple))
+            generic_context.default_specialization(db)
         }
     })
 }
