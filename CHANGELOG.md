@@ -24,7 +24,7 @@
 ### Other changes
 
 - Build `riscv64` binaries for release ([#19819](https://github.com/astral-sh/ruff/pull/19819))
-- Add rule code to error description in GitLab output([#19896](https://github.com/astral-sh/ruff/pull/19896))
+- Add rule code to error description in GitLab output ([#19896](https://github.com/astral-sh/ruff/pull/19896))
 
 ## 0.12.8
 
