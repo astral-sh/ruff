@@ -974,12 +974,11 @@ mod resolve_definition {
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
-    use ruff_text_size::{Ranged, TextRange};
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
     use crate::module_resolver::file_to_module;
-    use crate::semantic_index::definition::{Definition, DefinitionKind};
+    use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
     use crate::{Db, ModuleName, resolve_module, resolve_real_module};
@@ -993,6 +992,8 @@ mod resolve_definition {
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
+        /// The import resolved to an entire module
+        Module(File),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -1001,7 +1002,16 @@ mod resolve_definition {
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),
+                ResolvedDefinition::Module(file) => *file,
                 ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+            }
+        }
+
+        pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => definition.docstring(db),
+                ResolvedDefinition::Module(file) => module_docstring(db, *file),
+                ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
@@ -1071,10 +1081,7 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                    module_file,
-                    TextRange::default(),
-                ))]
+                vec![ResolvedDefinition::Module(module_file)]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
@@ -1284,24 +1291,19 @@ mod resolve_definition {
                 }
                 trace!("Built Definition Path: {path:?}");
             }
-            ResolvedDefinition::FileWithRange(file_range) => {
-                return if file_range.range() == TextRange::default() {
-                    trace!(
-                        "Found module mapping: {} => {}",
-                        stub_file.path(db),
-                        real_file.path(db)
-                    );
-                    // This is just a reference to a module, no need to do paths
-                    Some(vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                        real_file,
-                        TextRange::default(),
-                    ))])
-                } else {
-                    // Not yet implemented -- in this case we want to recover something like a Definition
-                    // and build a Definition Path, but this input is a bit too abstract for now.
-                    trace!("Found arbitrary FileWithRange by stub mapping, giving up");
-                    None
-                };
+            ResolvedDefinition::Module(_) => {
+                trace!(
+                    "Found module mapping: {} => {}",
+                    stub_file.path(db),
+                    real_file.path(db)
+                );
+                return Some(vec![ResolvedDefinition::Module(real_file)]);
+            }
+            ResolvedDefinition::FileWithRange(_) => {
+                // Not yet implemented -- in this case we want to recover something like a Definition
+                // and build a Definition Path, but this input is a bit too abstract for now.
+                trace!("Found arbitrary FileWithRange while stub mapping, giving up");
+                return None;
             }
         }
 

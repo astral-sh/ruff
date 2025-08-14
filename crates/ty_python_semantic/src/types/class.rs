@@ -22,10 +22,11 @@ use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    BareTypeAliasType, Binding, BoundSuperError, BoundSuperType, CallableType, DataclassParams,
-    DeprecatedInstance, KnownInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
-    TypeRelation, TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    declaration_type, infer_definition_types, todo_type,
+    ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
+    CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
+    NormalizedVisitor, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
+    infer_definition_types, todo_type,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet, Program,
@@ -167,7 +168,7 @@ fn try_metaclass_cycle_initial<'db>(
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike,
@@ -179,31 +180,58 @@ pub(crate) enum CodeGeneratorKind {
 
 impl CodeGeneratorKind {
     pub(crate) fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
-        if CodeGeneratorKind::DataclassLike.matches(db, class) {
-            Some(CodeGeneratorKind::DataclassLike)
-        } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
-            Some(CodeGeneratorKind::NamedTuple)
-        } else if CodeGeneratorKind::TypedDict.matches(db, class) {
-            Some(CodeGeneratorKind::TypedDict)
-        } else {
+        #[salsa::tracked(
+            cycle_fn=code_generator_of_class_recover,
+            cycle_initial=code_generator_of_class_initial,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn code_generator_of_class<'db>(
+            db: &'db dyn Db,
+            class: ClassLiteral<'db>,
+        ) -> Option<CodeGeneratorKind> {
+            if class.dataclass_params(db).is_some()
+                || class
+                    .try_metaclass(db)
+                    .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+            {
+                Some(CodeGeneratorKind::DataclassLike)
+            } else if class
+                .explicit_bases(db)
+                .iter()
+                .copied()
+                .filter_map(Type::into_class_literal)
+                .any(|class| class.is_known(db, KnownClass::NamedTuple))
+            {
+                Some(CodeGeneratorKind::NamedTuple)
+            } else if class.is_typed_dict(db) {
+                Some(CodeGeneratorKind::TypedDict)
+            } else {
+                None
+            }
+        }
+
+        fn code_generator_of_class_initial(
+            _db: &dyn Db,
+            _class: ClassLiteral<'_>,
+        ) -> Option<CodeGeneratorKind> {
             None
         }
+
+        #[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+        fn code_generator_of_class_recover(
+            _db: &dyn Db,
+            _value: &Option<CodeGeneratorKind>,
+            _count: u32,
+            _class: ClassLiteral<'_>,
+        ) -> salsa::CycleRecoveryAction<Option<CodeGeneratorKind>> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        code_generator_of_class(db, class)
     }
 
-    fn matches<'db>(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-        match self {
-            Self::DataclassLike => {
-                class.dataclass_params(db).is_some()
-                    || class
-                        .try_metaclass(db)
-                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-            }
-            Self::NamedTuple => class.explicit_bases(db).iter().any(|base| {
-                base.into_class_literal()
-                    .is_some_and(|c| c.is_known(db, KnownClass::NamedTuple))
-            }),
-            Self::TypedDict => class.is_typed_dict(db),
-        }
+    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+        CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }
 
@@ -231,7 +259,7 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.origin(db),
@@ -255,7 +283,7 @@ impl<'db> GenericAlias<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -319,7 +347,7 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
@@ -406,7 +434,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
@@ -469,7 +497,7 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         self.iter_mro(db).any(|base| {
             match base {
@@ -4521,7 +4549,9 @@ impl KnownClass {
                 }
 
                 let bound_or_constraint = match (bound, constraints) {
-                    (Some(bound), None) => Some(TypeVarBoundOrConstraints::UpperBound(*bound)),
+                    (Some(bound), None) => {
+                        Some(TypeVarBoundOrConstraints::UpperBound(*bound).into())
+                    }
 
                     (None, Some(_constraints)) => {
                         // We don't use UnionType::from_elements or UnionBuilder here,
@@ -4537,7 +4567,7 @@ impl KnownClass {
                                 .map(|(_, ty)| ty)
                                 .collect::<Box<_>>(),
                         );
-                        Some(TypeVarBoundOrConstraints::Constraints(elements))
+                        Some(TypeVarBoundOrConstraints::Constraints(elements).into())
                     }
 
                     // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
@@ -4555,7 +4585,7 @@ impl KnownClass {
                         Some(containing_assignment),
                         bound_or_constraint,
                         variance,
-                        *default,
+                        default.map(Into::into),
                         TypeVarKind::Legacy,
                     ),
                 )));

@@ -170,6 +170,24 @@ fn definition_expression_type<'db>(
     }
 }
 
+/// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
+pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
+
+/// A [`PairVisitor`] that is used in `has_relation_to` methods.
+pub(crate) type HasRelationToVisitor<'db> = PairVisitor<'db, TypeRelation>;
+
+/// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
+pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint>;
+pub(crate) struct IsDisjoint;
+
+/// A [`PairVisitor`] that is used in `is_equivalent` methods.
+pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent>;
+pub(crate) struct IsEquivalent;
+
+/// A [`TypeTransformer`] that is used in `normalized` methods.
+pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
+pub(crate) struct Normalized;
+
 /// The descriptor protocol distinguishes two kinds of descriptors. Non-data descriptors
 /// define a `__get__` method, while data descriptors additionally define a `__set__`
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
@@ -419,7 +437,7 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new(db, getter, setter)
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.getter(db).map(|ty| ty.normalized_impl(db, visitor)),
@@ -1075,7 +1093,7 @@ impl<'db> Type<'db> {
     }
 
     #[must_use]
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Type::Union(union) => {
                 visitor.visit(self, || Type::Union(union.normalized_impl(db, visitor)))
@@ -1338,7 +1356,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
@@ -1780,7 +1798,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &PairVisitor<'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> bool {
         if self == other {
             return true;
@@ -1866,13 +1884,13 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &PairVisitor<'db>,
+        visitor: &IsDisjointVisitor<'db>,
     ) -> bool {
         fn any_protocol_members_absent_or_disjoint<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
-            visitor: &PairVisitor<'db>,
+            visitor: &IsDisjointVisitor<'db>,
         ) -> bool {
             protocol.interface(db).members(db).any(|member| {
                 other
@@ -5478,7 +5496,7 @@ impl<'db> Type<'db> {
                         db,
                         ast::name::Name::new_static("Self"),
                         Some(class_definition),
-                        Some(TypeVarBoundOrConstraints::UpperBound(instance)),
+                        Some(TypeVarBoundOrConstraints::UpperBound(instance).into()),
                         TypeVarVariance::Invariant,
                         None,
                         TypeVarKind::TypingSelf,
@@ -5758,7 +5776,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match self {
             Type::TypeVar(bound_typevar) => match type_mapping {
@@ -6326,7 +6344,7 @@ impl<'db> TypeMapping<'_, 'db> {
         }
     }
 
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             TypeMapping::Specialization(specialization) => {
                 TypeMapping::Specialization(specialization.normalized_impl(db, visitor))
@@ -6418,7 +6436,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> KnownInstanceType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             Self::SubscriptedProtocol(context) => {
                 Self::SubscriptedProtocol(context.normalized_impl(db, visitor))
@@ -6488,9 +6506,7 @@ impl<'db> KnownInstanceType<'db> {
                     // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
                     // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
                     // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
-                    KnownInstanceType::TypeVar(typevar) => {
-                        write!(f, "typing.TypeVar({})", typevar.display(self.db))
-                    }
+                    KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
                     KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
                     KnownInstanceType::Field(field) => {
                         f.write_str("dataclasses.Field[")?;
@@ -6844,7 +6860,7 @@ pub struct FieldInstance<'db> {
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         FieldInstance::new(
             db,
             self.default_type(db).normalized_impl(db, visitor),
@@ -6936,14 +6952,17 @@ pub struct TypeVarInstance<'db> {
     /// The type var's definition (None if synthesized)
     pub definition: Option<Definition<'db>>,
 
-    /// The upper bound or constraint on the type of this TypeVar
-    bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
+    /// The upper bound or constraint on the type of this TypeVar, if any. Don't use this field
+    /// directly; use the `bound_or_constraints` (or `upper_bound` and `constraints`) methods
+    /// instead (to evaluate any lazy bound or constraints).
+    _bound_or_constraints: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
 
     /// The variance of the TypeVar
     variance: TypeVarVariance,
 
-    /// The default type for this TypeVar
-    default_ty: Option<Type<'db>>,
+    /// The default type for this TypeVar, if any. Don't use this field directly, use the
+    /// `default_type` method instead (to evaluate any lazy default).
+    _default: Option<TypeVarDefaultEvaluation<'db>>,
 
     pub kind: TypeVarKind,
 }
@@ -6959,11 +6978,12 @@ fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     if let Some(bounds) = typevar.bound_or_constraints(db) {
         walk_type_var_bounds(db, bounds, visitor);
     }
-    if let Some(default_type) = typevar.default_ty(db) {
+    if let Some(default_type) = typevar.default_type(db) {
         visitor.visit_type(db, default_type);
     }
 }
 
+#[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn with_binding_context(
         self,
@@ -6993,15 +7013,50 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<TypeVarBoundOrConstraints<'db>> {
+        self._bound_or_constraints(db).and_then(|w| match w {
+            TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                Some(bound_or_constraints)
+            }
+            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self.lazy_bound(db),
+            TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self.lazy_constraints(db),
+        })
+    }
+
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self._default(db).and_then(|d| match d {
+            TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
+            TypeVarDefaultEvaluation::Lazy => self.lazy_default(db),
+        })
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.bound_or_constraints(db)
-                .map(|b| b.normalized_impl(db, visitor)),
+            self._bound_or_constraints(db)
+                .and_then(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                        Some(bound_or_constraints.normalized_impl(db, visitor).into())
+                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                        .lazy_bound(db)
+                        .map(|bound| bound.normalized_impl(db, visitor).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                        .lazy_constraints(db)
+                        .map(|constraints| constraints.normalized_impl(db, visitor).into()),
+                }),
             self.variance(db),
-            self.default_ty(db).map(|d| d.normalized_impl(db, visitor)),
+            self._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => Some(ty.normalized_impl(db, visitor).into()),
+                TypeVarDefaultEvaluation::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| ty.normalized_impl(db, visitor).into()),
+            }),
             self.kind(db),
         )
     }
@@ -7011,10 +7066,25 @@ impl<'db> TypeVarInstance<'db> {
             db,
             self.name(db),
             self.definition(db),
-            self.bound_or_constraints(db)
-                .map(|b| b.materialize(db, variance)),
+            self._bound_or_constraints(db)
+                .and_then(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
+                        Some(bound_or_constraints.materialize(db, variance).into())
+                    }
+                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
+                        .lazy_bound(db)
+                        .map(|bound| bound.materialize(db, variance).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
+                        .lazy_constraints(db)
+                        .map(|constraints| constraints.materialize(db, variance).into()),
+                }),
             self.variance(db),
-            self.default_ty(db),
+            self._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => Some(ty.materialize(db, variance).into()),
+                TypeVarDefaultEvaluation::Lazy => self
+                    .lazy_default(db)
+                    .map(|ty| ty.materialize(db, variance).into()),
+            }),
             self.kind(db),
         )
     }
@@ -7032,10 +7102,41 @@ impl<'db> TypeVarInstance<'db> {
             db,
             Name::new(format!("{}'instance", self.name(db))),
             None,
-            Some(bound_or_constraints),
+            Some(bound_or_constraints.into()),
             self.variance(db),
             None,
             self.kind(db),
+        ))
+    }
+
+    #[salsa::tracked]
+    fn lazy_bound(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
+        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?);
+        Some(TypeVarBoundOrConstraints::UpperBound(ty))
+    }
+
+    #[salsa::tracked]
+    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarBoundOrConstraints<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
+        let ty = definition_expression_type(db, definition, typevar_node.bound.as_ref()?)
+            .into_union()?;
+        Some(TypeVarBoundOrConstraints::Constraints(ty))
+    }
+
+    #[salsa::tracked]
+    fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let definition = self.definition(db)?;
+        let module = parsed_module(db, definition.file(db)).load(db);
+        let typevar_node = definition.kind(db).as_typevar()?.node(&module);
+        Some(definition_expression_type(
+            db,
+            definition,
+            typevar_node.default.as_ref()?,
         ))
     }
 }
@@ -7102,14 +7203,14 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// By using `U` in the generic class, it becomes bound, and so we have a
     /// `BoundTypeVarInstance`. As part of binding `U` we must also bind its default value
     /// (resulting in `T@C`).
-    pub(crate) fn default_ty(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let binding_context = self.binding_context(db);
         self.typevar(db)
-            .default_ty(db)
+            .default_type(db)
             .map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindLegacyTypevars(binding_context)))
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.typevar(db).normalized_impl(db, visitor),
@@ -7156,6 +7257,38 @@ impl TypeVarVariance {
     }
 }
 
+/// Whether a typevar default is eagerly specified or lazily evaluated.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum TypeVarDefaultEvaluation<'db> {
+    /// The default type is lazily evaluated.
+    Lazy,
+    /// The default type is eagerly specified.
+    Eager(Type<'db>),
+}
+
+impl<'db> From<Type<'db>> for TypeVarDefaultEvaluation<'db> {
+    fn from(value: Type<'db>) -> Self {
+        TypeVarDefaultEvaluation::Eager(value)
+    }
+}
+
+/// Whether a typevar bound/constraints is eagerly specified or lazily evaluated.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum TypeVarBoundOrConstraintsEvaluation<'db> {
+    /// There is a lazily-evaluated upper bound.
+    LazyUpperBound,
+    /// There is a lazily-evaluated set of constraints.
+    LazyConstraints,
+    /// The upper bound/constraints are eagerly specified.
+    Eager(TypeVarBoundOrConstraints<'db>),
+}
+
+impl<'db> From<TypeVarBoundOrConstraints<'db>> for TypeVarBoundOrConstraintsEvaluation<'db> {
+    fn from(value: TypeVarBoundOrConstraints<'db>) -> Self {
+        TypeVarBoundOrConstraintsEvaluation::Eager(value)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
@@ -7176,7 +7309,7 @@ fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 TypeVarBoundOrConstraints::UpperBound(bound.normalized_impl(db, visitor))
@@ -8231,7 +8364,7 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.function(db).normalized_impl(db, visitor),
@@ -8348,7 +8481,7 @@ impl<'db> CallableType<'db> {
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         CallableType::new(
             db,
             self.signatures(db).normalized_impl(db, visitor),
@@ -8512,7 +8645,7 @@ impl<'db> MethodWrapperKind<'db> {
         }
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             MethodWrapperKind::FunctionTypeDunderGet(function) => {
                 MethodWrapperKind::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
@@ -8696,7 +8829,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
 }
@@ -8738,7 +8871,7 @@ fn walk_bare_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> BareTypeAliasType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
@@ -8774,7 +8907,7 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
@@ -9003,7 +9136,7 @@ impl<'db> UnionType<'db> {
         self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let mut new_elements: Vec<Type<'db>> = self
             .elements(db)
             .iter()
@@ -9077,11 +9210,11 @@ impl<'db> IntersectionType<'db> {
         self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
-            visitor: &TypeTransformer<'db>,
+            visitor: &NormalizedVisitor<'db>,
         ) -> FxOrderSet<Type<'db>> {
             let mut elements: FxOrderSet<Type<'db>> = elements
                 .iter()
@@ -9331,7 +9464,7 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &TypeTransformer<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
             defining_class: self
@@ -9403,7 +9536,7 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
             SuperOwnerKind::Class(class) => {
@@ -9675,7 +9808,7 @@ impl<'db> BoundSuperType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &TypeTransformer<'db>) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.pivot_class(db).normalized_impl(db, visitor),

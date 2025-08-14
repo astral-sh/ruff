@@ -26,7 +26,8 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[global_allocator]
@@ -42,7 +43,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
-        target_arch = "powerpc64"
+        target_arch = "powerpc64",
+        target_arch = "riscv64"
     )
 ))]
 #[unsafe(export_name = "_rjem_malloc_conf")]

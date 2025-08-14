@@ -237,14 +237,14 @@ impl WorkspaceOptions {
 #[serde(rename_all = "camelCase")]
 struct InlayHintOptions {
     variable_types: Option<bool>,
-    function_argument_names: Option<bool>,
+    call_argument_names: Option<bool>,
 }
 
 impl InlayHintOptions {
     fn into_settings(self) -> InlayHintSettings {
         InlayHintSettings {
-            variable_types: self.variable_types.unwrap_or_default(),
-            function_argument_names: self.function_argument_names.unwrap_or_default(),
+            variable_types: self.variable_types.unwrap_or(true),
+            call_argument_names: self.call_argument_names.unwrap_or(true),
         }
     }
 }

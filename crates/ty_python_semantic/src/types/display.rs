@@ -14,9 +14,8 @@ use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    BoundTypeVarInstance, CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
-    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType, WrapperDescriptorKind,
+    CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
+    SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
 
 impl<'db> Type<'db> {
@@ -425,83 +424,6 @@ impl Display for DisplayGenericAlias<'_> {
     }
 }
 
-impl<'db> TypeVarInstance<'db> {
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayTypeVarInstance<'db> {
-        DisplayTypeVarInstance { typevar: self, db }
-    }
-}
-
-pub(crate) struct DisplayTypeVarInstance<'db> {
-    typevar: TypeVarInstance<'db>,
-    db: &'db dyn Db,
-}
-
-impl Display for DisplayTypeVarInstance<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        display_quoted_string(self.typevar.name(self.db)).fmt(f)?;
-        match self.typevar.bound_or_constraints(self.db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                write!(f, ", bound={}", bound.display(self.db))?;
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                for constraint in constraints.iter(self.db) {
-                    write!(f, ", {}", constraint.display(self.db))?;
-                }
-            }
-            None => {}
-        }
-        if let Some(default_type) = self.typevar.default_ty(self.db) {
-            write!(f, ", default={}", default_type.display(self.db))?;
-        }
-        Ok(())
-    }
-}
-
-impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn display(self, db: &'db dyn Db) -> DisplayBoundTypeVarInstance<'db> {
-        DisplayBoundTypeVarInstance {
-            bound_typevar: self,
-            db,
-        }
-    }
-}
-
-pub(crate) struct DisplayBoundTypeVarInstance<'db> {
-    bound_typevar: BoundTypeVarInstance<'db>,
-    db: &'db dyn Db,
-}
-
-impl Display for DisplayBoundTypeVarInstance<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // This looks very much like DisplayTypeVarInstance::fmt, but note that we have typevar
-        // default values in a subtly different way: if the default value contains other typevars,
-        // here those must be bound as well, whereas in DisplayTypeVarInstance they should not. See
-        // BoundTypeVarInstance::default_ty for more details.
-        let typevar = self.bound_typevar.typevar(self.db);
-        f.write_str(typevar.name(self.db))?;
-        match typevar.bound_or_constraints(self.db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                write!(f, ": {}", bound.display(self.db))?;
-            }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                f.write_str(": (")?;
-                for (idx, constraint) in constraints.iter(self.db).enumerate() {
-                    if idx > 0 {
-                        f.write_str(", ")?;
-                    }
-                    constraint.display(self.db).fmt(f)?;
-                }
-                f.write_char(')')?;
-            }
-            None => {}
-        }
-        if let Some(default_type) = self.bound_typevar.default_ty(self.db) {
-            write!(f, " = {}", default_type.display(self.db))?;
-        }
-        Ok(())
-    }
-}
-
 impl<'db> GenericContext<'db> {
     pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
         DisplayGenericContext {
@@ -553,7 +475,7 @@ impl Display for DisplayGenericContext<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            bound_typevar.display(self.db).fmt(f)?;
+            f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
         }
         f.write_char(']')
     }
