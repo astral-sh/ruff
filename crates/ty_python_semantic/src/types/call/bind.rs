@@ -1441,7 +1441,9 @@ impl<'db> CallableBinding<'db> {
                         .annotated_type()
                         .unwrap_or(Type::unknown());
                     if let Some(first_parameter_type) = first_parameter_type {
-                        if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
+                        if !first_parameter_type
+                            .is_equivalent_to::<bool>(db, current_parameter_type)
+                        {
                             participating_parameter_index = Some(*parameter_index);
                             break 'overload;
                         }
@@ -2097,7 +2099,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
-            if !argument_type.is_assignable_to(self.db, expected_ty) {
+            if !argument_type.is_assignable_to::<bool>(self.db, expected_ty) {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
                 self.errors.push(BindingError::InvalidArgumentType {

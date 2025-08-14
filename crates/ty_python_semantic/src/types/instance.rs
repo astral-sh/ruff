@@ -7,6 +7,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::Constraints;
 use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
@@ -262,13 +263,13 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
-    ) -> bool {
+        visitor: &PairVisitor<'db, C>,
+    ) -> C {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
@@ -280,7 +281,7 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
@@ -289,26 +290,30 @@ impl<'db> NominalInstanceType<'db> {
             (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
                 class1.is_equivalent_to(db, class2)
             }
-            _ => false,
+            _ => C::never(db),
         }
     }
 
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &PairVisitor<'db>,
-    ) -> bool {
+        visitor: &PairVisitor<'db, C>,
+    ) -> C {
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
-                if self_spec.is_disjoint_from_impl(db, &other_spec, visitor) {
-                    return true;
+                let result: C = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
+                if !result.is_never(db) {
+                    return result;
                 }
             }
         }
-        !self
-            .class(db)
-            .could_coexist_in_mro_with(db, other.class(db))
+        C::from_bool(
+            db,
+            !self
+                .class(db)
+                .could_coexist_in_mro_with(db, other.class(db)),
+        )
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -497,30 +502,33 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-    ) -> bool {
-        other
-            .inner
-            .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db))
+    ) -> C {
+        C::from_bool(
+            db,
+            other
+                .inner
+                .interface(db)
+                .is_sub_interface_of(db, self.inner.interface(db)),
+        )
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         if self == other {
-            return true;
+            return C::always(db);
         }
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
-            return true;
+            return C::always(db);
         }
-        self_normalized == other.normalized(db)
+        C::from_bool(db, self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -528,13 +536,13 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         _other: Self,
-        _visitor: &PairVisitor<'db>,
-    ) -> bool {
-        false
+        _visitor: &PairVisitor<'db, C>,
+    ) -> C {
+        C::never(db)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

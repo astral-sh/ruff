@@ -65,6 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
+use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -858,49 +859,53 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         match relation {
             TypeRelation::Subtyping => self.is_subtype_of(db, other),
             TypeRelation::Assignability => self.is_assignable_to(db, other),
         }
     }
 
-    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_subtype_of<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         // A function type is the subtype of itself, and not of any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only subtypes
         // of each other if they result in subtype signatures.
         if self.normalized(db) == other.normalized(db) {
-            return true;
+            return C::always(db);
         }
         if self.literal(db) != other.literal(db) {
-            return false;
+            return C::never(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
         self_signature.is_subtype_of(db, other_signature)
     }
 
-    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_assignable_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         // A function type is assignable to itself, and not to any other function type. However,
         // our representation of a function type includes any specialization that should be applied
         // to the signature. Different specializations of the same function type are only
         // assignable to each other if they result in assignable signatures.
-        self.literal(db) == other.literal(db)
-            && self.signature(db).is_assignable_to(db, other.signature(db))
+        if self.literal(db) != other.literal(db) {
+            return C::never(db);
+        }
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+        self_signature.is_assignable_to(db, other_signature)
     }
 
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to<C: Constraints<'db>>(self, db: &'db dyn Db, other: Self) -> C {
         if self.normalized(db) == other.normalized(db) {
-            return true;
+            return C::always(db);
         }
         if self.literal(db) != other.literal(db) {
-            return false;
+            return C::never(db);
         }
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);

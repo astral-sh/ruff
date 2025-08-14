@@ -1144,7 +1144,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
 
         if self.inner.add(element_ty) {
             if let Some(first_ty) = self.first_type {
-                if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
+                if !first_ty.is_equivalent_to::<bool>(self.inner.db, element_ty) {
                     self.conflicting_types.insert(element_ty);
                 }
             } else {

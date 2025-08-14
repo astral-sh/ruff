@@ -17,6 +17,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::{Constraints, IteratorConstraintExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, KnownClass, TypeMapping, TypeRelation, todo_type,
@@ -107,12 +108,12 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         match relation {
             TypeRelation::Subtyping => self.is_subtype_of(db, other),
             TypeRelation::Assignability => self.is_assignable_to(db, other),
@@ -122,7 +123,7 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is a subtype of another callable type.
     ///
     /// See [`Type::is_subtype_of`] for more details.
-    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
+    pub(crate) fn is_subtype_of<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
         Self::has_relation_to_impl(
             db,
             &self.overloads,
@@ -134,7 +135,7 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
-    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    pub(crate) fn is_assignable_to<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
         Self::has_relation_to_impl(
             db,
             &self.overloads,
@@ -145,12 +146,12 @@ impl<'db> CallableSignature<'db> {
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<C: Constraints<'db>>(
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
@@ -158,7 +159,7 @@ impl<'db> CallableSignature<'db> {
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (_, [_]) => self_signatures.iter().any(|self_signature| {
+            (_, [_]) => self_signatures.iter().when_any(db, |self_signature| {
                 Self::has_relation_to_impl(
                     db,
                     std::slice::from_ref(self_signature),
@@ -168,7 +169,7 @@ impl<'db> CallableSignature<'db> {
             }),
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
-            ([_], _) => other_signatures.iter().all(|other_signature| {
+            ([_], _) => other_signatures.iter().when_all(db, |other_signature| {
                 Self::has_relation_to_impl(
                     db,
                     self_signatures,
@@ -178,7 +179,7 @@ impl<'db> CallableSignature<'db> {
             }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
-            (_, _) => other_signatures.iter().all(|other_signature| {
+            (_, _) => other_signatures.iter().when_all(db, |other_signature| {
                 Self::has_relation_to_impl(
                     db,
                     self_signatures,
@@ -192,7 +193,7 @@ impl<'db> CallableSignature<'db> {
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Self) -> bool {
+    pub(crate) fn is_equivalent_to<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
         match (self.overloads.as_slice(), other.overloads.as_slice()) {
             ([self_signature], [other_signature]) => {
                 // Common case: both callable types contain a single signature, use the custom
@@ -201,9 +202,10 @@ impl<'db> CallableSignature<'db> {
             }
             (_, _) => {
                 if self == other {
-                    return true;
+                    return C::always(db);
                 }
-                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
+                self.is_subtype_of::<C>(db, other)
+                    .and(db, || other.is_subtype_of(db, self))
             }
         }
     }
@@ -479,23 +481,28 @@ impl<'db> Signature<'db> {
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        let check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-            self_type
-                .unwrap_or(Type::unknown())
-                .is_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+    pub(crate) fn is_equivalent_to<C: Constraints<'db>>(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+    ) -> C {
+        let mut result = C::always(db);
+        let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
+            let self_type = self_type.unwrap_or(Type::unknown());
+            let other_type = other_type.unwrap_or(Type::unknown());
+            result.intersect(db, self_type.is_equivalent_to(db, other_type))
         };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
-            return false;
+            return C::never(db);
         }
 
         if self.parameters.len() != other.parameters.len() {
-            return false;
+            return C::never(db);
         }
 
         if !check_types(self.return_ty, other.return_ty) {
-            return false;
+            return result;
         }
 
         for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
@@ -539,27 +546,27 @@ impl<'db> Signature<'db> {
 
                 (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
 
-                _ => return false,
+                _ => return C::never(db),
             }
 
             if !check_types(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
-                return false;
+                return result;
             }
         }
 
-        true
+        result
     }
 
     /// Implementation of subtyping and assignability for signature.
-    fn has_relation_to(
+    fn has_relation_to<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
         relation: TypeRelation,
-    ) -> bool {
+    ) -> C {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -621,17 +628,16 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
-            type1.unwrap_or(Type::unknown()).has_relation_to(
-                db,
-                type2.unwrap_or(Type::unknown()),
-                relation,
-            )
+        let mut result = C::always(db);
+        let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+            let type1 = type1.unwrap_or(Type::unknown());
+            let type2 = type2.unwrap_or(Type::unknown());
+            result.intersect(db, type1.has_relation_to(db, type2, relation))
         };
 
         // Return types are covariant.
         if !check_types(self.return_ty, other.return_ty) {
-            return false;
+            return result;
         }
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
@@ -646,13 +652,13 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object(db)))
         {
-            return true;
+            return C::always(db);
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            return relation.is_assignability();
+            return C::from_bool(db, relation.is_assignability());
         }
 
         let mut parameters = ParametersZip {
@@ -670,7 +676,7 @@ impl<'db> Signature<'db> {
             let Some(next_parameter) = parameters.next() else {
                 // All parameters have been checked or both the parameter lists were empty. In
                 // either case, `self` is a subtype of `other`.
-                return true;
+                return result;
             };
 
             match next_parameter {
@@ -690,7 +696,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
-                            return false;
+                            return C::never(db);
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -702,7 +708,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return false;
+                    return C::never(db);
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -722,13 +728,13 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
-                                return false;
+                                return C::never(db);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
-                                return false;
+                                return result;
                             }
                         }
 
@@ -743,17 +749,17 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
-                                return false;
+                                return C::never(db);
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
-                                return false;
+                                return C::never(db);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
-                                return false;
+                                return result;
                             }
                         }
 
@@ -766,7 +772,7 @@ impl<'db> Signature<'db> {
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
-                                return false;
+                                return result;
                             }
 
                             if matches!(
@@ -806,7 +812,7 @@ impl<'db> Signature<'db> {
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
-                                    return false;
+                                    return result;
                                 }
                                 parameters.next_other();
                             }
@@ -817,7 +823,7 @@ impl<'db> Signature<'db> {
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
-                                return false;
+                                return result;
                             }
                         }
 
@@ -832,7 +838,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return false,
+                        _ => return C::never(db),
                     }
                 }
             }
@@ -866,7 +872,7 @@ impl<'db> Signature<'db> {
                     // previous loop. They cannot be matched against any parameter in `other` which
                     // only contains keyword-only and keyword-variadic parameters so the subtype
                     // relation is invalid.
-                    return false;
+                    return C::never(db);
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -893,13 +899,13 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return false;
+                                    return C::never(db);
                                 }
                                 if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
-                                    return false;
+                                    return result;
                                 }
                             }
                             _ => unreachable!(
@@ -911,25 +917,25 @@ impl<'db> Signature<'db> {
                             other_parameter.annotated_type(),
                             self_keyword_variadic_type,
                         ) {
-                            return false;
+                            return result;
                         }
                     } else {
-                        return false;
+                        return C::never(db);
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return false;
+                        return C::never(db);
                     };
                     if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
-                        return false;
+                        return result;
                     }
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return false;
+                    return C::never(db);
                 }
             }
         }
@@ -938,11 +944,11 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return false;
+                return C::never(db);
             }
         }
 
-        true
+        result
     }
 
     /// Create a new signature with the given definition.

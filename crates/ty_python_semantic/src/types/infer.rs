@@ -2041,7 +2041,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if !bound_ty.is_assignable_to(db, declared_ty) {
+        if !bound_ty.is_assignable_to::<bool>(db, declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
@@ -2174,7 +2174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let declared_type = declared_ty.inner_type();
                         if !declared_type
-                            .is_assignable_to(self.db(), module_type_implicit_declaration)
+                            .is_assignable_to::<bool>(self.db(), module_type_implicit_declaration)
                         {
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_DECLARATION, node)
@@ -2460,7 +2460,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if !inferred_return
                     .to_instance(self.db())
-                    .is_assignable_to(self.db(), expected_ty)
+                    .is_assignable_to::<bool>(self.db(), expected_ty)
                 {
                     report_invalid_generator_function_return_type(
                         &self.context,
@@ -2486,7 +2486,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ty if ty.is_notimplemented(self.db()) => None,
                     _ => Some(ty_range),
                 })
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), expected_ty))
+                .filter(|ty_range| !ty_range.ty.is_assignable_to::<bool>(self.db(), expected_ty))
             {
                 report_invalid_return_type(
                     &self.context,
@@ -2498,7 +2498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicitly_return_none(self.db())
-                && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
+                && !Type::none(self.db()).is_assignable_to::<bool>(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
                 report_implicit_return_type(
@@ -3789,7 +3789,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     // types like `LiteralString & Any` to pass, but it does not need to be perfect. We would just
                                     // fail to provide the "Only string literals are allowed" hint in that case.
                                     if slice_ty.is_assignable_to(db, Type::LiteralString)
-                                        && !slice_ty.is_equivalent_to(db, Type::LiteralString)
+                                        && !slice_ty
+                                            .is_equivalent_to::<bool>(db, Type::LiteralString)
                                     {
                                         if let Some(builder) =
                                             context.report_lint(&INVALID_ASSIGNMENT, &**slice)
@@ -3867,7 +3868,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let ensure_assignable_to = |attr_ty| -> bool {
-            let assignable = value_ty.is_assignable_to(db, attr_ty);
+            let assignable = value_ty.is_assignable_to::<bool>(db, attr_ty);
             if !assignable && emit_diagnostics {
                 report_invalid_attribute_assignment(
                     &self.context,
@@ -4594,7 +4595,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             if !KnownClass::Bool
                 .to_instance(self.db())
-                .is_assignable_to(self.db(), declared.inner_type())
+                .is_assignable_to::<bool>(self.db(), declared.inner_type())
             {
                 // annotation not assignable from `bool` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
@@ -5049,7 +5050,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised);
 
-            if !raised_type.is_assignable_to(self.db(), can_be_raised) {
+            if !raised_type.is_assignable_to::<bool>(self.db(), can_be_raised) {
                 report_invalid_exception_raised(&self.context, raised, raised_type);
             }
         }
@@ -5057,7 +5058,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(cause) = cause {
             let cause_type = self.infer_expression(cause);
 
-            if !cause_type.is_assignable_to(self.db(), can_be_exception_cause) {
+            if !cause_type.is_assignable_to::<bool>(self.db(), can_be_exception_cause) {
                 report_invalid_exception_cause(&self.context, cause, cause_type);
             }
         }

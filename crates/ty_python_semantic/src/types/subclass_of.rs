@@ -2,6 +2,7 @@ use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::Constraints;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, ClassType, DynamicType, KnownClass, MemberLookupPolicy,
     Type, TypeMapping, TypeRelation, TypeTransformer, TypeVarInstance, cyclic::PairVisitor,
@@ -154,21 +155,23 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &PairVisitor<'db>,
-    ) -> bool {
+        visitor: &PairVisitor<'db, C>,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                relation.is_assignability()
+                C::from_bool(db, relation.is_assignability())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                other_class.is_object(db) || relation.is_assignability()
+                C::from_bool(db, other_class.is_object(db) || relation.is_assignability())
             }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
+                C::from_bool(db, relation.is_assignability())
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
@@ -182,11 +185,15 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_disjoint_from_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => C::never(db),
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                !self_class.could_coexist_in_mro_with(db, other_class)
+                C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
             }
         }
     }

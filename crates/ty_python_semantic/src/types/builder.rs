@@ -111,7 +111,7 @@ impl<'db> UnionElement<'db> {
                         if other_type.is_subtype_of(db, ty) {
                             ignore = true;
                         }
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_subtype_of::<bool>(db, other_type)
                     });
                     if ignore {
                         ReduceResult::Ignore
@@ -122,7 +122,7 @@ impl<'db> UnionElement<'db> {
                     }
                 } else {
                     ReduceResult::KeepIf(
-                        !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::IntLiteral(literals[0]).is_subtype_of::<bool>(db, other_type),
                     )
                 }
             }
@@ -139,7 +139,7 @@ impl<'db> UnionElement<'db> {
                         if other_type.is_subtype_of(db, ty) {
                             ignore = true;
                         }
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_subtype_of::<bool>(db, other_type)
                     });
                     if ignore {
                         ReduceResult::Ignore
@@ -150,7 +150,7 @@ impl<'db> UnionElement<'db> {
                     }
                 } else {
                     ReduceResult::KeepIf(
-                        !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::StringLiteral(literals[0]).is_subtype_of::<bool>(db, other_type),
                     )
                 }
             }
@@ -167,7 +167,7 @@ impl<'db> UnionElement<'db> {
                         if other_type.is_subtype_of(db, ty) {
                             ignore = true;
                         }
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_subtype_of::<bool>(db, other_type)
                     });
                     if ignore {
                         ReduceResult::Ignore
@@ -178,7 +178,7 @@ impl<'db> UnionElement<'db> {
                     }
                 } else {
                     ReduceResult::KeepIf(
-                        !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::BytesLiteral(literals[0]).is_subtype_of::<bool>(db, other_type),
                     )
                 }
             }
