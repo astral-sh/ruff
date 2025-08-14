@@ -13,6 +13,6 @@ F811 Redefinition of unused `Bar` from line 3
 6 |     Bar: int  # OK
 7 |
 8 | Bar = 1  # F811
-  | ^^^
+  | ^^^ `Bar` redefined here
   |
 help: Remove definition: `Bar`

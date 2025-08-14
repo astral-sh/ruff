@@ -7,7 +7,7 @@ F811 [*] Redefinition of unused `Sequence` from line 26
 30 | from typing import (
 31 |     List,  # noqa: F811
 32 |     Sequence,
-   |     ^^^^^^^^
+   |     ^^^^^^^^ `Sequence` redefined here
 33 | )
    |
   ::: F811_21.py:26:5

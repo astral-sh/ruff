@@ -10,7 +10,7 @@ F811 Redefinition of unused `bar` from line 10
    |     --- previous definition of `bar` here
 11 |
 12 |     def bar(self) -> None:
-   |         ^^^
+   |         ^^^ `bar` redefined here
 13 |         """Bar."""
    |
 help: Remove definition: `bar`
@@ -25,7 +25,7 @@ F811 Redefinition of unused `baz` from line 18
 19 |         """Baz."""
 20 |
 21 |     baz = 1
-   |     ^^^
+   |     ^^^ `baz` redefined here
    |
 help: Remove definition: `baz`
 
@@ -39,6 +39,6 @@ F811 Redefinition of unused `foo` from line 26
 27 |         """Foo."""
 28 |
 29 |     bar = (foo := 1)
-   |            ^^^
+   |            ^^^ `foo` redefined here
    |
 help: Remove definition: `foo`

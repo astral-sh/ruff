@@ -11,7 +11,7 @@ F811 Redefinition of unused `mixer` from line 2
 4 |     pass
 5 | else:
 6 |     from bb import mixer
-  |                    ^^^^^
+  |                    ^^^^^ `mixer` redefined here
 7 | mixer(123)
   |
 help: Remove definition: `mixer`

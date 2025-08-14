@@ -10,7 +10,7 @@ F811 Redefinition of unused `func` from line 2
 3 |         pass
 4 |
 5 |     def func(self):
-  |         ^^^^
+  |         ^^^^ `func` redefined here
 6 |         pass
   |
 help: Remove definition: `func`

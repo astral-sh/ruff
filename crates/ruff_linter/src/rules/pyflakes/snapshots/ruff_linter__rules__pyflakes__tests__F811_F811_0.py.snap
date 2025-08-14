@@ -5,7 +5,7 @@ F811 Redefinition of unused `bar` from line 6
   --> F811_0.py:10:5
    |
 10 | def bar():
-   |     ^^^
+   |     ^^^ `bar` redefined here
 11 |     pass
    |
   ::: F811_0.py:6:5

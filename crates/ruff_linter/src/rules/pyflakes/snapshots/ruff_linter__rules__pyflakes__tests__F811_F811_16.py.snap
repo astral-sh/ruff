@@ -7,7 +7,7 @@ F811 Redefinition of unused `fu` from line 3
 6 | def bar():
 7 |     def baz():
 8 |         def fu():
-  |             ^^
+  |             ^^ `fu` redefined here
 9 |             pass
   |
  ::: F811_16.py:3:8
