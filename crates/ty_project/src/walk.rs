@@ -1,10 +1,10 @@
 use crate::glob::IncludeExcludeFilter;
 use crate::{Db, GlobFilterCheckMode, IOErrorDiagnostic, IOErrorKind, IncludeResult, Project};
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::File;
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{Metadata, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -163,9 +163,14 @@ impl<'a> ProjectFilesWalker<'a> {
 
     /// Walks the project paths and collects the paths of all files that
     /// are included in the project.
-    pub(crate) fn walk_paths(self) -> (Vec<SystemPathBuf>, Vec<IOErrorDiagnostic>) {
+    pub(crate) fn walk_paths(
+        self,
+        db: &dyn Db,
+    ) -> (Vec<(SystemPathBuf, Metadata)>, Vec<IOErrorDiagnostic>) {
         let paths = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
+
+        let system = db.system();
 
         self.walker.run(|| {
             Box::new(|entry| {
@@ -232,8 +237,12 @@ impl<'a> ProjectFilesWalker<'a> {
                                 }
                             }
 
-                            let mut paths = paths.lock().unwrap();
-                            paths.push(entry.into_path());
+                            // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
+                            // We can ignore this.
+                            if let Ok(metadata) = system.path_metadata(entry.path()) {
+                                let mut paths = paths.lock().unwrap();
+                                paths.push((entry.into_path(), metadata));
+                            }
                         }
                     }
                     Err(error) => match error.kind() {
@@ -280,31 +289,24 @@ impl<'a> ProjectFilesWalker<'a> {
     }
 
     pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths();
+        let (paths, diagnostics) = self.walk_paths(db);
 
         (
             paths
                 .into_iter()
-                .filter_map(move |path| {
-                    // If this returns `None`, then the file was deleted between the `walk_directory` call and now.
-                    // We can ignore this.
-                    system_path_to_file(db, &path).ok()
-                })
+                .map(|(path, metadata)| db.files().system_from_metadata(db, &path, metadata))
                 .collect(),
             diagnostics,
         )
     }
 
     pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths();
+        let (paths, diagnostics) = self.walk_paths(db);
 
-        let mut files = FxHashSet::with_capacity_and_hasher(paths.len(), FxBuildHasher);
-
-        for path in paths {
-            if let Ok(file) = system_path_to_file(db, &path) {
-                files.insert(file);
-            }
-        }
+        let files: FxHashSet<_> = paths
+            .into_iter()
+            .map(|(path, metadata)| db.files().system_from_metadata(db, &path, metadata))
+            .collect();
 
         (files, diagnostics)
     }
