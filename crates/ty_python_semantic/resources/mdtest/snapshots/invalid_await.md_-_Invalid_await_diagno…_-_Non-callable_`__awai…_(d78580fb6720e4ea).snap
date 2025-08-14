@@ -1,0 +1,35 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - Non-callable `__await__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NonCallableAwait:
+2 |     __await__ = 42
+3 | 
+4 | async def main() -> None:
+5 |     await NonCallableAwait()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `NonCallableAwait` is not awaitable
+ --> src/mdtest_snippet.py:5:11
+  |
+4 | async def main() -> None:
+5 |     await NonCallableAwait()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^^^^^^
+  |
+info: `__await__` is possibly not callable
+info: rule `invalid-await` is enabled by default
+
+```

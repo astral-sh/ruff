@@ -24,8 +24,8 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
-    NormalizedVisitor, StringLiteralType, TypeAliasType, TypeMapping, TypeRelation,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
+    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeMapping,
+    TypeRelation, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, declaration_type,
     infer_definition_types, todo_type,
 };
 use crate::{
@@ -1174,6 +1174,9 @@ pub(crate) struct Field<'db> {
 
     /// Whether or not this field should appear in the signature of `__init__`.
     pub(crate) init: bool,
+
+    /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+    pub(crate) kw_only: Option<bool>,
 }
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -1862,6 +1865,18 @@ impl<'db> ClassLiteral<'db> {
             .with_qualifiers(TypeQualifiers::CLASS_VAR);
         }
 
+        if CodeGeneratorKind::NamedTuple.matches(db, self) {
+            if let Some(field) = self.own_fields(db, specialization).get(name) {
+                let property_getter_signature = Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("self")))]),
+                    Some(field.declared_ty),
+                );
+                let property_getter = CallableType::single(db, property_getter_signature);
+                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                return Place::bound(Type::PropertyInstance(property)).into();
+            }
+        }
+
         let body_scope = self.body_scope(db);
         let symbol = class_symbol(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
@@ -1925,6 +1940,7 @@ impl<'db> ClassLiteral<'db> {
                     mut default_ty,
                     init_only: _,
                     init,
+                    kw_only,
                 },
             ) in self.fields(db, specialization, field_policy)
             {
@@ -1989,7 +2005,12 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let mut parameter = if kw_only_field_seen || name == "__replace__" {
+                let is_kw_only = name == "__replace__"
+                    || kw_only.unwrap_or(
+                        has_dataclass_param(DataclassParams::KW_ONLY) || kw_only_field_seen,
+                    );
+
+                let mut parameter = if is_kw_only {
                     Parameter::keyword_only(field_name)
                 } else {
                     Parameter::positional_or_keyword(field_name)
@@ -2007,6 +2028,10 @@ impl<'db> ClassLiteral<'db> {
 
                 parameters.push(parameter);
             }
+
+            // In the event that we have a mix of keyword-only and positional parameters, we need to sort them
+            // so that the keyword-only parameters appear after positional parameters.
+            parameters.sort_by_key(Parameter::is_keyword_only);
 
             let mut signature = Signature::new(Parameters::new(parameters), return_ty);
             signature.inherited_generic_context = self.generic_context(db);
@@ -2319,9 +2344,11 @@ impl<'db> ClassLiteral<'db> {
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
 
                 let mut init = true;
+                let mut kw_only = None;
                 if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
                     default_ty = Some(field.default_type(db));
                     init = field.init(db);
+                    kw_only = field.kw_only(db);
                 }
 
                 attributes.insert(
@@ -2331,6 +2358,7 @@ impl<'db> ClassLiteral<'db> {
                         default_ty,
                         init_only: attr.is_init_var(),
                         init,
+                        kw_only,
                     },
                 );
             }
