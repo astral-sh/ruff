@@ -87,11 +87,12 @@ impl Files {
             .system_by_path
             .entry(absolute.clone())
             .or_insert_with(|| {
-                tracing::trace!("Adding file '{path}'");
-
                 let metadata = db.system().path_metadata(path);
+
+                tracing::trace!("Adding file '{absolute}'");
+
                 let durability = self
-                    .root(db, path)
+                    .root(db, &absolute)
                     .map_or(Durability::default(), |root| root.durability(db));
 
                 let builder = File::builder(FilePath::System(absolute))
