@@ -261,7 +261,11 @@ impl Printer {
             OutputFormat::Concise | OutputFormat::Full => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
-                    .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
+                    .with_show_fix_diff(
+                        self.flags.intersects(Flags::SHOW_FIX_DIFF)
+                            && self.format == OutputFormat::Full
+                            && preview,
+                    )
                     .with_show_source(self.format == OutputFormat::Full)
                     .with_fix_applicability(self.unsafe_fixes.required_applicability())
                     .with_preview(preview)
