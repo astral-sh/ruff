@@ -12,25 +12,69 @@ use super::resolver::{
     ModuleResolveMode, ResolverContext, is_non_shadowable, resolve_file_module, search_paths,
 };
 
-/// List all available modules.
+/// List all available top-level modules.
 #[salsa::tracked]
 pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut lister = Lister::new(db);
+    let mut modules = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        match search_path.as_path() {
-            SystemOrVendoredPathRef::System(system_search_path) => {
-                let Ok(it) = db.system().read_directory(system_search_path) else {
-                    continue;
-                };
-                for result in it {
-                    let Ok(entry) = result else { continue };
-                    lister.add_path(search_path, &entry.path().into(), entry.file_type().into());
+        for module in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
+            match modules.entry(module.name(db)) {
+                Entry::Vacant(entry) => {
+                    entry.insert(module);
+                }
+                Entry::Occupied(mut entry) => {
+                    // The only case where a module can override
+                    // a module with the same name in a higher
+                    // precedent search path is if the higher
+                    // precedent search path contained a namespace
+                    // package and the lower precedent search path
+                    // contained a "regular" module.
+                    if let (None, Some(_)) = (entry.get().search_path(db), module.search_path(db)) {
+                        entry.insert(module);
+                    }
                 }
             }
-            SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
-                for entry in db.vendored().read_directory(vendored_search_path) {
-                    lister.add_path(search_path, &entry.path().into(), entry.file_type().into());
-                }
+        }
+    }
+    modules.into_values().collect()
+}
+
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+struct SearchPathIngredient<'db> {
+    #[returns(ref)]
+    path: SearchPath,
+}
+
+/// List all available top-level modules in the given `SearchPath`.
+#[salsa::tracked]
+fn list_modules_in<'db>(
+    db: &'db dyn Db,
+    search_path: SearchPathIngredient<'db>,
+) -> Vec<Module<'db>> {
+    let mut lister = Lister::new(db, search_path.path(db));
+    match search_path.path(db).as_path() {
+        SystemOrVendoredPathRef::System(system_search_path) => {
+            // Read the revision on the corresponding file root to
+            // register an explicit dependency on this directory. When
+            // the revision gets bumped, the cache that Salsa creates
+            // for this routine will be invalidated.
+            let root = db
+                .files()
+                .root(db, system_search_path)
+                .expect("System search path should have a registered root");
+            let _ = root.revision(db);
+
+            let Ok(it) = db.system().read_directory(system_search_path) else {
+                return vec![];
+            };
+            for result in it {
+                let Ok(entry) = result else { continue };
+                lister.add_path(&entry.path().into(), entry.file_type().into());
+            }
+        }
+        SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
+            for entry in db.vendored().read_directory(vendored_search_path) {
+                lister.add_path(&entry.path().into(), entry.file_type().into());
             }
         }
     }
@@ -47,17 +91,19 @@ pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
 struct Lister<'db> {
     db: &'db dyn Db,
     program: Program,
+    search_path: &'db SearchPath,
     modules: BTreeMap<&'db ModuleName, Module<'db>>,
 }
 
 impl<'db> Lister<'db> {
     /// Create new state that can accumulate modules from a list
     /// of file paths.
-    fn new(db: &'db dyn Db) -> Lister<'db> {
+    fn new(db: &'db dyn Db, search_path: &'db SearchPath) -> Lister<'db> {
         let program = Program::get(db);
         Lister {
             db,
             program,
+            search_path,
             modules: BTreeMap::new(),
         }
     }
@@ -67,19 +113,17 @@ impl<'db> Lister<'db> {
         self.modules.into_values().collect()
     }
 
-    /// Add the given `path` (from `search_path`) as a possible
-    /// module to this lister. The `file_type` should be the type
-    /// of `path` (file, directory or symlink).
+    /// Add the given `path` as a possible module to this lister. The
+    /// `file_type` should be the type of `path` (file, directory or
+    /// symlink).
     ///
     /// This may decide that the given path does not correspond to
     /// a valid Python module. In which case, it is dropped and this
     /// is a no-op.
-    fn add_path(
-        &mut self,
-        search_path: &SearchPath,
-        path: &SystemOrVendoredPathRef<'_>,
-        file_type: FileType,
-    ) {
+    ///
+    /// Callers must ensure that the path given came from the same
+    /// `SearchPath` used to create this `Lister`.
+    fn add_path(&mut self, path: &SystemOrVendoredPathRef<'_>, file_type: FileType) {
         let mut has_py_extension = false;
         // We must have no extension, a Python source file extension (`.py`)
         // or a Python stub file extension (`.pyi`).
@@ -91,7 +135,7 @@ impl<'db> Lister<'db> {
         }
 
         let Some(name) = path.file_name() else { return };
-        let mut module_path = search_path.to_module_path();
+        let mut module_path = self.search_path.to_module_path();
         module_path.push(name);
         let Some(module_name) = module_path.to_module_name() else {
             return;
@@ -99,7 +143,7 @@ impl<'db> Lister<'db> {
 
         // Some modules cannot shadow a subset of special
         // modules from the standard library.
-        if !search_path.is_standard_library() && self.is_non_shadowable(&module_name) {
+        if !self.search_path.is_standard_library() && self.is_non_shadowable(&module_name) {
             return;
         }
 
@@ -113,7 +157,7 @@ impl<'db> Lister<'db> {
                             self.db,
                             module_name,
                             ModuleKind::Package,
-                            search_path.clone(),
+                            self.search_path.clone(),
                             file,
                         ),
                     );
@@ -152,7 +196,7 @@ impl<'db> Lister<'db> {
             let is_dir =
                 file_type.is_definitely_directory() || module_path.is_directory(&self.context());
             if is_dir {
-                if !search_path.is_standard_library() {
+                if !self.search_path.is_standard_library() {
                     self.add_module(
                         &module_path,
                         Module::namespace_package(self.db, module_name),
@@ -185,7 +229,7 @@ impl<'db> Lister<'db> {
                 self.db,
                 module_name,
                 ModuleKind::Module,
-                search_path.clone(),
+                self.search_path.clone(),
                 file,
             ),
         );
@@ -214,15 +258,14 @@ impl<'db> Lister<'db> {
             (None, Some(_)) => {
                 entry.insert(module);
             }
-            (Some(search_path_existing), Some(search_path_new)) => {
+            (Some(_), Some(_)) => {
                 // Merging across search paths is only necessary for
                 // namespace packages. For all other modules, entries
                 // from earlier search paths take precedence. Thus, all
                 // of the cases below require that we're in the same
-                // directory.
-                if search_path_existing != search_path_new {
-                    return;
-                }
+                // directory. ... Which is true here, because a `Lister`
+                // only works for one specific search path.
+
                 // When we have a `foo/__init__.py` and a `foo.py` in
                 // the same directory, the former takes precedent.
                 // (This case can only occur when both have a search
@@ -322,7 +365,7 @@ fn is_python_extension(ext: &str) -> bool {
 mod tests {
     use camino::{Utf8Component, Utf8Path};
     use ruff_db::Db as _;
-    use ruff_db::files::{File, FilePath};
+    use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{
         DbWithTestSystem, DbWithWritableSystem, OsSystem, SystemPath, SystemPathBuf,
     };
@@ -906,6 +949,12 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
+        db.files().try_add_root(&db, &src, FileRootKind::Project);
+        db.files()
+            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
+        db.files()
+            .try_add_root(&db, &custom_typeshed, FileRootKind::LibrarySearchPath);
+
         Program::from_settings(
             &db,
             ProgramSettings {
@@ -966,11 +1015,13 @@ mod tests {
         // Now write the foo file
         db.write_file(&foo_path, "x = 1")?;
 
-        // FIXME: This is obviously wrong. The Salsa cache
-        // isn't being invalidated.
         insta::assert_debug_snapshot!(
             list_snapshot(&db),
-            @"[]",
+            @r#"
+        [
+            Module::File("foo", "first-party", "/src/foo.py", Module, None),
+        ]
+        "#,
         );
 
         Ok(())
@@ -1090,14 +1141,11 @@ mod tests {
         let src_functools_path = src.join("functools.py");
         db.write_file(&src_functools_path, "FOO: int").unwrap();
 
-        // FIXME: This looks wrong! This is a cache invalidation
-        // problem, not a logic problem in the "list modules"
-        // implementation.
         insta::assert_debug_snapshot!(
             list_snapshot(&db),
             @r#"
         [
-            Module::File("functools", "std-custom", "/typeshed/stdlib/functools.pyi", Module, None),
+            Module::File("functools", "first-party", "/src/functools.py", Module, None),
         ]
         "#,
         );
@@ -1157,6 +1205,7 @@ mod tests {
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x")
             .build();
 
         db.write_files(x_directory).unwrap();
@@ -1181,6 +1230,7 @@ mod tests {
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/y/src")
             .build();
 
         db.write_files(external_files).unwrap();
@@ -1207,6 +1257,7 @@ mod tests {
 
         let TestCase { db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x")
             .build();
 
         insta::assert_debug_snapshot!(
@@ -1246,6 +1297,9 @@ not_a_directory
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x/y/src")
+            .with_library_root("/")
+            .with_library_root("/baz")
             .build();
 
         db.write_files(root_files).unwrap();
@@ -1279,6 +1333,8 @@ not_a_directory
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x")
+            .with_library_root("/y")
             .build();
 
         db.write_files(external_directories).unwrap();
@@ -1325,6 +1381,7 @@ not_a_directory
             ..
         } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x")
             .build();
 
         db.write_files(x_directory).unwrap();
@@ -1360,6 +1417,7 @@ not_a_directory
 
         let TestCase { mut db, .. } = TestCaseBuilder::new()
             .with_site_packages_files(SITE_PACKAGES)
+            .with_library_root("/x")
             .build();
         let src_path = SystemPathBuf::from("/x/src");
 
@@ -1410,6 +1468,15 @@ not_a_directory
             (&system_site_packages_location, ""),
         ])
         .unwrap();
+
+        db.files()
+            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
+        db.files()
+            .try_add_root(&db, &venv_site_packages, FileRootKind::LibrarySearchPath);
+        db.files()
+            .try_add_root(&db, &system_site_packages, FileRootKind::LibrarySearchPath);
+        db.files()
+            .try_add_root(&db, SystemPath::new("/x"), FileRootKind::LibrarySearchPath);
 
         Program::from_settings(
             &db,
@@ -1497,6 +1564,8 @@ not_a_directory
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
+        db.files().try_add_root(&db, &root, FileRootKind::Project);
+
         Program::from_settings(
             &db,
             ProgramSettings {
@@ -1534,6 +1603,11 @@ not_a_directory
 
         let mut db = TestDb::new();
         db.write_file(&installed_foo_module, "").unwrap();
+
+        db.files()
+            .try_add_root(&db, &project_directory, FileRootKind::Project);
+        db.files()
+            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
 
         Program::from_settings(
             &db,
