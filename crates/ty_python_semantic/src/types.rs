@@ -8332,6 +8332,7 @@ fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     visitor.visit_type(db, method.self_instance(db));
 }
 
+#[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
     /// This is normally the bound instance type, but if the bound method is a `@classmethod`, then
@@ -8347,6 +8348,7 @@ impl<'db> BoundMethodType<'db> {
         self_instance
     }
 
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let function = self.function(db);
         let self_instance = self.typing_self_type(db);

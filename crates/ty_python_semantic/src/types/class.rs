@@ -969,6 +969,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
