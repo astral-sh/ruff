@@ -7,7 +7,7 @@ use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, FileRootKind, system_path_to_file};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -184,6 +184,8 @@ fn run_test(
     let project_root = SystemPathBuf::from("/src");
     db.create_directory_all(&project_root)
         .expect("Creating the project root to succeed");
+    db.files()
+        .try_add_root(db, &project_root, FileRootKind::Project);
 
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
@@ -255,6 +257,8 @@ fn run_test(
 
     // Create a custom typeshed `VERSIONS` file if none was provided.
     if let Some(typeshed_path) = custom_typeshed_path {
+        db.files()
+            .try_add_root(db, typeshed_path, FileRootKind::LibrarySearchPath);
         if !has_custom_versions_file {
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files

@@ -433,13 +433,16 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         let site_packages_dir = site_packages_search_path
             .as_system_path()
             .expect("Expected site package path to be a system path");
+        let site_packages_dir = system
+            .canonicalize_path(site_packages_dir)
+            .unwrap_or_else(|_| site_packages_dir.to_path_buf());
 
-        if !existing_paths.insert(Cow::Borrowed(site_packages_dir)) {
+        if !existing_paths.insert(Cow::Owned(site_packages_dir.clone())) {
             continue;
         }
 
         let site_packages_root = files
-            .root(db, site_packages_dir)
+            .root(db, &site_packages_dir)
             .expect("Site-package root to have been created");
 
         // This query needs to be re-executed each time a `.pth` file
@@ -457,7 +460,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
+        let pth_file_iterator = match PthFileIterator::new(db, &site_packages_dir) {
             Ok(iterator) => iterator,
             Err(error) => {
                 tracing::warn!(
