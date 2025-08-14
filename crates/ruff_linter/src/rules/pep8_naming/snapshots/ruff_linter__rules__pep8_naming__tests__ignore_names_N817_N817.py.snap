@@ -18,3 +18,7 @@ N817 CamelCase `StillBad` imported as acronym `SB`
 5 | from mod import StillBad as SB
   |                 ^^^^^^^^^^^^^^
   |
+
+## Concise Output
+N817.py:2:8: N817 CamelCase `StillBad` imported as acronym `SB`
+N817.py:5:17: N817 CamelCase `StillBad` imported as acronym `SB`

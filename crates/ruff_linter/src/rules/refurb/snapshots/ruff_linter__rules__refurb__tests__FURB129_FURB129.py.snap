@@ -381,3 +381,23 @@ help: Remove `readlines()`
     112 |+        fp  # 5
 115 113 |     ):
 116 114 |         ...
+
+## Concise Output
+FURB129.py:7:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:9:35: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:10:35: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:11:49: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:14:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:17:14: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:20:14: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:26:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:32:18: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:38:22: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:47:17: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:54:17: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:93:17: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:97:23: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:101:17: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:103:16: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:107:29: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly
+FURB129.py:112:9: FURB129 [*] Instead of calling `readlines()`, iterate over file object directly

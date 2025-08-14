@@ -21,3 +21,7 @@ DJ013 `@receiver` decorator must be on top of all the other decorators
 36 | def incorrect_multiple():
 37 |     pass
    |
+
+## Concise Output
+DJ013.py:15:1: DJ013 `@receiver` decorator must be on top of all the other decorators
+DJ013.py:35:1: DJ013 `@receiver` decorator must be on top of all the other decorators

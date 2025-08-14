@@ -202,3 +202,15 @@ help: Rewrite as a dict comprehension
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087
 16    |-saved.append(dict([(k, v)for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]]))
    16 |+saved.append({k: v for k,v in list(unique_instance.__dict__.items()) if k in [f.name for f in unique_instance._meta.fields]})
+
+## Concise Output
+C404.py:1:1: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:7:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:8:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:9:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:10:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:12:4: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:12:34: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:13:5: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:13:35: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)
+C404.py:16:14: C404 [*] Unnecessary list comprehension (rewrite as a dict comprehension)

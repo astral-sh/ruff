@@ -62,3 +62,11 @@ S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
 13 | User.objects.annotate(val=RawSQL(params=[], sql='{}secure'.format('no')))
    |                           ^^^^^^
    |
+
+## Concise Output
+S611.py:5:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
+S611.py:6:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
+S611.py:8:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
+S611.py:11:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
+S611.py:12:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
+S611.py:13:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities

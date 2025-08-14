@@ -429,3 +429,23 @@ help: Replace with `.update()`
 100     |-for x in (1,) if True else (2,):
 101     |-    s.add(x)
     100 |+s.update((1,) if True else (2,))
+
+## Concise Output
+FURB142.py:5:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:8:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:11:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:14:1: FURB142 [*] Use of `set.discard()` in a for loop
+FURB142.py:17:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:20:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:25:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:28:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:31:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:35:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:38:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:41:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:83:1: FURB142 [*] Use of `set.discard()` in a for loop
+FURB142.py:86:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:90:1: FURB142 [*] Use of `set.discard()` in a for loop
+FURB142.py:93:1: FURB142 [*] Use of `set.add()` in a for loop
+FURB142.py:97:1: FURB142 [*] Use of `set.discard()` in a for loop
+FURB142.py:100:1: FURB142 [*] Use of `set.add()` in a for loop

@@ -128,3 +128,18 @@ F704 `await` statement outside of a function
 41 | await 1  # error
    | ^^^^^^^
    |
+
+## Concise Output
+resources/test/fixtures/syntax_errors/yield_scope.py:1:1: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:2:1: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:3:1: F704 `yield from` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:4:1: F704 `await` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:5:3: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:23:9: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:25:7: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:26:7: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:27:7: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:28:7: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:29:10: F704 `yield` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:36:10: F704 `await` statement outside of a function
+resources/test/fixtures/syntax_errors/yield_scope.py:41:1: F704 `await` statement outside of a function

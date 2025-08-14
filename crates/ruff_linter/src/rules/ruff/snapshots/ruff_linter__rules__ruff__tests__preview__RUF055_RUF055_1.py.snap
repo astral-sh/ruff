@@ -39,3 +39,7 @@ help: Replace with `haystack.replace(r"abc", repl)`
 16 16 | repl = "new"
 17    |-re.sub(r"abc", repl, haystack)
    17 |+haystack.replace(r"abc", repl)
+
+## Concise Output
+RUF055_1.py:9:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_1.py:17:1: RUF055 [*] Plain string pattern passed to `re` function

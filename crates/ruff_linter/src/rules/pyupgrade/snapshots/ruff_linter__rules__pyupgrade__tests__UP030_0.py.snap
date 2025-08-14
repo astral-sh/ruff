@@ -565,3 +565,31 @@ help: Remove explicit positional indices
 64 64 | 
 65    |-"{{{0}}}".format(123)
    65 |+"{{{}}}".format(123)
+
+## Concise Output
+UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:25:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:30:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:34:1: UP030 Use implicit references for positional format fields
+UP030_0.py:39:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:41:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:43:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:45:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:47:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:49:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:51:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:53:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:55:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:57:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:59:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:61:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:63:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:65:1: UP030 [*] Use implicit references for positional format fields

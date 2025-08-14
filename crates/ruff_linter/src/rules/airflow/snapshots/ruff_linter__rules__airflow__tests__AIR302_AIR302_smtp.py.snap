@@ -40,3 +40,7 @@ help: Install `apache-airflow-providers-smtp>=1.0.0` and use `EmailOperator` fro
   7 |+from airflow.providers.smtp.operators.smtp import EmailOperator
 8 8 | 
 9 9 | EmailOperator()
+
+## Concise Output
+AIR302_smtp.py:5:1: AIR302 [*] `airflow.operators.email_operator.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+AIR302_smtp.py:9:1: AIR302 [*] `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;

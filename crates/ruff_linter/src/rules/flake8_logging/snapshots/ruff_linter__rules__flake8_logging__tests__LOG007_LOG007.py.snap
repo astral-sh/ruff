@@ -53,3 +53,10 @@ LOG007 Use of `logging.exception` with falsy `exc_info`
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 18 | exception("foo", exc_info=True)  # OK
    |
+
+## Concise Output
+LOG007.py:6:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:7:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:9:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:10:1: LOG007 Use of `logging.exception` with falsy `exc_info`
+LOG007.py:17:1: LOG007 Use of `logging.exception` with falsy `exc_info`

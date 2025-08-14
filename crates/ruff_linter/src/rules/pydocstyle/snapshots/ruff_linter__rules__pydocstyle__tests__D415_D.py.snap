@@ -324,4 +324,22 @@ help: Add closing punctuation
     665 |+    but continuations shouldn't be considered multi-line."
 666 666 | 
 667 667 | 
-668 668 |
+668 668 | 
+
+## Concise Output
+D.py:355:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:406:25: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:410:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:416:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:422:35: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:429:49: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:470:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:475:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:480:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:487:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:520:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:581:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:615:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:639:17: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:641:18: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:664:5: D415 [*] First line should end with a period, question mark, or exclamation point

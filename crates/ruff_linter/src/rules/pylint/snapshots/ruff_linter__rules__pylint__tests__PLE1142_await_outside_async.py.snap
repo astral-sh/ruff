@@ -95,3 +95,16 @@ PLE1142 `await` should be used within an async function
 86 |     {x: y async for x, y in foo()}
    |           ^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+await_outside_async.py:15:11: PLE1142 `await` should be used within an async function
+await_outside_async.py:29:9: PLE1142 `await` should be used within an async function
+await_outside_async.py:38:5: PLE1142 `await` should be used within an async function
+await_outside_async.py:43:5: PLE1142 `await` should be used within an async function
+await_outside_async.py:54:6: PLE1142 `await` should be used within an async function
+await_outside_async.py:59:8: PLE1142 `await` should be used within an async function
+await_outside_async.py:64:17: PLE1142 `await` should be used within an async function
+await_outside_async.py:74:17: PLE1142 `await` should be used within an async function
+await_outside_async.py:78:6: PLE1142 `await` should be used within an async function
+await_outside_async.py:82:9: PLE1142 `await` should be used within an async function
+await_outside_async.py:86:11: PLE1142 `await` should be used within an async function

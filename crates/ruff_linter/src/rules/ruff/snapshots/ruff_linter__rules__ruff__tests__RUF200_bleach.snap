@@ -14,3 +14,8 @@ tinycss2>=1.1.0<1.2
 7 | | ]
   | |_^
   |
+
+## Concise Output
+pyproject.toml:5:16: RUF200 Failed to parse pyproject.toml: after parsing `1.1.0`, found `<1.2`, which is not part of a valid version
+tinycss2>=1.1.0<1.2
+        ^^^^^^^^^^^

@@ -383,3 +383,24 @@ help: Replace with `deque()`
 101 101 | deque("abc") # OK
 102 102 | deque(b"abc") # OK
 103 103 | deque(f"" "a")  # OK
+
+## Concise Output
+RUF037.py:6:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:10:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:14:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:18:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:22:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:26:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:30:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:61:13: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:66:5: RUF037 Unnecessary empty iterable within a deque call
+RUF037.py:67:5: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:68:5: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:80:5: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:89:5: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:93:5: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:96:1: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:97:1: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:98:1: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:99:1: RUF037 [*] Unnecessary empty iterable within a deque call
+RUF037.py:100:1: RUF037 [*] Unnecessary empty iterable within a deque call

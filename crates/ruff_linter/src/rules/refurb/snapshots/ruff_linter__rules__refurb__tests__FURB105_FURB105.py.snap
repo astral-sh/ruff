@@ -392,4 +392,24 @@ help: Remove separator
    21 |+print()
 22 22 | 
 23 23 | # OK.
-24 24 |
+24 24 | 
+
+## Concise Output
+FURB105.py:3:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105.py:4:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:5:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105.py:6:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:7:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105.py:8:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:9:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:10:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:11:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:12:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:13:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105.py:14:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:15:1: FURB105 [*] Unnecessary empty string and separator passed to `print`
+FURB105.py:16:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105.py:18:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105.py:19:1: FURB105 [*] Unnecessary empty string passed to `print`
+FURB105.py:20:1: FURB105 [*] Unnecessary separator passed to `print`
+FURB105.py:21:1: FURB105 [*] Unnecessary separator passed to `print`

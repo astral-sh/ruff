@@ -82,3 +82,14 @@ N802 Function name `dont_OPTIONS` should be lowercase
     |         ^^^^^^^^^^^^
 107 |         pass
     |
+
+## Concise Output
+N802.py:4:5: N802 Function name `Bad` should be lowercase
+N802.py:8:5: N802 Function name `_Bad` should be lowercase
+N802.py:12:5: N802 Function name `BAD` should be lowercase
+N802.py:16:5: N802 Function name `BAD_FUNC` should be lowercase
+N802.py:40:9: N802 Function name `testTest` should be lowercase
+N802.py:65:9: N802 Function name `bad_Name` should be lowercase
+N802.py:84:9: N802 Function name `dont_GET` should be lowercase
+N802.py:95:9: N802 Function name `dont_OPTIONS` should be lowercase
+N802.py:106:9: N802 Function name `dont_OPTIONS` should be lowercase

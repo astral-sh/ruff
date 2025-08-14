@@ -20,4 +20,7 @@ help: Replace with single space
    48 |+a += 1
 49 49 | b += 1000
 50 50 | #:
-51 51 |
+51 51 | 
+
+## Concise Output
+E22.py:48:5: E224 [*] Tab after operator

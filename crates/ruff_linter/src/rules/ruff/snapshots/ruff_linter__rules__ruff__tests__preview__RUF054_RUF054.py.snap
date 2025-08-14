@@ -41,3 +41,9 @@ RUF054 Indented form feed
    |     ^
    |
 help: Remove form feed
+
+## Concise Output
+RUF054.py:8:2: RUF054 Indented form feed
+RUF054.py:10:3: RUF054 Indented form feed
+RUF054.py:13:2: RUF054 Indented form feed
+RUF054.py:17:5: RUF054 Indented form feed

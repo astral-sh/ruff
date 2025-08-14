@@ -24,3 +24,6 @@ help: Move into type-checking block
   8 |+    from typing import Final
 6 9 | 
 7 10 | Const: Final[dict] = {}
+
+## Concise Output
+exempt_type_checking_2.py:5:20: TC003 [*] Move standard library import `typing.Final` into a type-checking block

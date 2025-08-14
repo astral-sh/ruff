@@ -43,3 +43,9 @@ C415 Unnecessary subscript reversal of iterable within `sorted()`
 6 | e = set(lst[2:-1])
 7 | f = set(lst[:1:-1])
   |
+
+## Concise Output
+C415.py:2:5: C415 Unnecessary subscript reversal of iterable within `set()`
+C415.py:3:5: C415 Unnecessary subscript reversal of iterable within `reversed()`
+C415.py:4:5: C415 Unnecessary subscript reversal of iterable within `sorted()`
+C415.py:5:5: C415 Unnecessary subscript reversal of iterable within `sorted()`

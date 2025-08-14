@@ -276,3 +276,18 @@ help: Add period
 99 99 |     ==========
 100 100 | 
 101 101 |     My example explanation
+
+## Concise Output
+D400.py:2:5: D400 [*] First line should end with a period
+D400.py:7:5: D400 [*] First line should end with a period
+D400.py:12:5: D400 [*] First line should end with a period
+D400.py:20:5: D400 [*] First line should end with a period
+D400.py:25:5: D400 [*] First line should end with a period
+D400.py:32:5: D400 [*] First line should end with a period
+D400.py:39:5: D400 [*] First line should end with a period
+D400.py:44:5: D400 [*] First line should end with a period
+D400.py:49:5: D400 [*] First line should end with a period
+D400.py:57:5: D400 [*] First line should end with a period
+D400.py:62:5: D400 [*] First line should end with a period
+D400.py:69:5: D400 [*] First line should end with a period
+D400.py:97:5: D400 [*] First line should end with a period

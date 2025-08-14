@@ -59,3 +59,8 @@ help: Replace with `Path(...).stat().st_size`
 4 5 | os.path.getsize(filename=b"filename")
 5   |-os.path.getsize(filename=__file__)
   6 |+pathlib.Path(__file__).stat().st_size
+
+## Concise Output
+PTH202_2.py:3:1: PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202_2.py:4:1: PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202_2.py:5:1: PTH202 [*] `os.path.getsize` should be replaced by `Path.stat().st_size`

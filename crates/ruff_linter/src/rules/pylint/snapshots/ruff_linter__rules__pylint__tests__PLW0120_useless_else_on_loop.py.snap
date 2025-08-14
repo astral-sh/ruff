@@ -191,3 +191,13 @@ help: Remove `else`
     145 |+    print("fat chance")
     146 |+    for j in range(10):
     147 |+        break
+
+## Concise Output
+useless_else_on_loop.py:9:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:18:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:30:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:37:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:42:1: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:88:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:98:9: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
+useless_else_on_loop.py:144:5: PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents

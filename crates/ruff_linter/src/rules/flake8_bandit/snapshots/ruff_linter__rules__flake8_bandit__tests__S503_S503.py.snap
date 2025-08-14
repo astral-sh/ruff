@@ -32,3 +32,9 @@ S503 Argument default set to insecure SSL protocol: `PROTOCOL_TLSv1`
    |                   ^^^^^^^^^^^^^^
 19 |     pass
    |
+
+## Concise Output
+S503.py:6:18: S503 Argument default set to insecure SSL protocol: `PROTOCOL_SSLv2`
+S503.py:10:19: S503 Argument default set to insecure SSL protocol: `SSLv2_METHOD`
+S503.py:14:18: S503 Argument default set to insecure SSL protocol: `SSLv23_METHOD`
+S503.py:18:19: S503 Argument default set to insecure SSL protocol: `PROTOCOL_TLSv1`

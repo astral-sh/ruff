@@ -20,3 +20,7 @@ help: Insert required import: `from __future__ import generator_stop`
   2 |+from __future__ import generator_stop
 2 3 | 
 3 4 | x = 1
+
+## Concise Output
+docstring.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+docstring.py:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`

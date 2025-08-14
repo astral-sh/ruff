@@ -81,3 +81,9 @@ help: Delete empty type-checking block
 32 30 | 
 33 31 | # https://github.com/astral-sh/ruff/issues/11368
 34 32 | if TYPE_CHECKING:
+
+## Concise Output
+TC005.py:4:5: TC005 [*] Found empty type-checking block
+TC005.py:9:9: TC005 [*] Found empty type-checking block
+TC005.py:15:9: TC005 [*] Found empty type-checking block
+TC005.py:31:5: TC005 [*] Found empty type-checking block

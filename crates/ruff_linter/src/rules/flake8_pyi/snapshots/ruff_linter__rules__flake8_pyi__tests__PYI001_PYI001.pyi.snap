@@ -33,3 +33,8 @@ PYI001 Name of private `ParamSpec` must start with `_`
 8 |
 9 | _T = TypeVar("_T")  # OK
   |
+
+## Concise Output
+PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
+PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
+PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`

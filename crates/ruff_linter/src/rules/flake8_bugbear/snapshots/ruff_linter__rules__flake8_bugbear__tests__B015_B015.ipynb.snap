@@ -33,3 +33,8 @@ B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `a
 14 | # Comments, newlines and whitespace
 15 | x == 1 # comment
    |
+
+## Concise Output
+B015.ipynb:5:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.ipynb:9:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.ipynb:13:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.

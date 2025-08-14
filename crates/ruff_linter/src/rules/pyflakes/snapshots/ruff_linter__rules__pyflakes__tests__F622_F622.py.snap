@@ -9,3 +9,6 @@ F622 Two starred expressions in assignment
 2 | *a, b, c = (1, 2, 3)
 3 | a, b, *c = (1, 2, 3)
   |
+
+## Concise Output
+F622.py:1:1: F622 Two starred expressions in assignment

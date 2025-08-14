@@ -231,3 +231,15 @@ help: Use `list` of `tuple` for parameter values
 82 82 | @pytest.mark.parametrize("d", [3,])
 83 83 | @pytest.mark.parametrize(
 84 84 |     "d",
+
+## Concise Output
+PT007.py:4:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:11:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:22:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:23:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:24:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:50:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:51:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:61:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:62:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007.py:81:38: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`

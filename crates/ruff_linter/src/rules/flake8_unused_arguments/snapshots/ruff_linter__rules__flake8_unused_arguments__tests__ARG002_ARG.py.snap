@@ -84,3 +84,13 @@ ARG002 Unused method argument: `y`
 256 |         """Docstring."""
 257 |         msg = t"{x}..."
     |
+
+## Concise Output
+ARG.py:37:17: ARG002 Unused method argument: `x`
+ARG.py:40:20: ARG002 Unused method argument: `x`
+ARG.py:43:16: ARG002 Unused method argument: `x`
+ARG.py:58:17: ARG002 Unused method argument: `x`
+ARG.py:62:17: ARG002 Unused method argument: `x`
+ARG.py:66:17: ARG002 Unused method argument: `x`
+ARG.py:216:24: ARG002 Unused method argument: `x`
+ARG.py:255:20: ARG002 Unused method argument: `y`

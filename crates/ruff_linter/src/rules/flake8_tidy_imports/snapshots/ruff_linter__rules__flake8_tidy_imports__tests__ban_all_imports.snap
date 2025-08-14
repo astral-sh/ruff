@@ -205,3 +205,22 @@ TID252 Prefer absolute imports over relative imports
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace relative imports with absolute imports
+
+## Concise Output
+TID252.py:7:1: TID252 Prefer absolute imports over relative imports
+TID252.py:8:1: TID252 Prefer absolute imports over relative imports
+TID252.py:9:1: TID252 Prefer absolute imports over relative imports
+TID252.py:10:1: TID252 Prefer absolute imports over relative imports
+TID252.py:11:1: TID252 Prefer absolute imports over relative imports
+TID252.py:12:1: TID252 Prefer absolute imports over relative imports
+TID252.py:13:1: TID252 Prefer absolute imports over relative imports
+TID252.py:14:1: TID252 Prefer absolute imports over relative imports
+TID252.py:17:1: TID252 Prefer absolute imports over relative imports
+TID252.py:21:1: TID252 Prefer absolute imports over relative imports
+TID252.py:22:1: TID252 Prefer absolute imports over relative imports
+TID252.py:23:1: TID252 Prefer absolute imports over relative imports
+TID252.py:24:1: TID252 Prefer absolute imports over relative imports
+TID252.py:25:1: TID252 Prefer absolute imports over relative imports
+TID252.py:26:1: TID252 Prefer absolute imports over relative imports
+TID252.py:27:1: TID252 Prefer absolute imports over relative imports
+TID252.py:28:1: TID252 Prefer absolute imports over relative imports

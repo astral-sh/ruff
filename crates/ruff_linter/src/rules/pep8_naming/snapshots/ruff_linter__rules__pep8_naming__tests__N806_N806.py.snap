@@ -69,3 +69,12 @@ N806 Variable `ValidationError` in function should be lowercase
 60 |     ValidationError = import_string(variable)  # N806
    |     ^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+N806.py:12:5: N806 Variable `Camel` in function should be lowercase
+N806.py:13:5: N806 Variable `CONSTANT` in function should be lowercase
+N806.py:46:5: N806 Variable `Bad` in function should be lowercase
+N806.py:53:5: N806 Variable `Bad` in function should be lowercase
+N806.py:56:5: N806 Variable `Bad` in function should be lowercase
+N806.py:57:5: N806 Variable `Bad` in function should be lowercase
+N806.py:60:5: N806 Variable `ValidationError` in function should be lowercase

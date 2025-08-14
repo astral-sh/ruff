@@ -40,3 +40,7 @@ help: Remove unused import: `pathlib`
 9 8 | 
 10 9 | # Unused, marked as required.
 11 10 | import shelve as alias
+
+## Concise Output
+unused.py:5:8: F401 [*] `sys` imported but unused
+unused.py:8:19: F401 [*] `pathlib` imported but unused

@@ -218,3 +218,27 @@ C901 `exception` is too complex (1 > 0)
     |                 ^^^^^^^^^
 136 |                 pass
     |
+
+## Concise Output
+C901.py:2:5: C901 `trivial` is too complex (1 > 0)
+C901.py:7:5: C901 `expr_as_statement` is too complex (1 > 0)
+C901.py:12:5: C901 `sequential` is too complex (1 > 0)
+C901.py:19:5: C901 `if_elif_else_dead_path` is too complex (3 > 0)
+C901.py:29:5: C901 `nested_ifs` is too complex (3 > 0)
+C901.py:40:5: C901 `for_loop` is too complex (2 > 0)
+C901.py:46:5: C901 `for_else` is too complex (2 > 0)
+C901.py:54:5: C901 `recursive` is too complex (2 > 0)
+C901.py:62:5: C901 `nested_functions` is too complex (3 > 0)
+C901.py:63:9: C901 `a` is too complex (2 > 0)
+C901.py:64:13: C901 `b` is too complex (1 > 0)
+C901.py:73:5: C901 `try_else` is too complex (4 > 0)
+C901.py:85:5: C901 `nested_try_finally` is too complex (1 > 0)
+C901.py:96:11: C901 `foobar` is too complex (3 > 0)
+C901.py:107:5: C901 `annotated_assign` is too complex (1 > 0)
+C901.py:113:9: C901 `handle` is too complex (9 > 0)
+C901.py:118:17: C901 `a` is too complex (1 > 0)
+C901.py:121:17: C901 `b` is too complex (2 > 0)
+C901.py:126:17: C901 `c` is too complex (1 > 0)
+C901.py:129:17: C901 `error` is too complex (1 > 0)
+C901.py:132:17: C901 `info` is too complex (1 > 0)
+C901.py:135:17: C901 `exception` is too complex (1 > 0)

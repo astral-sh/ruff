@@ -9,3 +9,6 @@ S301 `pickle` and modules that wrap it can be unsafe when used to deserialize un
 3 | pickle.loads()
   | ^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S301.py:3:1: S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue

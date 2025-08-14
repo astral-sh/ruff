@@ -46,4 +46,8 @@ help: Move out of type-checking block
 10    |-    from array import array  # TC004
 11 11 | 
 12 12 | app = fastapi.FastAPI("First application")
-13 13 |
+13 13 | 
+
+## Concise Output
+app.py:9:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+app.py:10:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.

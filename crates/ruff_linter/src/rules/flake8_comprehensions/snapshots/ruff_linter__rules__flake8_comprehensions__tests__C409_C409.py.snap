@@ -258,3 +258,16 @@ help: Rewrite as a tuple literal
 27 27 | 
 28 28 | tuple([x for x in range(5)])
 29 29 | tuple({x for x in range(10)})
+
+## Concise Output
+C409.py:1:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:2:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:3:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:4:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:8:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:12:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:16:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:20:1: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:24:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:25:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:26:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)

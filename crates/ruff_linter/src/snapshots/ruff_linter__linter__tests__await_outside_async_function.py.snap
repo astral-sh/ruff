@@ -18,3 +18,7 @@ PLE1142 `await` should be used within an async function
 5 | await 1
   | ^^^^^^^
   |
+
+## Concise Output
+resources/test/fixtures/syntax_errors/await_outside_async_function.py:2:5: PLE1142 `await` should be used within an async function
+resources/test/fixtures/syntax_errors/await_outside_async_function.py:5:1: PLE1142 `await` should be used within an async function

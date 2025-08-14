@@ -9,3 +9,6 @@ D105 Missing docstring in magic method
    |         ^^^^^^^
 65 |         pass
    |
+
+## Concise Output
+D.py:64:9: D105 Missing docstring in magic method

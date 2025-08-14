@@ -272,3 +272,31 @@ S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom sch
 47 | foo = urllib.request.urlopen
    |       ^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+S310.py:6:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:7:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:10:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:11:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:16:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:17:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:20:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:21:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:23:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:24:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:25:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:26:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:27:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:28:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:29:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:30:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:31:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:32:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:37:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:38:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:41:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:41:24: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:42:1: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:42:24: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:46:5: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.
+S310.py:47:7: S310 Audit URL open for permitted schemes. Allowing use of `file:` or custom schemes is often unexpected.

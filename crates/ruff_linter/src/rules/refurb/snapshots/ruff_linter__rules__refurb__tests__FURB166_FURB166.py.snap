@@ -145,4 +145,13 @@ help: Replace with `base=0`
    19 |+_ = int(get_str(), 0)
 20 20 | 
 21 21 | # OK
-22 22 |
+22 22 | 
+
+## Concise Output
+FURB166.py:3:5: FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
+FURB166.py:4:5: FURB166 [*] Use of `int` with explicit `base=8` after removing prefix
+FURB166.py:5:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+FURB166.py:8:5: FURB166 [*] Use of `int` with explicit `base=2` after removing prefix
+FURB166.py:10:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+FURB166.py:12:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix
+FURB166.py:19:5: FURB166 [*] Use of `int` with explicit `base=16` after removing prefix

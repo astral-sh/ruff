@@ -336,3 +336,21 @@ help: Add `f` prefix
 75 75 | 
 76 76 | # fstrings are never correct as type definitions
 77 77 | # so we should always skip those
+
+## Concise Output
+RUF027_0.py:5:7: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:10:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:11:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:21:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:22:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:27:11: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:28:11: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:33:33: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:39:19: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:41:22: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:49:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:56:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:57:18: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:62:9: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:70:18: RUF027 [*] Possible f-string without an `f` prefix
+RUF027_0.py:74:9: RUF027 [*] Possible f-string without an `f` prefix

@@ -189,3 +189,14 @@ help: Remove the rule code
 17 17 | # Test for mixed code types
 18    |-import json  # noqa: E402, INVALID400, V100
    18 |+import json  # noqa: E402, V100
+
+## Concise Output
+RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+RUF102.py:7:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
+RUF102.py:8:53: RUF102 [*] Invalid rule code in `# noqa`: INVALID789
+RUF102.py:10:13: RUF102 [*] Invalid rule code in `# noqa`: INVALID000
+RUF102.py:12:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+RUF102.py:14:46: RUF102 [*] Invalid rule code in `# noqa`: INVALID100
+RUF102.py:14:58: RUF102 [*] Invalid rule code in `# noqa`: INVALID200
+RUF102.py:16:44: RUF102 [*] Invalid rule code in `# noqa`: INVALID300
+RUF102.py:18:28: RUF102 [*] Invalid rule code in `# noqa`: INVALID400

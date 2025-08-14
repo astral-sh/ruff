@@ -7,3 +7,6 @@ invalid-syntax: named expression cannot be used within a generic definition
 2 | def f[T](x: int) -> (y := 3): return x
   |                      ^^^^^^
   |
+
+## Concise Output
+<filename>:2:22: invalid-syntax: named expression cannot be used within a generic definition

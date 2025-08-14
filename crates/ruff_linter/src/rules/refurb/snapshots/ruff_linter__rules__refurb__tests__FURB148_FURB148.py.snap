@@ -463,3 +463,29 @@ help: Remove `enumerate`
 84 84 |     print(book)
 85 85 | 
 86 86 | # OK
+
+## Concise Output
+FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:17:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:20:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:23:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:26:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:29:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:32:17: FURB148 `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:35:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:38:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:41:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:44:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:47:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:50:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:53:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:56:22: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:59:21: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:62:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:65:18: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:68:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:71:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:74:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:77:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead
+FURB148.py:80:17: FURB148 [*] `enumerate` value is unused, use `for x in range(len(y))` instead
+FURB148.py:83:16: FURB148 [*] `enumerate` index is unused, use `for x in y` instead

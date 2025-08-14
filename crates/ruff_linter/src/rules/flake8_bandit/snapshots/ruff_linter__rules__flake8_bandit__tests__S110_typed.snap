@@ -34,3 +34,8 @@ S110 `try`-`except`-`pass` detected, consider logging the exception
 14 | |     pass
    | |________^
    |
+
+## Concise Output
+S110.py:3:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+S110.py:8:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+S110.py:13:1: S110 `try`-`except`-`pass` detected, consider logging the exception

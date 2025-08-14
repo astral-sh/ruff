@@ -9,3 +9,6 @@ PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter
    |                        ^^^^^^^^^^^^^^^^^
 14 |         raise ZeroDivisionError("Can't divide by 0")
    |
+
+## Concise Output
+PT011.py:13:24: PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception

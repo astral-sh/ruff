@@ -20,3 +20,7 @@ AIR002 DAG should have an explicit `schedule` argument
 14 | def decorator_default_schedule():
 15 |     pass
    |
+
+## Concise Output
+AIR002.py:4:1: AIR002 DAG should have an explicit `schedule` argument
+AIR002.py:13:2: AIR002 DAG should have an explicit `schedule` argument

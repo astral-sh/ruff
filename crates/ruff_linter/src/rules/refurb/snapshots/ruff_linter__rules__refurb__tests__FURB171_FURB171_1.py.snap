@@ -145,4 +145,13 @@ help: Convert to equality test
    21 |+if 1 == 1:
 22 22 |     print('Recursive solution')
 23 23 | 
-24 24 |
+24 24 | 
+
+## Concise Output
+FURB171_1.py:3:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:6:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:9:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:12:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:15:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:18:4: FURB171 [*] Membership test against single-item container
+FURB171_1.py:21:4: FURB171 [*] Membership test against single-item container

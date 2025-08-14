@@ -604,3 +604,33 @@ help: Replace with a single `Literal`
 100     |-    | Literal["c", "d"]  # Second comment
     99  |+    Literal["a", "b", "c", "d"]  # Second comment
 101 100 | )
+
+## Concise Output
+PYI030.pyi:9:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:12:17: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:17:16: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:22:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:23:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:24:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:25:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:28:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:31:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:34:9: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:35:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:38:15: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:41:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
+PYI030.pyi:42:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+PYI030.pyi:45:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
+PYI030.pyi:48:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, "foo", True]`
+PYI030.pyi:51:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 1]`
+PYI030.pyi:60:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:63:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:71:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+PYI030.pyi:74:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:77:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:80:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:83:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+PYI030.pyi:86:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+PYI030.pyi:89:10: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+PYI030.pyi:94:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`
+PYI030.pyi:99:5: PYI030 [*] Multiple literal members in a union. Use a single literal, e.g. `Literal["a", "b", "c", "d"]`

@@ -7,3 +7,6 @@ invalid-syntax: yield expression cannot be used within a type alias
 2 | type Y = (yield 1)
   |           ^^^^^^^
   |
+
+## Concise Output
+<filename>:2:11: invalid-syntax: yield expression cannot be used within a type alias

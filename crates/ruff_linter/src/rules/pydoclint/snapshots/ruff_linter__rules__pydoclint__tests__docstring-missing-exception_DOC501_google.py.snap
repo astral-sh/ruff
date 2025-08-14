@@ -166,3 +166,14 @@ DOC501 Raised exception `ValueError` missing from docstring
 244 |           raise TypeError  # DOC501
     |
 help: Add `ValueError` to the docstring
+
+## Concise Output
+DOC501_google.py:34:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:51:5: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_google.py:51:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_google.py:106:5: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:120:5: DOC501 Raised exception `AnotherError` missing from docstring
+DOC501_google.py:134:5: DOC501 Raised exception `SomeError` missing from docstring
+DOC501_google.py:197:5: DOC501 Raised exception `ZeroDivisionError` missing from docstring
+DOC501_google.py:238:5: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_google.py:238:5: DOC501 Raised exception `ValueError` missing from docstring

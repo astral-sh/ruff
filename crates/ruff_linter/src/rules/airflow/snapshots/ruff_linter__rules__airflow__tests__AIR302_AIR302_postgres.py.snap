@@ -29,3 +29,7 @@ AIR302 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0
 7 | Mapping()
   | ^^^^^^^
   |
+
+## Concise Output
+AIR302_postgres.py:6:1: AIR302 [*] `airflow.hooks.postgres_hook.PostgresHook` is moved into `postgres` provider in Airflow 3.0;
+AIR302_postgres.py:7:1: AIR302 `airflow.operators.postgres_operator.Mapping` is removed in Airflow 3.0

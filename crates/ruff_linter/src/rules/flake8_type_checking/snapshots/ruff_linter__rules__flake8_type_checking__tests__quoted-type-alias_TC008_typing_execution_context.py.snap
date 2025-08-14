@@ -264,3 +264,17 @@ help: Remove quotes
 29 28 | 
 30 29 | 
 31 30 |     class Baz: ...
+
+## Concise Output
+TC008_typing_execution_context.py:13:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:14:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:15:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:16:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:17:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:18:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:19:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:20:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:21:24: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:24:20: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:25:21: TC008 [*] Remove quotes from type alias
+TC008_typing_execution_context.py:27:21: TC008 [*] Remove quotes from type alias

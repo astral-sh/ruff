@@ -438,3 +438,26 @@ help: Replace with conversion flag
 57 57 | 
 58    |-f"{str((x for x in []))}"
    58 |+f"{(x for x in [])!s}"
+
+## Concise Output
+RUF010.py:9:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:9:16: RUF010 [*] Use explicit conversion flag
+RUF010.py:9:29: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:19: RUF010 [*] Use explicit conversion flag
+RUF010.py:11:35: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:5: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:19: RUF010 [*] Use explicit conversion flag
+RUF010.py:13:34: RUF010 [*] Use explicit conversion flag
+RUF010.py:15:14: RUF010 [*] Use explicit conversion flag
+RUF010.py:15:29: RUF010 [*] Use explicit conversion flag
+RUF010.py:35:20: RUF010 [*] Use explicit conversion flag
+RUF010.py:40:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:42:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:46:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:48:4: RUF010 Use explicit conversion flag
+RUF010.py:50:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:52:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:54:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:56:4: RUF010 [*] Use explicit conversion flag
+RUF010.py:58:4: RUF010 [*] Use explicit conversion flag

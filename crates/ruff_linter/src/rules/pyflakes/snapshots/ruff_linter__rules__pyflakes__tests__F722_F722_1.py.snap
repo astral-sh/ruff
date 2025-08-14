@@ -29,3 +29,8 @@ F722 Syntax error in forward annotation: Unexpected token at the end of an expre
 9 |         x: "this also isn't python" = 1
   |            ^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+F722_1.py:8:22: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
+F722_1.py:8:46: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
+F722_1.py:9:12: F722 Syntax error in forward annotation: Unexpected token at the end of an expression

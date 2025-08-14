@@ -165,3 +165,13 @@ help: Remove the `else` clause
 57 55 | 
 58 56 | 
 59 57 | ### No errors
+
+## Concise Output
+RUF047_if.py:5:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:11:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:19:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:26:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:32:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:44:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:49:1: RUF047 [*] Empty `else` clause
+RUF047_if.py:55:5: RUF047 [*] Empty `else` clause

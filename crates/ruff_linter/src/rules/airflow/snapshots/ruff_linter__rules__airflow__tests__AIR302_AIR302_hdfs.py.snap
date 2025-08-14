@@ -40,3 +40,7 @@ help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `WebHdfsSens
 5 5 | 
 6 6 | WebHDFSHook()
 7 7 | WebHdfsSensor()
+
+## Concise Output
+AIR302_hdfs.py:6:1: AIR302 [*] `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` provider in Airflow 3.0;
+AIR302_hdfs.py:7:1: AIR302 [*] `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache-hdfs` provider in Airflow 3.0;

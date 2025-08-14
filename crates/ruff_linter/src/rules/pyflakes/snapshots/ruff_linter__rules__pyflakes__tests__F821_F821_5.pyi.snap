@@ -9,3 +9,6 @@ F821 Undefined name `InnerClass`
   |                           ^^^^^^^^^^
 5 |     def good_func(self) -> OuterClass.InnerClass: ...  # Okay
   |
+
+## Concise Output
+F821_5.pyi:4:27: F821 Undefined name `InnerClass`

@@ -14,3 +14,6 @@ help: Organize imports
   1 |+import os
 1 2 | import sys
 2   |-import os
+
+## Concise Output
+reorder_within_section.py:1:1: I001 [*] Import block is un-sorted or un-formatted

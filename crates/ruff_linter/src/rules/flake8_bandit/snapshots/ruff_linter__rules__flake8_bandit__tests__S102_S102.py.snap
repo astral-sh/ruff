@@ -31,3 +31,8 @@ S102 Use of `exec` detected
 12 |
 13 | def _():
    |
+
+## Concise Output
+S102.py:3:5: S102 Use of `exec` detected
+S102.py:5:1: S102 Use of `exec` detected
+S102.py:11:5: S102 Use of `exec` detected

@@ -25,3 +25,6 @@ help: Move into type-checking block
 10 10 |     import os
 11 11 | 
 12 12 | def f(x: pd.DataFrame):
+
+## Concise Output
+<filename>:6:18: TC002 [*] Move third-party import `pandas` into a type-checking block

@@ -80,3 +80,9 @@ help: Replace `assertNotRegex` with `assertNotRegexpMatches`
 9  9  |         self.failUnlessAlmostEqual(1, 1.1)
 10    |-        self.assertNotRegexpMatches("a", "b")
    10 |+        self.assertNotRegex("a", "b")
+
+## Concise Output
+UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`

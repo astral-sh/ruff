@@ -314,3 +314,20 @@ help: Remove `super()` parameters
 142 142 |     def method3(self):
 143     |-        super(ExampleWithKeywords, self).some_method()  # Should be fixed - no keywords
     143 |+        super().some_method()  # Should be fixed - no keywords
+
+## Concise Output
+UP008.py:17:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:18:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:19:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:36:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:50:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:74:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:92:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:107:23: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:113:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:118:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:123:14: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:133:21: UP008 Use `super()` instead of `super(__class__, self)`
+UP008.py:137:14: UP008 Use `super()` instead of `super(__class__, self)`
+UP008.py:140:14: UP008 Use `super()` instead of `super(__class__, self)`
+UP008.py:143:14: UP008 [*] Use `super()` instead of `super(__class__, self)`

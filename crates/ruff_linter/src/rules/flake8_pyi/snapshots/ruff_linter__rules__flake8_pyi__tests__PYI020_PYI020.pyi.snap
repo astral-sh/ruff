@@ -192,3 +192,14 @@ help: Remove quotes
 25 25 | 
 26 26 | # These two shouldn't trigger Y020 -- empty strings can't be "quoted annotations"
 27 27 | k = ""  # Y052 Need type annotation for "k"
+
+## Concise Output
+PYI020.pyi:7:10: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:8:15: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:9:26: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:13:12: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:14:25: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:16:18: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:20:8: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:22:8: PYI020 [*] Quoted annotations should not be included in stubs
+PYI020.pyi:24:8: PYI020 [*] Quoted annotations should not be included in stubs

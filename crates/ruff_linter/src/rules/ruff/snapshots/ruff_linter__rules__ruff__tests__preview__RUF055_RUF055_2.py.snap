@@ -175,3 +175,13 @@ help: Replace with `s != "a really really really really long string"`
    46 |+    s != "a really really really really long string"  # trailing
 51 47 | ):
 52 48 |     pass
+
+## Concise Output
+RUF055_2.py:7:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:11:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:15:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:19:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:23:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:27:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:33:5: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_2.py:46:5: RUF055 [*] Plain string pattern passed to `re` function

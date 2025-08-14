@@ -74,4 +74,9 @@ help: Replace double quotes docstring with single quotes
    26 |+        '''
 27 27 | 
 28 28 |         some_expression = 'hello world'
-29 29 |
+29 29 | 
+
+## Concise Output
+docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
+docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred

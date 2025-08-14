@@ -42,3 +42,7 @@ help: Remove quotes
 13 14 | # OK
 14    |-X: "Tuple[int, int]" = (0, 0)
    15 |+X: Tuple[int, int] = (0, 0)
+
+## Concise Output
+UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation
+UP037_1.py:14:4: UP037 [*] Remove quotes from type annotation

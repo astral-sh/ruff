@@ -198,4 +198,15 @@ help: Remove parentheses
    36 |+d[*foo,bar]
 37 37 | 
 38 38 | x: dict[str, int]  # tuples inside type annotations should never be altered
-39 39 |
+39 39 | 
+
+## Concise Output
+RUF031.py:2:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:3:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:11:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:12:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:13:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:20:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:24:5: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:28:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:36:3: RUF031 [*] Avoid parentheses for tuples in subscripts

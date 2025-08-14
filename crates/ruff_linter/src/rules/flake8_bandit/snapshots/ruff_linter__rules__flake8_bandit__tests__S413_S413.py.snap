@@ -38,3 +38,9 @@ S413 `pycrypto` library is known to have publicly disclosed buffer overflow vuln
 4 | from Crypto.PublicKey import RSA  # S413
   |      ^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S413.py:1:8: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+S413.py:2:6: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+S413.py:3:8: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability
+S413.py:4:6: S413 `pycrypto` library is known to have publicly disclosed buffer overflow vulnerability

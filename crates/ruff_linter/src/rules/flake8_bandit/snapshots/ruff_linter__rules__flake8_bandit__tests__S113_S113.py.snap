@@ -259,3 +259,29 @@ S113 Probable use of `httpx` call with timeout set to `None`
    |                   ^^^^^^^^^^^^
 72 |     client.get('https://gmail.com')
    |
+
+## Concise Output
+S113.py:46:1: S113 Probable use of `requests` call without timeout
+S113.py:47:35: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:48:1: S113 Probable use of `requests` call without timeout
+S113.py:49:36: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:50:1: S113 Probable use of `requests` call without timeout
+S113.py:51:35: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:52:1: S113 Probable use of `requests` call without timeout
+S113.py:53:38: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:54:1: S113 Probable use of `requests` call without timeout
+S113.py:55:37: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:56:1: S113 Probable use of `requests` call without timeout
+S113.py:57:39: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:58:1: S113 Probable use of `requests` call without timeout
+S113.py:59:36: S113 Probable use of `requests` call with timeout set to `None`
+S113.py:61:32: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:62:33: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:63:32: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:64:35: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:65:34: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:66:36: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:67:33: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:68:14: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:69:19: S113 Probable use of `httpx` call with timeout set to `None`
+S113.py:71:19: S113 Probable use of `httpx` call with timeout set to `None`

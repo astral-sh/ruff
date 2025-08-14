@@ -20,3 +20,6 @@ help: Add missing blank line(s)
 55 56 | fn()
 56 57 | # end
 57 58 | # E306:3:5
+
+## Concise Output
+E30.ipynb:55:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)

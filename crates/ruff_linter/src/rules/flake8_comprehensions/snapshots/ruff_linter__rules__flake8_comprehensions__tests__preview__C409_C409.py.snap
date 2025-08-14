@@ -359,3 +359,20 @@ help: Rewrite as a generator
 41 41 |     {
 42 42 |         x for x in [1,2,3]
 43 43 |     }
+
+## Concise Output
+C409.py:1:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:2:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:3:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:4:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:8:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:12:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:16:1: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:20:1: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:24:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:25:6: C409 [*] Unnecessary tuple literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:26:6: C409 [*] Unnecessary list literal passed to `tuple()` (rewrite as a tuple literal)
+C409.py:28:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)
+C409.py:31:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)
+C409.py:34:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)
+C409.py:37:1: C409 [*] Unnecessary list comprehension passed to `tuple()` (rewrite as a generator)

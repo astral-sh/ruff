@@ -9,3 +9,6 @@ PD013 `.melt` is preferred to `.stack`; provides same functionality
 4 | y = x.stack(level=-1, dropna=True)
   |     ^^^^^^^
   |
+
+## Concise Output
+<filename>:4:5: PD013 `.melt` is preferred to `.stack`; provides same functionality

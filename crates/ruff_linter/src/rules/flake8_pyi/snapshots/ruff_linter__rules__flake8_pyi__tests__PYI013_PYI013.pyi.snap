@@ -209,4 +209,16 @@ help: Remove unnecessary `...`
    43 |+    # preserve me
 44 44 | 
 45 45 | # Not violations
-46 46 |
+46 46 | 
+
+## Concise Output
+PYI013.pyi:5:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:8:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:12:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:16:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:17:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:24:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:28:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:31:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:36:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.pyi:43:5: PYI013 [*] Non-empty class body must not contain `...`

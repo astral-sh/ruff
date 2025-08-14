@@ -36,3 +36,7 @@ help: Replace single multiline quotes with double quotes
 5 5 |     pass
 6   |-''' this is not a docstring '''
   6 |+""" this is not a docstring """
+
+## Concise Output
+docstring_singles_module_singleline.py:2:1: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles_module_singleline.py:6:1: Q001 [*] Single quote multiline found but double quotes preferred

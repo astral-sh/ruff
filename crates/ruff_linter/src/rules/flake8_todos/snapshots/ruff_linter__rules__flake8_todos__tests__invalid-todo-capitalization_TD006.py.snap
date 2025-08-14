@@ -57,3 +57,8 @@ help: Replace `todo` with `TODO`
 6 6 | # todo (evanrittenhouse): another invalid capitalization
 7   |-# foo # todo: invalid capitalization
   7 |+# foo # TODO: invalid capitalization
+
+## Concise Output
+TD006.py:5:3: TD006 [*] Invalid TODO capitalization: `ToDo` should be `TODO`
+TD006.py:6:3: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`
+TD006.py:7:9: TD006 [*] Invalid TODO capitalization: `todo` should be `TODO`

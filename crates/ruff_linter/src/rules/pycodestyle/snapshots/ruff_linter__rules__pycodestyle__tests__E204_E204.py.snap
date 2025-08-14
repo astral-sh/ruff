@@ -63,3 +63,8 @@ help: Remove whitespace
    31 |+@foo
 33 32 | def baz():
 34 33 |     print('baz')
+
+## Concise Output
+E204.py:14:2: E204 [*] Whitespace after decorator
+E204.py:25:6: E204 [*] Whitespace after decorator
+E204.py:31:2: E204 [*] Whitespace after decorator

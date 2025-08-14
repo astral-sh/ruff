@@ -22,3 +22,6 @@ help: Move into type-checking block
 4 7 | 
 5 8 | 
 6 9 | class Foo(MyBaseClass):
+
+## Concise Output
+undefined.py:3:29: TC003 [*] Move standard library import `collections.abc.Sequence` into a type-checking block

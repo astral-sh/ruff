@@ -10,3 +10,6 @@ invalid-syntax: wildcard makes remaining patterns unreachable
 4 |         pass
 5 |     case 1:
   |
+
+## Concise Output
+<filename>:3:10: invalid-syntax: wildcard makes remaining patterns unreachable

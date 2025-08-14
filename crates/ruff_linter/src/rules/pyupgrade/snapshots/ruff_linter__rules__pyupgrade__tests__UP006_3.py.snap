@@ -17,3 +17,6 @@ help: Replace with `collections.defaultdict`
 7   |-def f(x: "typing.DefaultDict[str, str]") -> None:
   7 |+def f(x: "defaultdict[str, str]") -> None:
 8 8 |     ...
+
+## Concise Output
+UP006_3.py:7:11: UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation

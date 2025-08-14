@@ -20,3 +20,6 @@ help: Organize imports
 3 4 | import numpy as np
 4   |-import os
   5 |+import pandas as pd
+
+## Concise Output
+separate_third_party_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted

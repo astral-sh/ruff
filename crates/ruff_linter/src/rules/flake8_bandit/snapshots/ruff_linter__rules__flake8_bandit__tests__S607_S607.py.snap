@@ -241,3 +241,27 @@ S607 Starting a process with a partial executable path
 38 |
 39 | # Check it does not fail for full paths.
    |
+
+## Concise Output
+S607.py:9:11: S607 Starting a process with a partial executable path
+S607.py:10:10: S607 Starting a process with a partial executable path
+S607.py:11:11: S607 Starting a process with a partial executable path
+S607.py:12:11: S607 Starting a process with a partial executable path
+S607.py:13:11: S607 Starting a process with a partial executable path
+S607.py:21:10: S607 Starting a process with a partial executable path
+S607.py:22:11: S607 Starting a process with a partial executable path
+S607.py:23:11: S607 Starting a process with a partial executable path
+S607.py:24:12: S607 Starting a process with a partial executable path
+S607.py:25:10: S607 Starting a process with a partial executable path
+S607.py:26:11: S607 Starting a process with a partial executable path
+S607.py:27:11: S607 Starting a process with a partial executable path
+S607.py:28:12: S607 Starting a process with a partial executable path
+S607.py:29:11: S607 Starting a process with a partial executable path
+S607.py:30:12: S607 Starting a process with a partial executable path
+S607.py:31:12: S607 Starting a process with a partial executable path
+S607.py:32:13: S607 Starting a process with a partial executable path
+S607.py:33:11: S607 Starting a process with a partial executable path
+S607.py:34:12: S607 Starting a process with a partial executable path
+S607.py:35:12: S607 Starting a process with a partial executable path
+S607.py:36:13: S607 Starting a process with a partial executable path
+S607.py:37:14: S607 Starting a process with a partial executable path

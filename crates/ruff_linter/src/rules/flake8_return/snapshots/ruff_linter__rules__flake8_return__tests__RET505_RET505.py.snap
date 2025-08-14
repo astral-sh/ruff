@@ -517,3 +517,27 @@ RET505 Unnecessary `else` after `return` statement
 254 |         return False
     |
 help: Remove unnecessary `else`
+
+## Concise Output
+RET505.py:8:5: RET505 [*] Unnecessary `elif` after `return` statement
+RET505.py:23:5: RET505 [*] Unnecessary `elif` after `return` statement
+RET505.py:41:5: RET505 [*] Unnecessary `elif` after `return` statement
+RET505.py:53:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:64:9: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:79:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:89:9: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:99:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:109:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:145:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:153:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:160:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:169:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:177:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:183:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:200:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:207:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:217:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:227:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:237:5: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:245:2: RET505 [*] Unnecessary `else` after `return` statement
+RET505.py:252:5: RET505 Unnecessary `else` after `return` statement

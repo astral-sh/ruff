@@ -28,3 +28,8 @@ RUF034 Useless `if`-`else` condition
 11 | x = 0.1 if False else 0.1
    |     ^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+RUF034.py:5:5: RUF034 Useless `if`-`else` condition
+RUF034.py:8:5: RUF034 Useless `if`-`else` condition
+RUF034.py:11:5: RUF034 Useless `if`-`else` condition

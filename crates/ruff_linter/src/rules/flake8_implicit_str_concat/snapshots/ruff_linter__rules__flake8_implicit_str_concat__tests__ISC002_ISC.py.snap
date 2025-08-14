@@ -26,3 +26,7 @@ ISC002 Implicitly concatenated string literals over multiple lines
 76 |
 77 |   # Explicitly concatenated nested f-strings
    |
+
+## Concise Output
+ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:74:10: ISC002 Implicitly concatenated string literals over multiple lines

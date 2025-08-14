@@ -13,3 +13,8 @@ RUF200 Failed to parse pyproject.toml: URL requirement must be preceded by a pac
 11 | zip-safe = false
 12 | version = "..."
    |
+
+## Concise Output
+pyproject.toml:10:16: RUF200 Failed to parse pyproject.toml: URL requirement must be preceded by a package name. Add the name of the package before the URL (e.g., `package_name @ /path/to/file`).
+...
+^^^

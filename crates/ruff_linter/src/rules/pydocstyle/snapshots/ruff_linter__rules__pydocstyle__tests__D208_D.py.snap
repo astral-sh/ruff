@@ -450,4 +450,27 @@ help: Remove over-indentation
     723 |+    Returns:
 724 724 |     """
 725 725 | 
-726 726 |
+726 726 | 
+
+## Concise Output
+D.py:252:1: D208 [*] Docstring is over-indented
+D.py:264:1: D208 [*] Docstring is over-indented
+D.py:272:1: D208 [*] Docstring is over-indented
+D.py:673:1: D208 [*] Docstring is over-indented
+D.py:674:1: D208 [*] Docstring is over-indented
+D.py:675:1: D208 [*] Docstring is over-indented
+D.py:682:1: D208 [*] Docstring is over-indented
+D.py:683:1: D208 [*] Docstring is over-indented
+D.py:684:1: D208 [*] Docstring is over-indented
+D.py:685:1: D208 [*] Docstring is over-indented
+D.py:686:1: D208 [*] Docstring is over-indented
+D.py:687:1: D208 [*] Docstring is over-indented
+D.py:695:1: D208 [*] Docstring is over-indented
+D.py:696:1: D208 [*] Docstring is over-indented
+D.py:697:1: D208 [*] Docstring is over-indented
+D.py:698:1: D208 [*] Docstring is over-indented
+D.py:704:1: D208 [*] Docstring is over-indented
+D.py:705:1: D208 [*] Docstring is over-indented
+D.py:706:1: D208 [*] Docstring is over-indented
+D.py:707:1: D208 [*] Docstring is over-indented
+D.py:723:1: D208 [*] Docstring is over-indented

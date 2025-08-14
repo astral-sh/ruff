@@ -103,3 +103,15 @@ PLR6301 Method `tstring` could be a function, class method, or static method
 152 |         msg = t"{x}"
 153 |         raise NotImplementedError(msg)
     |
+
+## Concise Output
+no_self_use.py:7:9: PLR6301 Method `developer_greeting` could be a function, class method, or static method
+no_self_use.py:10:9: PLR6301 Method `greeting_1` could be a function, class method, or static method
+no_self_use.py:13:9: PLR6301 Method `greeting_2` could be a function, class method, or static method
+no_self_use.py:103:9: PLR6301 Method `validate_y` could be a function, class method, or static method
+no_self_use.py:128:9: PLR6301 Method `non_simple_assignment` could be a function, class method, or static method
+no_self_use.py:132:9: PLR6301 Method `non_simple_assignment_2` could be a function, class method, or static method
+no_self_use.py:136:9: PLR6301 Method `unused_message` could be a function, class method, or static method
+no_self_use.py:140:9: PLR6301 Method `unused_message_2` could be a function, class method, or static method
+no_self_use.py:145:9: PLR6301 Method `developer_greeting` could be a function, class method, or static method
+no_self_use.py:151:9: PLR6301 Method `tstring` could be a function, class method, or static method

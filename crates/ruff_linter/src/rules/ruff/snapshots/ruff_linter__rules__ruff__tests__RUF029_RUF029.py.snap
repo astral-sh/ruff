@@ -52,3 +52,11 @@ RUF029 Function `fail_4b` is declared `async`, but doesn't `await` or use `async
 64 |     class Foo:
 65 |         async def foo(self):
    |
+
+## Concise Output
+RUF029.py:38:11: RUF029 Function `fail_1a` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:42:11: RUF029 Function `fail_1b` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:46:11: RUF029 Function `fail_2` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:51:11: RUF029 Function `fail_3` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:58:11: RUF029 Function `fail_4a` is declared `async`, but doesn't `await` or use `async` features.
+RUF029.py:63:11: RUF029 Function `fail_4b` is declared `async`, but doesn't `await` or use `async` features.

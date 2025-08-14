@@ -143,3 +143,12 @@ help: Add dashed line under "Parameters"
 614 615 |    -‐-----------------
 615 616 |    returns:
 616 617 |        some value
+
+## Concise Output
+sections.py:44:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:56:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:67:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:227:5: D407 [*] Missing dashed underline after section ("Raises")
+sections.py:522:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:530:5: D407 [*] Missing dashed underline after section ("Parameters")
+sections.py:613:4: D407 [*] Missing dashed underline after section ("Parameters")

@@ -1113,4 +1113,58 @@ help: Replace with `"bar"`
     168 |+print("bar")
 169 169 | print(f"{1}{''}" or "bar")
 170 170 | 
-171 171 |
+171 171 | 
+
+## Concise Output
+SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:24:16: SIM222 [*] Use `True` instead of `True or ...`
+SIM222.py:27:4: SIM222 [*] Use `True` instead of `True or ...`
+SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:47:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:49:6: SIM222 [*] Use `"foo"` instead of `"foo" or ...`
+SIM222.py:51:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:53:6: SIM222 [*] Use `1` instead of `1 or ...`
+SIM222.py:55:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:57:6: SIM222 [*] Use `0.1` instead of `0.1 or ...`
+SIM222.py:59:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:61:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:63:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
+SIM222.py:65:6: SIM222 [*] Use `list([1])` instead of `list([1]) or ...`
+SIM222.py:67:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:69:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:71:6: SIM222 [*] Use `{1: 1}` instead of `{1: 1} or ...`
+SIM222.py:73:6: SIM222 [*] Use `dict({1: 1})` instead of `dict({1: 1}) or ...`
+SIM222.py:75:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:77:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:79:6: SIM222 [*] Use `{1}` instead of `{1} or ...`
+SIM222.py:81:6: SIM222 [*] Use `set({1})` instead of `set({1}) or ...`
+SIM222.py:83:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:85:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:87:6: SIM222 [*] Use `(1,)` instead of `(1,) or ...`
+SIM222.py:89:6: SIM222 [*] Use `tuple((1,))` instead of `tuple((1,)) or ...`
+SIM222.py:91:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:93:6: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:95:6: SIM222 [*] Use `frozenset({1})` instead of `frozenset({1}) or ...`
+SIM222.py:97:6: SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset(frozenset({1})) or ...`
+SIM222.py:102:6: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:104:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:106:5: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:106:35: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:109:6: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:111:7: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:118:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:119:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:126:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:127:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:134:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:135:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:142:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:143:8: SIM222 [*] Use `True` instead of `... or True or ...`
+SIM222.py:148:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
+SIM222.py:150:10: SIM222 [*] Use `[1]` instead of `[1] or ...`
+SIM222.py:153:11: SIM222 [*] Use `[1]` instead of `[1] or ...`
+SIM222.py:157:30: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
+SIM222.py:161:31: SIM222 [*] Use `(int, int, int)` instead of `(int, int, int) or ...`
+SIM222.py:168:7: SIM222 [*] Use `"bar"` instead of `... or "bar"`

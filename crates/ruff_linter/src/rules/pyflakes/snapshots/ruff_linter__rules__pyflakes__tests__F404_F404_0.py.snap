@@ -11,3 +11,6 @@ F404 `from __future__` imports must occur at the beginning of the file
 7 |
 8 | import __future__
   |
+
+## Concise Output
+F404_0.py:6:1: F404 `from __future__` imports must occur at the beginning of the file

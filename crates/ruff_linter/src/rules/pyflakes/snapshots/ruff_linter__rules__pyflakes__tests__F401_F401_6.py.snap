@@ -75,3 +75,9 @@ help: Remove unused import: `datastructures`
 17 17 | 
 18 18 | # F401 `datastructures` imported but unused
 19    |-import datastructures as structures
+
+## Concise Output
+F401_6.py:7:25: F401 [*] `.background.BackgroundTasks` imported but unused
+F401_6.py:10:43: F401 [*] `.datastructures.UploadFile` imported but unused
+F401_6.py:16:8: F401 [*] `background` imported but unused
+F401_6.py:19:26: F401 [*] `datastructures` imported but unused

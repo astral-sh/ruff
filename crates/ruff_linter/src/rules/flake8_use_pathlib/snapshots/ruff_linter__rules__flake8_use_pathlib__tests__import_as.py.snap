@@ -289,3 +289,30 @@ PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, an
 31 | foo_p.splitext(p)
    | ^^^^^^^^^^^^^^
    |
+
+## Concise Output
+import_as.py:7:5: PTH100 `os.path.abspath()` should be replaced by `Path.resolve()`
+import_as.py:8:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+import_as.py:9:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+import_as.py:10:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+import_as.py:11:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
+import_as.py:12:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
+import_as.py:13:1: PTH106 `os.rmdir()` should be replaced by `Path.rmdir()`
+import_as.py:14:1: PTH107 `os.remove()` should be replaced by `Path.unlink()`
+import_as.py:15:1: PTH108 `os.unlink()` should be replaced by `Path.unlink()`
+import_as.py:16:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+import_as.py:17:5: PTH110 `os.path.exists()` should be replaced by `Path.exists()`
+import_as.py:18:6: PTH111 `os.path.expanduser()` should be replaced by `Path.expanduser()`
+import_as.py:19:7: PTH112 `os.path.isdir()` should be replaced by `Path.is_dir()`
+import_as.py:20:8: PTH113 `os.path.isfile()` should be replaced by `Path.is_file()`
+import_as.py:21:9: PTH114 `os.path.islink()` should be replaced by `Path.is_symlink()`
+import_as.py:22:1: PTH115 `os.readlink()` should be replaced by `Path.readlink()`
+import_as.py:23:1: PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+import_as.py:24:1: PTH117 `os.path.isabs()` should be replaced by `Path.is_absolute()`
+import_as.py:25:1: PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
+import_as.py:26:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+import_as.py:27:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+import_as.py:28:1: PTH119 `os.path.basename()` should be replaced by `Path.name`
+import_as.py:29:1: PTH120 `os.path.dirname()` should be replaced by `Path.parent`
+import_as.py:30:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+import_as.py:31:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`

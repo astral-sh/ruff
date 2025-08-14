@@ -59,3 +59,8 @@ help: Replace with `not ...`
   5 |+a = not b + c  # SIM211
 6 6 | 
 7 7 | a = True if b else False  # OK
+
+## Concise Output
+SIM211.py:1:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
+SIM211.py:3:5: SIM211 [*] Use `not ...` instead of `False if ... else True`
+SIM211.py:5:5: SIM211 [*] Use `not ...` instead of `False if ... else True`

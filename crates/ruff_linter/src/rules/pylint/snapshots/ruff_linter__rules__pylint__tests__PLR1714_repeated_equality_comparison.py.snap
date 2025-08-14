@@ -475,3 +475,27 @@ help: Merge multiple comparisons
 74 74 | 
 75    |-foo == 0.0 or foo == 0j # Different types, same hashed value
    75 |+foo in {0.0, 0j} # Different types, same hashed value
+
+## Concise Output
+repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
+repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b"}`.
+repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
+repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
+repeated_equality_comparison.py:10:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (a, "b", 3)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
+repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
+repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
+repeated_equality_comparison.py:18:1: PLR1714 [*] Consider merging multiple comparisons: `foo in (bar, baz, qux)`. Use a `set` if the elements are hashable.
+repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b", "c"}`.
+repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comparisons: `foo not in {"a", "b", "c"}`.
+repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
+repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
+repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comparisons: `foo.bar in {"a", "b"}`.
+repeated_equality_comparison.py:61:16: PLR1714 [*] Consider merging multiple comparisons: `bar in {"c", "d"}`.
+repeated_equality_comparison.py:63:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {"a", "b"}`.
+repeated_equality_comparison.py:63:29: PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
+repeated_equality_comparison.py:65:16: PLR1714 [*] Consider merging multiple comparisons: `bar not in {"c", "d"}`.
+repeated_equality_comparison.py:69:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {1, True}`.
+repeated_equality_comparison.py:71:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {1, 1.0}`.
+repeated_equality_comparison.py:73:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {False, 0}`.
+repeated_equality_comparison.py:75:1: PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.

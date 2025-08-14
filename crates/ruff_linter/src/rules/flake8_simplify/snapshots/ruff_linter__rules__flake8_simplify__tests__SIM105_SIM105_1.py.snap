@@ -24,3 +24,6 @@ help: Replace with `contextlib.suppress(ValueError)`
 6 7 |     math.sqrt(-1)
 7   |-except ValueError:
 8   |-    pass
+
+## Concise Output
+SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`

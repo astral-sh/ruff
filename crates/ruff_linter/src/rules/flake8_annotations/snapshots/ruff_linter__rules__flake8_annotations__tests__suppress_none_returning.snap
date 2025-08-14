@@ -50,3 +50,8 @@ ANN001 Missing type annotation for function argument `a`
    |         ^
 60 |     a = 2 + 2
    |
+
+## Concise Output
+suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for public function `foo`
+suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for public function `foo`
+suppress_none_returning.py:59:9: ANN001 Missing type annotation for function argument `a`

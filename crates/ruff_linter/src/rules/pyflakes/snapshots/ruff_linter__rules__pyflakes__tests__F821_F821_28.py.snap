@@ -9,3 +9,6 @@ F821 Undefined name `𝒟`
 9 | print(𝒟)  # F821
   |       ^
   |
+
+## Concise Output
+F821_28.py:9:7: F821 Undefined name `𝒟`

@@ -28,3 +28,6 @@ help: Organize imports
 6  10 | from library import foo
    11 |+
 7  12 | from . import local
+
+## Concise Output
+sections.py:1:1: I001 [*] Import block is un-sorted or un-formatted

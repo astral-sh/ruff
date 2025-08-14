@@ -9,3 +9,6 @@ F821 Undefined name `y`
 21 | print(y)
    |       ^
    |
+
+## Concise Output
+F821_19.py:21:7: F821 Undefined name `y`

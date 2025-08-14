@@ -254,3 +254,16 @@ PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
 48 |               raise ValueError
    |
 help: Replace `assertRaises` with `pytest.raises`
+
+## Concise Output
+PT027_0.py:6:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_0.py:8:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_0.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `failUnlessRaises`
+PT027_0.py:14:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
+PT027_0.py:17:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
+PT027_0.py:20:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
+PT027_0.py:25:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegex`
+PT027_0.py:30:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaisesRegexp`
+PT027_0.py:34:14: PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_0.py:37:14: PT027 Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_0.py:44:13: PT027 Use `pytest.raises` instead of unittest-style `assertRaises`

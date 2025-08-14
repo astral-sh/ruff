@@ -294,3 +294,32 @@ PERF401 Use a list comprehension to create a transformed list
 294 | G_INDEX = None
     |
 help: Replace for loop with list comprehension
+
+## Concise Output
+PERF401.py:6:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:13:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:82:13: PERF401 Use an async list comprehension to create a transformed list
+PERF401.py:89:9: PERF401 Use an async list comprehension to create a transformed list
+PERF401.py:96:9: PERF401 Use `list.extend` with an async comprehension to create a transformed list
+PERF401.py:102:9: PERF401 Use `list.extend` to create a transformed list
+PERF401.py:111:17: PERF401 Use `list.extend` to create a transformed list
+PERF401.py:119:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:135:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:142:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:149:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:156:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:162:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:169:9: PERF401 Use `list.extend` to create a transformed list
+PERF401.py:189:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:198:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:210:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:222:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:229:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:239:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:245:13: PERF401 Use `list.extend` to create a transformed list
+PERF401.py:262:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:268:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:276:13: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:280:13: PERF401 Use `list.extend` to create a transformed list
+PERF401.py:286:9: PERF401 Use a list comprehension to create a transformed list
+PERF401.py:292:9: PERF401 Use a list comprehension to create a transformed list

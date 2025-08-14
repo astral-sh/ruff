@@ -296,3 +296,19 @@ help: Replace with `True`
 58    |-if True == True: # No duplicated diagnostic
    58 |+if True: # No duplicated diagnostic
 59 59 |     pass
+
+## Concise Output
+E712.py:2:4: E712 [*] Avoid equality comparisons to `True`; use `res:` for truth checks
+E712.py:5:4: E712 [*] Avoid inequality comparisons to `False`; use `res:` for truth checks
+E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `not res:` for false checks
+E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `not res:` for false checks
+E712.py:14:4: E712 [*] Avoid equality comparisons to `True`; use `res[1]:` for truth checks
+E712.py:17:4: E712 [*] Avoid inequality comparisons to `False`; use `res[1]:` for truth checks
+E712.py:20:12: E712 [*] Avoid equality comparisons to `True`; use `cond:` for truth checks
+E712.py:20:36: E712 [*] Avoid equality comparisons to `False`; use `not cond:` for false checks
+E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth checks
+E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
+E712.py:25:4: E712 [*] Avoid equality comparisons to `True` or `False`
+E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `TrueElement:` for truth checks
+E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `yield i:` for truth checks
+E712.py:58:4: E712 [*] Avoid equality comparisons to `True`; use `True:` for truth checks

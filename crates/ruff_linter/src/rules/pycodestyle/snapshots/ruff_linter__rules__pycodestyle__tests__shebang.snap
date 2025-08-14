@@ -18,3 +18,6 @@ help: Format space
 3   |-#!
   3 |+# !
 4 4 | #:
+
+## Concise Output
+shebang.py:3:1: E265 [*] Block comment should start with `# `

@@ -55,3 +55,10 @@ DTZ001 `datetime.datetime()` called without a `tzinfo` argument
 23 | # uses `astimezone` method
    |
 help: Pass a `datetime.timezone` object to the `tzinfo` parameter
+
+## Concise Output
+DTZ001.py:4:1: DTZ001 `datetime.datetime()` called without a `tzinfo` argument
+DTZ001.py:7:1: DTZ001 `tzinfo=None` passed to `datetime.datetime()`
+DTZ001.py:13:1: DTZ001 `datetime.datetime()` called without a `tzinfo` argument
+DTZ001.py:16:1: DTZ001 `tzinfo=None` passed to `datetime.datetime()`
+DTZ001.py:21:1: DTZ001 `datetime.datetime()` called without a `tzinfo` argument

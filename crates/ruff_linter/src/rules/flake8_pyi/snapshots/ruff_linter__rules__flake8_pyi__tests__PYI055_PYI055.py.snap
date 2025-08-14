@@ -175,4 +175,14 @@ help: Combine multiple `type` members
    68 |+        type[_T | Converter[_T]] | str | Converter[_T] | Callable[[str], _T], ...  # PYI055
 69 69 |     ] = union.__args__
 70 70 |     ...
-71 71 |
+71 71 | 
+
+## Concise Output
+PYI055.py:34:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
+PYI055.py:35:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.py:36:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.py:45:8: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.py:50:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:56:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:62:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.
+PYI055.py:68:9: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[_T | Converter[_T]]`.

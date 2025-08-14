@@ -8,3 +8,6 @@ F407 Future feature `non_existent_feature` is not defined
 2 | from __future__ import non_existent_feature
   |                        ^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+F407.py:2:24: F407 Future feature `non_existent_feature` is not defined

@@ -109,3 +109,15 @@ RUF009 Do not perform function call `default_function` in dataclass defaults
 110 |     # ignored
 111 |     this_is_fine: int = f()
     |
+
+## Concise Output
+RUF009.py:20:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009.py:43:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009.py:44:28: RUF009 Do not perform function call `A` in dataclass defaults
+RUF009.py:45:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
+RUF009.py:91:24: RUF009 Do not perform function call `ListOfStrings` in dataclass defaults
+RUF009.py:92:24: RUF009 Do not perform function call `StringsToInts` in dataclass defaults
+RUF009.py:93:19: RUF009 Do not perform function call `Invalid1` in dataclass defaults
+RUF009.py:94:19: RUF009 Do not perform function call `Invalid2` in dataclass defaults
+RUF009.py:95:19: RUF009 Do not perform function call `Invalid3` in dataclass defaults
+RUF009.py:109:35: RUF009 Do not perform function call `default_function` in dataclass defaults

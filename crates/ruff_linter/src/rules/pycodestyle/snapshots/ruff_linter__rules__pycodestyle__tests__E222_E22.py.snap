@@ -129,4 +129,12 @@ help: Replace with single space
     184 |+if a  == 1:
 185 185 |     print(a)
 186 186 | 
-187 187 |
+187 187 | 
+
+## Concise Output
+E22.py:28:8: E222 [*] Multiple spaces after operator
+E22.py:31:4: E222 [*] Multiple spaces after operator
+E22.py:32:4: E222 [*] Multiple spaces after operator
+E22.py:35:7: E222 [*] Multiple spaces after operator
+E22.py:36:7: E222 [*] Multiple spaces after operator
+E22.py:184:9: E222 [*] Multiple spaces after operator

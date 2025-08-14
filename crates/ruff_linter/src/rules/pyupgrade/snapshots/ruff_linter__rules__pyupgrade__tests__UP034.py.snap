@@ -214,3 +214,15 @@ help: Remove extraneous parentheses
 40 40 | 
 41 41 | # OK
 42 42 | print("foo")
+
+## Concise Output
+UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
+UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
+UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
+UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
+UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
+UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
+UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
+UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
+UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
+UP034.py:39:7: UP034 [*] Avoid extraneous parentheses

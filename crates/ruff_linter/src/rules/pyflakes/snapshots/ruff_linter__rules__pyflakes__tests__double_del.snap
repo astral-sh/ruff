@@ -9,3 +9,6 @@ F821 Undefined name `x`
 5 |     del x
   |         ^
   |
+
+## Concise Output
+<filename>:5:9: F821 Undefined name `x`

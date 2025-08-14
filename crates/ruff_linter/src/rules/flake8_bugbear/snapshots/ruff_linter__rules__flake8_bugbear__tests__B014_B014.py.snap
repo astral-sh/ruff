@@ -106,3 +106,10 @@ help: De-duplicate exceptions
 89    |-except(re.error, re.error):
    89 |+except re.error:
 90 90 |     p
+
+## Concise Output
+B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
+B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
+B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
+B014.py:82:8: B014 [*] Exception handler with duplicate exception: `ValueError`
+B014.py:89:7: B014 [*] Exception handler with duplicate exception: `re.error`

@@ -23,4 +23,7 @@ help: Move into type-checking block
    14 |+    from pandas import DataFrame
 15 15 |     from numpy import ndarray
 16 16 | 
-17 17 |
+17 17 | 
+
+## Concise Output
+singledispatch.py:12:20: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block

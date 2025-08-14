@@ -15,3 +15,6 @@ help: Replace with `dict.fromkeys(iterable)`)
 2 2 | 
 3 3 | 
 4 4 | # Builtin bindings are placed at top of file, but should not count as
+
+## Concise Output
+C420_1.py:1:1: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead

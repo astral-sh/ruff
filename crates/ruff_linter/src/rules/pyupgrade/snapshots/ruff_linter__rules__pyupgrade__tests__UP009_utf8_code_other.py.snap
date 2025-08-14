@@ -15,3 +15,6 @@ help: Remove unnecessary coding comment
 1   |-# -*- coding: utf8 -*-
 2 1 | print("the following is not a coding comment")
 3 2 | # -*- coding: ascii -*-
+
+## Concise Output
+UP009_utf8_code_other.py:1:1: UP009 [*] UTF-8 encoding declaration is unnecessary

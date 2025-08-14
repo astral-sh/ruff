@@ -9,3 +9,6 @@ D102 Missing docstring in public method
    |         ^^^
 17 |         pass
    |
+
+## Concise Output
+setter.py:16:9: D102 Missing docstring in public method

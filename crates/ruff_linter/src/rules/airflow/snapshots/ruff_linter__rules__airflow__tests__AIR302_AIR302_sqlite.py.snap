@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `SqliteHook` from
   3 |+from airflow.providers.sqlite.hooks.sqlite import SqliteHook
 4 4 | 
 5 5 | SqliteHook()
+
+## Concise Output
+AIR302_sqlite.py:5:1: AIR302 [*] `airflow.hooks.sqlite_hook.SqliteHook` is moved into `sqlite` provider in Airflow 3.0;

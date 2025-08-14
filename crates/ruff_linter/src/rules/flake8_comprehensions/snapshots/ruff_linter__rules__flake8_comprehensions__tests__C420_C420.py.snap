@@ -245,3 +245,17 @@ help: Replace with `dict.fromkeys(iterable, value)`)
 102    |-iterable # 8
 103    |-} # 9
    95 |+dict.fromkeys(iterable) # 9
+
+## Concise Output
+C420.py:6:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:10:23: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:15:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:26:7: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:30:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:34:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:38:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:42:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:46:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:54:5: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:59:6: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead
+C420.py:95:1: C420 [*] Unnecessary dict comprehension for iterable; use `dict.fromkeys` instead

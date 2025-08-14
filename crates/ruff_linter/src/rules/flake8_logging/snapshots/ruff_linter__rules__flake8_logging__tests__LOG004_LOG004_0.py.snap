@@ -157,3 +157,14 @@ LOG004 `.exception()` call outside exception handlers
    |         ^^^^^^^
    |
 help: Replace with `.error()`
+
+## Concise Output
+LOG004_0.py:13:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:14:1: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:15:1: LOG004 `.exception()` call outside exception handlers
+LOG004_0.py:19:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:20:5: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:21:5: LOG004 `.exception()` call outside exception handlers
+LOG004_0.py:28:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:29:9: LOG004 [*] `.exception()` call outside exception handlers
+LOG004_0.py:30:9: LOG004 `.exception()` call outside exception handlers

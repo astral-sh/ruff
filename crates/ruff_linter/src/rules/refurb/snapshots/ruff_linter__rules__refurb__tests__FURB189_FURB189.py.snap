@@ -128,3 +128,10 @@ help: Replace with `collections.UserList`
 30 30 |     pass
 31 31 | 
 32 32 | # currently not detected
+
+## Concise Output
+FURB189.py:17:9: FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
+FURB189.py:20:9: FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead
+FURB189.py:23:9: FURB189 [*] Subclassing `str` can be error prone, use `collections.UserString` instead
+FURB189.py:26:21: FURB189 [*] Subclassing `dict` can be error prone, use `collections.UserDict` instead
+FURB189.py:29:21: FURB189 [*] Subclassing `list` can be error prone, use `collections.UserList` instead

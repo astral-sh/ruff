@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-samba>=1.0.0` and use `SambaHook` from `
   3 |+from airflow.providers.samba.hooks.samba import SambaHook
 4 4 | 
 5 5 | SambaHook()
+
+## Concise Output
+AIR302_samba.py:5:1: AIR302 [*] `airflow.hooks.samba_hook.SambaHook` is moved into `samba` provider in Airflow 3.0;

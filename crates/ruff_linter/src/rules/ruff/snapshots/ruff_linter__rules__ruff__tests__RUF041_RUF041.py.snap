@@ -246,3 +246,16 @@ help: Replace with flattened `Literal`
 26 26 | 
 27 27 | # OK
 28 28 | x: Literal[True, False, True, False]
+
+## Concise Output
+RUF041.py:6:4: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:7:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:8:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:9:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:10:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:11:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:12:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:20:10: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:23:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:24:1: RUF041 [*] Unnecessary nested `Literal`
+RUF041.py:25:1: RUF041 [*] Unnecessary nested `Literal`

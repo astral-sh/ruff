@@ -75,3 +75,12 @@ PLC2701 Private name import `_ddd` from external module `bbb.ccc`
  9 |
 10 | # Non-errors.
    |
+
+## Concise Output
+__main__.py:2:16: PLC2701 Private name import `_a`
+__main__.py:3:18: PLC2701 Private name import `_d` from external module `c`
+__main__.py:4:18: PLC2701 Private name import `_f`
+__main__.py:5:15: PLC2701 Private name import `_j` from external module `i`
+__main__.py:6:21: PLC2701 Private name import `_l` from external module `k`
+__main__.py:7:8: PLC2701 Private name import `_aaa`
+__main__.py:8:24: PLC2701 Private name import `_ddd` from external module `bbb.ccc`

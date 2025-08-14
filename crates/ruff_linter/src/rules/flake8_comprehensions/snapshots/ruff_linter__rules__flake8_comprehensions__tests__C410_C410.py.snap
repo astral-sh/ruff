@@ -127,3 +127,11 @@ help: Remove outer `list()` call
 14 14 | 
 15 15 | # Skip when too many positional arguments
 16 16 | # See https://github.com/astral-sh/ruff/issues/15810
+
+## Concise Output
+C410.py:1:6: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
+C410.py:2:6: C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
+C410.py:3:6: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
+C410.py:4:6: C410 [*] Unnecessary tuple literal passed to `list()` (rewrite as a single list literal)
+C410.py:7:1: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)
+C410.py:11:1: C410 [*] Unnecessary list literal passed to `list()` (remove the outer call to `list()`)

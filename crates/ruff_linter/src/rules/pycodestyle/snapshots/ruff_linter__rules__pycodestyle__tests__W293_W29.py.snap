@@ -22,3 +22,6 @@ help: Remove whitespace from blank line
 8 8 |     bang = 12
 9 9 | #: W291:2:35
 10 10 | '''multiline
+
+## Concise Output
+W29.py:7:1: W293 [*] Blank line contains whitespace

@@ -21,3 +21,7 @@ PLE0101 Explicit return in `__init__`
 23 |
 24 | class MyClass2:
    |
+
+## Concise Output
+return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
+return_in_init.py:22:9: PLE0101 Explicit return in `__init__`

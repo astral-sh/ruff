@@ -51,3 +51,8 @@ help: Replace double multiline quotes with single quotes
 4 4 |     pass
 5   |-""" this is not a docstring """
   5 |+''' this is not a docstring '''
+
+## Concise Output
+docstring_singles_mixed_quotes_module_singleline_var_2.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_module_singleline_var_2.py:1:36: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_module_singleline_var_2.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred

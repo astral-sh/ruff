@@ -16,3 +16,6 @@ help: Replace TypeVar `S` with `Self`
 3 3 | class F:
 4   |-    def m[S](self: S) -> S: ...
   4 |+    def m(self) -> typing.Self: ...
+
+## Concise Output
+PYI019_1.pyi:4:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`

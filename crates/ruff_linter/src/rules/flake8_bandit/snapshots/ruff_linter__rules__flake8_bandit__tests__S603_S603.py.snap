@@ -136,3 +136,18 @@ S603 `subprocess` call: check for execution of untrusted input
 41 | run(e)
    | ^^^
    |
+
+## Concise Output
+S603.py:5:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:6:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:7:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:8:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:9:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:12:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:13:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:14:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:15:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:18:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:21:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:34:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:41:1: S603 `subprocess` call: check for execution of untrusted input

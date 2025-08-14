@@ -485,3 +485,28 @@ help: Replace `IOError` with builtin `OSError`
 54 54 | raise EnvironmentError(1)
 55    |-raise IOError(1, 2)
    55 |+raise OSError(1, 2)
+
+## Concise Output
+UP024_2.py:10:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:11:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:12:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:13:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:15:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:16:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:17:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:18:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:20:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:27:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:30:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:33:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:36:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:39:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:40:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:41:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:43:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:44:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:45:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:47:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:53:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:54:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:55:7: UP024 [*] Replace aliased errors with `OSError`

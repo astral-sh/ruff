@@ -21,3 +21,7 @@ FIX001 Line contains FIXME, consider resolving the issue
  9 |
 10 | # test # TODO: todo
    |
+
+## Concise Output
+T00.py:7:3: FIX001 Line contains FIXME, consider resolving the issue
+T00.py:8:3: FIX001 Line contains FIXME, consider resolving the issue

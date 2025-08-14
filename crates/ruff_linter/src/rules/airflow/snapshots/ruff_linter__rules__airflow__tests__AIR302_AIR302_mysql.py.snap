@@ -69,3 +69,8 @@ help: Install `apache-airflow-providers-mysql>=1.0.0` and use `PrestoToMySqlOper
 8 8 | 
 9 9 | MySqlHook()
 10 10 | PrestoToMySqlOperator()
+
+## Concise Output
+AIR302_mysql.py:9:1: AIR302 [*] `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysql` provider in Airflow 3.0;
+AIR302_mysql.py:10:1: AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
+AIR302_mysql.py:11:1: AIR302 [*] `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;

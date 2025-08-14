@@ -448,3 +448,46 @@ PLW0127 Self-assignment of variable `bar`
 29 |
 30 | # Non-errors.
    |
+
+## Concise Output
+self_assigning_variable.py:6:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:7:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:8:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:8:6: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:9:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:9:6: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:10:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:10:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:11:2: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:11:7: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:12:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:12:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:12:12: PLW0127 Self-assignment of variable `baz`
+self_assigning_variable.py:13:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:13:7: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:13:12: PLW0127 Self-assignment of variable `baz`
+self_assigning_variable.py:14:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:14:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:14:13: PLW0127 Self-assignment of variable `baz`
+self_assigning_variable.py:15:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:15:8: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:15:13: PLW0127 Self-assignment of variable `baz`
+self_assigning_variable.py:16:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:17:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:18:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:19:2: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:20:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:20:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:21:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:21:7: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:22:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:22:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:23:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:23:8: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:24:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:25:1: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:26:1: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:27:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:27:7: PLW0127 Self-assignment of variable `bar`
+self_assigning_variable.py:28:2: PLW0127 Self-assignment of variable `foo`
+self_assigning_variable.py:28:7: PLW0127 Self-assignment of variable `bar`

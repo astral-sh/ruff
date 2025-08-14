@@ -33,4 +33,8 @@ help: Add `from __future__ import annotations`
   1 |+from __future__ import annotations
 1 2 | from typing import Dict, List, Optional, Set, Union, cast
 2 3 | 
-3 4 |
+3 4 | 
+
+## Concise Output
+from_typing_import_many.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
+from_typing_import_many.py:5:18: FA100 [*] Add `from __future__ import annotations` to simplify `typing.Optional`

@@ -423,4 +423,19 @@ help: Move into type-checking block
    94 |+    def func(self) -> "DataFrame | list[Series]":
 92 95 |         pass
 93 96 | 
-94 97 |
+94 97 | 
+
+## Concise Output
+quote.py:2:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:9:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:16:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+quote.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+quote.py:30:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+quote.py:38:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:47:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:64:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:64:35: TC002 [*] Move third-party import `pandas.Series` into a type-checking block
+quote.py:71:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:71:35: TC002 [*] Move third-party import `pandas.Series` into a type-checking block
+quote.py:89:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+quote.py:89:35: TC002 [*] Move third-party import `pandas.Series` into a type-checking block

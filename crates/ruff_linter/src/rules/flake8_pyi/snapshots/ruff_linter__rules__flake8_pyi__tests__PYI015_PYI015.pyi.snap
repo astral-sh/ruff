@@ -240,3 +240,16 @@ help: Replace default value with `...`
 56 56 | 
 57 57 | # We shouldn't emit Y015 within functions
 58 58 | def f():
+
+## Concise Output
+PYI015.pyi:44:23: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:45:23: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:46:23: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:47:26: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:48:47: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:49:31: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:50:37: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:52:28: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:53:11: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:54:11: PYI015 [*] Only simple default values allowed for assignments
+PYI015.pyi:55:11: PYI015 [*] Only simple default values allowed for assignments

@@ -18,3 +18,7 @@ YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.vers
 5 | version_info.minor > 8
   | ^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+YTT204.py:4:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
+YTT204.py:5:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple

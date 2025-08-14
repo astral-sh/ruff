@@ -137,3 +137,18 @@ PLE0116 `continue` not supported inside `finally` clause
 95 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^
    |
+
+## Concise Output
+continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:16:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:33:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:40:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:41:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:49:17: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:56:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:69:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:74:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:89:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:91:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:95:17: PLE0116 `continue` not supported inside `finally` clause

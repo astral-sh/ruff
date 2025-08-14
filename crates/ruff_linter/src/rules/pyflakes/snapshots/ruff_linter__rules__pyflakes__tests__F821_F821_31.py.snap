@@ -56,3 +56,11 @@ F821 Undefined name `A`
 16 |     x: "A" = 1
    |         ^
    |
+
+## Concise Output
+F821_31.py:8:23: F821 Undefined name `B`
+F821_31.py:8:31: F821 Undefined name `S`
+F821_31.py:9:13: F821 Undefined name `B`
+F821_31.py:15:13: F821 Undefined name `A`
+F821_31.py:15:21: F821 Undefined name `R`
+F821_31.py:16:9: F821 Undefined name `A`

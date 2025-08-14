@@ -370,3 +370,18 @@ FAST002 FastAPI dependency without `Annotated`
 72 |     pass
    |
 help: Replace with `typing.Annotated`
+
+## Concise Output
+FAST002_0.py:24:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:25:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:32:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:33:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:34:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:35:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:36:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:37:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:38:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:47:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:53:5: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:61:25: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_0.py:70:5: FAST002 FastAPI dependency without `Annotated`

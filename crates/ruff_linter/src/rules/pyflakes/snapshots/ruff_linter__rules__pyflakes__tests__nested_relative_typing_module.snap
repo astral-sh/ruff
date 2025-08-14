@@ -16,3 +16,7 @@ F821 Undefined name `foo`
 33 |     x: Literal["foo"]
    |                 ^^^
    |
+
+## Concise Output
+baz.py:26:17: F821 Undefined name `foo`
+baz.py:33:17: F821 Undefined name `foo`

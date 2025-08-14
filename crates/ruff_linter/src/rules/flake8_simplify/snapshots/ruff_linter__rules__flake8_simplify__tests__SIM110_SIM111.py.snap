@@ -345,3 +345,19 @@ help: Replace with `return all(not x.isdigit() for x in "012ß9💣2ℝ9012ß9�
 182 179 | 
 183 180 | 
 184 181 | def f():
+
+## Concise Output
+SIM111.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loop
+SIM111.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:162:5: SIM110 [*] Use `return all(x in y for x in iterable)` instead of `for` loop
+SIM111.py:170:5: SIM110 [*] Use `return all(x <= y for x in iterable)` instead of `for` loop
+SIM111.py:178:5: SIM110 [*] Use `return all(not x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9")` instead of `for` loop

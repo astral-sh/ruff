@@ -12,3 +12,5 @@ help: Remove unnecessary `int` call
 
 ℹ Safe fix
 1   |-int(-  1 |+(-2 2 |     1) # Carriage return as newline
+## Concise Output
+RUF046_CR.py:1:1: RUF046 [*] Value being cast to `int` is already an integer

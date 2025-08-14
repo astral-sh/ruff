@@ -82,3 +82,13 @@ ICN002 `torch.nn.functional` should not be imported as `F`
 10 |
 11 | from typing import Any  # ok
    |
+
+## Concise Output
+custom_banned.py:1:1: ICN002 `typing` should not be imported as `t`
+custom_banned.py:2:1: ICN002 `typing` should not be imported as `ty`
+custom_banned.py:4:1: ICN002 `numpy` should not be imported as `nmp`
+custom_banned.py:5:1: ICN002 `numpy` should not be imported as `npy`
+custom_banned.py:6:1: ICN002 `tensorflow.keras.backend` should not be imported as `K`
+custom_banned.py:7:1: ICN002 `torch.nn.functional` should not be imported as `F`
+custom_banned.py:8:1: ICN002 `tensorflow.keras.backend` should not be imported as `K`
+custom_banned.py:9:1: ICN002 `torch.nn.functional` should not be imported as `F`

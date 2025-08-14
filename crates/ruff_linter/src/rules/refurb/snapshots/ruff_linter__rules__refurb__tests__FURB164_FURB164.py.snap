@@ -742,3 +742,42 @@ help: Replace with `Decimal` constructor
 65 65 | _ = Decimal.from_float(float("\x2dnan"))
 66    |-_ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
    66 |+_ = Decimal("-nan")
+
+## Concise Output
+FURB164.py:7:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
+FURB164.py:8:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
+FURB164.py:9:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
+FURB164.py:10:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
+FURB164.py:11:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:12:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:13:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:13:27: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:14:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:15:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:16:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:17:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:18:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:19:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:20:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:21:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:22:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:23:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:24:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:25:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:26:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:27:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:28:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:31:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:32:5: FURB164 Verbose method `from_float` in `Decimal` construction
+FURB164.py:35:5: FURB164 Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:36:5: FURB164 Verbose method `from_float` in `Decimal` construction
+FURB164.py:39:5: FURB164 Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:40:5: FURB164 Verbose method `from_float` in `Decimal` construction
+FURB164.py:43:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:44:5: FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+FURB164.py:45:5: FURB164 [*] Verbose method `from_float` in `Fraction` construction
+FURB164.py:60:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:61:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:64:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:65:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction
+FURB164.py:66:5: FURB164 [*] Verbose method `from_float` in `Decimal` construction

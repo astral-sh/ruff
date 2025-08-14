@@ -77,3 +77,12 @@ E702 Multiple statements on one line (semicolon)
 66 | #: E703:2:1
 67 | 0\
    |
+
+## Concise Output
+E70.py:6:10: E702 Multiple statements on one line (semicolon)
+E70.py:8:17: E702 Multiple statements on one line (semicolon)
+E70.py:12:9: E702 Multiple statements on one line (semicolon)
+E70.py:25:11: E702 Multiple statements on one line (semicolon)
+E70.py:54:13: E702 Multiple statements on one line (semicolon)
+E70.py:56:13: E702 Multiple statements on one line (semicolon)
+E70.py:65:4: E702 Multiple statements on one line (semicolon)

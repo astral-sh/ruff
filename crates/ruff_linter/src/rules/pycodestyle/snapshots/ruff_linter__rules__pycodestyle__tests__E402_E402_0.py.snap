@@ -27,3 +27,8 @@ E402 Module level import not at top of file
 45 | import k; import l
    |           ^^^^^^^^
    |
+
+## Concise Output
+E402_0.py:35:1: E402 Module level import not at top of file
+E402_0.py:45:1: E402 Module level import not at top of file
+E402_0.py:45:11: E402 Module level import not at top of file

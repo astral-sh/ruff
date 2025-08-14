@@ -36,3 +36,9 @@ PLE0308 `__bytes__` does not return `bytes`
    |         ^^^^^^^^^
 21 |         print("ruff")  # [invalid-bytes-return]
    |
+
+## Concise Output
+invalid_return_type_bytes.py:6:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:11:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:16:16: PLE0308 `__bytes__` does not return `bytes`
+invalid_return_type_bytes.py:20:9: PLE0308 `__bytes__` does not return `bytes`

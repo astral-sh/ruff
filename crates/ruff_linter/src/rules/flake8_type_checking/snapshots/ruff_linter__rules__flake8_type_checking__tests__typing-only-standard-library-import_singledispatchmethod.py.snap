@@ -26,3 +26,6 @@ help: Move into type-checking block
 7 9 | 
 8 10 | 
 9 11 | class Foo:
+
+## Concise Output
+singledispatchmethod.py:4:21: TC003 [*] Move standard library import `pathlib.Path` into a type-checking block

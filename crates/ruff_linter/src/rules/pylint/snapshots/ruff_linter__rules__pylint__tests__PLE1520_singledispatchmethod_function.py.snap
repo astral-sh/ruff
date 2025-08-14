@@ -20,4 +20,7 @@ help: Replace with `@singledispatch`
   4 |+@singledispatch  # [singledispatchmethod-function]
 5 5 | def convert_position(position):
 6 6 |     pass
-7 7 |
+7 7 | 
+
+## Concise Output
+singledispatchmethod_function.py:4:1: PLE1520 [*] `@singledispatchmethod` decorator should not be used on non-method functions

@@ -22,3 +22,7 @@ DTZ004 `datetime.datetime.utcfromtimestamp()` used
 11 | # uses `astimezone` method
    |
 help: Use `datetime.datetime.fromtimestamp(ts, tz=...)` instead
+
+## Concise Output
+DTZ004.py:4:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used
+DTZ004.py:9:1: DTZ004 `datetime.datetime.utcfromtimestamp()` used

@@ -260,3 +260,15 @@ help: Replace `zip()` with `itertools.pairwise()`
 24 25 | zip(foo[:-1], foo[1:], strict=False)
 25    |-zip(foo[:-1], foo[1:], strict=bool(foo))
    26 |+itertools.pairwise(foo)
+
+## Concise Output
+RUF007.py:16:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:17:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:18:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:19:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:20:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:21:6: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:22:6: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:23:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:24:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:25:1: RUF007 [*] Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs

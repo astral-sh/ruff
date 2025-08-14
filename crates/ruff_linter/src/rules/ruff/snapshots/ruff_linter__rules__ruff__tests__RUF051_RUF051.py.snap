@@ -617,4 +617,33 @@ help: Replace `if` statement with `.pop(..., None)`
     98  |+d.pop(b'yt' b'es', None)             # This should not make the fix unsafe
 100 99  | 
 101 100 | 
-102 101 |
+102 101 | 
+
+## Concise Output
+RUF051.py:8:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:11:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:14:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:18:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:21:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:24:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:27:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:30:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:33:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:39:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:44:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:47:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:50:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:54:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:59:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:62:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:65:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:69:12: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:72:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:75:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:78:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:81:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:84:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:89:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:93:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:96:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`
+RUF051.py:99:5: RUF051 [*] Use `pop` instead of `key in dict` followed by `del dict[key]`

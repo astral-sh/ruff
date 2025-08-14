@@ -20,3 +20,7 @@ B022 No arguments passed to `contextlib.suppress`. No exceptions will be suppres
    |      ^^^^^^^^^^
 13 |     raise ValueError
    |
+
+## Concise Output
+B022.py:9:6: B022 No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant
+B022.py:12:6: B022 No arguments passed to `contextlib.suppress`. No exceptions will be suppressed and therefore this context manager is redundant

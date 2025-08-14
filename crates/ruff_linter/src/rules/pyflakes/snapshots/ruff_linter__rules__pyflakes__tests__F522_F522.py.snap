@@ -121,3 +121,11 @@ help: Remove extra named arguments: greeting
 13 13 | # even though the used argument has a side effect
 14    |-"Hello, {name}".format(greeting="Pikachu", name=print(1))
    14 |+"Hello, {name}".format(name=print(1))
+
+## Concise Output
+F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
+F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
+F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
+F522.py:5:2: F522 [*] `.format` call has unused named argument(s): x
+F522.py:10:1: F522 [*] `.format` call has unused named argument(s): greeting
+F522.py:14:1: F522 [*] `.format` call has unused named argument(s): greeting

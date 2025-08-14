@@ -7,3 +7,6 @@ F821 Undefined name `_`
 1 | _("Translations")
   | ^
   |
+
+## Concise Output
+builtins.py:1:1: F821 Undefined name `_`

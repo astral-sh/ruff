@@ -136,3 +136,12 @@ help: Delete the empty comment
 57 57 | α = 1
 58    |-α#
    58 |+α
+
+## Concise Output
+empty_comment.py:3:1: PLR2044 [*] Line with empty comment
+empty_comment.py:4:5: PLR2044 [*] Line with empty comment
+empty_comment.py:5:9: PLR2044 [*] Line with empty comment
+empty_comment.py:18:11: PLR2044 [*] Line with empty comment
+empty_comment.py:44:1: PLR2044 [*] Line with empty comment
+empty_comment.py:45:1: PLR2044 [*] Line with empty comment
+empty_comment.py:58:2: PLR2044 [*] Line with empty comment

@@ -48,3 +48,7 @@ help: Move into type-checking block
    9  |+
 8  10 | def f(x: os, y: sys):
 9  11 |     pass
+
+## Concise Output
+<filename>:6:8: TC003 [*] Move standard library import `os` into a type-checking block
+<filename>:6:12: TC003 [*] Move standard library import `sys` into a type-checking block

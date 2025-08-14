@@ -18,3 +18,7 @@ DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
 11 |         fields = b"__all__"
    |         ^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+DJ007.py:6:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
+DJ007.py:11:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead

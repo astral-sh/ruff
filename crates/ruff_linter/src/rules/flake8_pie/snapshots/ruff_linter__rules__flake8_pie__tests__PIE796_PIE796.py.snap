@@ -101,3 +101,16 @@ PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
 80 |     C = cast(SomeType, ...)  # PIE796
    |     ^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+PIE796.py:8:5: PIE796 Enum contains duplicate value: `"B"`
+PIE796.py:14:5: PIE796 Enum contains duplicate value: `2`
+PIE796.py:20:5: PIE796 Enum contains duplicate value: `"2"`
+PIE796.py:26:5: PIE796 Enum contains duplicate value: `2.5`
+PIE796.py:33:5: PIE796 Enum contains duplicate value: `False`
+PIE796.py:40:5: PIE796 Enum contains duplicate value: `None`
+PIE796.py:54:5: PIE796 Enum contains duplicate value: `2`
+PIE796.py:71:5: PIE796 Enum contains duplicate value: `...`
+PIE796.py:72:5: PIE796 Enum contains duplicate value: `...`
+PIE796.py:79:5: PIE796 Enum contains duplicate value: `cast(SomeType, ...)`
+PIE796.py:80:5: PIE796 Enum contains duplicate value: `cast(SomeType, ...)`

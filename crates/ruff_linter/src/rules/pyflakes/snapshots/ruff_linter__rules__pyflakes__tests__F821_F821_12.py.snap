@@ -16,3 +16,7 @@ F821 Undefined name `Baz`
 25 | f(Callable[["Baz"], None])
    |              ^^^
    |
+
+## Concise Output
+F821_12.py:20:28: F821 Undefined name `os`
+F821_12.py:25:14: F821 Undefined name `Baz`

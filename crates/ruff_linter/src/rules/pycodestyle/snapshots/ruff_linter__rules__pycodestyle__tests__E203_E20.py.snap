@@ -378,4 +378,24 @@ help: Remove whitespace before ':'
 204 204 | #: E203:1:13
 205     |-t"{ham[lower + 1  :, "columnname"]}"
     205 |+t"{ham[lower + 1:, "columnname"]}"
-206 206 |
+206 206 | 
+
+## Concise Output
+E20.py:51:10: E203 [*] Whitespace before ':'
+E20.py:55:10: E203 [*] Whitespace before ':'
+E20.py:60:16: E203 [*] Whitespace before ';'
+E20.py:63:16: E203 [*] Whitespace before ';'
+E20.py:67:13: E203 [*] Whitespace before ','
+E20.py:71:13: E203 [*] Whitespace before ','
+E20.py:86:61: E203 [*] Whitespace before ':'
+E20.py:91:61: E203 [*] Whitespace before ':'
+E20.py:101:61: E203 [*] Whitespace before ':'
+E20.py:126:16: E203 [*] Whitespace before ':'
+E20.py:129:19: E203 [*] Whitespace before ':'
+E20.py:157:21: E203 [*] Whitespace before ':'
+E20.py:160:20: E203 [*] Whitespace before ':'
+E20.py:163:20: E203 [*] Whitespace before ':'
+E20.py:175:10: E203 [*] Whitespace before ':'
+E20.py:181:14: E203 [*] Whitespace before ':'
+E20.py:187:17: E203 [*] Whitespace before ':'
+E20.py:205:17: E203 [*] Whitespace before ':'

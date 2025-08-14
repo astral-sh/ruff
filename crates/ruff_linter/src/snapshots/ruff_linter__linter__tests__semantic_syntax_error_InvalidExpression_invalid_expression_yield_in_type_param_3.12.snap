@@ -7,3 +7,6 @@ invalid-syntax: yield expression cannot be used within a TypeVar bound
 2 | type X[T: (yield 1)] = int
   |            ^^^^^^^
   |
+
+## Concise Output
+<filename>:2:12: invalid-syntax: yield expression cannot be used within a TypeVar bound

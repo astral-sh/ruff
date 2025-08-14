@@ -9,3 +9,6 @@ D101 Missing docstring in public class
 16 |
 17 |     expect('meta', 'D419: Docstring is empty')
    |
+
+## Concise Output
+D.py:15:7: D101 Missing docstring in public class

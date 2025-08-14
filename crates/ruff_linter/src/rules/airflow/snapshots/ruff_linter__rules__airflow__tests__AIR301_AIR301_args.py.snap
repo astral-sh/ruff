@@ -304,3 +304,23 @@ AIR301 `appbuilder` is removed in Airflow 3.0
     |               ^^^^^^
     |
 help: The constructor takes no parameter now
+
+## Concise Output
+AIR301_args.py:21:39: AIR301 [*] `schedule_interval` is removed in Airflow 3.0
+AIR301_args.py:23:31: AIR301 [*] `timetable` is removed in Airflow 3.0
+AIR301_args.py:26:31: AIR301 [*] `fail_stop` is removed in Airflow 3.0
+AIR301_args.py:28:34: AIR301 `default_view` is removed in Airflow 3.0
+AIR301_args.py:30:33: AIR301 `orientation` is removed in Airflow 3.0
+AIR301_args.py:41:6: AIR301 [*] `schedule_interval` is removed in Airflow 3.0
+AIR301_args.py:46:6: AIR301 [*] `timetable` is removed in Airflow 3.0
+AIR301_args.py:54:62: AIR301 [*] `execution_date` is removed in Airflow 3.0
+AIR301_args.py:57:62: AIR301 [*] `execution_date` is removed in Airflow 3.0
+AIR301_args.py:61:33: AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
+AIR301_args.py:61:62: AIR301 [*] `task_concurrency` is removed in Airflow 3.0
+AIR301_args.py:65:9: AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
+AIR301_args.py:92:9: AIR301 [*] `use_task_execution_day` is removed in Airflow 3.0
+AIR301_args.py:102:15: AIR301 `filename_template` is removed in Airflow 3.0
+AIR301_args.py:103:17: AIR301 `filename_template` is removed in Airflow 3.0
+AIR301_args.py:104:26: AIR301 `filename_template` is removed in Airflow 3.0
+AIR301_args.py:105:16: AIR301 `filename_template` is removed in Airflow 3.0
+AIR301_args.py:107:15: AIR301 `appbuilder` is removed in Airflow 3.0

@@ -42,3 +42,7 @@ help: Organize imports
   6 |+        import abc
 6 7 |         import collections
 7   |-        import abc
+
+## Concise Output
+match_case.py:3:9: I001 [*] Import block is un-sorted or un-formatted
+match_case.py:6:9: I001 [*] Import block is un-sorted or un-formatted

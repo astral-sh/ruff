@@ -7,3 +7,6 @@ EXE005 Shebang should be at the beginning of the file
 2 | pass  #!/usr/bin/env python
   |       ^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+EXE004_3.py:2:7: EXE005 Shebang should be at the beginning of the file

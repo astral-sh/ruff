@@ -8,3 +8,6 @@ F821 Undefined name `foo`
 26 |     x: Literal["foo"]
    |                 ^^^
    |
+
+## Concise Output
+bar.py:26:17: F821 Undefined name `foo`

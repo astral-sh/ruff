@@ -11,3 +11,6 @@ PYI008 Unrecognized platform `linus`
 4 |
 5 | if sys.platform != "linux": ...  # OK
   |
+
+## Concise Output
+PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`

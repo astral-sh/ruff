@@ -21,3 +21,6 @@ help: Remove definition: `os`
 6 5 | except:
 7 6 |     pass
 8 7 | os.path
+
+## Concise Output
+F811_8.py:5:12: F811 [*] Redefinition of unused `os` from line 4

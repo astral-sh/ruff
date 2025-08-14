@@ -44,3 +44,6 @@ help: Organize imports
 14 14 |     uint32,
 15 15 |     uint64,
 16 16 | )
+
+## Concise Output
+natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted

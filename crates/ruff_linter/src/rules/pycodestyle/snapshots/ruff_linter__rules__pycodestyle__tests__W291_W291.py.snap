@@ -77,3 +77,9 @@ help: Remove trailing whitespace
 14    |-    1 + 2 
    14 |+    1 + 2
 15 15 | }'
+
+## Concise Output
+W291.py:1:23: W291 [*] Trailing whitespace
+W291.py:4:24: W291 [*] Trailing whitespace
+W291.py:8:8: W291 [*] Trailing whitespace
+W291.py:14:10: W291 [*] Trailing whitespace

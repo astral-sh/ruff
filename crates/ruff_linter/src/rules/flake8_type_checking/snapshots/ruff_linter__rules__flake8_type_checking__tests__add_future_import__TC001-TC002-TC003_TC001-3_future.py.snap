@@ -77,3 +77,8 @@ help: Move into type-checking block
 6  10 | 
 7  11 | 
 8  12 | def f(x: first_party.foo): ...
+
+## Concise Output
+TC001-3_future.py:1:25: TC003 [*] Move standard library import `collections.Counter` into a type-checking block
+TC001-3_future.py:3:23: TC002 [*] Move third-party import `elsewhere.third_party` into a type-checking block
+TC001-3_future.py:5:15: TC001 [*] Move application import `.first_party` into a type-checking block

@@ -353,3 +353,23 @@ FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append(
     | |__________________^
     |
 help: Replace with `nums.extend((1, 2, 3))`
+
+## Concise Output
+FURB113.py:23:1: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+FURB113.py:29:1: FURB113 [*] Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
+FURB113.py:35:1: FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
+FURB113.py:41:1: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+FURB113.py:49:1: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+FURB113.py:53:1: FURB113 Use `nums3.extend((1, 2))` instead of repeatedly calling `nums3.append()`
+FURB113.py:56:1: FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly calling `nums4.append()`
+FURB113.py:62:1: FURB113 [*] Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+FURB113.py:69:5: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+FURB113.py:75:5: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly calling `nums.append()`
+FURB113.py:82:5: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+FURB113.py:90:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+FURB113.py:96:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+FURB113.py:102:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+FURB113.py:108:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+FURB113.py:114:5: FURB113 Use `x.extend((1, 2, 3))` instead of repeatedly calling `x.append()`
+FURB113.py:122:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calling `x.append()`
+FURB113.py:128:5: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`

@@ -80,3 +80,13 @@ PLC0132 `TypeVarTuple` name `Ts` does not match assigned variable name `Ws`
 16 |
 17 | # Non-errors.
    |
+
+## Concise Output
+type_param_name_mismatch.py:5:5: PLC0132 `TypeVar` name `T` does not match assigned variable name `X`
+type_param_name_mismatch.py:6:5: PLC0132 `TypeVar` name `T` does not match assigned variable name `X`
+type_param_name_mismatch.py:8:5: PLC0132 `ParamSpec` name `T` does not match assigned variable name `Y`
+type_param_name_mismatch.py:9:5: PLC0132 `ParamSpec` name `T` does not match assigned variable name `Y`
+type_param_name_mismatch.py:11:5: PLC0132 `NewType` name `T` does not match assigned variable name `Z`
+type_param_name_mismatch.py:12:5: PLC0132 `NewType` name `T` does not match assigned variable name `Z`
+type_param_name_mismatch.py:14:6: PLC0132 `TypeVarTuple` name `Ts` does not match assigned variable name `Ws`
+type_param_name_mismatch.py:15:6: PLC0132 `TypeVarTuple` name `Ts` does not match assigned variable name `Ws`

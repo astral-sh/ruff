@@ -13,4 +13,7 @@ help: Replace `exit` with `sys.exit()`
 1   |-exit(code=2)
   1 |+import sys
   2 |+sys.exit(2)
-2 3 |
+2 3 | 
+
+## Concise Output
+sys_exit_alias_13.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`

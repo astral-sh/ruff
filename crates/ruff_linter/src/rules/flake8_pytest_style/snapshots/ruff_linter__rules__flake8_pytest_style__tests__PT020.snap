@@ -18,3 +18,7 @@ PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
 20 | def error_with_parens():
 21 |     return 0
    |
+
+## Concise Output
+PT020.py:14:1: PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`
+PT020.py:19:1: PT020 `@pytest.yield_fixture` is deprecated, use `@pytest.fixture`

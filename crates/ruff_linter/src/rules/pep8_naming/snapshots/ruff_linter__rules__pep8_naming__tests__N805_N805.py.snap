@@ -305,3 +305,23 @@ N805 First argument of a method should be named `self`
 142 |         self = 123
     |
 help: Rename `this` to `self`
+
+## Concise Output
+N805.py:7:20: N805 [*] First argument of a method should be named `self`
+N805.py:11:30: N805 [*] First argument of a method should be named `self`
+N805.py:30:15: N805 [*] First argument of a method should be named `self`
+N805.py:34:15: N805 [*] First argument of a method should be named `self`
+N805.py:63:29: N805 [*] First argument of a method should be named `self`
+N805.py:69:13: N805 [*] First argument of a method should be named `self`
+N805.py:77:13: N805 [*] First argument of a method should be named `self`
+N805.py:85:14: N805 [*] First argument of a method should be named `self`
+N805.py:93:19: N805 [*] First argument of a method should be named `self`
+N805.py:98:26: N805 First argument of a method should be named `self`
+N805.py:101:35: N805 First argument of a method should be named `self`
+N805.py:104:34: N805 First argument of a method should be named `self`
+N805.py:107:24: N805 First argument of a method should be named `self`
+N805.py:110:24: N805 First argument of a method should be named `self`
+N805.py:115:20: N805 [*] First argument of a method should be named `self`
+N805.py:119:20: N805 First argument of a method should be named `self`
+N805.py:124:17: N805 [*] First argument of a method should be named `self`
+N805.py:141:11: N805 First argument of a method should be named `self`

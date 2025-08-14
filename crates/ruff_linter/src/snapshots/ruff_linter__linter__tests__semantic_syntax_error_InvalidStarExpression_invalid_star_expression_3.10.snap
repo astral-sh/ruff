@@ -8,3 +8,6 @@ invalid-syntax: Starred expression cannot be used here
 3 |     return *x
   |            ^^
   |
+
+## Concise Output
+<filename>:3:12: invalid-syntax: Starred expression cannot be used here

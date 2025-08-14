@@ -176,4 +176,14 @@ help: Convert to `tuple`
    23 |+numbers_gen = (i for i in (1, 2, 3))  # flags sets in generator expressions
 24 24 | 
 25 25 | # Non-errors
-26 26 |
+26 26 | 
+
+## Concise Output
+iteration_over_set.py:3:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:6:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:9:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:12:13: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:17:28: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:19:27: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:21:36: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values
+iteration_over_set.py:23:27: PLC0208 [*] Use a sequence type instead of a `set` when iterating over values

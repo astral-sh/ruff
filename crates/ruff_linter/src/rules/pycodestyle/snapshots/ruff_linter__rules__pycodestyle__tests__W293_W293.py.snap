@@ -84,3 +84,9 @@ help: Remove whitespace from blank line
 18    |- 
    18 |+
 19 19 | inside a multiline string'''
+
+## Concise Output
+W293.py:4:1: W293 [*] Blank line contains whitespace
+W293.py:10:1: W293 [*] Blank line contains whitespace
+W293.py:16:1: W293 [*] Blank line contains whitespace
+W293.py:18:1: W293 [*] Blank line contains whitespace

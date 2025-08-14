@@ -16,3 +16,6 @@ help: Remove unused import: `foo.baz`
 3 3 | __all__ = ("bar",)
 4   |-from foo import bar, baz
   4 |+from foo import bar
+
+## Concise Output
+F401_9.py:4:22: F401 [*] `foo.baz` imported but unused

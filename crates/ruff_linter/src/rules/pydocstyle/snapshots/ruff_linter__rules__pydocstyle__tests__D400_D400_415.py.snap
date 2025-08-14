@@ -58,3 +58,10 @@ help: Add period
 19    |-    """Here's a line ending with a whitespace  """
    19 |+    """Here's a line ending with a whitespace.  """
 20 20 |     ...
+
+## Concise Output
+D400_415.py:2:5: D400 First line should end with a period
+D400_415.py:7:5: D400 First line should end with a period
+D400_415.py:11:5: D400 First line should end with a period
+D400_415.py:15:5: D400 First line should end with a period
+D400_415.py:19:5: D400 [*] First line should end with a period

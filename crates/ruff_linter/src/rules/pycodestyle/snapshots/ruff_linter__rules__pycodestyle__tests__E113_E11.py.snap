@@ -55,3 +55,10 @@ invalid-syntax: Expected an indented block after `if` statement
 46 | #:
 47 | if False:
    |
+
+## Concise Output
+E11.py:9:1: invalid-syntax: Expected an indented block after `if` statement
+E11.py:12:1: E113 Unexpected indentation
+E11.py:12:1: invalid-syntax: Unexpected indentation
+E11.py:14:1: invalid-syntax: Expected a statement
+E11.py:45:1: invalid-syntax: Expected an indented block after `if` statement

@@ -80,3 +80,8 @@ help: Replace with `typing_extensions.Annotated`
 20    |-def handler3(echo: str = Query("123", min_length=3, max_length=50)):
    21 |+def handler3(echo: Annotated[str, Query(min_length=3, max_length=50)] = "123"):
 21 22 |     return echo
+
+## Concise Output
+FAST002_1.py:10:13: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_1.py:15:14: FAST002 [*] FastAPI dependency without `Annotated`
+FAST002_1.py:20:14: FAST002 [*] FastAPI dependency without `Annotated`

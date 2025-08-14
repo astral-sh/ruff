@@ -34,3 +34,9 @@ SLOT001 Subclasses of `tuple` should define `__slots__`
    |       ^^^^^^^
 27 |     pass
    |
+
+## Concise Output
+SLOT001.py:1:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:12:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:16:7: SLOT001 Subclasses of `tuple` should define `__slots__`
+SLOT001.py:26:7: SLOT001 Subclasses of `tuple` should define `__slots__`

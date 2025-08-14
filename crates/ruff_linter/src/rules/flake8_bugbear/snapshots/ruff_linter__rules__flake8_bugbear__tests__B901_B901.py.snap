@@ -21,3 +21,7 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 37 |
 38 |     yield from not_broken()
    |
+
+## Concise Output
+B901.py:9:9: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+B901.py:36:5: B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior

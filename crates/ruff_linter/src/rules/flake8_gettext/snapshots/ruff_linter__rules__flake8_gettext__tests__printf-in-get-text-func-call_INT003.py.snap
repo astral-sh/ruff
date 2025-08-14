@@ -7,3 +7,6 @@ INT003 printf-style format is resolved before function call; consider `_("string
 1 | _("%s" % "line")
   |   ^^^^^^^^^^^^^
   |
+
+## Concise Output
+INT003.py:1:3: INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`

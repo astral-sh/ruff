@@ -27,3 +27,8 @@ F822 Undefined name `c` in `__all__`
 5 | __all__ = ["a", "b", "c"]
   |                      ^^^
   |
+
+## Concise Output
+__init__.py:5:12: F822 Undefined name `a` in `__all__`
+__init__.py:5:17: F822 Undefined name `b` in `__all__`
+__init__.py:5:22: F822 Undefined name `c` in `__all__`

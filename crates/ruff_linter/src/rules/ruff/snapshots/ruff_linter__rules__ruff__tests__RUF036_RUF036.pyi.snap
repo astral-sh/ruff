@@ -86,3 +86,13 @@ RUF036 `None` not at the end of the type annotation.
 15 |
 16 | # Ok
    |
+
+## Concise Output
+RUF036.pyi:4:16: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:6:16: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:8:16: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:8:23: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:10:18: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:12:18: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:14:18: RUF036 `None` not at the end of the type annotation.
+RUF036.pyi:14:24: RUF036 `None` not at the end of the type annotation.

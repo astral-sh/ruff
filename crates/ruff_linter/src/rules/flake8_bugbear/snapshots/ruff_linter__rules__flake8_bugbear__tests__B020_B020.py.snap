@@ -29,3 +29,8 @@ B020 Loop control variable `vars` overrides iterable it iterates
    |     ^^^^
 37 |     print(vars)
    |
+
+## Concise Output
+B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
+B020.py:21:10: B020 Loop control variable `values` overrides iterable it iterates
+B020.py:36:5: B020 Loop control variable `vars` overrides iterable it iterates

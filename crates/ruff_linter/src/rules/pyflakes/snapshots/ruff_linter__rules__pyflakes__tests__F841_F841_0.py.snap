@@ -251,3 +251,18 @@ F841 Local variable `value` is assigned to but never used
 128 |         print(key)
     |
 help: Remove assignment to unused variable `value`
+
+## Concise Output
+F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
+F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
+F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
+F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
+F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
+F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
+F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
+F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
+F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
+F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
+F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
+F841_0.py:122:14: F841 Local variable `y` is assigned to but never used
+F841_0.py:127:21: F841 Local variable `value` is assigned to but never used

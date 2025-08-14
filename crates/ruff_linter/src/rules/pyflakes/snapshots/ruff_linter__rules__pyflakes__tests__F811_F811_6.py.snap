@@ -18,3 +18,6 @@ help: Remove definition: `os`
 5 5 |     import os
 6   |-    import os
 7 6 | os.path
+
+## Concise Output
+F811_6.py:6:12: F811 [*] Redefinition of unused `os` from line 5

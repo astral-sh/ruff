@@ -185,3 +185,14 @@ help: Replace `dict.get("Cat", None)` with `dict.get("Cat")`
 56 56 |     dict = {"Tom": 23, "Maria": 23, "Dog": 11}
 57    |-    age = dict.get("Cat", None)
    57 |+    age = dict.get("Cat")
+
+## Concise Output
+SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+SIM910.py:31:7: SIM910 [*] Use `ages.get("Cat")` instead of `ages.get("Cat", None)`
+SIM910.py:39:9: SIM910 [*] Use `kwargs.get('a')` instead of `kwargs.get('a', None)`
+SIM910.py:43:9: SIM910 [*] Use `some_dict.get('a')` instead of `some_dict.get('a', None)`
+SIM910.py:57:11: SIM910 [*] Use `dict.get("Cat")` instead of `dict.get("Cat", None)`

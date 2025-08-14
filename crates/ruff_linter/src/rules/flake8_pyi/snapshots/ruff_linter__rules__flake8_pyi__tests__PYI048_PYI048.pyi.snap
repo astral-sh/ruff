@@ -33,3 +33,8 @@ PYI048 Function body must contain exactly one statement
 18 |     print("fizz")
 19 |     print("buzz")
    |
+
+## Concise Output
+PYI048.pyi:8:5: PYI048 Function body must contain exactly one statement
+PYI048.pyi:12:5: PYI048 Function body must contain exactly one statement
+PYI048.pyi:17:5: PYI048 Function body must contain exactly one statement

@@ -398,3 +398,24 @@ help: Remove unicode prefix
 33 33 | """"""""""""""""""""u"hi"
 34    |-""U"helloooo"
    34 |+"" "helloooo"
+
+## Concise Output
+UP025.py:1:1: UP025 [*] Remove unicode literals from strings
+UP025.py:3:5: UP025 [*] Remove unicode literals from strings
+UP025.py:5:1: UP025 [*] Remove unicode literals from strings
+UP025.py:7:7: UP025 [*] Remove unicode literals from strings
+UP025.py:9:7: UP025 [*] Remove unicode literals from strings
+UP025.py:13:5: UP025 [*] Remove unicode literals from strings
+UP025.py:13:15: UP025 [*] Remove unicode literals from strings
+UP025.py:13:27: UP025 [*] Remove unicode literals from strings
+UP025.py:13:39: UP025 [*] Remove unicode literals from strings
+UP025.py:16:5: UP025 [*] Remove unicode literals from strings
+UP025.py:17:5: UP025 [*] Remove unicode literals from strings
+UP025.py:18:5: UP025 [*] Remove unicode literals from strings
+UP025.py:19:5: UP025 [*] Remove unicode literals from strings
+UP025.py:27:7: UP025 [*] Remove unicode literals from strings
+UP025.py:28:8: UP025 [*] Remove unicode literals from strings
+UP025.py:31:3: UP025 [*] Remove unicode literals from strings
+UP025.py:32:3: UP025 [*] Remove unicode literals from strings
+UP025.py:33:21: UP025 [*] Remove unicode literals from strings
+UP025.py:34:3: UP025 [*] Remove unicode literals from strings

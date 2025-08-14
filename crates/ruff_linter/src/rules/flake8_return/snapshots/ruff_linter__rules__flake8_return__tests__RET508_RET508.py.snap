@@ -185,3 +185,13 @@ help: Remove unnecessary `else`
 158     |-            else:
 159     |-                a = z
     158 |+            a = z
+
+## Concise Output
+RET508.py:8:9: RET508 [*] Unnecessary `elif` after `break` statement
+RET508.py:22:9: RET508 [*] Unnecessary `elif` after `break` statement
+RET508.py:33:9: RET508 [*] Unnecessary `else` after `break` statement
+RET508.py:44:13: RET508 [*] Unnecessary `else` after `break` statement
+RET508.py:60:9: RET508 [*] Unnecessary `else` after `break` statement
+RET508.py:71:13: RET508 [*] Unnecessary `else` after `break` statement
+RET508.py:82:9: RET508 [*] Unnecessary `else` after `break` statement
+RET508.py:158:13: RET508 [*] Unnecessary `else` after `break` statement

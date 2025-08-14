@@ -23,3 +23,6 @@ help: Move out of type-checking block
   7 |+    pass  # TC004
 7 8 | 
 8 9 | a: TypeAlias = Foo | None  # OK
+
+## Concise Output
+<filename>:6:21: TC004 [*] Move import `foo.Foo` out of type-checking block. Import is used for more than type hinting.

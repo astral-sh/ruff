@@ -9,3 +9,6 @@ invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous
 3 | [[x async for x in elements(5)] for i in range(5)]  # error on 3.10, okay after
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+resources/test/fixtures/syntax_errors/async_comprehension.ipynb:3:5: invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)

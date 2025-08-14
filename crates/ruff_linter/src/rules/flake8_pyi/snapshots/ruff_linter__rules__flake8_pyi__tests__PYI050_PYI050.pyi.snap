@@ -120,3 +120,16 @@ PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
    |                     ^^^^^^^^^^
 25 | def stringized_good(arg: "Never"): ...
    |
+
+## Concise Output
+PYI050.pyi:6:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:8:10: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:10:44: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:11:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:13:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:14:26: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:15:28: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:15:48: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:19:50: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:20:37: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.pyi:24:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations

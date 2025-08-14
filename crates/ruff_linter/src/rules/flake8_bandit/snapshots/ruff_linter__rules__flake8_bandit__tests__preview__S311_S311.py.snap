@@ -115,3 +115,16 @@ S311 Standard pseudo-random generators are not suitable for cryptographic purpos
 27 | foo = random.randrange
    |       ^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+S311.py:10:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:11:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:12:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:13:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:14:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:15:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:16:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:17:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:18:1: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:26:5: S311 Standard pseudo-random generators are not suitable for cryptographic purposes
+S311.py:27:7: S311 Standard pseudo-random generators are not suitable for cryptographic purposes

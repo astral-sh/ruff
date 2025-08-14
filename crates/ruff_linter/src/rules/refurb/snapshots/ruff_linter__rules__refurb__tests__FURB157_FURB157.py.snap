@@ -580,3 +580,32 @@ help: Replace with `"nan"`
 70 70 | Decimal(float("   -" "nan"))
 71    |-Decimal(float("-nAn"))
    71 |+Decimal("nan")
+
+## Concise Output
+FURB157.py:5:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:6:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:7:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:8:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:9:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:10:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:11:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:12:17: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:23:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:24:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:48:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:49:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:52:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:53:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:54:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:55:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:56:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:57:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:58:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:64:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:65:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:66:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:67:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:68:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:69:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:70:9: FURB157 [*] Verbose expression in `Decimal` constructor
+FURB157.py:71:9: FURB157 [*] Verbose expression in `Decimal` constructor

@@ -24,3 +24,8 @@ B008 Do not perform function call `L` in argument defaults; instead, perform the
 48 | def error(obj = L()): ...
    |                 ^^^
    |
+
+## Concise Output
+B008_extended.py:24:51: B008 Do not perform function call `Depends` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B008_extended.py:36:15: B008 Do not perform function call `OtherClass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B008_extended.py:48:17: B008 Do not perform function call `L` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable

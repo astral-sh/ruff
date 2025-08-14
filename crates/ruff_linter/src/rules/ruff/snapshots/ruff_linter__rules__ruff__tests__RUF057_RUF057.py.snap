@@ -284,3 +284,18 @@ help: Remove unnecessary `round` call
 82    |-    17 # a comment
 83    |-)
    81 |+17
+
+## Concise Output
+RUF057.py:6:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:7:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:8:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:24:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:25:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:26:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:42:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:43:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:44:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:71:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:73:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:78:1: RUF057 [*] Value being rounded is already an integer
+RUF057.py:81:1: RUF057 [*] Value being rounded is already an integer

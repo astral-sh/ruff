@@ -72,3 +72,12 @@ PLW3201 Dunder method `__unicode__` has no special meaning in Python 3
    |         ^^^^^^^^^^^
 99 |         pass
    |
+
+## Concise Output
+bad_dunder_method_name.py:5:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
+bad_dunder_method_name.py:8:9: PLW3201 Dunder method `__hello__` has no special meaning in Python 3
+bad_dunder_method_name.py:11:9: PLW3201 Dunder method `__init_` has no special meaning in Python 3
+bad_dunder_method_name.py:15:9: PLW3201 Dunder method `_init_` has no special meaning in Python 3
+bad_dunder_method_name.py:19:9: PLW3201 Dunder method `___neg__` has no special meaning in Python 3
+bad_dunder_method_name.py:23:9: PLW3201 Dunder method `__inv__` has no special meaning in Python 3
+bad_dunder_method_name.py:98:9: PLW3201 Dunder method `__unicode__` has no special meaning in Python 3

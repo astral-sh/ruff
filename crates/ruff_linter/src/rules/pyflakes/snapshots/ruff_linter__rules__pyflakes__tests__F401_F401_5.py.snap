@@ -71,3 +71,9 @@ help: Remove unused import: `j.k`
 3 3 | from d.e import f as g
 4 4 | import h.i
 5   |-import j.k as l
+
+## Concise Output
+F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
+F401_5.py:3:22: F401 [*] `d.e.f` imported but unused
+F401_5.py:4:8: F401 [*] `h.i` imported but unused
+F401_5.py:5:15: F401 [*] `j.k` imported but unused

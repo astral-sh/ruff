@@ -11,3 +11,6 @@ F508 `%`-format string `*` specifier requires sequence
 12 |
 13 | # ok: single %s with mapping
    |
+
+## Concise Output
+F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence

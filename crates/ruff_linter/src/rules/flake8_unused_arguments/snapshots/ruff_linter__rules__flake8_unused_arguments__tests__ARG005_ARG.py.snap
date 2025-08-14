@@ -11,3 +11,6 @@ ARG005 Unused lambda argument: `x`
 29 |
 30 | lambda: print("Hello, world!")
    |
+
+## Concise Output
+ARG.py:28:8: ARG005 Unused lambda argument: `x`

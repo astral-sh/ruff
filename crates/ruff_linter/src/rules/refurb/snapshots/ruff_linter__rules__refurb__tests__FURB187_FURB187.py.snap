@@ -60,3 +60,8 @@ help: Replace with `l.reverse()`
 17 17 | 
 18 18 | 
 19 19 | # False negative
+
+## Concise Output
+FURB187.py:6:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+FURB187.py:11:5: FURB187 [*] Use of assignment of `reversed` on list `l`
+FURB187.py:16:5: FURB187 [*] Use of assignment of `reversed` on list `l`

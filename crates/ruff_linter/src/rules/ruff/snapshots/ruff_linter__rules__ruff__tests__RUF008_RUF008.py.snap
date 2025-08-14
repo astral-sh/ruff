@@ -53,3 +53,10 @@ RUF008 Do not use mutable default values for dataclass attributes
 36 |     class_variable: 'typing.ClassVar[list[int]]'= []
    |                                                   ^^
    |
+
+## Concise Output
+RUF008.py:10:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008.py:20:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008.py:31:36: RUF008 Do not use mutable default values for dataclass attributes
+RUF008.py:32:52: RUF008 Do not use mutable default values for dataclass attributes
+RUF008.py:36:51: RUF008 Do not use mutable default values for dataclass attributes

@@ -316,3 +316,20 @@ help: Remove unnecessary assignment
     461 |+    return (1
 462 462 |               )
 463     |-    return x
+
+## Concise Output
+RET504.py:6:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
+RET504.py:23:12: RET504 [*] Unnecessary assignment to `formatted` before `return` statement
+RET504.py:246:12: RET504 [*] Unnecessary assignment to `queryset` before `return` statement
+RET504.py:251:12: RET504 [*] Unnecessary assignment to `queryset` before `return` statement
+RET504.py:269:12: RET504 [*] Unnecessary assignment to `val` before `return` statement
+RET504.py:321:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+RET504.py:342:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
+RET504.py:348:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
+RET504.py:354:12: RET504 [*] Unnecessary assignment to `b` before `return` statement
+RET504.py:359:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
+RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` statement
+RET504.py:400:12: RET504 [*] Unnecessary assignment to `y` before `return` statement
+RET504.py:423:16: RET504 [*] Unnecessary assignment to `services` before `return` statement
+RET504.py:458:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+RET504.py:463:12: RET504 [*] Unnecessary assignment to `x` before `return` statement

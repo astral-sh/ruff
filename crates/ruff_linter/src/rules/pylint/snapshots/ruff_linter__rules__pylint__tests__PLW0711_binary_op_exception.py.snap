@@ -20,3 +20,7 @@ PLW0711 Exception to catch is the result of a binary `and` operation
   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 9 |     print(e)
   |
+
+## Concise Output
+binary_op_exception.py:3:8: PLW0711 Exception to catch is the result of a binary `or` operation
+binary_op_exception.py:8:8: PLW0711 Exception to catch is the result of a binary `and` operation

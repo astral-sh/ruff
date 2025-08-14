@@ -329,3 +329,16 @@ help: Convert to `elif`
 145     |-        else:
 146     |-            pass  # final pass comment
     145 |+        pass  # final pass comment
+
+## Concise Output
+collapsible_else_if.py:37:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:45:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:55:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:69:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:79:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:87:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:96:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:105:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:117:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:128:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+collapsible_else_if.py:139:5: PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation

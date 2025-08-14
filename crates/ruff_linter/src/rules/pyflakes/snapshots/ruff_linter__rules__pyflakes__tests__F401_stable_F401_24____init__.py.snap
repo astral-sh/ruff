@@ -24,3 +24,8 @@ F401 `.renamed` imported but unused; consider removing, adding to `__all__`, or 
    |                          ^^^^
    |
 help: Use an explicit re-export: `renamed as renamed`
+
+## Concise Output
+__init__.py:19:8: F401 `sys` imported but unused
+__init__.py:33:15: F401 `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:36:26: F401 `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias

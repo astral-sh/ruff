@@ -9,3 +9,6 @@ ARG003 Unused class method argument: `x`
    |                ^
 48 |         print("Hello, world!")
    |
+
+## Concise Output
+ARG.py:47:16: ARG003 Unused class method argument: `x`

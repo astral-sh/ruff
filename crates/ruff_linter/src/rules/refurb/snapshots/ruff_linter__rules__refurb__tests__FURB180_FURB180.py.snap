@@ -80,4 +80,10 @@ help: Replace with `abc.ABC`
    31 |+class A3(B0, abc.ABC, before_metaclass=1):
 32 32 |     pass
 33 33 | 
-34 34 |
+34 34 | 
+
+## Concise Output
+FURB180.py:7:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:12:10: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:26:18: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+FURB180.py:31:34: FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class

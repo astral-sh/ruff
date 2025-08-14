@@ -9,3 +9,6 @@ D402 First line should not be the function's signature
 378 |     """Signature: foobar()."""
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
+
+## Concise Output
+D.py:378:5: D402 First line should not be the function's signature

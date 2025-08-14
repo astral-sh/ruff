@@ -752,3 +752,45 @@ help: Remove assignment to unused variable `x`
 172 172 |     ((x)) = foo()
 173     |-    (x) = (y.z) = foo()
     173 |+    (y.z) = foo()
+
+## Concise Output
+F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
+F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
+F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
+F841_3.py:32:6: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:32:10: F841 [*] Local variable `y1` is assigned to but never used
+F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
+F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
+F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
+F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
+F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
+F841_3.py:87:26: F841 [*] Local variable `cm` is assigned to but never used
+F841_3.py:92:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:98:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:98:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:102:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:106:14: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:110:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:110:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:115:19: F841 Local variable `x` is assigned to but never used
+F841_3.py:121:14: F841 Local variable `x` is assigned to but never used
+F841_3.py:127:18: F841 Local variable `bar` is assigned to but never used
+F841_3.py:127:26: F841 Local variable `x` is assigned to but never used
+F841_3.py:133:27: F841 Local variable `x` is assigned to but never used
+F841_3.py:139:17: F841 Local variable `x` is assigned to but never used
+F841_3.py:155:17: F841 [*] Local variable `e` is assigned to but never used
+F841_3.py:160:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:161:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:165:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:167:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:173:6: F841 [*] Local variable `x` is assigned to but never used

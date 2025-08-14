@@ -51,3 +51,7 @@ help: Move out of type-checking block
     111 |+        pass
 111 112 | 
 112 113 |     x: TypeAlias = DataFrame | None
+
+## Concise Output
+quote.py:57:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.
+quote.py:110:28: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.

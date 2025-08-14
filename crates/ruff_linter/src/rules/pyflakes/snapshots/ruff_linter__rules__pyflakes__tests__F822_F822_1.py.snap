@@ -9,3 +9,6 @@ F822 Undefined name `b` in `__all__`
 3 | __all__ = list(["a", "b"])
   |                      ^^^
   |
+
+## Concise Output
+F822_1.py:3:22: F822 Undefined name `b` in `__all__`

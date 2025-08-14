@@ -147,3 +147,12 @@ help: Replace with `f"{url}{filename}"`
 22 22 | def create_file_public_url(url, filename):
 23    |-    return''.join([url, filename])
    23 |+    return f"{url}{filename}"
+
+## Concise Output
+FLY002.py:5:7: FLY002 [*] Consider `f"{a}  World"` instead of string join
+FLY002.py:6:7: FLY002 [*] Consider `f"Finally, {a} World"` instead of string join
+FLY002.py:7:7: FLY002 [*] Consider `"1x2x3"` instead of string join
+FLY002.py:8:7: FLY002 [*] Consider `f"{1}y{2}y{3}"` instead of string join
+FLY002.py:9:7: FLY002 [*] Consider `f"{random()}a{random()}"` instead of string join
+FLY002.py:10:7: FLY002 [*] Consider `f"{secrets.token_urlsafe()}a{secrets.token_hex()}"` instead of string join
+FLY002.py:23:11: FLY002 [*] Consider `f"{url}{filename}"` instead of string join

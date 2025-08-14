@@ -267,3 +267,18 @@ help: Change outer quotes to avoid escaping inner quotes
 60 60 | t"\"normal\" {t"\"nested\" {"other"} normal"} 'single quotes'"  # Q003
 61    |-t"\"normal\" {t"\"nested\" {"other"} 'single quotes'"} normal"  # Q003
    61 |+t'"normal" {t"\"nested\" {"other"} 'single quotes'"} normal'  # Q003
+
+## Concise Output
+singles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:9:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:13:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:21:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:43:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:51:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:53:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:54:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:55:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:55:12: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:58:1: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:60:15: Q003 [*] Change outer quotes to avoid escaping inner quotes
+singles_escaped.py:61:1: Q003 [*] Change outer quotes to avoid escaping inner quotes

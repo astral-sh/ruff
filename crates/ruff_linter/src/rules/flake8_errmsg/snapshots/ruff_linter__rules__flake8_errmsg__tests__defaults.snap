@@ -363,3 +363,22 @@ help: Assign to variable; remove `.format()` string
 91 94 | 
 92 95 | 
 93 96 | def raise_typing_cast_exception():
+
+## Concise Output
+EM.py:5:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:9:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:13:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:18:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:54:32: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:55:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:59:28: EM101 Exception must not use a string literal, assign to variable first
+EM.py:60:35: EM101 Exception must not use a string literal, assign to variable first
+EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+EM.py:69:9: EM101 [*] Exception must not use a string literal, assign to variable first
+EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first

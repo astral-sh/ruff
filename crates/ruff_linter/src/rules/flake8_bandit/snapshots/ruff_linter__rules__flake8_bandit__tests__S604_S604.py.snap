@@ -7,3 +7,6 @@ S604 Function call with `shell=True` parameter identified, security issue
 5 | foo(shell=True)
   | ^^^
   |
+
+## Concise Output
+S604.py:5:1: S604 Function call with `shell=True` parameter identified, security issue

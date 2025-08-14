@@ -349,3 +349,19 @@ help: Replace with `return any(check(x) for x in await iterable)`
 195 192 | 
 196 193 | def f():
 197 194 |     # OK (can't turn this into any() because the yield would end up inside a genexp)
+
+## Concise Output
+SIM110.py:3:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:25:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM110.py:33:5: SIM110 [*] Use `return all(x.is_empty() for x in iterable)` instead of `for` loop
+SIM110.py:55:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:64:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM110.py:73:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM110.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM110.py:144:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:154:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM110.py:162:5: SIM110 [*] Use `return any(x.isdigit() for x in "012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ9012ß9💣2ℝ")` instead of `for` loop
+SIM110.py:184:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM110.py:191:5: SIM110 [*] Use `return any(check(x) for x in await iterable)` instead of `for` loop

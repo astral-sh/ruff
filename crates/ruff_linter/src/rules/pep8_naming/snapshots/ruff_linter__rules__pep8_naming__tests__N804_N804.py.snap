@@ -174,3 +174,16 @@ N804 First argument of a class method should be named `cls`
 89 |         cls = 1234
    |
 help: Rename `this` to `cls`
+
+## Concise Output
+N804.py:30:27: N804 [*] First argument of a class method should be named `cls`
+N804.py:38:56: N804 [*] First argument of a class method should be named `cls`
+N804.py:43:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:54:25: N804 First argument of a class method should be named `cls`
+N804.py:57:34: N804 First argument of a class method should be named `cls`
+N804.py:60:33: N804 First argument of a class method should be named `cls`
+N804.py:63:23: N804 First argument of a class method should be named `cls`
+N804.py:66:23: N804 First argument of a class method should be named `cls`
+N804.py:70:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:74:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:88:18: N804 First argument of a class method should be named `cls`

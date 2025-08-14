@@ -18,3 +18,7 @@ YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version
 5 | version_info[1] < 6
   | ^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+YTT203.py:4:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
+YTT203.py:5:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple

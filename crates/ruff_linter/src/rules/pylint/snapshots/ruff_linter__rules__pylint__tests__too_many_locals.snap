@@ -9,3 +9,6 @@ PLR0914 Too many local variables (16/15)
 21 |     first = 1
 22 |     second = 2
    |
+
+## Concise Output
+too_many_locals.py:20:5: PLR0914 Too many local variables (16/15)

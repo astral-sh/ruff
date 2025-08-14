@@ -214,3 +214,15 @@ help: Replace with `ElementTree`
 25 25 | 
 26 26 | # The below items should NOT be changed.
 27 27 | import xml.etree.cElementTree
+
+## Concise Output
+UP023.py:2:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:3:8: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:6:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:7:11: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:10:1: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:16:12: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:17:27: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:19:23: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:21:20: UP023 [*] `cElementTree` is deprecated, use `ElementTree`
+UP023.py:24:32: UP023 [*] `cElementTree` is deprecated, use `ElementTree`

@@ -1074,4 +1074,56 @@ help: Replace with `f"{''}{''}"`
     154 |+print(f"{''}{''}")
 155 155 | print(f"{1}{''}" and "bar")
 156 156 | 
-157 157 |
+157 157 | 
+
+## Concise Output
+SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:19:18: SIM223 [*] Use `False` instead of `False and ...`
+SIM223.py:22:4: SIM223 [*] Use `False` instead of `False and ...`
+SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:42:7: SIM223 [*] Use `""` instead of `"" and ...`
+SIM223.py:44:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:46:7: SIM223 [*] Use `0` instead of `0 and ...`
+SIM223.py:48:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:50:7: SIM223 [*] Use `0.0` instead of `0.0 and ...`
+SIM223.py:52:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:54:7: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:56:7: SIM223 [*] Use `list([])` instead of `list([]) and ...`
+SIM223.py:58:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:60:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:62:7: SIM223 [*] Use `{}` instead of `{} and ...`
+SIM223.py:64:7: SIM223 [*] Use `dict()` instead of `dict() and ...`
+SIM223.py:66:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:68:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:70:7: SIM223 [*] Use `set()` instead of `set() and ...`
+SIM223.py:72:7: SIM223 [*] Use `set(set())` instead of `set(set()) and ...`
+SIM223.py:74:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:76:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:78:7: SIM223 [*] Use `()` instead of `() and ...`
+SIM223.py:80:7: SIM223 [*] Use `tuple(())` instead of `tuple(()) and ...`
+SIM223.py:82:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:84:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:86:7: SIM223 [*] Use `frozenset()` instead of `frozenset() and ...`
+SIM223.py:88:7: SIM223 [*] Use `frozenset(frozenset())` instead of `frozenset(frozenset()) and ...`
+SIM223.py:90:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:92:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:99:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:101:5: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:101:36: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:104:6: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:106:7: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:113:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:114:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:121:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:122:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:129:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:130:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:137:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:138:8: SIM223 [*] Use `False` instead of `... and False and ...`
+SIM223.py:143:7: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:145:11: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:148:12: SIM223 [*] Use `[]` instead of `[] and ...`
+SIM223.py:154:7: SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`

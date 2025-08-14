@@ -58,3 +58,8 @@ help: Use `pytest.deprecated_call()` as a context-manager
 25    |-    pytest.deprecated_call(lambda: warnings.warn("", DeprecationWarning))
    25 |+    with pytest.deprecated_call():
    26 |+        (lambda: warnings.warn("", DeprecationWarning))()
+
+## Concise Output
+RUF061_deprecated_call.py:16:5: RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
+RUF061_deprecated_call.py:20:9: RUF061 [*] Use context-manager form of `pytest.deprecated_call()`
+RUF061_deprecated_call.py:25:5: RUF061 [*] Use context-manager form of `pytest.deprecated_call()`

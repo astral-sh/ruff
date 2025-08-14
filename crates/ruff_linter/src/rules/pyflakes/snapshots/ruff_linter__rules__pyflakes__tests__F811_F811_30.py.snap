@@ -31,3 +31,8 @@ F811 Redefinition of unused `foo` from line 26
    |            ^^^
    |
 help: Remove definition: `foo`
+
+## Concise Output
+F811_30.py:12:9: F811 Redefinition of unused `bar` from line 10
+F811_30.py:21:5: F811 Redefinition of unused `baz` from line 18
+F811_30.py:29:12: F811 Redefinition of unused `foo` from line 26

@@ -20,4 +20,7 @@ help: Remove quotes
    9  |+    x: Tuple[int, int] = (0, 0)
 10 10 |     print(x)
 11 11 | 
-12 12 |
+12 12 | 
+
+## Concise Output
+UP037_1.py:9:8: UP037 [*] Remove quotes from type annotation

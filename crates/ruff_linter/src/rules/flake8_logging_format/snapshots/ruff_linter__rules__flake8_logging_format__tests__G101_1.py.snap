@@ -22,3 +22,7 @@ G101 Logging statement uses an `extra` field that clashes with a `LogRecord` fie
 16 |     },
 17 | )
    |
+
+## Concise Output
+G101_1.py:6:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`
+G101_1.py:15:9: G101 Logging statement uses an `extra` field that clashes with a `LogRecord` field: `name`

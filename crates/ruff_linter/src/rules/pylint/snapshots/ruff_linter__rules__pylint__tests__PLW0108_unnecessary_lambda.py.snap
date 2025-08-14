@@ -191,3 +191,15 @@ PLW0108 Lambda may be unnecessary; consider inlining inner function
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Inline function call
+
+## Concise Output
+unnecessary_lambda.py:1:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:2:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:4:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:5:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:6:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:7:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:9:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:10:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:62:5: PLW0108 [*] Lambda may be unnecessary; consider inlining inner function
+unnecessary_lambda.py:63:5: PLW0108 Lambda may be unnecessary; consider inlining inner function

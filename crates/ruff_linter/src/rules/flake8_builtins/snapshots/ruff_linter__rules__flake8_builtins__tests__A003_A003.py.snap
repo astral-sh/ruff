@@ -20,3 +20,7 @@ A003 Python builtin is shadowed by class attribute `id` from line 3
    |                                  ^^
 21 |         pass
    |
+
+## Concise Output
+A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
+A003.py:20:34: A003 Python builtin is shadowed by class attribute `id` from line 3

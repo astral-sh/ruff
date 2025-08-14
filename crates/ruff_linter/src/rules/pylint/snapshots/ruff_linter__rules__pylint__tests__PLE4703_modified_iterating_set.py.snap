@@ -132,4 +132,12 @@ help: Iterate over a copy of `odds`
    24 |+for num in odds.copy():
 25 25 |     if num > 1:
 26 26 |         odds.add(num + 1)
-27 27 |
+27 27 | 
+
+## Concise Output
+modified_iterating_set.py:4:1: PLE4703 [*] Iterated set `nums` is modified within the `for` loop
+modified_iterating_set.py:8:1: PLE4703 [*] Iterated set `animals` is modified within the `for` loop
+modified_iterating_set.py:12:1: PLE4703 [*] Iterated set `fruits` is modified within the `for` loop
+modified_iterating_set.py:16:1: PLE4703 [*] Iterated set `planets` is modified within the `for` loop
+modified_iterating_set.py:20:1: PLE4703 [*] Iterated set `colors` is modified within the `for` loop
+modified_iterating_set.py:24:1: PLE4703 [*] Iterated set `odds` is modified within the `for` loop

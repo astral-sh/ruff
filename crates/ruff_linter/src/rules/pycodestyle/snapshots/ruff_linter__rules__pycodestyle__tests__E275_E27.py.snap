@@ -152,3 +152,12 @@ help: Added missing whitespace after keyword
 79 79 |         pass
 80 80 | 
 81 81 | # https://github.com/astral-sh/ruff/issues/12094
+
+## Concise Output
+E27.py:38:8: E275 [*] Missing whitespace after keyword
+E27.py:40:24: E275 [*] Missing whitespace after keyword
+E27.py:43:28: E275 [*] Missing whitespace after keyword
+E27.py:47:1: E275 [*] Missing whitespace after keyword
+E27.py:55:5: E275 [*] Missing whitespace after keyword
+E27.py:77:1: E275 [*] Missing whitespace after keyword
+E27.py:78:5: E275 [*] Missing whitespace after keyword

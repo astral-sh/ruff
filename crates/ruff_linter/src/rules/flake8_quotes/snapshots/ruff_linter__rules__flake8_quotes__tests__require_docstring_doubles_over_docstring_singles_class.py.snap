@@ -55,3 +55,8 @@ help: Replace single quotes docstring with double quotes
 8 8 | 
 9   |-    class Nested(foo()[:]): ''' inline docstring '''; pass
   9 |+    class Nested(foo()[:]): """ inline docstring """; pass
+
+## Concise Output
+docstring_singles_class.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_class.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred

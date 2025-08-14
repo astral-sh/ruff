@@ -18,3 +18,7 @@ F403 `from F634 import *` used; unable to detect undefined names
 3 |
 4 | from F634 import *  # noqa
   |
+
+## Concise Output
+F403.py:1:1: F403 `from F634 import *` used; unable to detect undefined names
+F403.py:2:1: F403 `from F634 import *` used; unable to detect undefined names

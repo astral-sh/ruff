@@ -350,3 +350,38 @@ AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0
 111 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^
     |
+
+## Concise Output
+AIR301_names.py:39:1: AIR301 `airflow.PY36` is removed in Airflow 3.0
+AIR301_names.py:39:7: AIR301 `airflow.PY37` is removed in Airflow 3.0
+AIR301_names.py:39:13: AIR301 `airflow.PY38` is removed in Airflow 3.0
+AIR301_names.py:39:19: AIR301 `airflow.PY39` is removed in Airflow 3.0
+AIR301_names.py:39:25: AIR301 `airflow.PY310` is removed in Airflow 3.0
+AIR301_names.py:39:32: AIR301 `airflow.PY311` is removed in Airflow 3.0
+AIR301_names.py:39:39: AIR301 `airflow.PY312` is removed in Airflow 3.0
+AIR301_names.py:42:1: AIR301 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
+AIR301_names.py:45:1: AIR301 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is removed in Airflow 3.0
+AIR301_names.py:49:1: AIR301 `airflow.datasets.DatasetAliasEvent` is removed in Airflow 3.0
+AIR301_names.py:53:1: AIR301 `airflow.operators.subdag.SubDagOperator` is removed in Airflow 3.0
+AIR301_names.py:61:1: AIR301 [*] `airflow.secrets.cache.SecretCache` is removed in Airflow 3.0
+AIR301_names.py:65:1: AIR301 `airflow.triggers.external_task.TaskStateTrigger` is removed in Airflow 3.0
+AIR301_names.py:68:1: AIR301 `airflow.utils.dates.date_range` is removed in Airflow 3.0
+AIR301_names.py:69:1: AIR301 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+AIR301_names.py:71:1: AIR301 `airflow.utils.dates.date_range` is removed in Airflow 3.0
+AIR301_names.py:72:1: AIR301 `airflow.utils.dates.days_ago` is removed in Airflow 3.0
+AIR301_names.py:73:1: AIR301 `airflow.utils.dates.infer_time_unit` is removed in Airflow 3.0
+AIR301_names.py:74:1: AIR301 `airflow.utils.dates.parse_execution_date` is removed in Airflow 3.0
+AIR301_names.py:75:1: AIR301 `airflow.utils.dates.round_time` is removed in Airflow 3.0
+AIR301_names.py:76:1: AIR301 `airflow.utils.dates.scale_time_units` is removed in Airflow 3.0
+AIR301_names.py:83:1: AIR301 `airflow.utils.dag_cycle_tester.test_cycle` is removed in Airflow 3.0
+AIR301_names.py:87:1: AIR301 `airflow.utils.db.create_session` is removed in Airflow 3.0
+AIR301_names.py:90:1: AIR301 `airflow.utils.decorators.apply_defaults` is removed in Airflow 3.0
+AIR301_names.py:93:1: AIR301 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
+AIR301_names.py:97:1: AIR301 `airflow.utils.state.SHUTDOWN` is removed in Airflow 3.0
+AIR301_names.py:98:1: AIR301 `airflow.utils.state.terminating_states` is removed in Airflow 3.0
+AIR301_names.py:101:1: AIR301 `airflow.utils.trigger_rule.TriggerRule.DUMMY` is removed in Airflow 3.0
+AIR301_names.py:102:1: AIR301 `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+AIR301_names.py:106:1: AIR301 `airflow.www.auth.has_access` is removed in Airflow 3.0
+AIR301_names.py:107:1: AIR301 `airflow.www.auth.has_access_dataset` is removed in Airflow 3.0
+AIR301_names.py:110:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
+AIR301_names.py:111:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is removed in Airflow 3.0

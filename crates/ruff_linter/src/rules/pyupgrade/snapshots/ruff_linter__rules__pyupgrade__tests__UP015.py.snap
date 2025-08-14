@@ -1028,3 +1028,53 @@ help: Remove mode argument
 78 78 | 
 79 79 | open("foo", "r+")
 80 80 | open("foo", "rb")
+
+## Concise Output
+UP015.py:1:13: UP015 [*] Unnecessary mode argument
+UP015.py:2:13: UP015 [*] Unnecessary mode argument
+UP015.py:3:13: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:4:13: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:5:13: UP015 [*] Unnecessary mode argument
+UP015.py:6:13: UP015 [*] Unnecessary mode argument
+UP015.py:7:11: UP015 [*] Unnecessary mode argument
+UP015.py:8:11: UP015 [*] Unnecessary modes, use `w`
+UP015.py:9:11: UP015 [*] Unnecessary modes, use `w`
+UP015.py:11:18: UP015 [*] Unnecessary mode argument
+UP015.py:13:18: UP015 [*] Unnecessary mode argument
+UP015.py:15:18: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:17:18: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:19:18: UP015 [*] Unnecessary mode argument
+UP015.py:21:18: UP015 [*] Unnecessary mode argument
+UP015.py:23:18: UP015 [*] Unnecessary mode argument
+UP015.py:25:18: UP015 [*] Unnecessary modes, use `w`
+UP015.py:28:24: UP015 [*] Unnecessary mode argument
+UP015.py:29:24: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:31:29: UP015 [*] Unnecessary mode argument
+UP015.py:33:29: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:36:18: UP015 [*] Unnecessary mode argument
+UP015.py:36:42: UP015 [*] Unnecessary mode argument
+UP015.py:38:18: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:38:43: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:41:18: UP015 [*] Unnecessary mode argument
+UP015.py:42:23: UP015 [*] Unnecessary mode argument
+UP015.py:43:11: UP015 [*] Unnecessary mode argument
+UP015.py:45:23: UP015 [*] Unnecessary mode argument
+UP015.py:47:28: UP015 [*] Unnecessary mode argument
+UP015.py:49:16: UP015 [*] Unnecessary mode argument
+UP015.py:52:18: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:53:23: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:54:11: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:56:23: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:58:28: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:60:16: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:63:23: UP015 [*] Unnecessary mode argument
+UP015.py:64:106: UP015 [*] Unnecessary mode argument
+UP015.py:65:65: UP015 [*] Unnecessary mode argument
+UP015.py:66:11: UP015 [*] Unnecessary mode argument
+UP015.py:68:23: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:69:106: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:70:65: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:71:11: UP015 [*] Unnecessary modes, use `rb`
+UP015.py:75:22: UP015 [*] Unnecessary mode argument
+UP015.py:76:22: UP015 [*] Unnecessary mode argument
+UP015.py:77:27: UP015 [*] Unnecessary mode argument

@@ -199,3 +199,25 @@ RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Di
 61 | x: '''"""'Literal["ﮨ"]'"""'''
    |                    ^
    |
+
+## Concise Output
+confusables.py:1:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:6:56: RUF002 Docstring contains ambiguous `）` (FULLWIDTH RIGHT PARENTHESIS). Did you mean `)` (RIGHT PARENTHESIS)?
+confusables.py:7:62: RUF003 Comment contains ambiguous `᜵` (PHILIPPINE SINGLE PUNCTUATION). Did you mean `/` (SOLIDUS)?
+confusables.py:17:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:26:10: RUF001 String contains ambiguous `α` (GREEK SMALL LETTER ALPHA). Did you mean `a` (LATIN SMALL LETTER A)?
+confusables.py:31:6: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+confusables.py:31:7: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+confusables.py:34:7: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:37:11: RUF001 String contains ambiguous `α` (GREEK SMALL LETTER ALPHA). Did you mean `a` (LATIN SMALL LETTER A)?
+confusables.py:38:7: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+confusables.py:38:8: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+confusables.py:41:7: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:41:21: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+confusables.py:41:25: RUF001 String contains ambiguous `Р` (CYRILLIC CAPITAL LETTER ER). Did you mean `P` (LATIN CAPITAL LETTER P)?
+confusables.py:41:26: RUF001 String contains ambiguous ` ` (EN QUAD). Did you mean ` ` (SPACE)?
+confusables.py:44:68: RUF003 Comment contains ambiguous `）` (FULLWIDTH RIGHT PARENTHESIS). Did you mean `)` (RIGHT PARENTHESIS)?
+confusables.py:46:62: RUF003 Comment contains ambiguous `᜵` (PHILIPPINE SINGLE PUNCTUATION). Did you mean `/` (SOLIDUS)?
+confusables.py:58:6: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:58:13: RUF001 String contains ambiguous `𝐁` (MATHEMATICAL BOLD CAPITAL B). Did you mean `B` (LATIN CAPITAL LETTER B)?
+confusables.py:61:20: RUF001 String contains ambiguous `ﮨ` (ARABIC LETTER HEH GOAL INITIAL FORM). Did you mean `o` (LATIN SMALL LETTER O)?

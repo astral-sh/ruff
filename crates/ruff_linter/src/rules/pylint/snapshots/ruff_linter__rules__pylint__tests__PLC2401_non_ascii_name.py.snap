@@ -93,3 +93,14 @@ PLC2401 Annotation name `ápple_count` contains a non-ASCII character
 23 | try:
    |
 help: Rename the variable using ASCII characters
+
+## Concise Output
+non_ascii_name.py:1:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:2:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:3:1: PLC2401 Variable name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:5:18: PLC2401 Variable name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:8:10: PLC2401 Argument name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:9:12: PLC2401 Global name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:13:5: PLC2401 Function name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:18:10: PLC2401 Variable name `ápple_count` contains a non-ASCII character
+non_ascii_name.py:21:1: PLC2401 Annotation name `ápple_count` contains a non-ASCII character

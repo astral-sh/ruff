@@ -106,3 +106,10 @@ help: Organize imports
    63 |+
    64 |+
 62 65 | class MissingCommand(TypeError): ...  # noqa: N818
+
+## Concise Output
+E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:21:5: E303 [*] Too many blank lines (2)
+E30_isort.py:26:5: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:33:5: E303 [*] Too many blank lines (2)
+E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted

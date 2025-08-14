@@ -29,3 +29,8 @@ F821 Undefined name `Undefined`
 13 | _ = DefaultNamedArg("Undefined", "some_prop_name")
    |                      ^^^^^^^^^
    |
+
+## Concise Output
+F821_7.py:11:22: F821 Undefined name `Undefined`
+F821_7.py:12:27: F821 Undefined name `Undefined`
+F821_7.py:13:22: F821 Undefined name `Undefined`

@@ -118,3 +118,11 @@ help: Use `pytest.raises()` as a context-manager
 40    |-    pytest.raises(ZeroDivisionError, lambda: 1 / 0)
    40 |+    with pytest.raises(ZeroDivisionError):
    41 |+        (lambda: 1 / 0)()
+
+## Concise Output
+RUF061_raises.py:19:5: RUF061 [*] Use context-manager form of `pytest.raises()`
+RUF061_raises.py:23:5: RUF061 [*] Use context-manager form of `pytest.raises()`
+RUF061_raises.py:27:15: RUF061 [*] Use context-manager form of `pytest.raises()`
+RUF061_raises.py:31:5: RUF061 [*] Use context-manager form of `pytest.raises()`
+RUF061_raises.py:35:15: RUF061 [*] Use context-manager form of `pytest.raises()`
+RUF061_raises.py:40:5: RUF061 [*] Use context-manager form of `pytest.raises()`

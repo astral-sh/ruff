@@ -39,3 +39,9 @@ PLW0211 First argument of a static method should not be named `self`
    |                 ^^^^
 56 |         pass
    |
+
+## Concise Output
+bad_staticmethod_argument.py:3:13: PLW0211 First argument of a static method should not be named `self`
+bad_staticmethod_argument.py:15:13: PLW0211 First argument of a static method should not be named `cls`
+bad_staticmethod_argument.py:19:15: PLW0211 First argument of a static method should not be named `self`
+bad_staticmethod_argument.py:55:17: PLW0211 First argument of a static method should not be named `self`

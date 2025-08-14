@@ -49,3 +49,10 @@ ICN003 Members of `pandas` should not be imported explicitly
 7 |
 8 | import logging.config  # ok
   |
+
+## Concise Output
+custom_banned_from.py:1:1: ICN003 Members of `logging.config` should not be imported explicitly
+custom_banned_from.py:2:1: ICN003 Members of `typing` should not be imported explicitly
+custom_banned_from.py:3:1: ICN003 Members of `typing` should not be imported explicitly
+custom_banned_from.py:5:1: ICN003 Members of `pandas` should not be imported explicitly
+custom_banned_from.py:6:1: ICN003 Members of `pandas` should not be imported explicitly

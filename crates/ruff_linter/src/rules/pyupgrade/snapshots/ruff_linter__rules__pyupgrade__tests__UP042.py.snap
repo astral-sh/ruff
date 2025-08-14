@@ -57,3 +57,9 @@ UP042 Class E inherits from both `str` and `enum.Enum`
    |       ^
    |
 help: Inherit from `enum.StrEnum`
+
+## Concise Output
+UP042.py:4:7: UP042 [*] Class A inherits from both `str` and `enum.Enum`
+UP042.py:7:7: UP042 [*] Class B inherits from both `str` and `enum.Enum`
+UP042.py:10:7: UP042 Class D inherits from both `str` and `enum.Enum`
+UP042.py:13:7: UP042 Class E inherits from both `str` and `enum.Enum`

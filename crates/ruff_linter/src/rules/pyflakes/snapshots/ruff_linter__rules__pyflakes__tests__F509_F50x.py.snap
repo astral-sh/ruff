@@ -11,3 +11,6 @@ F509 `%`-format string has unsupported format character `j`
 5 | '%s %s' % (1,)  # F507
 6 | '%s %s' % (1, 2, 3)  # F507
   |
+
+## Concise Output
+F50x.py:4:1: F509 `%`-format string has unsupported format character `j`

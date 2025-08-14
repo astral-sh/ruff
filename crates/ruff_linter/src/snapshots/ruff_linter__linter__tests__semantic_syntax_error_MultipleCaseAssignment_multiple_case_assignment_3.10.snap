@@ -10,3 +10,6 @@ invalid-syntax: multiple assignments to name `a` in pattern
 4 |         pass
 5 |     case _:
   |
+
+## Concise Output
+<filename>:3:14: invalid-syntax: multiple assignments to name `a` in pattern

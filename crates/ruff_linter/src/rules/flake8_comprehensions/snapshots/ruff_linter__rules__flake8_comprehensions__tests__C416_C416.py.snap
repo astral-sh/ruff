@@ -151,3 +151,12 @@ help: Rewrite using `list()`
 26 26 | 
 27 27 | zz = [[1], [2], [3]]
 28 28 | [(i,) for (i,) in zz]  # != list(zz)
+
+## Concise Output
+C416.py:6:1: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
+C416.py:7:1: C416 [*] Unnecessary set comprehension (rewrite using `set()`)
+C416.py:8:1: C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
+C416.py:9:1: C416 [*] Unnecessary dict comprehension (rewrite using `dict()`)
+C416.py:10:1: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
+C416.py:11:1: C416 [*] Unnecessary list comprehension (rewrite using `list()`)
+C416.py:25:70: C416 [*] Unnecessary list comprehension (rewrite using `list()`)

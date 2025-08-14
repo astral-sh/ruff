@@ -278,4 +278,15 @@ help: Move into type-checking block
    75 |+    def test_annotated_literal_mixed_quotes(user: "AbstractBaseUser[Annotated[str, 'max_length=20', Literal['user', 'admin']]]"):
 73 76 |         pass
 74 77 | 
-75 78 |
+75 78 | 
+
+## Concise Output
+quote2.py:2:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:9:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:16:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:25:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:34:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:43:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:52:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:61:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote2.py:70:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block

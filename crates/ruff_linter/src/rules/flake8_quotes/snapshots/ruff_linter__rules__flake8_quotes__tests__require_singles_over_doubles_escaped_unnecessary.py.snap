@@ -397,3 +397,24 @@ help: Remove backslash
 44 44 | this_is_fine = 'This is an \\"escaped\\" quote'
 45    |-this_should_raise_Q004 = 'This is an \\\"escaped\\\" quote with an extra backslash'
    45 |+this_should_raise_Q004 = 'This is an \\"escaped\\" quote with an extra backslash'
+
+## Concise Output
+doubles_escaped_unnecessary.py:1:26: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:2:26: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:3:16: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:10:5: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:14:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:15:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:16:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:23:5: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:33:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:34:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:35:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:35:12: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:38:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:39:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:40:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:40:15: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:41:1: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:41:15: Q004 [*] Unnecessary escape on inner quote character
+doubles_escaped_unnecessary.py:45:26: Q004 [*] Unnecessary escape on inner quote character

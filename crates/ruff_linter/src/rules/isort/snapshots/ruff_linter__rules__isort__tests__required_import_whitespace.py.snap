@@ -12,3 +12,6 @@ help: Insert required import: `from __future__ import annotations`
   3 |+"docstring"; from __future__ import annotations; print(
 4 4 |     f"{__doc__=}",
 5 5 | )
+
+## Concise Output
+whitespace.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`

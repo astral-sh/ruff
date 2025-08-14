@@ -13,3 +13,6 @@ SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
    | |____________^
    |
 help: Replace with `contextlib.suppress(ValueError)`
+
+## Concise Output
+SIM105_3.py:10:5: SIM105 Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`

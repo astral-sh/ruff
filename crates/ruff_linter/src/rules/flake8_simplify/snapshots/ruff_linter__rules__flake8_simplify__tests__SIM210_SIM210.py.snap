@@ -90,3 +90,10 @@ help: Remove unnecessary `True if ... else False`
 20    |-                                   psl.privatesuffix(src.netloc)) else False
    19 |+samesld = (psl.privatesuffix(urlparse(response.url).netloc) ==
    20 |+                                   psl.privatesuffix(src.netloc))
+
+## Concise Output
+SIM210.py:1:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
+SIM210.py:3:5: SIM210 [*] Remove unnecessary `True if ... else False`
+SIM210.py:5:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
+SIM210.py:15:9: SIM210 Use `bool(...)` instead of `True if ... else False`
+SIM210.py:19:11: SIM210 [*] Remove unnecessary `True if ... else False`

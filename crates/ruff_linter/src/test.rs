@@ -354,11 +354,27 @@ pub(crate) fn print_jupyter_messages(
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
     let mut output = Vec::new();
 
-    TextEmitter::default()
+    let mut emitter = TextEmitter::default()
         .with_show_fix_status(true)
         .with_show_fix_diff(true)
         .with_show_source(true)
-        .with_unsafe_fixes(UnsafeFixes::Enabled)
+        .with_unsafe_fixes(UnsafeFixes::Enabled);
+
+    emitter
+        .emit(
+            &mut output,
+            diagnostics,
+            &EmitterContext::new(&FxHashMap::default()),
+        )
+        .unwrap();
+
+    if !diagnostics.is_empty() {
+        output.extend(b"## Concise Output\n");
+    }
+
+    emitter
+        .with_show_source(false)
+        .with_show_fix_diff(false)
         .emit(
             &mut output,
             diagnostics,

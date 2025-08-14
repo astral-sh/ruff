@@ -64,3 +64,8 @@ help: Remove extraneous blank line(s)
 785 782 | # second comment  E304 not expected
 786 783 | def function():
 787 784 |     pass
+
+## Concise Output
+E30.py:765:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:774:1: E304 [*] Blank lines found after function decorator (1)
+E30.py:786:1: E304 [*] Blank lines found after function decorator (2)

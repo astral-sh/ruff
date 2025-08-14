@@ -29,3 +29,6 @@ help: Organize imports
 5  10 | from . import leading_prefix
 6     |-from .. import trailing_prefix
 7     |-from ruff import check
+
+## Concise Output
+separate_local_folder_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted

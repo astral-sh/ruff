@@ -209,3 +209,15 @@ help: Remove over-indentation
 37 37 | 
 38 38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
 39 39 | class Platform:
+
+## Concise Output
+D208.py:2:1: D208 [*] Docstring is over-indented
+D208.py:8:1: D208 [*] Docstring is over-indented
+D208.py:9:1: D208 [*] Docstring is over-indented
+D208.py:10:1: D208 [*] Docstring is over-indented
+D208.py:24:1: D208 [*] Docstring is over-indented
+D208.py:29:1: D208 [*] Docstring is over-indented
+D208.py:30:1: D208 [*] Docstring is over-indented
+D208.py:31:1: D208 [*] Docstring is over-indented
+D208.py:35:1: D208 [*] Docstring is over-indented
+D208.py:36:1: D208 [*] Docstring is over-indented

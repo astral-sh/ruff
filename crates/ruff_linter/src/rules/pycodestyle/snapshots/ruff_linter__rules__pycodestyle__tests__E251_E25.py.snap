@@ -242,3 +242,16 @@ help: Remove whitespace
 24 24 |     )
 25 25 | #: Okay
 26 26 | foo(bar=(1 == 1))
+
+## Concise Output
+E25.py:2:12: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:2:14: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:6:9: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:8:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:10:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:10:10: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:12:14: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:15:29: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:18:45: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:23:8: E251 [*] Unexpected spaces around keyword / parameter equals
+E25.py:23:10: E251 [*] Unexpected spaces around keyword / parameter equals

@@ -8,3 +8,6 @@ invalid-syntax: cannot assign to `__debug__`
   |             ^^^^^^^^^
 3 |     pass
   |
+
+## Concise Output
+<filename>:2:13: invalid-syntax: cannot assign to `__debug__`

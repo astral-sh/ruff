@@ -108,3 +108,10 @@ help: Remove unnecessary comprehension
    18 |+    ),
 19 19 |     dt.timedelta(),
 20 20 | )
+
+## Concise Output
+C419_1.py:1:5: C419 [*] Unnecessary list comprehension
+C419_1.py:2:5: C419 [*] Unnecessary list comprehension
+C419_1.py:3:5: C419 [*] Unnecessary list comprehension
+C419_1.py:4:5: C419 [*] Unnecessary list comprehension
+C419_1.py:14:5: C419 [*] Unnecessary list comprehension

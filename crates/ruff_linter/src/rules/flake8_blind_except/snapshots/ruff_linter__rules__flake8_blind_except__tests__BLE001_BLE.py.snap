@@ -263,3 +263,31 @@ BLE001 Do not catch blind exception: `BaseException`
     |                      ^^^^^^^^^^^^^
 221 |     pass
     |
+
+## Concise Output
+BLE.py:25:8: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:31:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:42:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:45:12: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:54:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:60:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:62:8: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:69:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:75:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:81:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:101:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:107:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:113:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:119:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:125:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:131:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:174:9: BLE001 Do not catch blind exception: `Exception`
+BLE.py:179:9: BLE001 Do not catch blind exception: `Exception`
+BLE.py:184:21: BLE001 Do not catch blind exception: `Exception`
+BLE.py:189:21: BLE001 Do not catch blind exception: `Exception`
+BLE.py:194:9: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:199:20: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:204:9: BLE001 Do not catch blind exception: `Exception`
+BLE.py:209:9: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:215:10: BLE001 Do not catch blind exception: `Exception`
+BLE.py:220:22: BLE001 Do not catch blind exception: `BaseException`

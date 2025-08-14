@@ -37,3 +37,9 @@ ARG004 Unused static method argument: `x`
     |                      ^
 214 |         print("Hello, world!")
     |
+
+## Concise Output
+ARG.py:51:11: ARG004 Unused static method argument: `cls`
+ARG.py:51:16: ARG004 Unused static method argument: `x`
+ARG.py:55:11: ARG004 Unused static method argument: `x`
+ARG.py:213:22: ARG004 Unused static method argument: `x`

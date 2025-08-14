@@ -174,3 +174,20 @@ PLW0642 Reassigned `cls` variable in `__new__` method
    |         ^^^
    |
 help: Consider using a different variable name
+
+## Concise Output
+self_or_cls_assignment.py:4:9: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:5:9: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:7:10: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:8:9: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:9:16: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:10:16: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:14:9: PLW0642 Reassigned `cls` variable in class method
+self_or_cls_assignment.py:17:9: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:18:9: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:20:10: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:21:9: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:22:16: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:23:16: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:26:9: PLW0642 Reassigned `self` variable in instance method
+self_or_cls_assignment.py:50:9: PLW0642 Reassigned `cls` variable in `__new__` method

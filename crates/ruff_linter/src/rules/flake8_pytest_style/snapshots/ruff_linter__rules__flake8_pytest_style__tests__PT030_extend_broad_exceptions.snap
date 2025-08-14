@@ -57,3 +57,11 @@ PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use
    |                       ^^^^^^^^^^^
 34 |         pass
    |
+
+## Concise Output
+PT030.py:11:23: PT030 `pytest.warns(EncodingWarning)` is too broad, set the `match` parameter or use a more specific warning
+PT030.py:16:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+PT030.py:19:40: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+PT030.py:27:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+PT030.py:30:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning
+PT030.py:33:23: PT030 `pytest.warns(UserWarning)` is too broad, set the `match` parameter or use a more specific warning

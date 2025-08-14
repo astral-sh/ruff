@@ -237,3 +237,13 @@ help: Move into type-checking block
 102 105 | 
 103 106 |     def test(value: F.Foo):
 104 107 |         return B.Bar()
+
+## Concise Output
+strict.py:27:21: TC002 [*] Move third-party import `pkg.A` into a type-checking block
+strict.py:35:21: TC002 [*] Move third-party import `pkg.A` into a type-checking block
+strict.py:54:25: TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
+strict.py:62:12: TC002 [*] Move third-party import `pkg` into a type-checking block
+strict.py:71:23: TC002 [*] Move third-party import `pkg.foo` into a type-checking block
+strict.py:80:12: TC002 [*] Move third-party import `pkg` into a type-checking block
+strict.py:91:12: TC002 [*] Move third-party import `pkg` into a type-checking block
+strict.py:101:23: TC002 [*] Move third-party import `pkg.foo` into a type-checking block

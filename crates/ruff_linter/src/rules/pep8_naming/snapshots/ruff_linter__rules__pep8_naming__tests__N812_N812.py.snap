@@ -27,3 +27,8 @@ N812 Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`
 3 | from mod import another_lowercase as AnotherLowercase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+N812.py:1:8: N812 Lowercase `lowercase` imported as non-lowercase `Lower`
+N812.py:2:17: N812 Lowercase `lowercase` imported as non-lowercase `Lowercase`
+N812.py:3:17: N812 Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`

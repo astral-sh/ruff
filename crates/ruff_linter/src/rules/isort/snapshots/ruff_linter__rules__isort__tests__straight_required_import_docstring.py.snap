@@ -10,3 +10,6 @@ help: Insert required import: `import os`
   2 |+import os
 2 3 | 
 3 4 | x = 1
+
+## Concise Output
+docstring.py:1:1: I002 [*] Missing required import: `import os`

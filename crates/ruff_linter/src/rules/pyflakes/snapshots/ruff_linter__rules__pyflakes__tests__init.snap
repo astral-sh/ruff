@@ -10,3 +10,6 @@ F401 `os` imported but unused
 3 | print(__path__)
   |
 help: Remove unused import: `os`
+
+## Concise Output
+__init__.py:1:8: F401 `os` imported but unused

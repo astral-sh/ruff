@@ -36,3 +36,9 @@ PLE0309 `__hash__` does not return an integer
    |         ^^^^^^^^
 21 |         print("ruff")  # [invalid-hash-return]
    |
+
+## Concise Output
+invalid_return_type_hash.py:6:16: PLE0309 `__hash__` does not return an integer
+invalid_return_type_hash.py:11:16: PLE0309 `__hash__` does not return an integer
+invalid_return_type_hash.py:16:16: PLE0309 `__hash__` does not return an integer
+invalid_return_type_hash.py:20:9: PLE0309 `__hash__` does not return an integer

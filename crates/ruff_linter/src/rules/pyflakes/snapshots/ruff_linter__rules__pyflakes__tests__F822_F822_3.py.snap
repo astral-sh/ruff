@@ -10,3 +10,6 @@ F822 Undefined name `ExponentialFamily` in `__all__`
    |     ^^^^^^^^^^^^^^^^^^^
 13 | ]
    |
+
+## Concise Output
+F822_3.py:12:5: F822 Undefined name `ExponentialFamily` in `__all__`

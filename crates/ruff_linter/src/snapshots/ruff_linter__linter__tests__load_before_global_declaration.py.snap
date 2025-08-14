@@ -20,3 +20,7 @@ PLE0118 Name `x` is used prior to global declaration on line 14
 14 |     global x
 15 |     x = 5
    |
+
+## Concise Output
+resources/test/fixtures/syntax_errors/load_before_global_declaration.py:9:5: PLE0118 Name `x` is used prior to global declaration on line 10
+resources/test/fixtures/syntax_errors/load_before_global_declaration.py:13:11: PLE0118 Name `x` is used prior to global declaration on line 14

@@ -700,3 +700,37 @@ help: Use `get_connection` instead
 97 97 | lfb = LocalFilesystemBackend()
 98    |-lfb.get_connections()
    98 |+lfb.get_connection()
+
+## Concise Output
+AIR301_class_attribute.py:25:19: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:26:19: AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+AIR301_class_attribute.py:30:29: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:31:29: AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+AIR301_class_attribute.py:34:27: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:35:27: AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+AIR301_class_attribute.py:38:25: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:39:25: AIR301 [*] `iter_dataset_aliases` is removed in Airflow 3.0
+AIR301_class_attribute.py:42:6: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+AIR301_class_attribute.py:43:4: AIR301 [*] `register_dataset_change` is removed in Airflow 3.0
+AIR301_class_attribute.py:44:4: AIR301 [*] `create_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:45:4: AIR301 [*] `notify_dataset_created` is removed in Airflow 3.0
+AIR301_class_attribute.py:46:4: AIR301 [*] `notify_dataset_changed` is removed in Airflow 3.0
+AIR301_class_attribute.py:47:4: AIR301 [*] `notify_dataset_alias_created` is removed in Airflow 3.0
+AIR301_class_attribute.py:50:11: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+AIR301_class_attribute.py:51:9: AIR301 [*] `dataset` is removed in Airflow 3.0
+AIR301_class_attribute.py:54:5: AIR301 [*] `create_dataset` is removed in Airflow 3.0
+AIR301_class_attribute.py:55:5: AIR301 [*] `add_input_dataset` is removed in Airflow 3.0
+AIR301_class_attribute.py:56:5: AIR301 [*] `add_output_dataset` is removed in Airflow 3.0
+AIR301_class_attribute.py:57:5: AIR301 [*] `collected_datasets` is removed in Airflow 3.0
+AIR301_class_attribute.py:61:5: AIR301 [*] `is_authorized_dataset` is removed in Airflow 3.0
+AIR301_class_attribute.py:73:13: AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+AIR301_class_attribute.py:74:13: AIR301 [*] `get_connections` is removed in Airflow 3.0
+AIR301_class_attribute.py:78:15: AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+AIR301_class_attribute.py:79:15: AIR301 [*] `get_connections` is removed in Airflow 3.0
+AIR301_class_attribute.py:86:4: AIR301 [*] `initialize_providers_dataset_uri_resources` is removed in Airflow 3.0
+AIR301_class_attribute.py:87:4: AIR301 [*] `dataset_factories` is removed in Airflow 3.0
+AIR301_class_attribute.py:88:4: AIR301 [*] `dataset_uri_handlers` is removed in Airflow 3.0
+AIR301_class_attribute.py:89:4: AIR301 [*] `dataset_to_openlineage_converters` is removed in Airflow 3.0
+AIR301_class_attribute.py:93:21: AIR301 [*] `get_conn_uri` is removed in Airflow 3.0
+AIR301_class_attribute.py:94:21: AIR301 [*] `get_connections` is removed in Airflow 3.0
+AIR301_class_attribute.py:98:5: AIR301 [*] `get_connections` is removed in Airflow 3.0

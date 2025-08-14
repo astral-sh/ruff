@@ -128,3 +128,17 @@ TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
 34 |
 35 | # relative imports are respected
    |
+
+## Concise Output
+TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:4:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:6:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:9:8: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:11:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:13:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:17:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:22:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:24:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:27:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:29:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.

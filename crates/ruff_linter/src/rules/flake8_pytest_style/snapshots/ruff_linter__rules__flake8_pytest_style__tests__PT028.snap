@@ -233,3 +233,16 @@ help: Remove default argument
 12 12 | 
 13 13 | 
 14 14 | # No errors
+
+## Concise Output
+PT028.py:3:16: PT028 Test function parameter `a` has default argument
+PT028.py:4:18: PT028 Test function parameter `a` has default argument
+PT028.py:5:19: PT028 Test function parameter `a` has default argument
+PT028.py:6:21: PT028 Test function parameter `a` has default argument
+PT028.py:7:23: PT028 Test function parameter `a` has default argument
+PT028.py:8:25: PT028 Test function parameter `a` has default argument
+PT028.py:9:24: PT028 Test function parameter `a` has default argument
+PT028.py:10:26: PT028 Test function parameter `a` has default argument
+PT028.py:11:16: PT028 Test function parameter `a` has default argument
+PT028.py:11:24: PT028 Test function parameter `b` has default argument
+PT028.py:11:32: PT028 Test function parameter `c` has default argument

@@ -608,3 +608,34 @@ help: Remove `len`
 249     |-):
     247 |+if fruits:
 250 248 |     ...
+
+## Concise Output
+len_as_condition.py:1:4: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:4:8: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:8:10: PLC1802 [*] `len(['T', 'E', 'S', 'T'])` used as condition without comparison
+len_as_condition.py:11:12: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:53:6: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:58:10: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:61:7: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:64:11: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:67:13: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:70:11: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:93:12: PLC1802 [*] `len(args)` used as condition without comparison
+len_as_condition.py:96:12: PLC1802 [*] `len(args)` used as condition without comparison
+len_as_condition.py:99:18: PLC1802 [*] `len(args)` used as condition without comparison
+len_as_condition.py:102:18: PLC1802 [*] `len(args)` used as condition without comparison
+len_as_condition.py:104:10: PLC1802 [*] `len(z)` used as condition without comparison
+len_as_condition.py:105:10: PLC1802 [*] `len('TEST')` used as condition without comparison
+len_as_condition.py:126:12: PLC1802 [*] `len(range(0))` used as condition without comparison
+len_as_condition.py:127:12: PLC1802 [*] `len([t + 1 for t in []])` used as condition without comparison
+len_as_condition.py:129:12: PLC1802 [*] `len({"1":(v + 1) for v in {}})` used as condition without comparison
+len_as_condition.py:130:12: PLC1802 [*] `len(set((w + 1) for w in set()))` used as condition without comparison
+len_as_condition.py:193:8: PLC1802 [*] `len(x)` used as condition without comparison
+len_as_condition.py:200:8: PLC1802 [*] `len(x)` used as condition without comparison
+len_as_condition.py:214:8: PLC1802 [*] `len(x)` used as condition without comparison
+len_as_condition.py:220:8: PLC1802 [*] `len(x)` used as condition without comparison
+len_as_condition.py:233:8: PLC1802 [*] `len(x)` used as condition without comparison
+len_as_condition.py:237:6: PLC1802 [*] `len(ascii(1))` used as condition without comparison
+len_as_condition.py:238:6: PLC1802 [*] `len(sorted(""))` used as condition without comparison
+len_as_condition.py:242:3: PLC1802 [*] `len(fruits)` used as condition without comparison
+len_as_condition.py:247:4: PLC1802 [*] `len(fruits)` used as condition without comparison

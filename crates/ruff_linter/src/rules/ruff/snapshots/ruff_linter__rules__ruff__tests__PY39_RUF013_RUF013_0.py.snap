@@ -377,4 +377,26 @@ help: Convert to `Optional[T]`
     204 |+def f(arg: Optional[Union["int", "str"]] = None):  # RUF013
 205 205 |     pass
 206 206 | 
-207 207 |
+207 207 | 
+
+## Concise Output
+RUF013_0.py:20:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:24:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:28:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:58:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:62:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:66:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:85:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:89:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:108:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:112:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:131:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:135:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:151:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:152:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:153:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:181:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:188:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:192:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_0.py:196:12: RUF013 PEP 484 prohibits implicit `Optional`
+RUF013_0.py:204:12: RUF013 [*] PEP 484 prohibits implicit `Optional`

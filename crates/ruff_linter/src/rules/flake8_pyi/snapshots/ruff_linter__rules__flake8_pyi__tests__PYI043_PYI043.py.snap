@@ -41,3 +41,9 @@ PYI043 Private type alias `_FooT` should not be suffixed with `T` (the `T` suffi
    |      ^^^^^
 27 | type Foo = str | int
    |
+
+## Concise Output
+PYI043.py:10:1: PYI043 Private type alias `_PrivateAliasT` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)
+PYI043.py:11:1: PYI043 Private type alias `_PrivateAliasT2` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)
+PYI043.py:12:1: PYI043 Private type alias `_PrivateAliasT3` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)
+PYI043.py:26:6: PYI043 Private type alias `_FooT` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)

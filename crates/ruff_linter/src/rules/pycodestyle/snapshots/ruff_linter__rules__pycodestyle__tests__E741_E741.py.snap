@@ -234,3 +234,30 @@ E741 Ambiguous variable name: `l`
    |     ^
 75 |     pass
    |
+
+## Concise Output
+E741.py:3:1: E741 Ambiguous variable name: `l`
+E741.py:4:1: E741 Ambiguous variable name: `I`
+E741.py:5:1: E741 Ambiguous variable name: `O`
+E741.py:6:1: E741 Ambiguous variable name: `l`
+E741.py:8:4: E741 Ambiguous variable name: `l`
+E741.py:9:5: E741 Ambiguous variable name: `l`
+E741.py:10:5: E741 Ambiguous variable name: `l`
+E741.py:11:5: E741 Ambiguous variable name: `l`
+E741.py:16:5: E741 Ambiguous variable name: `l`
+E741.py:20:8: E741 Ambiguous variable name: `l`
+E741.py:25:12: E741 Ambiguous variable name: `l`
+E741.py:26:5: E741 Ambiguous variable name: `l`
+E741.py:30:5: E741 Ambiguous variable name: `l`
+E741.py:33:18: E741 Ambiguous variable name: `l`
+E741.py:34:9: E741 Ambiguous variable name: `l`
+E741.py:40:8: E741 Ambiguous variable name: `l`
+E741.py:40:14: E741 Ambiguous variable name: `I`
+E741.py:44:8: E741 Ambiguous variable name: `l`
+E741.py:44:16: E741 Ambiguous variable name: `I`
+E741.py:48:9: E741 Ambiguous variable name: `l`
+E741.py:48:14: E741 Ambiguous variable name: `I`
+E741.py:57:16: E741 Ambiguous variable name: `l`
+E741.py:66:20: E741 Ambiguous variable name: `l`
+E741.py:71:22: E741 Ambiguous variable name: `l`
+E741.py:74:5: E741 Ambiguous variable name: `l`

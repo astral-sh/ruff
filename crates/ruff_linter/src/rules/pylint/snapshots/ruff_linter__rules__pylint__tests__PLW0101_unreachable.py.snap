@@ -35,3 +35,8 @@ PLW0101 Unreachable code in `multiple_returns`
 30 | |     print("unreachable range should include above return")
    | |__________________________________________________________^
    |
+
+## Concise Output
+unreachable.py:18:5: PLW0101 Unreachable code in `after_return`
+unreachable.py:23:5: PLW0101 Unreachable code in `after_raise`
+unreachable.py:28:5: PLW0101 Unreachable code in `multiple_returns`

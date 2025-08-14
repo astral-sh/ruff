@@ -196,4 +196,15 @@ help: Replace with `min`
    21 |+min(l)
 22 22 | 
 23 23 | # Non-errors
-24 24 |
+24 24 | 
+
+## Concise Output
+FURB192.py:3:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+FURB192.py:5:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+FURB192.py:7:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+FURB192.py:9:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+FURB192.py:11:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+FURB192.py:13:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+FURB192.py:17:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
+FURB192.py:19:1: FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
+FURB192.py:21:1: FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence

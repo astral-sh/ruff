@@ -30,3 +30,7 @@ F821 Undefined name `x`
 13 |         print(x)
    |               ^
    |
+
+## Concise Output
+<filename>:8:30: F841 [*] Local variable `x` is assigned to but never used
+<filename>:13:15: F821 Undefined name `x`

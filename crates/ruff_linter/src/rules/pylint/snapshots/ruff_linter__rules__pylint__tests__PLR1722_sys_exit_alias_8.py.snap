@@ -16,3 +16,6 @@ help: Replace `exit` with `sys.exit()`
 2 2 | 
 3 3 | 
 4 4 | def main():
+
+## Concise Output
+sys_exit_alias_8.py:5:5: PLR1722 [*] Use `sys.exit()` instead of `exit`

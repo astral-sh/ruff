@@ -23,3 +23,6 @@ help: Remove definition: `Sequence`
 34 30 | 
 35 31 | # This should ignore both errors.
 36 32 | from typing import (  # noqa
+
+## Concise Output
+F811_21.py:32:5: F811 [*] Redefinition of unused `Sequence` from line 26

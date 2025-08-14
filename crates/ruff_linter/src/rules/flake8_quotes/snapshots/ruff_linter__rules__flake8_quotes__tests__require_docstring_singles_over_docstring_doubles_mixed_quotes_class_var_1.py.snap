@@ -30,3 +30,8 @@ Q002 Double quote docstring found but single quotes preferred
   |                             ^^
   |
 help: Replace double quotes docstring with single quotes
+
+## Concise Output
+docstring_doubles_mixed_quotes_class_var_1.py:2:5: Q002 Double quote docstring found but single quotes preferred
+docstring_doubles_mixed_quotes_class_var_1.py:6:9: Q002 Double quote docstring found but single quotes preferred
+docstring_doubles_mixed_quotes_class_var_1.py:9:29: Q002 Double quote docstring found but single quotes preferred

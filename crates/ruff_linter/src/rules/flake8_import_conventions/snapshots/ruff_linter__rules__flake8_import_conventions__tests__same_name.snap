@@ -16,3 +16,6 @@ help: Alias `django.conf.settings` to `settings`
 9  9  | def unconventional_alias():
 10    |-    from django.conf import settings as s
    10 |+    from django.conf import settings as settings
+
+## Concise Output
+same_name.py:10:41: ICN001 [*] `django.conf.settings` should be imported as `settings`

@@ -16,3 +16,7 @@ F406 `from F634 import *` only allowed at module level
 9 |     from F634 import *
   |     ^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+F406.py:5:5: F406 `from F634 import *` only allowed at module level
+F406.py:9:5: F406 `from F634 import *` only allowed at module level

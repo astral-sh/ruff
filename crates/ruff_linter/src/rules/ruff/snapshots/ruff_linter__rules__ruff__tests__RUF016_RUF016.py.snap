@@ -415,3 +415,45 @@ RUF016 Indexed access to type `list` uses type `str` instead of an integer or sl
 95 |
 96 | # Cannot emit on invalid access using variable in index
    |
+
+## Concise Output
+RUF016.py:20:13: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice
+RUF016.py:21:14: RUF016 Indexed access to type `str` uses type `str` instead of an integer or slice
+RUF016.py:24:14: RUF016 Indexed access to type `bytes` uses type `str` instead of an integer or slice
+RUF016.py:27:17: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice
+RUF016.py:28:17: RUF016 Indexed access to type `tuple` uses type `str` instead of an integer or slice
+RUF016.py:31:30: RUF016 Indexed access to type `list comprehension` uses type `str` instead of an integer or slice
+RUF016.py:34:13: RUF016 Indexed access to type `str` uses type `tuple` instead of an integer or slice
+RUF016.py:37:14: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice
+RUF016.py:40:14: RUF016 Indexed access to type `list` uses type `float` instead of an integer or slice
+RUF016.py:43:14: RUF016 Indexed access to type `list` uses type `dict` instead of an integer or slice
+RUF016.py:46:14: RUF016 Indexed access to type `list` uses type `dict comprehension` instead of an integer or slice
+RUF016.py:49:14: RUF016 Indexed access to type `list` uses type `tuple` instead of an integer or slice
+RUF016.py:52:14: RUF016 Indexed access to type `list` uses type `list comprehension` instead of an integer or slice
+RUF016.py:55:14: RUF016 Indexed access to type `list` uses type `set` instead of an integer or slice
+RUF016.py:58:14: RUF016 Indexed access to type `list` uses type `set comprehension` instead of an integer or slice
+RUF016.py:61:14: RUF016 Indexed access to type `list` uses type `bytes` instead of an integer or slice
+RUF016.py:64:17: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:65:17: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:66:17: RUF016 Slice in indexed access to type `list` uses type `float` instead of an integer
+RUF016.py:67:17: RUF016 Slice in indexed access to type `list` uses type `set` instead of an integer
+RUF016.py:68:17: RUF016 Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+RUF016.py:69:17: RUF016 Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+RUF016.py:70:17: RUF016 Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+RUF016.py:73:19: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:74:19: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:75:19: RUF016 Slice in indexed access to type `list` uses type `float` instead of an integer
+RUF016.py:76:19: RUF016 Slice in indexed access to type `list` uses type `set` instead of an integer
+RUF016.py:77:19: RUF016 Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+RUF016.py:78:19: RUF016 Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+RUF016.py:79:19: RUF016 Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+RUF016.py:82:21: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:83:21: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:84:21: RUF016 Slice in indexed access to type `list` uses type `float` instead of an integer
+RUF016.py:85:21: RUF016 Slice in indexed access to type `list` uses type `set` instead of an integer
+RUF016.py:86:21: RUF016 Slice in indexed access to type `list` uses type `set comprehension` instead of an integer
+RUF016.py:87:21: RUF016 Slice in indexed access to type `list` uses type `dict comprehension` instead of an integer
+RUF016.py:88:21: RUF016 Slice in indexed access to type `list` uses type `list comprehension` instead of an integer
+RUF016.py:91:17: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:91:21: RUF016 Slice in indexed access to type `list` uses type `str` instead of an integer
+RUF016.py:94:17: RUF016 Indexed access to type `list` uses type `str` instead of an integer or slice

@@ -24,3 +24,8 @@ E742 Ambiguous class name: `O`
    |       ^
 10 |     pass
    |
+
+## Concise Output
+E742.py:1:7: E742 Ambiguous class name: `l`
+E742.py:5:7: E742 Ambiguous class name: `I`
+E742.py:9:7: E742 Ambiguous class name: `O`

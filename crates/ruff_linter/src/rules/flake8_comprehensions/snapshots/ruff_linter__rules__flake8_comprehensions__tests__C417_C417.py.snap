@@ -377,4 +377,24 @@ help: Replace `map()` with a dict comprehension
 75 75 | _ = t"{set(map(lambda x: x % 2 == 0, nums))}"
 76    |-_ = t"{dict(map(lambda v: (v, v**2), nums))}"
    76 |+_ = t"{ {v: v**2 for v in nums} }"
-77 77 |
+77 77 | 
+
+## Concise Output
+C417.py:3:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:4:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:5:1: C417 [*] Unnecessary `map()` usage (rewrite using a list comprehension)
+C417.py:6:1: C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
+C417.py:7:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+C417.py:8:1: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+C417.py:10:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:11:13: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:12:5: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:13:14: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:17:8: C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
+C417.py:18:8: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)
+C417.py:36:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:47:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:48:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:49:1: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)
+C417.py:75:8: C417 [*] Unnecessary `map()` usage (rewrite using a set comprehension)
+C417.py:76:8: C417 [*] Unnecessary `map()` usage (rewrite using a dict comprehension)

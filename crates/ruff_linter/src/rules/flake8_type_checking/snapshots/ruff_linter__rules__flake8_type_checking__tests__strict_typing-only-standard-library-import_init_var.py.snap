@@ -48,3 +48,7 @@ help: Move into type-checking block
 7  10 | 
 8  11 | 
 9  12 | @dataclass
+
+## Concise Output
+init_var.py:5:25: TC003 [*] Move standard library import `dataclasses.FrozenInstanceError` into a type-checking block
+init_var.py:6:21: TC003 [*] Move standard library import `pathlib.Path` into a type-checking block

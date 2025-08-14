@@ -21,3 +21,7 @@ I001 Import block is un-sorted or un-formatted
   | |_____________^
   |
 help: Organize imports
+
+## Concise Output
+trailing_suffix.py:1:1: I001 Import block is un-sorted or un-formatted
+trailing_suffix.py:5:5: I001 Import block is un-sorted or un-formatted

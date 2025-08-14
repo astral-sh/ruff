@@ -75,3 +75,9 @@ help: Replace with `object`
 27 27 |    def __eq__(self, other: "Any") -> bool: ...  # PYI032
 28    |-   def __ne__(self, other: "Any") -> bool: ...  # PYI032
    28 |+   def __ne__(self, other: object) -> bool: ...  # PYI032
+
+## Concise Output
+PYI032.py:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+PYI032.py:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+PYI032.py:27:28: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+PYI032.py:28:28: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`

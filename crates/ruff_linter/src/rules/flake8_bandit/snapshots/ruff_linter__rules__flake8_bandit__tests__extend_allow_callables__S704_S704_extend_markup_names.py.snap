@@ -18,3 +18,7 @@ S704 Unsafe use of `webhelpers.html.literal` detected
 6 | literal(f"unsafe {content}")  # S704
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S704_extend_markup_names.py:5:1: S704 Unsafe use of `markupsafe.Markup` detected
+S704_extend_markup_names.py:6:1: S704 Unsafe use of `webhelpers.html.literal` detected

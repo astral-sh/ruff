@@ -730,3 +730,42 @@ help: Add a leading dot
 64 64 | 
 65 65 | ### No errors
 66 66 | path.with_suffix()
+
+## Concise Output
+PTH210.py:21:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:22:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:23:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:24:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:25:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:27:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:28:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:29:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:30:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:31:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:33:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:34:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:35:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:36:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:37:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:39:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:40:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:41:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:42:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:43:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:45:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:46:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:47:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:48:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:49:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:51:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:52:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:53:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:54:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:55:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:57:1: PTH210 Invalid suffix passed to `.with_suffix()`
+PTH210.py:58:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:59:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:60:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:61:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:62:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`
+PTH210.py:63:1: PTH210 [*] Dotless suffix passed to `.with_suffix()`

@@ -8,3 +8,6 @@ F821 Undefined name `Class`
 7 | y = Optional["Class"]
   |               ^^^^^
   |
+
+## Concise Output
+typing_modules.py:7:15: F821 Undefined name `Class`

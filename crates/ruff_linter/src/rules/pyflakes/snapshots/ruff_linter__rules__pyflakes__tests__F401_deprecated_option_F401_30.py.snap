@@ -16,3 +16,6 @@ help: Remove unused import: `.main.MaμToMan`
 4 4 | """
 5 5 | 
 6   |-from .main import MaµToMan
+
+## Concise Output
+F401_30.py:6:19: F401 [*] `.main.MaμToMan` imported but unused

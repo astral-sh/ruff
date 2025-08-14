@@ -16,3 +16,7 @@ S408 `xml.dom.minidom` is vulnerable to XML attacks
 2 | import xml.dom.minidom  # S408
   |        ^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S408.py:1:6: S408 `xml.dom.minidom` is vulnerable to XML attacks
+S408.py:2:8: S408 `xml.dom.minidom` is vulnerable to XML attacks

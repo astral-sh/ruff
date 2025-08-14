@@ -193,3 +193,14 @@ help: Rewrite as a literal
 35 35 | 
 36 36 | t"{dict(x='y') | dict(y='z')}"
 37 37 | t"{ dict(x='y') | dict(y='z') }"
+
+## Concise Output
+C408.py:1:5: C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
+C408.py:2:5: C408 [*] Unnecessary `list()` call (rewrite as a literal)
+C408.py:3:6: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+C408.py:16:4: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+C408.py:17:6: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+C408.py:24:1: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+C408.py:28:1: C408 [*] Unnecessary `tuple()` call (rewrite as a literal)
+C408.py:33:4: C408 [*] Unnecessary `dict()` call (rewrite as a literal)
+C408.py:34:6: C408 [*] Unnecessary `dict()` call (rewrite as a literal)

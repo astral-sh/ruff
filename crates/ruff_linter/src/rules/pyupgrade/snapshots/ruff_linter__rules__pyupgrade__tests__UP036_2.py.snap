@@ -288,3 +288,17 @@ help: Remove outdated version block
 58 55 | 
 59 56 | if sys.version_info[0] > "2":
 60 57 |     3
+
+## Concise Output
+UP036_2.py:4:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:9:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:14:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:19:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:24:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:29:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:34:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:39:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:42:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:46:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:49:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_2.py:54:4: UP036 [*] Version block is outdated for minimum Python version

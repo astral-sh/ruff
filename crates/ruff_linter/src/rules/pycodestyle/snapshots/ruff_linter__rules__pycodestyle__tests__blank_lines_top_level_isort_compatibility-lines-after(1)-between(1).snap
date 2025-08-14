@@ -106,4 +106,11 @@ help: Add missing blank line(s)
    41 |+
 41 42 | def __call__2(self, name: str, *args: Any, **kwargs: Any) -> Any:
 42 43 |     ...
-43 44 |
+43 44 | 
+
+## Concise Output
+E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:23:1: E302 [*] Expected 2 blank lines, found 1
+E30_isort.py:26:5: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:35:1: E302 [*] Expected 2 blank lines, found 1
+E30_isort.py:41:1: E302 [*] Expected 2 blank lines, found 1

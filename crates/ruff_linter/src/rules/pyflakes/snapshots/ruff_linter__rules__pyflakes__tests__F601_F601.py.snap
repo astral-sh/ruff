@@ -403,3 +403,33 @@ F601 Dictionary key literal `False` repeated (`False` hashes to the same value a
 70 | }
    |
 help: Remove repeated key literal `False`
+
+## Concise Output
+F601.py:3:5: F601 Dictionary key literal `"a"` repeated
+F601.py:6:5: F601 Dictionary key literal `("a", "b")` repeated
+F601.py:8:5: F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+F601.py:9:5: F601 Dictionary key literal `1` repeated (`1` hashes to the same value as `1.0`)
+F601.py:11:5: F601 Dictionary key literal `b"123"` repeated
+F601.py:16:5: F601 Dictionary key literal `"a"` repeated
+F601.py:17:5: F601 Dictionary key literal `"a"` repeated
+F601.py:18:5: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:23:5: F601 Dictionary key literal `"a"` repeated
+F601.py:24:5: F601 Dictionary key literal `"a"` repeated
+F601.py:25:5: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:26:5: F601 Dictionary key literal `"a"` repeated
+F601.py:31:5: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:32:5: F601 Dictionary key literal `"a"` repeated
+F601.py:33:5: F601 Dictionary key literal `"a"` repeated
+F601.py:34:5: F601 Dictionary key literal `"a"` repeated
+F601.py:41:5: F601 Dictionary key literal `"a"` repeated
+F601.py:43:5: F601 Dictionary key literal `"a"` repeated
+F601.py:45:5: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:49:14: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:50:22: F601 [*] Dictionary key literal `"a"` repeated
+F601.py:54:5: F601 Dictionary key literal `('a', 'b')` repeated
+F601.py:58:19: F601 [*] Dictionary key literal `"x"` repeated
+F601.py:60:21: F601 [*] Dictionary key literal `"x"` repeated
+F601.py:65:5: F601 Dictionary key literal `1` repeated
+F601.py:66:5: F601 Dictionary key literal `True` repeated (`True` hashes to the same value as `1`)
+F601.py:68:5: F601 Dictionary key literal `0` repeated
+F601.py:69:5: F601 Dictionary key literal `False` repeated (`False` hashes to the same value as `0`)

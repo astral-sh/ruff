@@ -7,3 +7,6 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 1 | _("{}".format("line"))
   |   ^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+INT002.py:1:3: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`

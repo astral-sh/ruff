@@ -27,3 +27,7 @@ TC010 Invalid string member in `X | Y`-style union type
 7 | b: TypeAlias = 'int' | None  # TC010
   |                ^^^^^
   |
+
+## Concise Output
+<filename>:6:16: TC008 [*] Remove quotes from type alias
+<filename>:7:16: TC010 Invalid string member in `X | Y`-style union type

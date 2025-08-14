@@ -61,3 +61,11 @@ E501 Line too long (147 > 88)
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 84 | …
    |
+
+## Concise Output
+E501.py:5:89: E501 Line too long (123 > 88)
+E501.py:16:85: E501 Line too long (95 > 88)
+E501.py:25:89: E501 Line too long (127 > 88)
+E501.py:40:89: E501 Line too long (132 > 88)
+E501.py:43:89: E501 Line too long (105 > 88)
+E501.py:83:89: E501 Line too long (147 > 88)

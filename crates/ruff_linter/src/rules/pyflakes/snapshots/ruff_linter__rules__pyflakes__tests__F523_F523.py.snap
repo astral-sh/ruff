@@ -366,3 +366,25 @@ help: Remove extra positional arguments at position(s): 1
 44 44 | # even though the used argument has a side effect
 45    |-"Hello, {0}".format(print(1), "Pikachu")
    45 |+"Hello, {0}".format(print(1), )
+
+## Concise Output
+F523.py:2:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:3:1: F523 `.format` call has unused arguments at position(s): 0, 2
+F523.py:5:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:6:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:7:1: F523 `.format` call has unused arguments at position(s): 0, 3
+F523.py:10:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:11:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+F523.py:13:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:19:1: F523 `.format` call has unused arguments at position(s): 2
+F523.py:22:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+F523.py:23:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:24:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:27:1: F523 `.format` call has unused arguments at position(s): 0
+F523.py:28:1: F523 `.format` call has unused arguments at position(s): 0, 2
+F523.py:29:1: F523 `.format` call has unused arguments at position(s): 0
+F523.py:32:2: F523 [*] `.format` call has unused arguments at position(s): 0
+F523.py:36:1: F523 [*] `.format` call has unused arguments at position(s): 0
+F523.py:37:1: F523 [*] `.format` call has unused arguments at position(s): 0
+F523.py:41:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:45:1: F523 [*] `.format` call has unused arguments at position(s): 1

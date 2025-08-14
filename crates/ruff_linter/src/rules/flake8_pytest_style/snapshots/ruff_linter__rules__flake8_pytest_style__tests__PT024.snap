@@ -77,3 +77,9 @@ help: Remove `pytest.mark.asyncio`
 33    |-@pytest.mark.asyncio
 34 33 | async def my_fixture():  # Error after no parens
 35 34 |     return 0
+
+## Concise Output
+PT024.py:14:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:20:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:27:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:33:1: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures

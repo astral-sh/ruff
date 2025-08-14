@@ -10,3 +10,6 @@ RUF058 `itertools.starmap` called on `zip` iterable
 11 |     pass
    |
 help: Use `map` instead
+
+## Concise Output
+RUF058_1.py:10:10: RUF058 `itertools.starmap` called on `zip` iterable

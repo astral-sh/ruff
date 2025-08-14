@@ -35,3 +35,7 @@ help: Assign to variable; remove string literal
 6   |-    raise RuntimeError(b"")
   6 |+    msg = b""
   7 |+    raise RuntimeError(msg)
+
+## Concise Output
+EM101_byte_string.py:2:24: EM101 [*] Exception must not use a string literal, assign to variable first
+EM101_byte_string.py:6:24: EM101 [*] Exception must not use a string literal, assign to variable first

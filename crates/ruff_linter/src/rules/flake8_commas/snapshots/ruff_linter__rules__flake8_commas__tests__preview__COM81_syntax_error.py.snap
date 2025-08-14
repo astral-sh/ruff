@@ -31,3 +31,8 @@ COM819 Trailing comma prohibited
 7 |     pass
   |
 help: Remove trailing comma
+
+## Concise Output
+COM81_syntax_error.py:3:5: invalid-syntax: Starred expression cannot be used here
+COM81_syntax_error.py:6:9: invalid-syntax: Type parameter list cannot be empty
+COM81_syntax_error.py:6:38: COM819 Trailing comma prohibited

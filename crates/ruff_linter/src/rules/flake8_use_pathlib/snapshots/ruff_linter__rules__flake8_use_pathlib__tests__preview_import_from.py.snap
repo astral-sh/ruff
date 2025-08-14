@@ -647,3 +647,36 @@ help: Replace with `Path(...).rename(...)`
    64 |+pathlib.Path(file).rename("file_2.py")
 64 65 | 
 65 66 | rename(file, "file_2.py", src_dir_fd=1)
+
+## Concise Output
+import_from.py:9:5: PTH100 [*] `os.path.abspath()` should be replaced by `Path.resolve()`
+import_from.py:10:6: PTH101 `os.chmod()` should be replaced by `Path.chmod()`
+import_from.py:11:7: PTH102 `os.mkdir()` should be replaced by `Path.mkdir()`
+import_from.py:12:1: PTH103 `os.makedirs()` should be replaced by `Path.mkdir(parents=True)`
+import_from.py:13:1: PTH104 `os.rename()` should be replaced by `Path.rename()`
+import_from.py:14:1: PTH105 `os.replace()` should be replaced by `Path.replace()`
+import_from.py:15:1: PTH106 [*] `os.rmdir()` should be replaced by `Path.rmdir()`
+import_from.py:16:1: PTH107 [*] `os.remove()` should be replaced by `Path.unlink()`
+import_from.py:17:1: PTH108 [*] `os.unlink()` should be replaced by `Path.unlink()`
+import_from.py:18:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+import_from.py:19:5: PTH110 [*] `os.path.exists()` should be replaced by `Path.exists()`
+import_from.py:20:6: PTH111 [*] `os.path.expanduser()` should be replaced by `Path.expanduser()`
+import_from.py:21:7: PTH112 [*] `os.path.isdir()` should be replaced by `Path.is_dir()`
+import_from.py:22:8: PTH113 [*] `os.path.isfile()` should be replaced by `Path.is_file()`
+import_from.py:23:9: PTH114 [*] `os.path.islink()` should be replaced by `Path.is_symlink()`
+import_from.py:24:1: PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
+import_from.py:25:1: PTH116 `os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`
+import_from.py:26:1: PTH117 [*] `os.path.isabs()` should be replaced by `Path.is_absolute()`
+import_from.py:27:1: PTH118 `os.path.join()` should be replaced by `Path` with `/` operator
+import_from.py:28:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+import_from.py:29:1: PTH118 `os.sep.join()` should be replaced by `Path` with `/` operator
+import_from.py:30:1: PTH119 [*] `os.path.basename()` should be replaced by `Path.name`
+import_from.py:31:1: PTH120 [*] `os.path.dirname()` should be replaced by `Path.parent`
+import_from.py:32:1: PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
+import_from.py:33:1: PTH122 `os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`
+import_from.py:34:6: PTH123 `open()` should be replaced by `Path.open()`
+import_from.py:36:1: PTH123 `open()` should be replaced by `Path.open()`
+import_from.py:43:10: PTH123 `open()` should be replaced by `Path.open()`
+import_from.py:53:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+import_from.py:55:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+import_from.py:63:1: PTH104 [*] `os.rename()` should be replaced by `Path.rename()`

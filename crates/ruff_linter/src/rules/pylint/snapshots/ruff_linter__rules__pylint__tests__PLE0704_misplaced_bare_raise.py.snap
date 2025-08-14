@@ -95,3 +95,14 @@ PLE0704 Bare `raise` statement is not inside an exception handler
 71 |     raise # [misplaced-bare-raise]
    |     ^^^^^
    |
+
+## Concise Output
+misplaced_bare_raise.py:30:5: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:36:9: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:41:5: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:47:17: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:50:5: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:52:1: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:58:9: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:64:9: PLE0704 Bare `raise` statement is not inside an exception handler
+misplaced_bare_raise.py:71:5: PLE0704 Bare `raise` statement is not inside an exception handler

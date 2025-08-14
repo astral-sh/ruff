@@ -30,3 +30,8 @@ E402 Module level import not at top of cell
 31 |
 32 | %%time
    |
+
+## Concise Output
+E402.ipynb:9:1: E402 Module level import not at top of cell
+E402.ipynb:22:1: E402 Module level import not at top of cell
+E402.ipynb:30:1: E402 Module level import not at top of cell

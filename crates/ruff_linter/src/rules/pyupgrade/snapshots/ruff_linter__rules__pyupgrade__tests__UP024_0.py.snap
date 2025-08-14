@@ -316,3 +316,20 @@ help: Replace `os.error` with builtin `OSError`
 114     |-except os.error:
     114 |+except OSError:
 115 115 |     pass
+
+## Concise Output
+UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:105:11: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:114:8: UP024 [*] Replace aliased errors with `OSError`

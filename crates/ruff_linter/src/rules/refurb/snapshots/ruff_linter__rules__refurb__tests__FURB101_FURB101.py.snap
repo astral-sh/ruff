@@ -94,3 +94,15 @@ FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
 50 |     # We have other things in here, multiple with items, but
 51 |     # the user reads the whole file and that bit they can replace.
    |
+
+## Concise Output
+FURB101.py:12:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:16:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
+FURB101.py:20:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_bytes()`
+FURB101.py:24:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf8")`
+FURB101.py:28:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text(errors="ignore")`
+FURB101.py:32:6: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`
+FURB101.py:36:6: FURB101 `open` and `read` should be replaced by `Path(foo()).read_bytes()`
+FURB101.py:44:6: FURB101 `open` and `read` should be replaced by `Path("a.txt").read_text()`
+FURB101.py:44:26: FURB101 `open` and `read` should be replaced by `Path("b.txt").read_bytes()`
+FURB101.py:49:18: FURB101 `open` and `read` should be replaced by `Path("file.txt").read_text()`

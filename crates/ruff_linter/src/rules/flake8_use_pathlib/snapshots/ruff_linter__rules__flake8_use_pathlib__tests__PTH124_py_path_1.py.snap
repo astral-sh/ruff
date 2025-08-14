@@ -9,3 +9,6 @@ PTH124 `py.path` is in maintenance mode, use `pathlib` instead
 3 | p = py.path.local("../foo")
   |     ^^^^^^^^^^^^^
   |
+
+## Concise Output
+py_path_1.py:3:5: PTH124 `py.path` is in maintenance mode, use `pathlib` instead

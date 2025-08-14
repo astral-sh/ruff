@@ -1282,3 +1282,65 @@ help: Use `str()` builtin
 133 133 | # https://github.com/astral-sh/ruff/issues/18813
 134     |-three = 1 if 1 else(3.0).__str__()
     134 |+three = 1 if 1 else str(3.0)
+
+## Concise Output
+unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`. Use `*` operator.
+unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truediv__`. Use `/` operator.
+unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floordiv__`. Use `//` operator.
+unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`. Use `%` operator.
+unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
+unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`. Use `!=` operator.
+unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`. Use `<` operator.
+unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`. Use `<=` operator.
+unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`. Use `>` operator.
+unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`. Use `>=` operator.
+unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
+unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr__`. Use `repr()` builtin.
+unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__`. Use `len()` builtin.
+unnecessary_dunder_call.py:19:7: PLC2801 Unnecessary dunder call to `__neg__`. Multiply by -1 instead.
+unnecessary_dunder_call.py:20:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:21:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:22:10: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:23:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:24:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:25:8: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:26:13: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:27:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
+unnecessary_dunder_call.py:28:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:29:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:30:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:35:7: PLC2801 [*] Unnecessary dunder call to `__rsub__`. Use `-` operator.
+unnecessary_dunder_call.py:40:11: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:41:9: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:42:10: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:43:5: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:44:6: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:45:5: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:46:6: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:49:7: PLC2801 Unnecessary dunder call to `__call__`
+unnecessary_dunder_call.py:63:1: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:67:16: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:70:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:70:34: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:73:13: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:74:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:75:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:76:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:79:11: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:80:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:81:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:82:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:85:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:89:13: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:91:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:94:9: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:98:9: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:101:8: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:101:22: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
+unnecessary_dunder_call.py:105:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
+unnecessary_dunder_call.py:116:16: PLC2801 Unnecessary dunder call to `__getattribute__`. Access attribute directly or use getattr built-in function.
+unnecessary_dunder_call.py:128:1: PLC2801 [*] Unnecessary dunder call to `__contains__`. Use `in` operator.
+unnecessary_dunder_call.py:131:8: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
+unnecessary_dunder_call.py:134:20: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.

@@ -94,4 +94,11 @@ help: Convert to `*` for unpacking
    22 |+def f(*args: Generic[int, *int]):
 23 23 |     pass
 24 24 | 
-25 25 |
+25 25 | 
+
+## Concise Output
+UP044.py:6:17: UP044 [*] Use `*` for unpacking
+UP044.py:10:17: UP044 [*] Use `*` for unpacking
+UP044.py:14:14: UP044 [*] Use `*` for unpacking
+UP044.py:18:14: UP044 [*] Use `*` for unpacking
+UP044.py:22:27: UP044 [*] Use `*` for unpacking

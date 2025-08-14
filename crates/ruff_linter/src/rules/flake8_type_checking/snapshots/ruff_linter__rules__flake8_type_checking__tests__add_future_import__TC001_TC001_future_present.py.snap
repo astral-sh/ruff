@@ -22,3 +22,6 @@ help: Move into type-checking block
 4 7 | 
 5 8 | 
 6 9 | def f(x: first_party.foo): ...
+
+## Concise Output
+TC001_future_present.py:3:15: TC001 [*] Move application import `.first_party` into a type-checking block

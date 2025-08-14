@@ -8,3 +8,6 @@ EXE003 Shebang should contain `python`, `pytest`, or `uv run`
   | ^^^^^^^^^^^^^^^
 2 | print("hello world")
   |
+
+## Concise Output
+EXE003.py:1:1: EXE003 Shebang should contain `python`, `pytest`, or `uv run`

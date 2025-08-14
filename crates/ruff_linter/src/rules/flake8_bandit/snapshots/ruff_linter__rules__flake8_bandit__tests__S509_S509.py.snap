@@ -18,3 +18,7 @@ S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv`
 6 |
 7 | less_insecure = UsmUserData("securityName", "authName", "privName")  # OK
   |
+
+## Concise Output
+S509.py:4:12: S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
+S509.py:5:16: S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.

@@ -73,3 +73,10 @@ help: Add missing colon
 22 22 | 
 23 23 | # PGH004
 24 24 | x = 2  # noqa : X300
+
+## Concise Output
+PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:3:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:18:8: PGH004 [*] Use a colon when specifying `noqa` rule codes
+PGH004_0.py:21:8: PGH004 [*] Use a colon when specifying `noqa` rule codes

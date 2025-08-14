@@ -11,4 +11,7 @@ help: Add trailing newline
 
 ℹ Safe fix
 1   |- 
-  1 |+
+  1 |+ 
+
+## Concise Output
+W292_4.py:1:2: W292 [*] No newline at end of file

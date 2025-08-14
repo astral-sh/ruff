@@ -230,3 +230,27 @@ PLE1310 String `lstrip` call contains duplicate characters (did you mean `remove
 90 | bar.lstrip(b"//")
    |            ^^^^^
    |
+
+## Concise Output
+bad_str_strip_call.py:2:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:5:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:8:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:11:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:14:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:17:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:20:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:23:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:26:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:30:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:36:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:42:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:49:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:61:11: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)
+bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
+bad_str_strip_call.py:79:10: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:80:10: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:81:10: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:85:9: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:89:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
+bad_str_strip_call.py:90:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)

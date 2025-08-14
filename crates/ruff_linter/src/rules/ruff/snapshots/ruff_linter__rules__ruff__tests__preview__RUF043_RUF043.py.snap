@@ -358,3 +358,36 @@ RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped
    |                                          ^^^^^^^^^^^^^^
    |
 help: Use a raw string or `re.escape()` to make the intention explicit
+
+## Concise Output
+RUF043.py:8:43: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:9:53: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:10:48: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:12:51: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:14:67: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:16:41: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:17:38: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:18:58: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:19:58: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:22:50: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:27:44: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:28:44: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:29:47: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:30:37: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:31:40: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:32:42: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:33:45: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:34:45: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:35:48: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:36:42: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:38:45: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:39:45: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:40:48: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:41:38: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:42:41: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:43:43: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:44:46: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:45:46: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:46:49: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:47:43: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw
+RUF043.py:52:42: RUF043 Pattern passed to `match=` contains metacharacters but is neither escaped nor raw

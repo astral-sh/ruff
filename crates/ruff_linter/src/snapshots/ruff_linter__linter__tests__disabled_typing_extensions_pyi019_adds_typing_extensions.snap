@@ -22,3 +22,6 @@ help: Replace TypeVar `T` with `Self`
 7   |-	def __new__(cls: type[T]) -> T:
   8 |+	def __new__(cls) -> Self:
 8 9 |               return cls
+
+## Concise Output
+<filename>:7:13: PYI019 [*] Use `Self` instead of custom TypeVar `T`

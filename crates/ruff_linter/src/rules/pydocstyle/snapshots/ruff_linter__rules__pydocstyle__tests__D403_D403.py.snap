@@ -277,3 +277,17 @@ help: Capitalize `singleword` to `Singleword`
 87 87 | 
 88 88 |     This is more text.
 89 89 |     """
+
+## Concise Output
+D403.py:2:5: D403 [*] First word of the docstring should be capitalized: `this` -> `This`
+D403.py:30:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:33:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:36:5: D403 [*] First word of the docstring should be capitalized: `here` -> `Here`
+D403.py:46:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:51:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:56:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:61:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:66:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:72:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:78:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
+D403.py:85:5: D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`

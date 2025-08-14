@@ -11,3 +11,6 @@ F505 `%`-format string is missing argument(s) for placeholder(s): bar
 8 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
 9 | '%(bar)s' % (1, 2, 3)  # F502
   |
+
+## Concise Output
+F50x.py:7:1: F505 `%`-format string is missing argument(s) for placeholder(s): bar

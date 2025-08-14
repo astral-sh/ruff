@@ -105,3 +105,15 @@ PLW0129 Asserting on a non-empty string literal will always pass
    |        ^^^^^^^^^^^^^
 24 | assert 12, "ok here"
    |
+
+## Concise Output
+assert_on_string_literal.py:3:12: PLW0129 Asserting on a non-empty string literal will always pass
+assert_on_string_literal.py:12:12: PLW0129 Asserting on a non-empty string literal will always pass
+assert_on_string_literal.py:14:12: PLW0129 Asserting on a non-empty string literal will always pass
+assert_on_string_literal.py:17:8: PLW0129 Asserting on a non-empty string literal will always pass
+assert_on_string_literal.py:18:8: PLW0129 Asserting on a string literal may have unintended results
+assert_on_string_literal.py:19:8: PLW0129 Asserting on an empty string literal will never pass
+assert_on_string_literal.py:20:8: PLW0129 Asserting on an empty string literal will never pass
+assert_on_string_literal.py:21:8: PLW0129 Asserting on a non-empty string literal will always pass
+assert_on_string_literal.py:22:8: PLW0129 Asserting on an empty string literal will never pass
+assert_on_string_literal.py:23:8: PLW0129 Asserting on a non-empty string literal will always pass

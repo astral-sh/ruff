@@ -43,3 +43,7 @@ help: Remove assignment to unused variable `x`
 10 10 |         pass
 11 11 | 
 12 12 |     # No error here, though it should arguably be an F821 error. `x` will
+
+## Concise Output
+<filename>:7:26: F841 [*] Local variable `x` is assigned to but never used
+<filename>:9:27: F841 [*] Local variable `x` is assigned to but never used

@@ -23,3 +23,6 @@ help: Replace single multiline quotes with double quotes
 4 4 | 
 5 5 | s = """ This 'should'
 6 6 | 'not' be
+
+## Concise Output
+singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but double quotes preferred

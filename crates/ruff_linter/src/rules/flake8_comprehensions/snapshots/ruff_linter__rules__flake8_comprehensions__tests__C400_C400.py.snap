@@ -210,3 +210,14 @@ help: Rewrite as a list comprehension
 28 26 | 
 29 27 | 
 30 28 | # Not built-in list.
+
+## Concise Output
+C400.py:2:13: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:3:12: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:9:5: C400 [*] Unnecessary generator (rewrite using `list()`)
+C400.py:10:5: C400 [*] Unnecessary generator (rewrite using `list()`)
+C400.py:15:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:16:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:17:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:21:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)
+C400.py:22:1: C400 [*] Unnecessary generator (rewrite as a list comprehension)

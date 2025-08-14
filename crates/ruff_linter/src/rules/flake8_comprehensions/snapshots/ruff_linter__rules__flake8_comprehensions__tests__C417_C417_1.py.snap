@@ -20,3 +20,6 @@ help: Replace `map()` with a generator expression
 8 8 | 
 9 9 | 
 10 10 | ### No errors
+
+## Concise Output
+C417_1.py:7:10: C417 [*] Unnecessary `map()` usage (rewrite using a generator expression)

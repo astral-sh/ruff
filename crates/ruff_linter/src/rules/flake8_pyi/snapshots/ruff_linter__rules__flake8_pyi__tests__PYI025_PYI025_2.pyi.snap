@@ -33,3 +33,6 @@ help: Alias `Set` to `AbstractSet`
 13 13 | if not False:
 14    |-    __all__ += ["Se" 't']
    14 |+    __all__ += ["AbstractSet"]
+
+## Concise Output
+PYI025_2.pyi:3:29: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin

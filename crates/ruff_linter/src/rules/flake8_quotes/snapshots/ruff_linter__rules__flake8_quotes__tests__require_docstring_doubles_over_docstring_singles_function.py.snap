@@ -64,3 +64,8 @@ help: Replace single quotes docstring with double quotes
 28 28 | 
 29 29 | 
 30 30 | def double_inside_single(a):
+
+## Concise Output
+docstring_singles_function.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_function.py:8:5: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_function.py:27:5: Q002 [*] Single quote docstring found but double quotes preferred

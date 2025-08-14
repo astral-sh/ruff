@@ -371,3 +371,22 @@ help: Remove redundant '+' operator to implicitly concatenate
 187 187 | 		# leading comment
 188 188 |     "end"
 189 189 | )
+
+## Concise Output
+ISC.py:9:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:14:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:19:3: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:78:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:80:10: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:110:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:117:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:122:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:127:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:133:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:139:6: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:160:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:165:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:170:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:175:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:180:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated
+ISC.py:186:5: ISC003 [*] Explicitly concatenated string should be implicitly concatenated

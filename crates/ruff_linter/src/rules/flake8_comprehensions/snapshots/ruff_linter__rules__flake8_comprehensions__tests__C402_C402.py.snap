@@ -278,3 +278,18 @@ help: Rewrite as a dict comprehension
 22 22 | 
 23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458940
 24 24 | dict((*v, k) for k, v in enumerate(calendar.month_abbr))
+
+## Concise Output
+C402.py:1:1: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:2:1: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:6:8: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:7:16: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:8:16: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:9:16: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:10:16: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:12:4: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:12:37: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:13:5: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:13:38: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:18:16: C402 [*] Unnecessary generator (rewrite as a dict comprehension)
+C402.py:21:1: C402 [*] Unnecessary generator (rewrite as a dict comprehension)

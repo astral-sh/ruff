@@ -44,3 +44,7 @@ help: Alias `Set` to `AbstractSet`
 18 18 |     class Class:
 19    |-        member: Set[int]
    19 |+        member: AbstractSet[int]
+
+## Concise Output
+PYI025_1.py:10:33: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin
+PYI025_1.py:14:51: PYI025 [*] Use `from collections.abc import Set as AbstractSet` to avoid confusion with the `set` builtin

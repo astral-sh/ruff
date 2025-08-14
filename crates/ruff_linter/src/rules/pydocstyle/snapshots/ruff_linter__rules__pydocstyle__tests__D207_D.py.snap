@@ -82,3 +82,9 @@ help: Increase indentation
 442 442 | 
 443 443 | 
 444 444 | def function_with_lambda_arg(x=lambda y: y):
+
+## Concise Output
+D.py:232:1: D207 [*] Docstring is under-indented
+D.py:244:1: D207 [*] Docstring is under-indented
+D.py:440:1: D207 [*] Docstring is under-indented
+D.py:441:1: D207 [*] Docstring is under-indented

@@ -58,3 +58,8 @@ help: Use `pytest.warns()` as a context-manager
 25    |-    pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
    25 |+    with pytest.warns(UserWarning):
    26 |+        (lambda: warnings.warn("", UserWarning))()
+
+## Concise Output
+RUF061_warns.py:16:5: RUF061 [*] Use context-manager form of `pytest.warns()`
+RUF061_warns.py:20:9: RUF061 [*] Use context-manager form of `pytest.warns()`
+RUF061_warns.py:25:5: RUF061 [*] Use context-manager form of `pytest.warns()`

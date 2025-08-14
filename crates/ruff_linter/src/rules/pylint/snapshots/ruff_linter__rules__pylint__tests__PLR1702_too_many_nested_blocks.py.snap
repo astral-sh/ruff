@@ -16,3 +16,6 @@ PLR1702 Too many nested blocks (6 > 5)
    | |_______________________________________^
 10 |       return False
    |
+
+## Concise Output
+too_many_nested_blocks.py:2:5: PLR1702 Too many nested blocks (6 > 5)

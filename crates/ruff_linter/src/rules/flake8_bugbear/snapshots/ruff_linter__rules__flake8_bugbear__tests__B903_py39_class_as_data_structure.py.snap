@@ -73,3 +73,11 @@ B903 Class could be dataclass or namedtuple
 96 | |         self.bar = bar
    | |______________________^
    |
+
+## Concise Output
+class_as_data_structure.py:6:1: B903 Class could be dataclass or namedtuple
+class_as_data_structure.py:40:1: B903 Class could be dataclass or namedtuple
+class_as_data_structure.py:45:1: B903 Class could be dataclass or namedtuple
+class_as_data_structure.py:63:1: B903 Class could be dataclass or namedtuple
+class_as_data_structure.py:85:1: B903 Class could be dataclass or namedtuple
+class_as_data_structure.py:91:1: B903 Class could be dataclass or namedtuple

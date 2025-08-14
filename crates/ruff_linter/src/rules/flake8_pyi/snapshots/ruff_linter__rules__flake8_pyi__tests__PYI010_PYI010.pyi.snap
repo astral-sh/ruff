@@ -63,3 +63,8 @@ help: Replace function body with `...`
 13 13 | 
 14 14 | def foo3():
 15 15 |     pass  # OK, pass is handled by another rule
+
+## Concise Output
+PYI010.pyi:6:5: PYI010 [*] Function body must contain only `...`
+PYI010.pyi:9:5: PYI010 [*] Function body must contain only `...`
+PYI010.pyi:12:5: PYI010 [*] Function body must contain only `...`

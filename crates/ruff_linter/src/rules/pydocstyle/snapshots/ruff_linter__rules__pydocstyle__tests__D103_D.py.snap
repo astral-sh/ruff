@@ -8,3 +8,6 @@ D103 Missing docstring in public function
 400 | def oneliner_d102(): return
     |     ^^^^^^^^^^^^^
     |
+
+## Concise Output
+D.py:400:5: D103 Missing docstring in public function

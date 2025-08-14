@@ -695,3 +695,41 @@ help: Replace `assertTrue(...)` with `assert ...`
 99    |-    "piAx_piAy_beta[r][x][y] = {17}".format(
 100    |-        self.model.piAx_piAy_beta[r][x][y])))
    98 |+assert "piAx_piAy_beta[r][x][y] = {17}".format(self.model.piAx_piAy_beta[r][x][y])
+
+## Concise Output
+PT009.py:11:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:12:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:13:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:14:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:15:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:16:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:17:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:18:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:19:9: PT009 Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:21:13: PT009 Use a regular `assert` instead of unittest-style `assertIsNotNone`
+PT009.py:23:18: PT009 Use a regular `assert` instead of unittest-style `assertIsNone`
+PT009.py:25:16: PT009 Use a regular `assert` instead of unittest-style `assertEqual`
+PT009.py:28:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertFalse`
+PT009.py:31:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertEqual`
+PT009.py:34:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotEqual`
+PT009.py:37:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreater`
+PT009.py:40:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreaterEqual`
+PT009.py:43:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLess`
+PT009.py:46:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLessEqual`
+PT009.py:49:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIn`
+PT009.py:52:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIn`
+PT009.py:55:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNone`
+PT009.py:58:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNotNone`
+PT009.py:61:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIs`
+PT009.py:64:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNot`
+PT009.py:67:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsInstance`
+PT009.py:70:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIsInstance`
+PT009.py:73:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
+PT009.py:76:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
+PT009.py:79:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
+PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
+PT009.py:85:9: PT009 [*] Use a regular `assert` instead of unittest-style `failIf`
+PT009.py:88:9: PT009 [*] Use a regular `assert` instead of unittest-style `failUnless`
+PT009.py:91:9: PT009 [*] Use a regular `assert` instead of unittest-style `failUnlessEqual`
+PT009.py:94:9: PT009 [*] Use a regular `assert` instead of unittest-style `failIfEqual`
+PT009.py:98:2: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`

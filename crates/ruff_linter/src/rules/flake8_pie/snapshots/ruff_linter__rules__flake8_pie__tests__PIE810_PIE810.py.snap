@@ -168,3 +168,13 @@ help: Merge into a single `startswith` call
 83    |-    if x.startswith("a") or x.startswith("b") or re.match(r"a\.b", x):
    83 |+    if x.startswith(("a", "b")) or re.match(r"a\.b", x):
 84 84 |         print("yes")
+
+## Concise Output
+PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
+PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:19:8: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:25:8: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:83:8: PIE810 [*] Call `startswith` once with a `tuple`

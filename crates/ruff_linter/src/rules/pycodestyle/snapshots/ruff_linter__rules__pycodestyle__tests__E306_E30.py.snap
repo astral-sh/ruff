@@ -230,3 +230,16 @@ help: Add missing blank line
 925 926 |     async def b():
 926 927 |         pass
 927 928 | # end
+
+## Concise Output
+E30.py:854:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:862:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:870:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:872:9: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:880:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:883:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:892:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:899:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:907:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:916:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:925:5: E306 [*] Expected 1 blank line before a nested definition, found 0

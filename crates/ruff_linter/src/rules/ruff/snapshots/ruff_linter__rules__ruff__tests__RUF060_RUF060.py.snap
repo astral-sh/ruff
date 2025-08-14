@@ -251,3 +251,28 @@ RUF060 Unnecessary membership test on empty collection
 25 |
 26 | # OK
    |
+
+## Concise Output
+RUF060.py:2:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:3:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:4:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:5:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:6:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:7:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:8:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:9:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:10:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:11:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:12:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:13:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:14:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:15:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:16:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:17:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:18:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:19:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:20:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:21:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:22:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:23:1: RUF060 Unnecessary membership test on empty collection
+RUF060.py:24:1: RUF060 Unnecessary membership test on empty collection

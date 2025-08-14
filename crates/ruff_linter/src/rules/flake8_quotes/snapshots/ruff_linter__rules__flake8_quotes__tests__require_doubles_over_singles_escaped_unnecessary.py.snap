@@ -375,3 +375,23 @@ help: Remove backslash
 45 45 | # Invalid escapes in bytestrings are also triggered:
 46    |-x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce\'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
    46 |+x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
+
+## Concise Output
+singles_escaped_unnecessary.py:1:26: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:2:26: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:9:5: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:13:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:14:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:21:5: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:31:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:32:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:33:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:33:12: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:36:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:37:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:38:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:38:15: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:39:1: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:39:15: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:43:26: Q004 [*] Unnecessary escape on inner quote character
+singles_escaped_unnecessary.py:46:5: Q004 [*] Unnecessary escape on inner quote character

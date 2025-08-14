@@ -8,3 +8,6 @@ PLE1142 `await` should be used within an async function
 9 |     await asyncio.sleep(1)  # # [await-outside-async]
   |     ^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+await_outside_async.ipynb:9:5: PLE1142 `await` should be used within an async function

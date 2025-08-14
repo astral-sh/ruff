@@ -154,3 +154,19 @@ PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
    | ^^^^^^^^
    |
 help: Replace with `Path.stat(...).st_atime`
+
+## Concise Output
+PTH203.py:5:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:6:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:7:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:10:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:11:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:12:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:17:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:18:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:19:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:21:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:29:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:31:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:33:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`
+PTH203.py:35:1: PTH203 `os.path.getatime` should be replaced by `Path.stat().st_atime`

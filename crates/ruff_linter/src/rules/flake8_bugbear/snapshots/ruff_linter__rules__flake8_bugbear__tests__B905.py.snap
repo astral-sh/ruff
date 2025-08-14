@@ -211,3 +211,15 @@ help: Add explicit value for parameter `strict=`
 28 28 | # Still an error even though it uses the qualified name
 29    |-builtins.zip([1, 2, 3])
    29 |+builtins.zip([1, 2, 3], strict=False)
+
+## Concise Output
+B905.py:4:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:5:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:6:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:7:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:7:16: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:8:5: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:9:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:24:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:25:1: B905 [*] `zip()` without an explicit `strict=` parameter
+B905.py:29:1: B905 [*] `zip()` without an explicit `strict=` parameter

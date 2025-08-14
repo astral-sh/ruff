@@ -106,4 +106,11 @@ help: Replace double multiline quotes with single quotes
    22 |+    ''' not a docstring '''):
 23 23 |     pass
 24 24 | 
-25 25 |
+25 25 | 
+
+## Concise Output
+docstring_doubles_function.py:3:5: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles_function.py:11:5: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles_function.py:15:39: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles_function.py:17:5: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles_function.py:22:5: Q001 [*] Double quote multiline found but single quotes preferred

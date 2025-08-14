@@ -25,3 +25,8 @@ E743 Ambiguous function name: `O`
    |         ^
 11 |         pass
    |
+
+## Concise Output
+E743.py:1:5: E743 Ambiguous function name: `l`
+E743.py:5:5: E743 Ambiguous function name: `I`
+E743.py:10:9: E743 Ambiguous function name: `O`

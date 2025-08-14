@@ -397,3 +397,22 @@ help: Replace with `return a == 10`
 160     |-        return False
 161     |-    return True
     159 |+    return a == 10
+
+## Concise Output
+SIM103.py:3:5: SIM103 [*] Return the condition `bool(a)` directly
+SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
+SIM103.py:21:5: SIM103 [*] Return the condition `bool(b)` directly
+SIM103.py:32:9: SIM103 [*] Return the condition `bool(b)` directly
+SIM103.py:57:5: SIM103 [*] Return the condition `not a` directly
+SIM103.py:83:5: SIM103 Return the condition directly
+SIM103.py:91:5: SIM103 [*] Return the condition `not (keys is not None and notice.key not in keys)` directly
+SIM103.py:104:5: SIM103 [*] Return the condition `bool(a)` directly
+SIM103.py:111:5: SIM103 [*] Return the condition `not a` directly
+SIM103.py:117:5: SIM103 [*] Return the condition `10 < a` directly
+SIM103.py:123:5: SIM103 [*] Return the condition `not 10 < a` directly
+SIM103.py:129:5: SIM103 [*] Return the condition `10 not in a` directly
+SIM103.py:135:5: SIM103 [*] Return the condition `10 in a` directly
+SIM103.py:141:5: SIM103 [*] Return the condition `a is not 10` directly
+SIM103.py:147:5: SIM103 [*] Return the condition `a is 10` directly
+SIM103.py:153:5: SIM103 [*] Return the condition `a != 10` directly
+SIM103.py:159:5: SIM103 [*] Return the condition `a == 10` directly

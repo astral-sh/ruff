@@ -37,3 +37,7 @@ help: Insert single blank line
 213 212 |     Description.
 214 213 | 
 215 214 |     """
+
+## Concise Output
+D.py:200:5: D205 1 blank line required between summary line and description
+D.py:210:5: D205 [*] 1 blank line required between summary line and description (found 2)

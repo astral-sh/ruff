@@ -10,3 +10,6 @@ A003 Python builtin is shadowed by method `str` from line 14
    |                               ^^^
 18 |         pass
    |
+
+## Concise Output
+A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14

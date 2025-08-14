@@ -531,3 +531,29 @@ help: Remove `object` inheritance
 159     |-class Unusual(builtins.object):
     159 |+class Unusual:
 160 160 |     ...
+
+## Concise Output
+UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
+UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
+UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
+UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
+UP004.py:137:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:137:17: UP004 [*] Class `A` inherits from `object`
+UP004.py:142:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:146:9: UP004 [*] Class `A` inherits from `object`
+UP004.py:159:15: UP004 [*] Class `Unusual` inherits from `object`

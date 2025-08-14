@@ -361,3 +361,19 @@ help: Combine `if` statements using `and`
 167     |-            d
     165 |+    elif b and c:
     166 |+        d
+
+## Concise Output
+SIM102.py:2:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:7:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:8:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:15:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:20:1: SIM102 Use a single `if` statement instead of nested `if` statements
+SIM102.py:26:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:51:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:67:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:83:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:90:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:97:1: SIM102 Use a single `if` statement instead of nested `if` statements
+SIM102.py:106:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:132:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+SIM102.py:165:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements

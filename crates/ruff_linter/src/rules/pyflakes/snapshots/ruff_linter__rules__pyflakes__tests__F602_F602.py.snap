@@ -259,3 +259,23 @@ help: Remove repeated key `a`
 44 44 | x = {a: 1, a: 1}
 45    |-x = {a: 1, b: 2, a: 1}
    45 |+x = {a: 1, b: 2}
+
+## Concise Output
+F602.py:5:5: F602 Dictionary key `a` repeated
+F602.py:11:5: F602 Dictionary key `a` repeated
+F602.py:12:5: F602 Dictionary key `a` repeated
+F602.py:13:5: F602 [*] Dictionary key `a` repeated
+F602.py:18:5: F602 Dictionary key `a` repeated
+F602.py:19:5: F602 Dictionary key `a` repeated
+F602.py:20:5: F602 [*] Dictionary key `a` repeated
+F602.py:21:5: F602 Dictionary key `a` repeated
+F602.py:26:5: F602 [*] Dictionary key `a` repeated
+F602.py:27:5: F602 Dictionary key `a` repeated
+F602.py:28:5: F602 Dictionary key `a` repeated
+F602.py:29:5: F602 Dictionary key `a` repeated
+F602.py:35:5: F602 [*] Dictionary key `a` repeated
+F602.py:37:5: F602 Dictionary key `a` repeated
+F602.py:39:5: F602 Dictionary key `a` repeated
+F602.py:41:5: F602 Dictionary key `a` repeated
+F602.py:44:12: F602 [*] Dictionary key `a` repeated
+F602.py:45:18: F602 [*] Dictionary key `a` repeated

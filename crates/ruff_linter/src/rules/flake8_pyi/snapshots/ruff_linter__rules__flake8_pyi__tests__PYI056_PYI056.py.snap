@@ -31,3 +31,8 @@ PYI056 Calling `.remove()` on `__all__` may not be supported by all type checker
 7 |
 8 | # OK
   |
+
+## Concise Output
+PYI056.py:4:1: PYI056 Calling `.append()` on `__all__` may not be supported by all type checkers (use `+=` instead)
+PYI056.py:5:1: PYI056 Calling `.extend()` on `__all__` may not be supported by all type checkers (use `+=` instead)
+PYI056.py:6:1: PYI056 Calling `.remove()` on `__all__` may not be supported by all type checkers (use `+=` instead)

@@ -21,3 +21,7 @@ YTT202 `six.PY3` referenced (python4), use `not six.PY2`
   |    ^^^
 7 |     print("3")
   |
+
+## Concise Output
+YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`

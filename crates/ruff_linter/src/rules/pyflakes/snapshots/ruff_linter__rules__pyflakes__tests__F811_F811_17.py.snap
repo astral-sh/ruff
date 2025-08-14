@@ -30,3 +30,7 @@ F811 Redefinition of unused `fu` from line 6
 10 |             pass
    |
 help: Remove definition: `fu`
+
+## Concise Output
+F811_17.py:6:12: F811 [*] Redefinition of unused `fu` from line 2
+F811_17.py:9:13: F811 Redefinition of unused `fu` from line 6

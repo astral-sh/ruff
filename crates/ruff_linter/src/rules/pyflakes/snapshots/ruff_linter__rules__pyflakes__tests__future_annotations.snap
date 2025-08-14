@@ -29,3 +29,7 @@ F821 Undefined name `Bar`
    |                   ^^^
 27 |         return cls(x=0, y=0)
    |
+
+## Concise Output
+future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
+future_annotations.py:26:19: F821 Undefined name `Bar`

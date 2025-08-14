@@ -19,4 +19,7 @@ help: Remove definition: `List`
 5   |-    List,
 6 5 | )
 7 6 | 
-8 7 |
+8 7 | 
+
+## Concise Output
+F811_32.py:5:5: F811 [*] Redefinition of unused `List` from line 4

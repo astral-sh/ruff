@@ -11,3 +11,6 @@ PD010 `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same funct
 5 |     x,
 6 |     index="foo",
   |
+
+## Concise Output
+<filename>:4:9: PD010 `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality

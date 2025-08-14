@@ -20,3 +20,7 @@ PLE0304 `__bool__` does not return `bool`
 9 |         return 0  # [invalid-bool-return]
   |                ^
   |
+
+## Concise Output
+invalid_return_type_bool.py:5:16: PLE0304 `__bool__` does not return `bool`
+invalid_return_type_bool.py:9:16: PLE0304 `__bool__` does not return `bool`

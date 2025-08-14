@@ -95,3 +95,14 @@ B035 Dictionary comprehension uses static key: `tokens`
 25 | {tokens: token for token in tokens}
    |  ^^^^^^
    |
+
+## Concise Output
+B035.py:17:2: B035 Dictionary comprehension uses static key: `"key"`
+B035.py:18:2: B035 Dictionary comprehension uses static key: `True`
+B035.py:19:2: B035 Dictionary comprehension uses static key: `0`
+B035.py:20:2: B035 Dictionary comprehension uses static key: `(1, "a")`
+B035.py:21:2: B035 Dictionary comprehension uses static key: `constant`
+B035.py:22:2: B035 Dictionary comprehension uses static key: `constant + constant`
+B035.py:23:2: B035 Dictionary comprehension uses static key: `constant.attribute`
+B035.py:24:2: B035 Dictionary comprehension uses static key: `constant[0]`
+B035.py:25:2: B035 Dictionary comprehension uses static key: `tokens`

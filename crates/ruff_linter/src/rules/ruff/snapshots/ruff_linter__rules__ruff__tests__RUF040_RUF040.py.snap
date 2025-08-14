@@ -11,3 +11,6 @@ RUF040 Non-string literal used as assert message
 4 |
 5 | assert True, "always true"
   |
+
+## Concise Output
+RUF040.py:3:21: RUF040 Non-string literal used as assert message

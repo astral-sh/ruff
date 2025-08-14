@@ -9,3 +9,6 @@ F811 Redefinition of unused `foo` from line 3
   |               ^^^
   |
 help: Remove definition: `foo`
+
+## Concise Output
+F811_23.py:4:15: F811 Redefinition of unused `foo` from line 3

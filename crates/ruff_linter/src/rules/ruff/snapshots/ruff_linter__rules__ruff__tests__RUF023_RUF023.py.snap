@@ -735,4 +735,31 @@ help: Apply a natural sort to `VeryDRY.__slots__`
     199 |+    __slots__ = ("bar", "foo")
 200 200 |     __match_args__ = __slots__
 201 201 | 
-202 202 |
+202 202 | 
+
+## Concise Output
+RUF023.py:6:17: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:7:17: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:11:22: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:14:24: RUF023 [*] `Klass.__slots__` is not sorted
+RUF023.py:18:21: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:20:21: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:22:28: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:23:17: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:26:17: RUF023 [*] `Klass2.__slots__` is not sorted
+RUF023.py:33:17: RUF023 [*] `Klass3.__slots__` is not sorted
+RUF023.py:40:17: RUF023 [*] `Klass3.__slots__` is not sorted
+RUF023.py:54:17: RUF023 [*] `Klass4.__slots__` is not sorted
+RUF023.py:64:17: RUF023 [*] `Klass4.__slots__` is not sorted
+RUF023.py:75:17: RUF023 [*] `PurePath.__slots__` is not sorted
+RUF023.py:113:17: RUF023 [*] `ArgumentDescriptor.__slots__` is not sorted
+RUF023.py:138:17: RUF023 `SlotUser.__slots__` is not sorted
+RUF023.py:142:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:148:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:155:17: RUF023 `Klass5.__slots__` is not sorted
+RUF023.py:162:17: RUF023 [*] `BezierBuilder.__slots__` is not sorted
+RUF023.py:166:17: RUF023 [*] `BezierBuilder2.__slots__` is not sorted
+RUF023.py:170:17: RUF023 [*] `BezierBuilder3.__slots__` is not sorted
+RUF023.py:181:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+RUF023.py:191:17: RUF023 [*] `BezierBuilder4.__slots__` is not sorted
+RUF023.py:199:17: RUF023 [*] `VeryDRY.__slots__` is not sorted

@@ -579,3 +579,34 @@ help: Replace with `numpy.any`
 69 69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
 70 70 | 
 71 71 |     try:
+
+## Concise Output
+NPY201_2.py:4:5: NPY201 `np.obj2sctype` will be removed without replacement in NumPy 2.0
+NPY201_2.py:6:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.inf` instead.
+NPY201_2.py:8:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` instead.
+NPY201_2.py:10:5: NPY201 `np.recfromcsv` will be removed in NumPy 2.0. Use `np.genfromtxt` with comma delimiter instead.
+NPY201_2.py:12:5: NPY201 `np.recfromtxt` will be removed in NumPy 2.0. Use `np.genfromtxt` instead.
+NPY201_2.py:14:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `numpy.round` instead.
+NPY201_2.py:16:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast.literal_eval` instead.
+NPY201_2.py:18:5: NPY201 `np.sctype2char` will be removed without replacement in NumPy 2.0
+NPY201_2.py:20:5: NPY201 `np.sctypes` will be removed without replacement in NumPy 2.0
+NPY201_2.py:22:5: NPY201 `np.seterrobj` will be removed in NumPy 2.0. Use the `np.errstate` context manager instead.
+NPY201_2.py:26:5: NPY201 `np.set_string_function` will be removed in NumPy 2.0. Use `np.set_printoptions` for custom printing of NumPy objects.
+NPY201_2.py:28:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Use `numpy.complex64` instead.
+NPY201_2.py:30:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy.bytes_` instead.
+NPY201_2.py:32:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspect.getsource` instead.
+NPY201_2.py:34:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0. Use `numpy.lib.tracemalloc_domain` instead.
+NPY201_2.py:36:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `numpy.str_` instead.
+NPY201_2.py:38:5: NPY201 `np.who` will be removed in NumPy 2.0. Use an IDE variable explorer or `locals()` instead.
+NPY201_2.py:40:5: NPY201 [*] `np.row_stack` will be removed in NumPy 2.0. Use `numpy.vstack` instead.
+NPY201_2.py:42:5: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
+NPY201_2.py:44:5: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.
+NPY201_2.py:46:5: NPY201 [*] `np.cumproduct` will be removed in NumPy 2.0. Use `numpy.cumprod` instead.
+NPY201_2.py:48:5: NPY201 [*] `np.product` will be removed in NumPy 2.0. Use `numpy.prod` instead.
+NPY201_2.py:50:5: NPY201 [*] `np.trapz` will be removed in NumPy 2.0. Use `numpy.trapezoid` on NumPy 2.0, or ignore this warning on earlier versions.
+NPY201_2.py:52:5: NPY201 [*] `np.in1d` will be removed in NumPy 2.0. Use `numpy.isin` instead.
+NPY201_2.py:54:5: NPY201 [*] `np.AxisError` will be removed in NumPy 2.0. Use `numpy.exceptions.AxisError` instead.
+NPY201_2.py:56:5: NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
+NPY201_2.py:58:5: NPY201 [*] `np.compare_chararrays` will be removed in NumPy 2.0. Use `numpy.char.compare_chararrays` instead.
+NPY201_2.py:63:9: NPY201 [*] `np.alltrue` will be removed in NumPy 2.0. Use `numpy.all` instead.
+NPY201_2.py:68:9: NPY201 [*] `np.sometrue` will be removed in NumPy 2.0. Use `numpy.any` instead.

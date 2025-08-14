@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-papermill>=1.0.0` and use `PapermillOper
   3 |+from airflow.providers.papermill.operators.papermill import PapermillOperator
 4 4 | 
 5 5 | PapermillOperator()
+
+## Concise Output
+AIR302_papermill.py:5:1: AIR302 [*] `airflow.operators.papermill_operator.PapermillOperator` is moved into `papermill` provider in Airflow 3.0;

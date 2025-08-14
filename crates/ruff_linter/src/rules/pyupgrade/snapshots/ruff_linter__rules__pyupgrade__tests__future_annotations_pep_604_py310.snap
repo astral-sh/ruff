@@ -36,3 +36,7 @@ help: Convert to `X | Y`
 41 41 | 
 42    |-MyList: TypeAlias = Union[List[int], List[str]]
    42 |+MyList: TypeAlias = List[int] | List[str]
+
+## Concise Output
+future_annotations.py:40:4: UP045 [*] Use `X | None` for type annotations
+future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations

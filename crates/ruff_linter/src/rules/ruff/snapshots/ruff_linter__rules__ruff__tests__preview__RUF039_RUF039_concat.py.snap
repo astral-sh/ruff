@@ -737,3 +737,42 @@ help: Replace with raw string
     108 |+    r"]+",
 109 109 |     flags=re.UNICODE,
 110 110 | )
+
+## Concise Output
+RUF039_concat.py:5:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:6:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:12:5: RUF039 [*] First argument to `re.findall()` is not raw string
+RUF039_concat.py:26:5: RUF039 [*] First argument to `re.match()` is not raw bytes literal
+RUF039_concat.py:30:8: RUF039 First argument to `re.search()` is not raw string
+RUF039_concat.py:31:5: RUF039 [*] First argument to `re.search()` is not raw string
+RUF039_concat.py:33:10: RUF039 [*] First argument to `re.split()` is not raw string
+RUF039_concat.py:33:12: RUF039 First argument to `re.split()` is not raw string
+RUF039_concat.py:33:20: RUF039 First argument to `re.split()` is not raw string
+RUF039_concat.py:35:5: RUF039 [*] First argument to `re.sub()` is not raw string
+RUF039_concat.py:36:5: RUF039 [*] First argument to `re.sub()` is not raw string
+RUF039_concat.py:38:9: RUF039 [*] First argument to `re.subn()` is not raw string
+RUF039_concat.py:38:21: RUF039 [*] First argument to `re.subn()` is not raw string
+RUF039_concat.py:45:5: RUF039 [*] First argument to `regex.compile()` is not raw string
+RUF039_concat.py:46:5: RUF039 [*] First argument to `regex.compile()` is not raw string
+RUF039_concat.py:52:5: RUF039 [*] First argument to `regex.findall()` is not raw string
+RUF039_concat.py:66:5: RUF039 [*] First argument to `regex.match()` is not raw bytes literal
+RUF039_concat.py:70:8: RUF039 First argument to `regex.search()` is not raw string
+RUF039_concat.py:71:5: RUF039 [*] First argument to `regex.search()` is not raw string
+RUF039_concat.py:73:13: RUF039 [*] First argument to `regex.split()` is not raw string
+RUF039_concat.py:73:15: RUF039 First argument to `regex.split()` is not raw string
+RUF039_concat.py:73:23: RUF039 First argument to `regex.split()` is not raw string
+RUF039_concat.py:75:5: RUF039 [*] First argument to `regex.sub()` is not raw string
+RUF039_concat.py:76:5: RUF039 [*] First argument to `regex.sub()` is not raw string
+RUF039_concat.py:78:12: RUF039 [*] First argument to `regex.subn()` is not raw string
+RUF039_concat.py:78:24: RUF039 [*] First argument to `regex.subn()` is not raw string
+RUF039_concat.py:98:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:99:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:100:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:101:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:102:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:103:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:104:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:105:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:106:5: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039_concat.py:107:5: RUF039 First argument to `re.compile()` is not raw string
+RUF039_concat.py:108:5: RUF039 [*] First argument to `re.compile()` is not raw string

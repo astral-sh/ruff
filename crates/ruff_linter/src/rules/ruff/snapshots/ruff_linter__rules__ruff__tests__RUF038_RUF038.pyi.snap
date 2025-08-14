@@ -120,3 +120,11 @@ RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`
 16 | # ok
    |
 help: Replace with `Literal[...] | bool`
+
+## Concise Output
+RUF038.pyi:4:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
+RUF038.pyi:6:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
+RUF038.pyi:8:16: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
+RUF038.pyi:10:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
+RUF038.pyi:12:17: RUF038 [*] `Literal[True, False]` can be replaced with `bool`
+RUF038.pyi:14:17: RUF038 `Literal[True, False, ...]` can be replaced with `Literal[...] | bool`

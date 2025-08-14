@@ -27,3 +27,7 @@ F811 Redefinition of unused `os` from line 2
 6 |     print(os)
   |
 help: Remove definition: `os`
+
+## Concise Output
+<filename>:2:8: F401 [*] `os` imported but unused
+<filename>:5:5: F811 Redefinition of unused `os` from line 2

@@ -12,3 +12,6 @@ help: Insert required import: `from __future__ import annotations`
   5 |+from __future__ import annotations
 5 6 | 
 6 7 | x = 1
+
+## Concise Output
+comments_and_newlines.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`

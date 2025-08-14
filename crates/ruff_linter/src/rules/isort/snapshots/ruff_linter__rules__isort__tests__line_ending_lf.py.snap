@@ -18,4 +18,7 @@ help: Organize imports
   5 |+    member_three,
   6 |+    member_two,
   7 |+)
-2 8 |
+2 8 | 
+
+## Concise Output
+line_ending_lf.py:1:1: I001 [*] Import block is un-sorted or un-formatted

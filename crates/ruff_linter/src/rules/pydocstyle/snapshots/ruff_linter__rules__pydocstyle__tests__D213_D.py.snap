@@ -702,3 +702,33 @@ help: Insert line break and indentation after opening quotes
 722 723 | 
 723 724 |        Returns:
 724 725 |     """
+
+## Concise Output
+D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:210:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:220:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:230:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:240:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:250:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:260:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:270:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:281:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:299:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:343:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:383:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:392:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:438:37: D213 [*] Multi-line docstring summary should start at the second line
+D.py:450:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:526:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:555:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:588:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:606:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:615:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:671:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:680:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:693:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:702:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:712:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:721:5: D213 [*] Multi-line docstring summary should start at the second line

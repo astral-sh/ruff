@@ -270,3 +270,18 @@ help: Use a string for the first argument
 143 143 |     [
 144 144 |         (1,),
 145 145 |         (2, 3),
+
+## Concise Output
+PT006.py:24:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:29:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:34:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:39:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:44:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:49:26: PT006 Wrong type passed to first argument of `pytest.mark.parametrize`; expected a string of comma-separated values
+PT006.py:86:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:91:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:96:26: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:103:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:114:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:129:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+PT006.py:142:5: PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`

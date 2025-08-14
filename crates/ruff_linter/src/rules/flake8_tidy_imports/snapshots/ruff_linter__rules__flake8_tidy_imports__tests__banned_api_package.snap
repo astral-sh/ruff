@@ -30,3 +30,8 @@ TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated
 10 | from ..protocol.UpperCaseModule import some_function
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+application.py:3:8: TID251 `attrs` is banned: The attrs module is deprecated.
+application.py:6:1: TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated.
+application.py:10:1: TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated.

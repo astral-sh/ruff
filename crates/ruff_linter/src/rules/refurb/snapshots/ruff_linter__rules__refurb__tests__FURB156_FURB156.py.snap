@@ -371,4 +371,20 @@ help: Replace hardcoded charset with `string.digits`
    32 |+_ += string.digits
 32 33 | 
 33 34 | # OK
-34 35 |
+34 35 | 
+
+## Concise Output
+FURB156.py:3:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:4:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:5:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:6:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:7:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:8:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:9:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:10:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:12:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:14:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:17:8: FURB156 [*] Use of hardcoded string charset
+FURB156.py:22:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:26:5: FURB156 [*] Use of hardcoded string charset
+FURB156.py:31:6: FURB156 [*] Use of hardcoded string charset

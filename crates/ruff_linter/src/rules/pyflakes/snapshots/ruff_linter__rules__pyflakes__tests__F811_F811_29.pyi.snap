@@ -10,3 +10,6 @@ F811 Redefinition of unused `Bar` from line 3
   | ^^^
   |
 help: Remove definition: `Bar`
+
+## Concise Output
+F811_29.pyi:8:1: F811 Redefinition of unused `Bar` from line 3

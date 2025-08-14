@@ -44,3 +44,7 @@ help: Replace with single space
 32 32 | #: Okay
 33 33 | from u import (a, b)
 34 34 | from v import c, d
+
+## Concise Output
+E27.py:29:2: E274 [*] Tab before keyword
+E27.py:31:5: E274 [*] Tab before keyword

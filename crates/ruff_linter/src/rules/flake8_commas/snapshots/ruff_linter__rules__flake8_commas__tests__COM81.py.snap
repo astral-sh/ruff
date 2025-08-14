@@ -1029,3 +1029,57 @@ help: Add trailing comma
 644 644 | )
 645 645 | 
 646 646 | assert False, f"<- This is not a trailing comma"
+
+## Concise Output
+COM81.py:4:18: COM812 [*] Trailing comma missing
+COM81.py:10:6: COM812 [*] Trailing comma missing
+COM81.py:16:6: COM812 [*] Trailing comma missing
+COM81.py:23:6: COM812 [*] Trailing comma missing
+COM81.py:36:8: COM818 Trailing comma on bare tuple prohibited
+COM81.py:38:19: COM818 Trailing comma on bare tuple prohibited
+COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
+COM81.py:49:10: COM818 Trailing comma on bare tuple prohibited
+COM81.py:56:32: COM818 Trailing comma on bare tuple prohibited
+COM81.py:58:26: COM818 Trailing comma on bare tuple prohibited
+COM81.py:61:17: COM818 Trailing comma on bare tuple prohibited
+COM81.py:70:8: COM812 [*] Trailing comma missing
+COM81.py:78:8: COM812 [*] Trailing comma missing
+COM81.py:86:8: COM812 [*] Trailing comma missing
+COM81.py:152:6: COM812 [*] Trailing comma missing
+COM81.py:158:11: COM812 [*] Trailing comma missing
+COM81.py:293:15: COM812 [*] Trailing comma missing
+COM81.py:304:14: COM812 [*] Trailing comma missing
+COM81.py:310:14: COM812 [*] Trailing comma missing
+COM81.py:316:10: COM812 [*] Trailing comma missing
+COM81.py:322:15: COM812 [*] Trailing comma missing
+COM81.py:368:15: COM812 [*] Trailing comma missing
+COM81.py:375:15: COM812 [*] Trailing comma missing
+COM81.py:404:15: COM812 [*] Trailing comma missing
+COM81.py:432:15: COM812 [*] Trailing comma missing
+COM81.py:485:21: COM819 [*] Trailing comma prohibited
+COM81.py:487:13: COM819 [*] Trailing comma prohibited
+COM81.py:489:18: COM819 [*] Trailing comma prohibited
+COM81.py:494:6: COM819 [*] Trailing comma prohibited
+COM81.py:496:21: COM819 [*] Trailing comma prohibited
+COM81.py:498:13: COM819 [*] Trailing comma prohibited
+COM81.py:500:18: COM819 [*] Trailing comma prohibited
+COM81.py:505:6: COM819 [*] Trailing comma prohibited
+COM81.py:511:10: COM819 [*] Trailing comma prohibited
+COM81.py:513:9: COM819 [*] Trailing comma prohibited
+COM81.py:519:13: COM812 [*] Trailing comma missing
+COM81.py:526:10: COM812 [*] Trailing comma missing
+COM81.py:534:16: COM812 [*] Trailing comma missing
+COM81.py:541:13: COM812 [*] Trailing comma missing
+COM81.py:547:24: COM812 [*] Trailing comma missing
+COM81.py:554:15: COM812 [*] Trailing comma missing
+COM81.py:561:13: COM812 [*] Trailing comma missing
+COM81.py:565:13: COM812 [*] Trailing comma missing
+COM81.py:569:10: COM812 [*] Trailing comma missing
+COM81.py:573:10: COM812 [*] Trailing comma missing
+COM81.py:579:10: COM812 [*] Trailing comma missing
+COM81.py:586:13: COM812 [*] Trailing comma missing
+COM81.py:594:15: COM812 [*] Trailing comma missing
+COM81.py:623:20: COM812 [*] Trailing comma missing
+COM81.py:628:42: COM812 [*] Trailing comma missing
+COM81.py:640:46: COM819 [*] Trailing comma prohibited
+COM81.py:643:49: COM812 [*] Trailing comma missing

@@ -52,3 +52,10 @@ F821 Undefined name `tempor`
    |                                         ^^^^^^
 28 | }]
    |
+
+## Concise Output
+F821_30.py:13:18: F821 Undefined name `qux`
+F821_30.py:19:19: F821 Undefined name `dolor`
+F821_30.py:26:31: F821 Undefined name `adipiscing`
+F821_30.py:27:29: F821 Undefined name `eiusmod`
+F821_30.py:27:41: F821 Undefined name `tempor`

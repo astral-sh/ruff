@@ -35,3 +35,9 @@ F702 `continue` not properly in loop
 23 | continue
    | ^^^^^^^^
    |
+
+## Concise Output
+F702.py:4:5: F702 `continue` not properly in loop
+F702.py:16:5: F702 `continue` not properly in loop
+F702.py:20:5: F702 `continue` not properly in loop
+F702.py:23:1: F702 `continue` not properly in loop

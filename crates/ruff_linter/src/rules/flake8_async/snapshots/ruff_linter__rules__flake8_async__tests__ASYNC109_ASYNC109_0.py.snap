@@ -18,3 +18,7 @@ ASYNC109 Async function definition with a `timeout` parameter
 13 |     ...
    |
 help: Use `trio.fail_after` instead
+
+## Concise Output
+ASYNC109_0.py:8:16: ASYNC109 Async function definition with a `timeout` parameter
+ASYNC109_0.py:12:16: ASYNC109 Async function definition with a `timeout` parameter

@@ -27,3 +27,6 @@ help: Move into type-checking block
 14    |-    import flask
 15 18 | 
 16 19 |     x: flask
+
+## Concise Output
+exempt_modules.py:14:12: TC002 [*] Move third-party import `flask` into a type-checking block

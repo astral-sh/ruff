@@ -16,3 +16,7 @@ SLF001 Private member accessed: `_bar`
 10 |     obj._bar  # SLF001
    |     ^^^^^^^^
    |
+
+## Concise Output
+SLF001_extended.py:6:5: SLF001 Private member accessed: `_asdict`
+SLF001_extended.py:10:5: SLF001 Private member accessed: `_bar`

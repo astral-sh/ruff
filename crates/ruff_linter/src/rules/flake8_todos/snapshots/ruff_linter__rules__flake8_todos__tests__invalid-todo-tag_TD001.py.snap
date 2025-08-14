@@ -29,3 +29,8 @@ TD001 Invalid TODO tag: `XXX`
 9 | # foo # XXX: this isn't fine either
   |         ^^^
   |
+
+## Concise Output
+TD001.py:7:3: TD001 Invalid TODO tag: `XXX`
+TD001.py:8:3: TD001 Invalid TODO tag: `FIXME`
+TD001.py:9:9: TD001 Invalid TODO tag: `XXX`

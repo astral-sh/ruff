@@ -43,3 +43,7 @@ help: Replace with `re.IGNORECASE`
 21    |-    if match("^hello", "hello world", I):
    22 |+    if match("^hello", "hello world", re.IGNORECASE):
 22 23 |         pass
+
+## Concise Output
+FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
+FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`

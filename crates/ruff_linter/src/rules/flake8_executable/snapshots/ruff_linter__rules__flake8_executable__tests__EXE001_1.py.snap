@@ -9,3 +9,6 @@ EXE001 Shebang is present but file is not executable
 2 |
 3 | if __name__ == '__main__':
   |
+
+## Concise Output
+EXE001_1.py:1:1: EXE001 Shebang is present but file is not executable

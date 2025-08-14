@@ -18,3 +18,6 @@ help: Add missing blank line(s)
   3 |+
 3 4 | def fn():
 4 5 |     pass
+
+## Concise Output
+E302_first_line_expression.py:3:1: E302 [*] Expected 2 blank lines, found 1

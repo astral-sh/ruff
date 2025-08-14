@@ -259,4 +259,20 @@ help: Remove extraneous blank line(s)
 757     |-
 758 757 |     pass
 759 758 | # end
-760 759 |
+760 759 | 
+
+## Concise Output
+E30.py:617:2: E303 [*] Too many blank lines (2)
+E30.py:644:5: E303 [*] Too many blank lines (2)
+E30.py:656:5: E303 [*] Too many blank lines (2)
+E30.py:667:1: E303 [*] Too many blank lines (3)
+E30.py:676:1: E303 [*] Too many blank lines (3)
+E30.py:687:5: E303 [*] Too many blank lines (2)
+E30.py:690:5: E303 [*] Too many blank lines (2)
+E30.py:701:1: E303 [*] Too many blank lines (3)
+E30.py:713:5: E303 [*] Too many blank lines (2)
+E30.py:723:5: E303 [*] Too many blank lines (2)
+E30.py:731:5: E303 [*] Too many blank lines (2)
+E30.py:734:5: E303 [*] Too many blank lines (2)
+E30.py:748:5: E303 [*] Too many blank lines (2)
+E30.py:758:5: E303 [*] Too many blank lines (2)

@@ -98,3 +98,10 @@ help: Remove parentheses
 22 22 |     pass
 23 23 | 
 24 24 | # OK
+
+## Concise Output
+UP039.py:2:8: UP039 [*] Unnecessary parentheses after class definition
+UP039.py:6:8: UP039 [*] Unnecessary parentheses after class definition
+UP039.py:12:9: UP039 [*] Unnecessary parentheses after class definition
+UP039.py:17:8: UP039 [*] Unnecessary parentheses after class definition
+UP039.py:21:8: UP039 [*] Unnecessary parentheses after class definition

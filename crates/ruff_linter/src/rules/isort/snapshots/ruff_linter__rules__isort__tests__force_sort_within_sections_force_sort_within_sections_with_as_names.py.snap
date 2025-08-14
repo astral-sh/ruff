@@ -23,3 +23,6 @@ help: Organize imports
 3   |-from datetime import timedelta
 4   |-import datetime as dt
 5   |-import datetime
+
+## Concise Output
+force_sort_within_sections_with_as_names.py:1:1: I001 [*] Import block is un-sorted or un-formatted

@@ -354,3 +354,17 @@ help: Replace with `contextlib.suppress(BaseException)`
 141 142 |     int("a")
 142     |-except BaseException:
 143     |-    pass
+
+## Concise Output
+SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`
+SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
+SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+SIM105_0.py:100:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+SIM105_0.py:133:1: SIM105 [*] Use `contextlib.suppress()` instead of `try`-`except`-`pass`
+SIM105_0.py:140:1: SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`pass`

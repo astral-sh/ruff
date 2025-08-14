@@ -20,3 +20,6 @@ help: Move out of type-checking block
 5 6 | 
 6 7 | 
 7 8 | def example():
+
+## Concise Output
+TC004_2.py:4:26: TC004 [*] Move import `datetime.date` out of type-checking block. Import is used for more than type hinting.

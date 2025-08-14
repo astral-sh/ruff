@@ -64,4 +64,9 @@ help: Capitalize "returns"
     573 |+    Returns:
 574 574 |         Here's another note.
 575 575 |     """
-576 576 |
+576 576 | 
+
+## Concise Output
+sections.py:19:5: D405 [*] Section name should be properly capitalized ("returns")
+sections.py:218:5: D405 [*] Section name should be properly capitalized ("Short summary")
+sections.py:573:5: D405 [*] Section name should be properly capitalized ("returns")

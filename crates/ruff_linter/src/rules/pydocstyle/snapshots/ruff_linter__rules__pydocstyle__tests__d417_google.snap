@@ -101,3 +101,17 @@ D417 Missing argument description in the docstring for `should_fail`: `Args`
 200 |     """
 201 |     Send a message.
     |
+
+## Concise Output
+D417.py:1:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
+D417.py:14:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
+D417.py:27:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
+D417.py:39:5: D417 Missing argument descriptions in the docstring for `f`: `y`, `z`
+D417.py:52:5: D417 Missing argument description in the docstring for `f`: `y`
+D417.py:65:5: D417 Missing argument description in the docstring for `f`: `y`
+D417.py:77:5: D417 Missing argument description in the docstring for `f`: `y`
+D417.py:98:5: D417 Missing argument description in the docstring for `f`: `x`
+D417.py:108:5: D417 Missing argument description in the docstring for `f`: `*args`
+D417.py:155:5: D417 Missing argument description in the docstring for `select_data`: `auto_save`
+D417.py:172:5: D417 Missing argument description in the docstring for `f`: `**kwargs`
+D417.py:199:5: D417 Missing argument description in the docstring for `should_fail`: `Args`

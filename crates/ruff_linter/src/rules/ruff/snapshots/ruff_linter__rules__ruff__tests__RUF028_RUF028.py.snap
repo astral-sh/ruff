@@ -226,3 +226,16 @@ help: Remove this comment
 64 64 | 
 65 65 | 
 66 66 | # all of these should be fine
+
+## Concise Output
+RUF028.py:3:9: RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
+RUF028.py:12:5: RUF028 [*] This suppression comment is invalid because it cannot be on its own line
+RUF028.py:17:1: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+RUF028.py:24:1: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+RUF028.py:33:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+RUF028.py:39:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+RUF028.py:45:5: RUF028 [*] This suppression comment is invalid because it cannot be directly above an alternate body
+RUF028.py:52:5: RUF028 [*] This suppression comment is invalid because it cannot be after a decorator
+RUF028.py:54:9: RUF028 [*] This suppression comment is invalid because it cannot be in an expression, pattern, argument list, or other non-statement
+RUF028.py:62:13: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line
+RUF028.py:63:10: RUF028 [*] This suppression comment is invalid because it cannot be at the end of a line

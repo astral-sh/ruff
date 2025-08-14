@@ -8,3 +8,6 @@ F811 Redefinition of unused `FU` from line 1
   |                         ^^
   |
 help: Remove definition: `FU`
+
+## Concise Output
+F811_1.py:1:25: F811 Redefinition of unused `FU` from line 1

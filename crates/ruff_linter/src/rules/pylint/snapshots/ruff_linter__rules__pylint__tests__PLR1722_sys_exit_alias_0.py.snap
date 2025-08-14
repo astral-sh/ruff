@@ -77,3 +77,9 @@ help: Replace `quit` with `sys.exit()`
 6 7 |     exit(2)
 7   |-    quit(2)
   8 |+    sys.exit(2)
+
+## Concise Output
+sys_exit_alias_0.py:1:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
+sys_exit_alias_0.py:2:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
+sys_exit_alias_0.py:6:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+sys_exit_alias_0.py:7:5: PLR1722 [*] Use `sys.exit()` instead of `quit`

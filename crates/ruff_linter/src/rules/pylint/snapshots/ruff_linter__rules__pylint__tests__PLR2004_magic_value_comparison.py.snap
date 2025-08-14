@@ -80,3 +80,13 @@ PLR2004 Magic value used in comparison, consider replacing `0x3` with a constant
    |                     ^^^
 87 |     pass
    |
+
+## Concise Output
+magic_value_comparison.py:5:4: PLR2004 Magic value used in comparison, consider replacing `10` with a constant variable
+magic_value_comparison.py:47:12: PLR2004 Magic value used in comparison, consider replacing `2` with a constant variable
+magic_value_comparison.py:50:12: PLR2004 Magic value used in comparison, consider replacing `-2` with a constant variable
+magic_value_comparison.py:53:12: PLR2004 Magic value used in comparison, consider replacing `+2` with a constant variable
+magic_value_comparison.py:56:12: PLR2004 Magic value used in comparison, consider replacing `-2.0` with a constant variable
+magic_value_comparison.py:59:12: PLR2004 Magic value used in comparison, consider replacing `+2.0` with a constant variable
+magic_value_comparison.py:80:21: PLR2004 Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
+magic_value_comparison.py:86:21: PLR2004 Magic value used in comparison, consider replacing `0x3` with a constant variable

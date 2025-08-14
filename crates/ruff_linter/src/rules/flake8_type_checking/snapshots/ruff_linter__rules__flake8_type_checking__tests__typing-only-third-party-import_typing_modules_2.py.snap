@@ -24,3 +24,6 @@ help: Move into type-checking block
 7     |-    from pandas import DataFrame
 8  10 | 
 9  11 |     df: DataFrame
+
+## Concise Output
+typing_modules_2.py:7:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block

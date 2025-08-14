@@ -7,3 +7,6 @@ invalid-syntax: Expected an expression
 1 | a = (1 or)
   |          ^
   |
+
+## Concise Output
+E2_syntax_error.py:1:10: invalid-syntax: Expected an expression

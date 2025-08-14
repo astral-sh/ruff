@@ -72,4 +72,9 @@ help: Move out of type-checking block
 15    |-    import pandas  # TC004
 16 16 |     import pyproj
 17 17 | 
-18 18 |
+18 18 | 
+
+## Concise Output
+runtime_evaluated_decorators_1.py:12:12: TC004 [*] Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_decorators_1.py:13:23: TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_decorators_1.py:15:12: TC004 [*] Move import `pandas` out of type-checking block. Import is used for more than type hinting.

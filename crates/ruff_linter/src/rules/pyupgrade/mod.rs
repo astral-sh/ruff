@@ -360,6 +360,11 @@ mod tests {
         ℹ Safe fix
           1 |+from collections import Sequence
         1 2 | from pipes import quote, Template
+
+        ## Concise Output
+        <filename>:1:1: UP035 [*] Import from `shlex` instead: `quote`
+        <filename>:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+        <filename>:1:1: I002 [*] Missing required import: `from collections import Sequence`
         ");
     }
 }

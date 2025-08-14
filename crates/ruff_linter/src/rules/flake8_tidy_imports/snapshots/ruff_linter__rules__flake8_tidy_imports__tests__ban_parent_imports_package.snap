@@ -135,3 +135,12 @@ help: Replace relative imports from parent modules with absolute imports
 9  9  | from . import logger, models
 10    |-from ..protocol.UpperCaseModule import some_function
    10 |+from my_package.sublib.protocol.UpperCaseModule import some_function
+
+## Concise Output
+application.py:5:1: TID252 Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:6:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:7:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:8:1: TID252 [*] Prefer absolute imports over relative imports from parent modules
+application.py:10:1: TID252 [*] Prefer absolute imports over relative imports from parent modules

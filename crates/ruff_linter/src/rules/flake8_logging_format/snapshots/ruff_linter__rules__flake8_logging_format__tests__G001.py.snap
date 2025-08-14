@@ -157,3 +157,20 @@ G001 Logging statement uses `str.format`
 27 | log(msg="Hello {}".format("World!"), level=logging.INFO)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+G001.py:4:14: G001 Logging statement uses `str.format`
+G001.py:5:27: G001 Logging statement uses `str.format`
+G001.py:6:10: G001 Logging statement uses `str.format`
+G001.py:7:31: G001 Logging statement uses `str.format`
+G001.py:8:37: G001 Logging statement uses `str.format`
+G001.py:9:17: G001 Logging statement uses `str.format`
+G001.py:16:31: G001 Logging statement uses `str.format`
+G001.py:17:25: G001 Logging statement uses `str.format`
+G001.py:18:30: G001 Logging statement uses `str.format`
+G001.py:22:6: G001 Logging statement uses `str.format`
+G001.py:23:19: G001 Logging statement uses `str.format`
+G001.py:24:6: G001 Logging statement uses `str.format`
+G001.py:25:23: G001 Logging statement uses `str.format`
+G001.py:26:29: G001 Logging statement uses `str.format`
+G001.py:27:9: G001 Logging statement uses `str.format`

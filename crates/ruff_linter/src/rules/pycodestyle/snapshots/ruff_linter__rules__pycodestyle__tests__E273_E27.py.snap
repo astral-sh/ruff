@@ -131,3 +131,11 @@ help: Replace with single space
 75 75 | 
 76 76 | #: E275
 77 77 | match(foo):
+
+## Concise Output
+E27.py:11:9: E273 [*] Tab after keyword
+E27.py:13:5: E273 [*] Tab after keyword
+E27.py:13:10: E273 [*] Tab after keyword
+E27.py:27:6: E273 [*] Tab after keyword
+E27.py:31:10: E273 [*] Tab after keyword
+E27.py:74:5: E273 [*] Tab after keyword

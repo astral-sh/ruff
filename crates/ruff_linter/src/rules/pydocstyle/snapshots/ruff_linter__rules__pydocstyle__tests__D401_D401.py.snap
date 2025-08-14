@@ -68,3 +68,12 @@ D401 First line of docstring should be in imperative mood: "This method docstrin
 75 |
 76 |     @property
    |
+
+## Concise Output
+D401.py:10:5: D401 First line of docstring should be in imperative mood: "Returns foo."
+D401.py:14:5: D401 First line of docstring should be in imperative mood: "Constructor for a foo."
+D401.py:18:5: D401 First line of docstring should be in imperative mood: "Constructor for a boa."
+D401.py:26:5: D401 First line of docstring should be in imperative mood: "Runs something"
+D401.py:29:9: D401 First line of docstring should be in imperative mood: "Runs other things, nested"
+D401.py:35:5: D401 First line of docstring should be in imperative mood: "Writes a logical line that"
+D401.py:74:9: D401 First line of docstring should be in imperative mood: "This method docstring should be written in imperative mood."

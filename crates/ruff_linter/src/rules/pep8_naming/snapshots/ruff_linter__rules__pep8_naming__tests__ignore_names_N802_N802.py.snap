@@ -20,3 +20,7 @@ N802 Function name `stillBad` should be lowercase
    |         ^^^^^^^^
 14 |         return super().tearDown()
    |
+
+## Concise Output
+N802.py:6:5: N802 Function name `stillBad` should be lowercase
+N802.py:13:9: N802 Function name `stillBad` should be lowercase

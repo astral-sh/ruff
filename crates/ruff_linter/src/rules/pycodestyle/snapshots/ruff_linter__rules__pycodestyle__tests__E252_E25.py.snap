@@ -498,3 +498,29 @@ help: Add missing whitespace
 68 68 |     pass
 69 69 | 
 70 70 | # The last of these should cause us to emit E231,
+
+## Concise Output
+E25.py:46:15: E252 [*] Missing whitespace around parameter equals
+E25.py:46:15: E252 [*] Missing whitespace around parameter equals
+E25.py:46:26: E252 [*] Missing whitespace around parameter equals
+E25.py:46:36: E252 [*] Missing whitespace around parameter equals
+E25.py:64:18: E252 [*] Missing whitespace around parameter equals
+E25.py:64:18: E252 [*] Missing whitespace around parameter equals
+E25.py:64:26: E252 [*] Missing whitespace around parameter equals
+E25.py:64:33: E252 [*] Missing whitespace around parameter equals
+E25.py:64:49: E252 [*] Missing whitespace around parameter equals
+E25.py:64:49: E252 [*] Missing whitespace around parameter equals
+E25.py:64:64: E252 [*] Missing whitespace around parameter equals
+E25.py:64:64: E252 [*] Missing whitespace around parameter equals
+E25.py:64:80: E252 [*] Missing whitespace around parameter equals
+E25.py:64:96: E252 [*] Missing whitespace around parameter equals
+E25.py:67:18: E252 [*] Missing whitespace around parameter equals
+E25.py:67:18: E252 [*] Missing whitespace around parameter equals
+E25.py:67:26: E252 [*] Missing whitespace around parameter equals
+E25.py:67:33: E252 [*] Missing whitespace around parameter equals
+E25.py:67:49: E252 [*] Missing whitespace around parameter equals
+E25.py:67:49: E252 [*] Missing whitespace around parameter equals
+E25.py:67:64: E252 [*] Missing whitespace around parameter equals
+E25.py:67:64: E252 [*] Missing whitespace around parameter equals
+E25.py:67:80: E252 [*] Missing whitespace around parameter equals
+E25.py:67:96: E252 [*] Missing whitespace around parameter equals

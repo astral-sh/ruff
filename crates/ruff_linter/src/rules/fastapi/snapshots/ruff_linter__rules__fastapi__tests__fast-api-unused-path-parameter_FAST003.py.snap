@@ -465,3 +465,29 @@ help: Add `id` to function signature
 205 205 | 
 206 206 | 
 207 207 | # No errors
+
+## Concise Output
+FAST003.py:9:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:14:23: FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
+FAST003.py:19:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:24:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:29:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:34:18: FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
+FAST003.py:34:32: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:39:18: FAST003 Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003.py:39:27: FAST003 Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003.py:44:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:44:35: FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` signature
+FAST003.py:51:18: FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` signature
+FAST003.py:51:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:56:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:61:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003.py:66:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:73:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:80:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003.py:87:18: FAST003 [*] Parameter `name` appears in route path, but not in `read_thing` signature
+FAST003.py:158:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` signature
+FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
+FAST003.py:197:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
+FAST003.py:201:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
+FAST003.py:203:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature

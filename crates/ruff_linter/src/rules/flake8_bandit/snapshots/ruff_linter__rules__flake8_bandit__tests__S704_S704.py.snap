@@ -62,3 +62,11 @@ S704 Unsafe use of `flask.Markup` detected
 18 | flask.Markup("hello {}".format("world"))  # S704 (false positive)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+S704.py:5:1: S704 Unsafe use of `markupsafe.Markup` detected
+S704.py:6:1: S704 Unsafe use of `flask.Markup` detected
+S704.py:10:1: S704 Unsafe use of `markupsafe.Markup` detected
+S704.py:11:1: S704 Unsafe use of `flask.Markup` detected
+S704.py:17:1: S704 Unsafe use of `markupsafe.Markup` detected
+S704.py:18:1: S704 Unsafe use of `flask.Markup` detected

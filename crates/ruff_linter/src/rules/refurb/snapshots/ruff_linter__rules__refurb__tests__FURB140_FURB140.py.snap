@@ -202,4 +202,15 @@ help: Replace with `itertools.starmap`
    31 |+set(sm(foo, [(85, 60), (100, 80)]))
 32 32 | 
 33 33 | # Non-errors.
-34 34 |
+34 34 | 
+
+## Concise Output
+FURB140.py:7:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:10:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:13:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:19:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:22:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:25:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:29:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:30:1: FURB140 [*] Use `itertools.starmap` instead of the generator
+FURB140.py:31:1: FURB140 [*] Use `itertools.starmap` instead of the generator

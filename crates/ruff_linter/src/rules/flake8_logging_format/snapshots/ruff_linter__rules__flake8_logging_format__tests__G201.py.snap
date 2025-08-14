@@ -44,3 +44,9 @@ G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=T
 34 |
 35 | # OK
    |
+
+## Concise Output
+G201.py:8:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+G201.py:13:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+G201.py:28:5: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+G201.py:33:5: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`

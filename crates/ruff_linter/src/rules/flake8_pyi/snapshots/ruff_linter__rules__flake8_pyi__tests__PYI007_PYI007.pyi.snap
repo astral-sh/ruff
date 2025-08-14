@@ -31,3 +31,8 @@ PYI007 Unrecognized `sys.platform` check
 11 | if sys.platform == 10.12: ...  # Error: PYI007 Unrecognized sys.platform check
    |    ^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+PYI007.pyi:7:4: PYI007 Unrecognized `sys.platform` check
+PYI007.pyi:9:4: PYI007 Unrecognized `sys.platform` check
+PYI007.pyi:11:4: PYI007 Unrecognized `sys.platform` check

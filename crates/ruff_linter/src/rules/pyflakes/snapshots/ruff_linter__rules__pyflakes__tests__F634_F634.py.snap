@@ -30,3 +30,8 @@ F634 If test is a tuple, which is always `True`
 13 |         pass
 14 |     elif ():
    |
+
+## Concise Output
+F634.py:1:4: F634 If test is a tuple, which is always `True`
+F634.py:4:4: F634 If test is a tuple, which is always `True`
+F634.py:12:10: F634 If test is a tuple, which is always `True`

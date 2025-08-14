@@ -739,3 +739,33 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `TimeDeltaTrigg
 69 69 | 
 70 70 | TimeDeltaSensor()
 71 71 | TimeDeltaSensorAsync()
+
+## Concise Output
+AIR312.py:14:1: AIR312 [*] `airflow.hooks.filesystem.FSHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:15:1: AIR312 [*] `airflow.hooks.package_index.PackageIndexHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:16:1: AIR312 [*] `airflow.hooks.subprocess.SubprocessHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:18:1: AIR312 [*] `airflow.operators.bash.BashOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:19:1: AIR312 [*] `airflow.operators.datetime.BranchDateTimeOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:20:1: AIR312 [*] `airflow.operators.trigger_dagrun.TriggerDagRunOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:21:1: AIR312 [*] `airflow.operators.empty.EmptyOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:23:1: AIR312 [*] `airflow.operators.latest_only.LatestOnlyOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:24:1: AIR312 [*] `airflow.operators.weekday.BranchDayOfWeekOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:25:1: AIR312 [*] `airflow.sensors.date_time.DateTimeSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:44:1: AIR312 [*] `airflow.operators.python.BranchPythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:45:1: AIR312 [*] `airflow.operators.python.PythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:46:1: AIR312 [*] `airflow.operators.python.PythonVirtualenvOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:47:1: AIR312 [*] `airflow.operators.python.ShortCircuitOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:48:1: AIR312 [*] `airflow.sensors.date_time.DateTimeSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:49:1: AIR312 [*] `airflow.sensors.external_task.ExternalTaskMarker` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:50:1: AIR312 [*] `airflow.sensors.external_task.ExternalTaskSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:51:1: AIR312 [*] `airflow.sensors.filesystem.FileSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:52:1: AIR312 [*] `airflow.sensors.time_sensor.TimeSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:53:1: AIR312 [*] `airflow.sensors.time_sensor.TimeSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:70:1: AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:71:1: AIR312 [*] `airflow.sensors.time_delta.TimeDeltaSensorAsync` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:72:1: AIR312 [*] `airflow.sensors.weekday.DayOfWeekSensor` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:73:1: AIR312 [*] `airflow.triggers.external_task.DagStateTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:74:1: AIR312 [*] `airflow.triggers.external_task.WorkflowTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:75:1: AIR312 [*] `airflow.triggers.file.FileTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:76:1: AIR312 [*] `airflow.triggers.temporal.DateTimeTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR312.py:77:1: AIR312 [*] `airflow.triggers.temporal.TimeDeltaTrigger` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.

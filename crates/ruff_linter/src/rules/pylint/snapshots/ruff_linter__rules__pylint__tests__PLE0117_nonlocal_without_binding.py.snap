@@ -24,3 +24,8 @@ PLE0117 Nonlocal name `y` found without binding
 19 |         nonlocal y
    |                  ^
    |
+
+## Concise Output
+nonlocal_without_binding.py:5:14: PLE0117 Nonlocal name `x` found without binding
+nonlocal_without_binding.py:9:14: PLE0117 Nonlocal name `y` found without binding
+nonlocal_without_binding.py:19:18: PLE0117 Nonlocal name `y` found without binding

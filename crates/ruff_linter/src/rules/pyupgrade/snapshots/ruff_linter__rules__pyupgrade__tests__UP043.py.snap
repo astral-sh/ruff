@@ -139,3 +139,12 @@ help: Remove default type arguments
 58    |-]:
    55 |+async def func() -> AsyncGenerator[str]:
 59 56 |     yield "hello"
+
+## Concise Output
+UP043.py:4:15: UP043 [*] Unnecessary default type arguments
+UP043.py:8:15: UP043 [*] Unnecessary default type arguments
+UP043.py:21:15: UP043 [*] Unnecessary default type arguments
+UP043.py:31:21: UP043 [*] Unnecessary default type arguments
+UP043.py:47:15: UP043 [*] Unnecessary default type arguments
+UP043.py:51:21: UP043 [*] Unnecessary default type arguments
+UP043.py:55:21: UP043 [*] Unnecessary default type arguments

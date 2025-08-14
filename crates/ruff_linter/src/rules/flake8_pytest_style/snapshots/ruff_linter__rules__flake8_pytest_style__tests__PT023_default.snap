@@ -178,3 +178,13 @@ help: Remove parentheses
     99  |+    @(pytest.mark.foo)
 100 100 |     def test_method_outer_paren():
 101 101 |         pass
+
+## Concise Output
+PT023.py:51:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:56:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:63:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:69:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:77:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:82:1: PT023 [*] Use `@pytest.mark.parametrize` over `@pytest.mark.parametrize()`
+PT023.py:93:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+PT023.py:99:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`

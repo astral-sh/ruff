@@ -131,3 +131,12 @@ help: Prefix it with an underscore or any other dummy variable pattern
 21 21 | 
 22 22 | 
 23 23 | def f():
+
+## Concise Output
+RUF059_1.py:2:5: RUF059 [*] Unpacked variable `x` is never used
+RUF059_1.py:2:8: RUF059 [*] Unpacked variable `y` is never used
+RUF059_1.py:10:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059_1.py:16:6: RUF059 [*] Unpacked variable `x` is never used
+RUF059_1.py:16:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059_1.py:20:15: RUF059 [*] Unpacked variable `x` is never used
+RUF059_1.py:20:18: RUF059 [*] Unpacked variable `y` is never used

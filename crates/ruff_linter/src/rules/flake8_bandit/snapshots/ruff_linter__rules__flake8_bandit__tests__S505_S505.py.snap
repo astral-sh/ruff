@@ -152,3 +152,19 @@ S505 DSA key sizes below 2048 bits are considered breakable
 45 |
 46 | # Don't crash when the size is variable.
    |
+
+## Concise Output
+S505.py:29:35: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:30:31: S505 EC key sizes below 224 bits are considered breakable
+S505.py:32:37: S505 RSA key sizes below 2048 bits are considered breakable
+S505.py:34:28: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:35:28: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:36:33: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:37:33: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:38:26: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:39:25: S505 EC key sizes below 224 bits are considered breakable
+S505.py:40:29: S505 RSA key sizes below 2048 bits are considered breakable
+S505.py:41:23: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:42:23: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:43:28: S505 DSA key sizes below 2048 bits are considered breakable
+S505.py:44:28: S505 DSA key sizes below 2048 bits are considered breakable

@@ -326,3 +326,33 @@ help: Add return type annotation: `None`
 165     |-    def __init__(self):
     165 |+    def __init__(self) -> None:
 166 166 |         print(f"{self.attr=}")
+
+## Concise Output
+annotation_presence.py:5:5: ANN201 [*] Missing return type annotation for public function `foo`
+annotation_presence.py:5:9: ANN001 Missing type annotation for function argument `a`
+annotation_presence.py:5:12: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:10:5: ANN201 [*] Missing return type annotation for public function `foo`
+annotation_presence.py:10:17: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:15:17: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:20:5: ANN201 [*] Missing return type annotation for public function `foo`
+annotation_presence.py:25:5: ANN201 [*] Missing return type annotation for public function `foo`
+annotation_presence.py:45:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:50:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+annotation_presence.py:55:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+annotation_presence.py:55:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+annotation_presence.py:60:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+annotation_presence.py:65:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+annotation_presence.py:79:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:83:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+annotation_presence.py:87:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+annotation_presence.py:87:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+annotation_presence.py:91:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+annotation_presence.py:95:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+annotation_presence.py:149:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:150:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:151:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:152:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:153:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:154:10: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for special method `__init__`
+annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for special method `__init__`

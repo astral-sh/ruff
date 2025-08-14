@@ -159,3 +159,21 @@ PLE0302 The special method `__setitem__` expects 3 parameters, 4 were given
     |         ^^^^^^^^^^^
 111 |         ...
     |
+
+## Concise Output
+unexpected_special_method_signature.py:5:9: PLE0302 The special method `__bool__` expects 1 parameter, 2 were given
+unexpected_special_method_signature.py:19:9: PLE0302 The special method `__bool__` expects 0 parameters, 1 was given
+unexpected_special_method_signature.py:32:9: PLE0302 The special method `__eq__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:35:9: PLE0302 The special method `__eq__` expects 2 parameters, 3 were given
+unexpected_special_method_signature.py:44:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 3 were given
+unexpected_special_method_signature.py:47:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 4 were given
+unexpected_special_method_signature.py:56:9: PLE0302 The special method `__eq__` expects 2 parameters, 3 were given
+unexpected_special_method_signature.py:65:9: PLE0302 The special method `__round__` expects between 1 and 2 parameters, 3 were given
+unexpected_special_method_signature.py:89:9: PLE0302 The special method `__next__` expects 1 parameter, 2 were given
+unexpected_special_method_signature.py:92:9: PLE0302 The special method `__buffer__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:95:9: PLE0302 The special method `__class_getitem__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:98:9: PLE0302 The special method `__mro_entries__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:101:9: PLE0302 The special method `__release_buffer__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:104:9: PLE0302 The special method `__subclasshook__` expects 2 parameters, 1 was given
+unexpected_special_method_signature.py:107:9: PLE0302 The special method `__setattr__` expects 3 parameters, 2 were given
+unexpected_special_method_signature.py:110:9: PLE0302 The special method `__setitem__` expects 3 parameters, 4 were given

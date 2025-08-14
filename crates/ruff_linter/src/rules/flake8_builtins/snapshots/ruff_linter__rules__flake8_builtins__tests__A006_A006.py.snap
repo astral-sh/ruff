@@ -71,3 +71,12 @@ A006 Lambda argument `dir` is shadowing a Python builtin
 6 |
 7 | # Ok for A006 - should trigger A002 instead
   |
+
+## Concise Output
+A006.py:1:8: A006 Lambda argument `print` is shadowing a Python builtin
+A006.py:1:15: A006 Lambda argument `copyright` is shadowing a Python builtin
+A006.py:2:11: A006 Lambda argument `float` is shadowing a Python builtin
+A006.py:3:8: A006 Lambda argument `min` is shadowing a Python builtin
+A006.py:3:13: A006 Lambda argument `max` is shadowing a Python builtin
+A006.py:4:8: A006 Lambda argument `id` is shadowing a Python builtin
+A006.py:5:8: A006 Lambda argument `dir` is shadowing a Python builtin

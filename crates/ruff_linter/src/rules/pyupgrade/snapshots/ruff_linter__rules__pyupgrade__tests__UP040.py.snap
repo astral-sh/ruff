@@ -509,3 +509,27 @@ help: Use the `type` keyword
 123 123 |     # comment1
 124 124 |     int  # comment2
 125 125 |     # comment3
+
+## Concise Output
+UP040.py:5:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:10:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:14:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:18:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:22:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:26:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:30:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:36:5: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:57:1: UP040 [*] Type alias `Decorator` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:67:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:73:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:81:1: UP040 [*] Type alias `Tuple3` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:84:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:85:1: UP040 [*] Type alias `PositiveInt` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:99:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:104:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:111:1: UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
+UP040.py:117:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.py:122:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword

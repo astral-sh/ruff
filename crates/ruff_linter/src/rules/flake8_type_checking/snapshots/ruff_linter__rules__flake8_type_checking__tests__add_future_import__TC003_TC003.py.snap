@@ -26,4 +26,7 @@ help: Move into type-checking block
 8     |-    import os
 9  12 | 
 10 13 |     x: os
-11 14 |
+11 14 | 
+
+## Concise Output
+TC003.py:8:12: TC003 [*] Move standard library import `os` into a type-checking block

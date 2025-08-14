@@ -99,3 +99,10 @@ help: Rename `self` to `cls`
 21    |-    def stillBad(self):
    21 |+    def stillBad(cls):
 22 22 |         pass
+
+## Concise Output
+N804.py:5:27: N804 [*] First argument of a class method should be named `cls`
+N804.py:9:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:13:18: N804 [*] First argument of a class method should be named `cls`
+N804.py:18:20: N804 [*] First argument of a class method should be named `cls`
+N804.py:21:18: N804 [*] First argument of a class method should be named `cls`

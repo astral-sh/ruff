@@ -20,3 +20,6 @@ help: Replace with `list`
 35 35 |     y = List[int]()
 36 36 |     y.append(x)
 37 37 |     return y
+
+## Concise Output
+future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation

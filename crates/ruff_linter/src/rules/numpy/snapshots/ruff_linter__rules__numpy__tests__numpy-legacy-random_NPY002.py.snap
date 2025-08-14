@@ -566,3 +566,57 @@ NPY002 Replace legacy `np.random.zipf` call with `np.random.Generator`
 67 | numpy.random.zipf()
    | ^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+NPY002.py:12:8: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:13:13: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:18:1: NPY002 Replace legacy `np.random.seed` call with `np.random.Generator`
+NPY002.py:19:1: NPY002 Replace legacy `np.random.get_state` call with `np.random.Generator`
+NPY002.py:20:1: NPY002 Replace legacy `np.random.set_state` call with `np.random.Generator`
+NPY002.py:21:1: NPY002 Replace legacy `np.random.rand` call with `np.random.Generator`
+NPY002.py:22:1: NPY002 Replace legacy `np.random.ranf` call with `np.random.Generator`
+NPY002.py:23:1: NPY002 Replace legacy `np.random.sample` call with `np.random.Generator`
+NPY002.py:24:1: NPY002 Replace legacy `np.random.randn` call with `np.random.Generator`
+NPY002.py:25:1: NPY002 Replace legacy `np.random.randint` call with `np.random.Generator`
+NPY002.py:26:1: NPY002 Replace legacy `np.random.random` call with `np.random.Generator`
+NPY002.py:27:1: NPY002 Replace legacy `np.random.random_integers` call with `np.random.Generator`
+NPY002.py:28:1: NPY002 Replace legacy `np.random.random_sample` call with `np.random.Generator`
+NPY002.py:29:1: NPY002 Replace legacy `np.random.choice` call with `np.random.Generator`
+NPY002.py:30:1: NPY002 Replace legacy `np.random.bytes` call with `np.random.Generator`
+NPY002.py:31:1: NPY002 Replace legacy `np.random.shuffle` call with `np.random.Generator`
+NPY002.py:32:1: NPY002 Replace legacy `np.random.permutation` call with `np.random.Generator`
+NPY002.py:33:1: NPY002 Replace legacy `np.random.beta` call with `np.random.Generator`
+NPY002.py:34:1: NPY002 Replace legacy `np.random.binomial` call with `np.random.Generator`
+NPY002.py:35:1: NPY002 Replace legacy `np.random.chisquare` call with `np.random.Generator`
+NPY002.py:36:1: NPY002 Replace legacy `np.random.dirichlet` call with `np.random.Generator`
+NPY002.py:37:1: NPY002 Replace legacy `np.random.exponential` call with `np.random.Generator`
+NPY002.py:38:1: NPY002 Replace legacy `np.random.f` call with `np.random.Generator`
+NPY002.py:39:1: NPY002 Replace legacy `np.random.gamma` call with `np.random.Generator`
+NPY002.py:40:1: NPY002 Replace legacy `np.random.geometric` call with `np.random.Generator`
+NPY002.py:41:1: NPY002 Replace legacy `np.random.gumbel` call with `np.random.Generator`
+NPY002.py:42:1: NPY002 Replace legacy `np.random.hypergeometric` call with `np.random.Generator`
+NPY002.py:43:1: NPY002 Replace legacy `np.random.laplace` call with `np.random.Generator`
+NPY002.py:44:1: NPY002 Replace legacy `np.random.logistic` call with `np.random.Generator`
+NPY002.py:45:1: NPY002 Replace legacy `np.random.lognormal` call with `np.random.Generator`
+NPY002.py:46:1: NPY002 Replace legacy `np.random.logseries` call with `np.random.Generator`
+NPY002.py:47:1: NPY002 Replace legacy `np.random.multinomial` call with `np.random.Generator`
+NPY002.py:48:1: NPY002 Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`
+NPY002.py:49:1: NPY002 Replace legacy `np.random.negative_binomial` call with `np.random.Generator`
+NPY002.py:50:1: NPY002 Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`
+NPY002.py:51:1: NPY002 Replace legacy `np.random.noncentral_f` call with `np.random.Generator`
+NPY002.py:52:1: NPY002 Replace legacy `np.random.normal` call with `np.random.Generator`
+NPY002.py:53:1: NPY002 Replace legacy `np.random.pareto` call with `np.random.Generator`
+NPY002.py:54:1: NPY002 Replace legacy `np.random.poisson` call with `np.random.Generator`
+NPY002.py:55:1: NPY002 Replace legacy `np.random.power` call with `np.random.Generator`
+NPY002.py:56:1: NPY002 Replace legacy `np.random.rayleigh` call with `np.random.Generator`
+NPY002.py:57:1: NPY002 Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`
+NPY002.py:58:1: NPY002 Replace legacy `np.random.standard_exponential` call with `np.random.Generator`
+NPY002.py:59:1: NPY002 Replace legacy `np.random.standard_gamma` call with `np.random.Generator`
+NPY002.py:60:1: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:61:1: NPY002 Replace legacy `np.random.standard_t` call with `np.random.Generator`
+NPY002.py:62:1: NPY002 Replace legacy `np.random.triangular` call with `np.random.Generator`
+NPY002.py:63:1: NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+NPY002.py:64:1: NPY002 Replace legacy `np.random.vonmises` call with `np.random.Generator`
+NPY002.py:65:1: NPY002 Replace legacy `np.random.wald` call with `np.random.Generator`
+NPY002.py:66:1: NPY002 Replace legacy `np.random.weibull` call with `np.random.Generator`
+NPY002.py:67:1: NPY002 Replace legacy `np.random.zipf` call with `np.random.Generator`

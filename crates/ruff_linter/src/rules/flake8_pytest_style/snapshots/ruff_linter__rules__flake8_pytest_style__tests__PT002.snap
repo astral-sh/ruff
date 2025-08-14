@@ -18,3 +18,7 @@ PT002 Configuration for fixture `my_fixture` specified via positional args, use 
 20 | def my_fixture():  # Error mixed
 21 |     return 0
    |
+
+## Concise Output
+PT002.py:14:1: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs
+PT002.py:19:1: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs

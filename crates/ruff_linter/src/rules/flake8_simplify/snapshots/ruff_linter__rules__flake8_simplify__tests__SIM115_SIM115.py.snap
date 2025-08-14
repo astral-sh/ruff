@@ -366,3 +366,39 @@ SIM115 Use a context manager for opening files
     |     ^^^^^^^^^^^^^^^^
 259 | f.close()
     |
+
+## Concise Output
+SIM115.py:8:5: SIM115 Use a context manager for opening files
+SIM115.py:9:5: SIM115 Use a context manager for opening files
+SIM115.py:10:5: SIM115 Use a context manager for opening files
+SIM115.py:11:5: SIM115 Use a context manager for opening files
+SIM115.py:12:5: SIM115 Use a context manager for opening files
+SIM115.py:40:9: SIM115 Use a context manager for opening files
+SIM115.py:81:5: SIM115 Use a context manager for opening files
+SIM115.py:82:5: SIM115 Use a context manager for opening files
+SIM115.py:83:5: SIM115 Use a context manager for opening files
+SIM115.py:84:5: SIM115 Use a context manager for opening files
+SIM115.py:85:5: SIM115 Use a context manager for opening files
+SIM115.py:86:5: SIM115 Use a context manager for opening files
+SIM115.py:87:5: SIM115 Use a context manager for opening files
+SIM115.py:88:5: SIM115 Use a context manager for opening files
+SIM115.py:89:5: SIM115 Use a context manager for opening files
+SIM115.py:90:5: SIM115 Use a context manager for opening files
+SIM115.py:91:5: SIM115 Use a context manager for opening files
+SIM115.py:92:5: SIM115 Use a context manager for opening files
+SIM115.py:93:5: SIM115 Use a context manager for opening files
+SIM115.py:94:5: SIM115 Use a context manager for opening files
+SIM115.py:95:5: SIM115 Use a context manager for opening files
+SIM115.py:96:5: SIM115 Use a context manager for opening files
+SIM115.py:97:5: SIM115 Use a context manager for opening files
+SIM115.py:98:5: SIM115 Use a context manager for opening files
+SIM115.py:99:5: SIM115 Use a context manager for opening files
+SIM115.py:100:5: SIM115 Use a context manager for opening files
+SIM115.py:101:5: SIM115 Use a context manager for opening files
+SIM115.py:102:5: SIM115 Use a context manager for opening files
+SIM115.py:103:5: SIM115 Use a context manager for opening files
+SIM115.py:104:5: SIM115 Use a context manager for opening files
+SIM115.py:105:5: SIM115 Use a context manager for opening files
+SIM115.py:241:9: SIM115 Use a context manager for opening files
+SIM115.py:245:9: SIM115 Use a context manager for opening files
+SIM115.py:258:5: SIM115 Use a context manager for opening files

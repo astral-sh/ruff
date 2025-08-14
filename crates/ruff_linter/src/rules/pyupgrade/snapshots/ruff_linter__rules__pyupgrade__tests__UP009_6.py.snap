@@ -15,3 +15,6 @@ help: Remove unnecessary coding comment
 2 1 | print("Hello world")
 3 2 | 
 4 3 | """
+
+## Concise Output
+UP009_6.py:1:2: UP009 [*] UTF-8 encoding declaration is unnecessary

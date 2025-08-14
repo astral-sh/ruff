@@ -126,3 +126,17 @@ S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
 37 | def some_func():
 38 |     return '<script>alert("evil!")</script>'
    |
+
+## Concise Output
+S308.py:6:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:7:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:8:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:9:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:10:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:16:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:26:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:27:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:28:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:29:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:30:5: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities
+S308.py:36:1: S308 Use of `mark_safe` may expose cross-site scripting vulnerabilities

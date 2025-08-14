@@ -391,3 +391,20 @@ help: Use `math.e`
 44 45 | 
 45    |-e = 2.7182000000000001  # FURB152
    46 |+e = math.e  # FURB152
+
+## Concise Output
+FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
+FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
+FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
+FURB152.py:11:5: FURB152 [*] Replace `3.141` with `math.pi`
+FURB152.py:13:5: FURB152 [*] Replace `3.142` with `math.pi`
+FURB152.py:15:5: FURB152 [*] Replace `3.1415` with `math.pi`
+FURB152.py:17:5: FURB152 [*] Replace `3.1416` with `math.pi`
+FURB152.py:19:5: FURB152 [*] Replace `3.141592` with `math.pi`
+FURB152.py:21:5: FURB152 [*] Replace `3.141593` with `math.pi`
+FURB152.py:23:5: FURB152 [*] Replace `3.14159265` with `math.pi`
+FURB152.py:25:5: FURB152 [*] Replace `3.141592653589793238462643383279` with `math.pi`
+FURB152.py:31:5: FURB152 [*] Replace `2.718` with `math.e`
+FURB152.py:33:5: FURB152 [*] Replace `2.7182` with `math.e`
+FURB152.py:35:5: FURB152 [*] Replace `2.7183` with `math.e`
+FURB152.py:45:5: FURB152 [*] Replace `2.7182000000000001` with `math.e`

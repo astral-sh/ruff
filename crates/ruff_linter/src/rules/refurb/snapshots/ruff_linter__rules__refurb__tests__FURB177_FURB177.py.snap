@@ -210,3 +210,15 @@ help: Replace `Path().resolve()` with `Path.cwd()`
 19 19 | 
 20 20 | # OK
 21 21 | _ = Path.cwd()
+
+## Concise Output
+FURB177.py:5:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:6:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:8:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:9:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:11:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:12:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:14:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:15:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:17:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups
+FURB177.py:18:5: FURB177 [*] Prefer `Path.cwd()` over `Path().resolve()` for current-directory lookups

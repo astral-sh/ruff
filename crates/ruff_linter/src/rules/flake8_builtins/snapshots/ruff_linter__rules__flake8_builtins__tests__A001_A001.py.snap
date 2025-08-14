@@ -174,3 +174,22 @@ A001 Variable `sum` is shadowing a Python builtin
 30 | [0 for sum in ()]
    |        ^^^
    |
+
+## Concise Output
+A001.py:5:1: A001 Variable `print` is shadowing a Python builtin
+A001.py:6:1: A001 Variable `copyright` is shadowing a Python builtin
+A001.py:7:2: A001 Variable `complex` is shadowing a Python builtin
+A001.py:8:1: A001 Variable `float` is shadowing a Python builtin
+A001.py:8:9: A001 Variable `object` is shadowing a Python builtin
+A001.py:9:1: A001 Variable `min` is shadowing a Python builtin
+A001.py:9:6: A001 Variable `max` is shadowing a Python builtin
+A001.py:11:1: A001 Variable `id` is shadowing a Python builtin
+A001.py:13:5: A001 Variable `bytes` is shadowing a Python builtin
+A001.py:16:7: A001 Variable `slice` is shadowing a Python builtin
+A001.py:21:23: A001 Variable `ValueError` is shadowing a Python builtin
+A001.py:24:5: A001 Variable `memoryview` is shadowing a Python builtin
+A001.py:24:18: A001 Variable `bytearray` is shadowing a Python builtin
+A001.py:27:22: A001 Variable `str` is shadowing a Python builtin
+A001.py:27:45: A001 Variable `all` is shadowing a Python builtin
+A001.py:27:50: A001 Variable `any` is shadowing a Python builtin
+A001.py:30:8: A001 Variable `sum` is shadowing a Python builtin

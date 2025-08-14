@@ -9,3 +9,6 @@ PD008 Use `.loc` instead of `.at`. If speed is important, use NumPy.
 4 | index = x.at[:, ["B", "A"]]
   |         ^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+<filename>:4:9: PD008 Use `.loc` instead of `.at`. If speed is important, use NumPy.
