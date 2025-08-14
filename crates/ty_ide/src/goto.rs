@@ -7,7 +7,6 @@ use std::borrow::Cow;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
-use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
@@ -280,9 +279,10 @@ impl GotoTarget<'_> {
             GotoTarget::ImportModuleAlias { alias } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
-            GotoTarget::StringAnnotationExprName { .. } => {
+            GotoTarget::StringAnnotationExprName { string_literal, .. } => {
                 // TODO: make a way to ask the inference engine about a sub-expr of a string annotation
-                return None;
+                // for now we just yield the type of the entire string expression
+                string_literal.inferred_type(model)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -528,7 +528,7 @@ impl GotoTarget<'_> {
 
     /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
     pub(crate) fn from_covering_node<'a>(
-        db: &dyn Db,
+        db: &dyn crate::Db,
         file: File,
         covering_node: &crate::find_node::CoveringNode<'a>,
         offset: TextSize,
@@ -680,13 +680,20 @@ impl GotoTarget<'_> {
                 }
             },
 
-            AnyNodeRef::ExprStringLiteral(string_literal) => {
-                // If we encounter a string literal, blindly assume it's a string annotation
-                // like `x: "str | int"` by parsing it as a sub-AST.
-                //
-                // TODO: we *really* should be asking the semantic analysis if this is actually
-                // a string annotation, because this behaviour will effect any random string
-                // literal that looks like a type..!
+            node @ AnyNodeRef::ExprStringLiteral(string_literal) => {
+                // If we encounter a string literal, try to figure out if it's actually
+                // a string annotation by asking the type checker if its type is
+                // a StringLiteral equal to itself
+                let model = SemanticModel::new(db, file);
+                let string_ty = string_literal.inferred_type(&model);
+                if let Type::StringLiteral(string) = string_ty {
+                    if string.value(db) == string_literal.value.to_str() {
+                        return node.as_expr_ref().map(GotoTarget::Expression);
+                    }
+                }
+
+                // Ok it has a different type, that means it's some kind of string annotation,
+                // so try to parse it as a sub-AST
                 let source = source_text(db, file);
                 let sub_ast = parse_string_annotation(
                     source.as_str(),
@@ -814,7 +821,7 @@ fn definitions_to_navigation_targets<'db>(
 }
 
 pub(crate) fn find_goto_target<'a>(
-    db: &dyn Db,
+    db: &dyn crate::Db,
     file: File,
     parsed: &'a ParsedModuleRef,
     offset: TextSize,
@@ -823,7 +830,7 @@ pub(crate) fn find_goto_target<'a>(
 }
 
 fn find_goto_target_impl<'a>(
-    db: &dyn Db,
+    db: &dyn crate::Db,
     file: File,
     tokens: &'a Tokens,
     root: AnyNodeRef<'a>,
