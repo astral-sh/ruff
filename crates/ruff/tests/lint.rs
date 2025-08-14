@@ -5588,15 +5588,15 @@ fn cookiecutter_globbing() -> Result<()> {
                 .args(STDIN_BASE_OPTIONS)
                 .arg("--select=F811")
                 .current_dir(tempdir.path()), @r"
-			success: false
-			exit_code: 1
-			----- stdout -----
-			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-			Found 1 error.
-			[*] 1 fixable with the `--fix` option.
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-			----- stderr -----
-		");
+        ----- stderr -----
+        ");
     });
 
     Ok(())
