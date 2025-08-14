@@ -513,7 +513,7 @@ pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Si
 
 impl<'db> Specialization<'db> {
     pub(crate) fn types(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        #[salsa::tracked(returns(ref))]
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
         fn homogeneous_element_type<'db>(db: &'db dyn Db, tuple: TupleType<'db>) -> Type<'db> {
             tuple.tuple(db).homogeneous_element_type(db)
         }
