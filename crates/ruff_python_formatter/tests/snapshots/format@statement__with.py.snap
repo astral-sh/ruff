@@ -387,6 +387,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+function-arg-extra-indent  = Disabled
 target_version             = 3.8
 source_type                = Python
 ```
@@ -818,6 +819,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
+function-arg-extra-indent  = Disabled
 target_version             = 3.9
 source_type                = Python
 ```

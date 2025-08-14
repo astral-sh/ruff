@@ -41,7 +41,7 @@ use ruff_linter::{
 };
 use ruff_python_ast as ast;
 use ruff_python_formatter::{
-    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, FunctionArgExtraIndent, MagicTrailingComma, QuoteStyle,
 };
 
 use crate::options::{
@@ -211,6 +211,11 @@ impl Configuration {
             docstring_code_line_width: format
                 .docstring_code_line_width
                 .unwrap_or(format_defaults.docstring_code_line_width),
+            function_arg_extra_indent: if format.function_arg_extra_indent.unwrap_or(false) {
+                FunctionArgExtraIndent::Enabled
+            } else {
+                FunctionArgExtraIndent::Disabled
+            },
         };
 
         let analyze = self.analyze;
@@ -1213,6 +1218,7 @@ pub struct FormatConfiguration {
     pub line_ending: Option<LineEnding>,
     pub docstring_code_format: Option<DocstringCode>,
     pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
+    pub function_arg_extra_indent: Option<bool>,
 }
 
 impl FormatConfiguration {
@@ -1249,6 +1255,7 @@ impl FormatConfiguration {
                 }
             }),
             docstring_code_line_width: options.docstring_code_line_length,
+            function_arg_extra_indent: options.function_arg_extra_indent,
         })
     }
 
@@ -1266,6 +1273,9 @@ impl FormatConfiguration {
             docstring_code_line_width: self
                 .docstring_code_line_width
                 .or(config.docstring_code_line_width),
+            function_arg_extra_indent: self
+                .function_arg_extra_indent
+                .or(config.function_arg_extra_indent),
         }
     }
 }

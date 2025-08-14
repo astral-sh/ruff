@@ -3795,6 +3795,41 @@ pub struct FormatOptions {
         "#
     )]
     pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
+
+    /// Whether to add extra indentation for function arguments when they are wrapped.
+    ///
+    /// When enabled, function arguments will be indented with 8 spaces instead of the usual 4 spaces.
+    ///
+    /// `function-arg-extra-indent = false` (default):
+    ///
+    /// ```python
+    /// def my_function(
+    ///     arg1,
+    ///     arg2,
+    ///     arg3,
+    /// ):
+    ///     pass
+    /// ```
+    ///
+    /// `function-arg-extra-indent = true`:
+    ///
+    /// ```python
+    /// def my_function(
+    ///         arg1,
+    ///         arg2,
+    ///         arg3,
+    /// ):
+    ///     pass
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = r#"bool"#,
+        example = r#"
+            # Enable extra indentation for function arguments.
+            function-arg-extra-indent = true
+        "#
+    )]
+    pub function_arg_extra_indent: Option<bool>,
 }
 
 /// Configures Ruff's `analyze` command.

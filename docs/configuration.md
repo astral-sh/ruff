@@ -90,6 +90,10 @@ If left unspecified, Ruff's default configuration is equivalent to:
     # This only has an effect when the `docstring-code-format` setting is
     # enabled.
     docstring-code-line-length = "dynamic"
+
+    # Enable extra indentation for function arguments when they span multiple lines.
+    # When enabled, arguments are indented with 8 spaces instead of the default 4.
+    function-arg-extra-indent = false
     ```
 
 === "ruff.toml"
@@ -172,6 +176,10 @@ If left unspecified, Ruff's default configuration is equivalent to:
     # This only has an effect when the `docstring-code-format` setting is
     # enabled.
     docstring-code-line-length = "dynamic"
+
+    # Enable extra indentation for function arguments when they span multiple lines.
+    # When enabled, arguments are indented with 8 spaces instead of the default 4.
+    function-arg-extra-indent = false
     ```
 
 As an example, the following would configure Ruff to:
@@ -752,7 +760,12 @@ File selection:
           command-line. Use `--no-force-exclude` to disable
 
 Format configuration:
-      --line-length <LINE_LENGTH>  Set the line-length
+      --line-length <LINE_LENGTH>
+          Set the line-length
+      --function-arg-extra-indent
+          Enable extra indentation (8 spaces instead of 4) for function
+          arguments (default: disabled). Use `--no-function-arg-extra-indent`
+          to disable (overrides configuration files)
 
 Editor options:
       --range <RANGE>  When specified, Ruff will try to only format the code in

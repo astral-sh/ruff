@@ -3,6 +3,7 @@ use ruff_python_ast::{AnyNodeRef, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::builders::soft_two_level_block_indent;
 use crate::comments::{
     SourceComment, dangling_comments, dangling_open_parenthesis_comments, leading_comments,
     leading_node_comments, trailing_comments,
@@ -250,29 +251,55 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             // If we have a single argument, avoid the inner group, to ensure that we insert a
             // trailing comma if the outer group breaks.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&format_inner),
-                    token(")")
-                ]
-            )
+
+            if f.options().function_arg_extra_indent().is_enabled() {
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_two_level_block_indent(&format_inner),
+                        token(")")
+                    ]
+                )
+            } else {
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&format_inner),
+                        token(")")
+                    ]
+                )
+            }
         } else {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-            write!(
-                f,
-                [
-                    token("("),
-                    dangling_open_parenthesis_comments(parenthesis_dangling),
-                    soft_block_indent(&group(&format_inner)),
-                    token(")")
-                ]
-            )
+
+            if f.options().function_arg_extra_indent().is_enabled() {
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_two_level_block_indent(&group(&format_inner)),
+                        token(")")
+                    ]
+                )
+            } else {
+                write!(
+                    f,
+                    [
+                        token("("),
+                        dangling_open_parenthesis_comments(parenthesis_dangling),
+                        soft_block_indent(&group(&format_inner)),
+                        token(")")
+                    ]
+                )
+            }
         }
     }
 }

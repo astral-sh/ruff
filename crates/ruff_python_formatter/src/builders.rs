@@ -1,4 +1,5 @@
-use ruff_formatter::{Argument, Arguments, write};
+use ruff_formatter::format_element::tag::Tag;
+use ruff_formatter::{Argument, Arguments, FormatElement, write};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -241,5 +242,48 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
 
             Ok(())
         })
+    }
+}
+
+/// Creates a soft block indent with two levels of indentation (8 spaces instead of 4).
+/// This is used for function argument indentation when the extra indentation option is enabled.
+pub(crate) fn soft_two_level_block_indent<Context>(
+    content: &impl Format<Context>,
+) -> SoftTwoLevelBlockIndent<'_, Context> {
+    SoftTwoLevelBlockIndent {
+        content: Argument::new(content),
+    }
+}
+
+pub(crate) struct SoftTwoLevelBlockIndent<'a, Context> {
+    content: Argument<'a, Context>,
+}
+
+impl<Context> Format<Context> for SoftTwoLevelBlockIndent<'_, Context> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        let snapshot = f.snapshot();
+
+        // Add two indent levels
+        f.write_element(FormatElement::Tag(Tag::StartIndent));
+        f.write_element(FormatElement::Tag(Tag::StartIndent));
+
+        write!(f, [soft_line_break()])?;
+
+        let is_empty = {
+            let mut recording = f.start_recording();
+            recording.write_fmt(Arguments::from(&self.content))?;
+            recording.stop().is_empty()
+        };
+
+        if is_empty {
+            f.restore_snapshot(snapshot);
+            return Ok(());
+        }
+
+        // End two indent levels
+        f.write_element(FormatElement::Tag(Tag::EndIndent));
+        f.write_element(FormatElement::Tag(Tag::EndIndent));
+
+        write!(f, [soft_line_break()])
     }
 }

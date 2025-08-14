@@ -502,6 +502,16 @@ pub struct FormatCommand {
     /// Set the line-length.
     #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
+    /// Enable extra indentation (8 spaces instead of 4) for function arguments (default: disabled).
+    /// Use `--no-function-arg-extra-indent` to disable (overrides configuration files).
+    #[arg(
+        long,
+        overrides_with("no_function_arg_extra_indent"),
+        help_heading = "Format configuration"
+    )]
+    function_arg_extra_indent: bool,
+    #[clap(long, overrides_with("function_arg_extra_indent"), hide = true)]
+    no_function_arg_extra_indent: bool,
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
@@ -784,6 +794,10 @@ impl FormatCommand {
             target_version: self.target_version.map(ast::PythonVersion::from),
             cache_dir: self.cache_dir,
             extension: self.extension,
+            function_arg_extra_indent: resolve_bool_arg(
+                self.function_arg_extra_indent,
+                self.no_function_arg_extra_indent,
+            ),
             ..ExplicitConfigOverrides::default()
         };
 
@@ -1310,6 +1324,7 @@ struct ExplicitConfigOverrides {
     extension: Option<Vec<ExtensionPair>>,
     detect_string_imports: Option<bool>,
     string_imports_min_dots: Option<usize>,
+    function_arg_extra_indent: Option<bool>,
 }
 
 impl ConfigurationTransformer for ExplicitConfigOverrides {
@@ -1399,6 +1414,9 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         if let Some(string_imports_min_dots) = &self.string_imports_min_dots {
             config.analyze.string_imports_min_dots = Some(*string_imports_min_dots);
+        }
+        if let Some(function_arg_extra_indent) = &self.function_arg_extra_indent {
+            config.format.function_arg_extra_indent = Some(*function_arg_extra_indent);
         }
 
         config

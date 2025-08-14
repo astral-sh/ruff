@@ -62,6 +62,9 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// Whether to add extra indentation for function arguments
+    function_arg_extra_indent: FunctionArgExtraIndent,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +94,7 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            function_arg_extra_indent: FunctionArgExtraIndent::default(),
         }
     }
 }
@@ -142,6 +146,10 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn function_arg_extra_indent(&self) -> FunctionArgExtraIndent {
+        self.function_arg_extra_indent
     }
 
     #[must_use]
@@ -207,6 +215,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_source_map_generation(mut self, source_map: SourceMapGeneration) -> Self {
         self.source_map_generation = source_map;
+        self
+    }
+
+    #[must_use]
+    pub fn with_function_arg_extra_indent(mut self, indent: FunctionArgExtraIndent) -> Self {
+        self.function_arg_extra_indent = indent;
         self
     }
 }
@@ -466,5 +480,45 @@ where
             serde::de::Unexpected::Str(s),
             &"dynamic",
         )),
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum FunctionArgExtraIndent {
+    /// Use standard indentation (4 spaces) for function arguments
+    #[default]
+    Disabled,
+
+    /// Use extra indentation (8 spaces) for function arguments
+    Enabled,
+}
+
+impl FunctionArgExtraIndent {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, FunctionArgExtraIndent::Enabled)
+    }
+}
+
+impl fmt::Display for FunctionArgExtraIndent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
+impl FromStr for FunctionArgExtraIndent {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "disabled" | "Disabled" => Ok(Self::Disabled),
+            "enabled" | "Enabled" => Ok(Self::Enabled),
+            _ => Err("Value not supported for FunctionArgExtraIndent"),
+        }
     }
 }

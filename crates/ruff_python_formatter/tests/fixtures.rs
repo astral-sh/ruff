@@ -520,6 +520,7 @@ magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
 preview                    = {preview:?}
+function-arg-extra-indent  = {function_arg_extra_indent:?}
 target_version             = {target_version}
 source_type                = {source_type:?}"#,
             indent_style = self.0.indent_style(),
@@ -531,6 +532,7 @@ source_type                = {source_type:?}"#,
             docstring_code = self.0.docstring_code(),
             docstring_code_line_width = self.0.docstring_code_line_width(),
             preview = self.0.preview(),
+            function_arg_extra_indent = self.0.function_arg_extra_indent(),
             target_version = self.0.target_version(),
             source_type = self.0.source_type()
         )

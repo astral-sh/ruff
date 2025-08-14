@@ -114,6 +114,7 @@ following to your configuration file:
     quote-style = "single"
     indent-style = "tab"
     docstring-code-format = true
+    function-arg-extra-indent = true
     ```
 
 === "ruff.toml"
@@ -125,6 +126,7 @@ following to your configuration file:
     quote-style = "single"
     indent-style = "tab"
     docstring-code-format = true
+    function-arg-extra-indent = true
     ```
 
 
@@ -132,7 +134,7 @@ For the full list of supported settings, see [_Settings_](settings.md#format). F
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).
 
 Given the focus on Black compatibility (and unlike formatters like [YAPF](https://github.com/google/yapf)),
-Ruff does not currently expose any other configuration options.
+Ruff does not currently expose many configuration options.
 
 ## Docstring formatting
 
@@ -224,6 +226,55 @@ def f(x):
 [fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
 [`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+
+## Function argument indentation
+
+The Ruff formatter supports an optional feature for using extra indentation when formatting
+function arguments that span multiple lines. When enabled via the `function-arg-extra-indent` 
+setting, function arguments will be indented with 8 spaces instead of the default 4 spaces,
+making it easier to visually distinguish between function arguments and the function body.
+This style of extra indentation is suggested in [PEP-008](https://peps.python.org/pep-0008/#indentation).
+
+By default, this feature is disabled and Ruff uses standard 4-space indentation:
+
+```python
+def my_function(
+    arg1,
+    arg2,
+    arg3,
+):
+    pass
+```
+
+When `function-arg-extra-indent` is enabled, function arguments use 8-space indentation:
+
+```python
+def my_function(
+        arg1,
+        arg2,
+        arg3,
+):
+    pass
+```
+
+This feature applies to all types of function arguments, including positional arguments,
+keyword arguments, `*args`, `**kwargs`, and positional-only or keyword-only arguments.
+
+To enable this feature, add the following to your configuration:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.format]
+    function-arg-extra-indent = true
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [format]
+    function-arg-extra-indent = true
+    ```
 
 ## Format suppression
 

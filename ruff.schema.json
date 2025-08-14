@@ -1556,6 +1556,13 @@
             "type": "string"
           }
         },
+        "function-arg-extra-indent": {
+          "description": "Whether to add extra indentation for function arguments when they are wrapped.\n\nWhen enabled, function arguments will be indented with 8 spaces instead of the usual 4 spaces.\n\n`function-arg-extra-indent = false` (default):\n\n```python def my_function( arg1, arg2, arg3, ): pass ```\n\n`function-arg-extra-indent = true`:\n\n```python def my_function( arg1, arg2, arg3, ): pass ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "indent-style": {
           "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python def f(): print(\"Hello\") #  Spaces indent the `print` statement. ```\n\n`indent-style = \"tab\"`:\n\n```python def f(): print(\"Hello\") #  A tab `\\t` indents the `print` statement. ```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation). We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [
