@@ -93,18 +93,19 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorK
 use crate::types::class::{CodeGeneratorKind, Field, MetaclassErrorKind};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
+    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_instance_layout_conflict,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1358,33 +1359,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (5) Check that a dataclass does not have more than one `KW_ONLY`
+            // and that required fields are defined before default fields.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
                 let specialization = None;
                 let mut kw_only_field_names = vec![];
+                let mut required_after_default_field_names = vec![];
+                let mut has_seen_default_field = false;
 
                 for (
                     name,
                     Field {
                         declared_ty: field_ty,
+                        default_ty,
                         ..
                     },
                 ) in class.fields(self.db(), specialization, field_policy)
                 {
-                    let Some(instance) = field_ty.into_nominal_instance() else {
-                        continue;
-                    };
-
-                    if !instance
-                        .class(self.db())
-                        .is_known(self.db(), KnownClass::KwOnly)
-                    {
-                        continue;
+                    // Check for KW_ONLY
+                    if let Some(instance) = field_ty.into_nominal_instance() {
+                        if instance
+                            .class(self.db())
+                            .is_known(self.db(), KnownClass::KwOnly)
+                        {
+                            kw_only_field_names.push(name.clone());
+                        }
                     }
 
-                    kw_only_field_names.push(name);
+                    // Check field ordering
+                    if default_ty.is_some() {
+                        has_seen_default_field = true;
+                    } else if has_seen_default_field {
+                        required_after_default_field_names.push(name);
+                    }
                 }
 
                 if kw_only_field_names.len() > 1 {
@@ -1404,6 +1413,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .map(|name| format!("`{name}`"))
                                 .join(", ")
                         ));
+                    }
+                }
+
+                if !required_after_default_field_names.is_empty() {
+                    // Report field ordering violations
+                    let body_scope = class.body_scope(self.db()).file_scope_id(self.db());
+                    let use_def_map = self.index.use_def_map(body_scope);
+                    let place_table = self.index.place_table(body_scope);
+
+                    for name in required_after_default_field_names {
+                        let Some(symbol_id) = place_table.symbol_id(name.as_str()) else {
+                            continue;
+                        };
+                        if let Some(ann_assign) = use_def_map
+                            .end_of_scope_symbol_declarations(symbol_id)
+                            .find_map(|decl_with_constraints| {
+                                decl_with_constraints
+                                    .declaration
+                                    .definition()?
+                                    .kind(self.db())
+                                    .as_annotated_assignment()
+                            })
+                        {
+                            if let Some(builder) = self.context.report_lint(
+                                &DATACLASS_FIELD_ORDER,
+                                ann_assign.target(self.module()),
+                            ) {
+                                builder.into_diagnostic(format_args!(
+                                "Required field `{name}` cannot be defined after fields with default values",
+                            ));
+                            }
+                        }
                     }
                 }
             }
