@@ -291,7 +291,7 @@ help: Use `Self` as return type
 333 333 | class Generic1[T](list):
 334 334 |     def __new__(cls: type[Generic1]) -> Generic1: ...
 
-PYI034 `__new__` methods in classes like `Generic1` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.py:334:9
     |
 333 | class Generic1[T](list):
@@ -311,7 +311,7 @@ help: Use `Self` as return type
 336 336 | 
 337 337 | 
 
-PYI034 `__enter__` methods in classes like `Generic1` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic1` usually return `self` at runtime
    --> PYI034.py:335:9
     |
 333 | class Generic1[T](list):
@@ -331,7 +331,7 @@ help: Use `Self` as return type
 337 337 | 
 338 338 | ### Correctness of typevar-likes are not verified.
 
-PYI034 `__new__` methods in classes like `Generic2` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.py:345:9
     |
 344 | class Generic2(Generic[T]):
@@ -351,7 +351,7 @@ help: Use `Self` as return type
 347 347 | 
 348 348 | class Generic3(tuple[*Ts]):
 
-PYI034 `__enter__` methods in classes like `Generic2` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic2` usually return `self` at runtime
    --> PYI034.py:346:9
     |
 344 | class Generic2(Generic[T]):
@@ -373,7 +373,7 @@ help: Use `Self` as return type
 348 348 | class Generic3(tuple[*Ts]):
 349 349 |     def __new__(cls: type[Generic3]) -> Generic3: ...
 
-PYI034 `__new__` methods in classes like `Generic3` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.py:349:9
     |
 348 | class Generic3(tuple[*Ts]):
@@ -393,7 +393,7 @@ help: Use `Self` as return type
 351 351 | 
 352 352 | class Generic4(collections.abc.Callable[P, ...]):
 
-PYI034 `__enter__` methods in classes like `Generic3` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic3` usually return `self` at runtime
    --> PYI034.py:350:9
     |
 348 | class Generic3(tuple[*Ts]):
@@ -415,7 +415,7 @@ help: Use `Self` as return type
 352 352 | class Generic4(collections.abc.Callable[P, ...]):
 353 353 |     def __new__(cls: type[Generic4]) -> Generic4: ...
 
-PYI034 `__new__` methods in classes like `Generic4` usually return `self` at runtime
+PYI034 [*] `__new__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.py:353:9
     |
 352 | class Generic4(collections.abc.Callable[P, ...]):
@@ -435,7 +435,7 @@ help: Use `Self` as return type
 355 355 | 
 356 356 | from some_module import PotentialTypeVar
 
-PYI034 `__enter__` methods in classes like `Generic4` usually return `self` at runtime
+PYI034 [*] `__enter__` methods in classes like `Generic4` usually return `self` at runtime
    --> PYI034.py:354:9
     |
 352 | class Generic4(collections.abc.Callable[P, ...]):

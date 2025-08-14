@@ -105,7 +105,7 @@ help: Rewrite `f` as a `def`
 26 27 | 
 27 28 | def scope():
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:57:5
    |
 55 | class Scope:
@@ -126,7 +126,7 @@ help: Rewrite `f` as a `def`
 59 60 | 
 60 61 | class Scope:
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:73:9
    |
 71 |     x: Callable[[int], int]
@@ -149,7 +149,7 @@ help: Rewrite `x` as a `def`
 75 76 |         x = lambda: 2
 76 77 |     return x
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
   --> E731.py:75:9
    |
 73 |         x = lambda: 1
@@ -318,7 +318,7 @@ help: Rewrite `f` as a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
    --> E731.py:139:5
     |
 138 | class TemperatureScales(Enum):
@@ -339,7 +339,7 @@ help: Rewrite `CELSIUS` as a `def`
 141 142 | 
 142 143 | 
 
-E731 Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
    --> E731.py:140:5
     |
 138 | class TemperatureScales(Enum):
