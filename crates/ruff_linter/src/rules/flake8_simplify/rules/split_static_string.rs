@@ -9,6 +9,8 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_maxsplit_without_separator_fix_enabled;
+use crate::settings::LinterSettings;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -84,7 +86,9 @@ pub(crate) fn split_static_string(
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
-            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, direction),
+            Expr::NoneLiteral(_) => {
+                split_default(str_value, maxsplit_value, direction, checker.settings())
+            }
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
                 Some(split_sep(
@@ -100,7 +104,7 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value, direction)
+        split_default(str_value, maxsplit_value, direction, checker.settings())
     };
 
     let mut diagnostic = checker.report_diagnostic(SplitStaticString, call.range());
@@ -174,6 +178,7 @@ fn split_default(
     str_value: &StringLiteralValue,
     max_split: i32,
     direction: Direction,
+    settings: &LinterSettings,
 ) -> Option<Expr> {
     // From the Python documentation:
     // > If sep is not specified or is None, a different splitting algorithm is applied: runs of
@@ -185,6 +190,9 @@ fn split_default(
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
         Ordering::Greater => {
+            if !is_maxsplit_without_separator_fix_enabled(settings) {
+                return None;
+            }
             let Ok(max_split) = usize::try_from(max_split) else {
                 return None;
             };

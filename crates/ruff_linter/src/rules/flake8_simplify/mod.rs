@@ -60,6 +60,7 @@ mod tests {
     }
 
     #[test_case(Rule::MultipleWithStatements, Path::new("SIM117.py"))]
+    #[test_case(Rule::SplitStaticString, Path::new("SIM905.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
