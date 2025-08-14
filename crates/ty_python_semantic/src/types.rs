@@ -7141,13 +7141,13 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                if let Some(definition) = bindings.callable_type().definition(db)
-                    && let Some(definition_range) = definition.focus_range(db)
-                {
-                    diag.annotate(
-                        Annotation::secondary(definition_range.into())
-                            .message("attribute defined here"),
-                    );
+                if let Some(definition) = bindings.callable_type().definition(db) {
+                    if let Some(definition_range) = definition.focus_range(db) {
+                        diag.annotate(
+                            Annotation::secondary(definition_range.into())
+                                .message("attribute defined here"),
+                        );
+                    }
                 }
             }
             Self::Call(CallDunderError::PossiblyUnbound(bindings)) => {
@@ -7161,12 +7161,13 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::MethodNotAvailable) => {
                 diag.info("`__await__` is missing");
-                if let Some(type_definition) = context_expression_type.definition(db)
-                    && let Some(definition_range) = type_definition.focus_range(db)
-                {
-                    diag.annotate(
-                        Annotation::secondary(definition_range.into()).message("type defined here"),
-                    );
+                if let Some(type_definition) = context_expression_type.definition(db) {
+                    if let Some(definition_range) = type_definition.focus_range(db) {
+                        diag.annotate(
+                            Annotation::secondary(definition_range.into())
+                                .message("type defined here"),
+                        );
+                    }
                 }
             }
             Self::InvalidReturnType(return_type, bindings) => {
