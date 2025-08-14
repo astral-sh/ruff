@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_await.md - Invalid await diagnostics - `__await__` definition with extra arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_await.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class InvalidAwaitArgs:
+2 |     def __await__(self, value: int):
+3 |         yield value
+4 | 
+5 | async def main() -> None:
+6 |     await InvalidAwaitArgs()  # error: [invalid-await]
+```
+
+# Diagnostics
+
+```
+error[invalid-await]: `InvalidAwaitArgs` is not awaitable
+ --> src/mdtest_snippet.py:6:11
+  |
+5 | async def main() -> None:
+6 |     await InvalidAwaitArgs()  # error: [invalid-await]
+  |           ^^^^^^^^^^^^^^^^^^
+  |
+ ::: src/mdtest_snippet.py:2:18
+  |
+1 | class InvalidAwaitArgs:
+2 |     def __await__(self, value: int):
+  |                  ------------------ parameters here
+3 |         yield value
+  |
+info: `__await__` requires arguments and cannot be called implicitly
+info: rule `invalid-await` is enabled by default
+
+```

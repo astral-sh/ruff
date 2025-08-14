@@ -1,5 +1,7 @@
 # Invalid await diagnostics
 
+<!-- snapshot-diagnostics -->
+
 ## Basic
 
 This is a test showcasing a primitive case where an object is not awaitable.
@@ -39,10 +41,9 @@ async def main() -> None:
 
 ## `__await__` definition with extra arguments
 
-Currently, the signature of `__await__` isn't checked for conformity with the `Awaitable`
-protocol directly. Instead, individual anomalies are reported, such as the following.
-Here, the diagnostic reports that the object is not implicitly awaitable, while also pointing
-at the function parameters.
+Currently, the signature of `__await__` isn't checked for conformity with the `Awaitable` protocol
+directly. Instead, individual anomalies are reported, such as the following. Here, the diagnostic
+reports that the object is not implicitly awaitable, while also pointing at the function parameters.
 
 ```py
 class InvalidAwaitArgs:
@@ -55,8 +56,8 @@ async def main() -> None:
 
 ## Non-callable `__await__`
 
-This diagnostic doesn't point to the attribute definition,
-but complains about it being possibly not awaitable.
+This diagnostic doesn't point to the attribute definition, but complains about it being possibly not
+awaitable.
 
 ```py
 class NonCallableAwait:
@@ -68,8 +69,8 @@ async def main() -> None:
 
 ## `__await__` definition with explicit invalid return type
 
-`__await__` must return a valid iterator.
-This diagnostic also points to the method definition if available.
+`__await__` must return a valid iterator. This diagnostic also points to the method definition if
+available.
 
 ```py
 class InvalidAwaitReturn:
@@ -82,9 +83,8 @@ async def main() -> None:
 
 ## Invalid union return type
 
-When multiple potential definitions of `__await__` exist, all of them must be proper
-in order for an instance to be awaitable.
-In this specific case, no specific function definition is highlighted.
+When multiple potential definitions of `__await__` exist, all of them must be proper in order for an
+instance to be awaitable. In this specific case, no specific function definition is highlighted.
 
 ```py
 import typing
@@ -95,7 +95,6 @@ class UnawaitableUnion:
 
         def __await__(self) -> typing.Generator[typing.Any, None, None]:
             yield
-
     else:
 
         def __await__(self) -> int:

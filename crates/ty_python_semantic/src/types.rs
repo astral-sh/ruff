@@ -7123,7 +7123,7 @@ impl<'db> AwaitError<'db> {
         );
         match self {
             Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
-                diag.info("`__await__` expects invalid arguments and cannot be called implicitly");
+                diag.info("`__await__` requires arguments and cannot be called implicitly");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
                         Annotation::secondary(definition_spans.parameters)
