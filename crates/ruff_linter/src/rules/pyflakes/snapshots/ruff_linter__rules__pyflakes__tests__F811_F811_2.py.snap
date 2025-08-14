@@ -2,15 +2,11 @@
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
 F811 Redefinition of unused `FU` from line 1
- --> F811_2.py:1:34
-  |
-1 | from moo import fu as FU, bar as FU
-  |                                  ^^
-  |
-info: previous definition of `FU` here
  --> F811_2.py:1:23
   |
 1 | from moo import fu as FU, bar as FU
-  |                       ^^
+  |                       --         ^^
+  |                       |
+  |                       previous definition of `FU` here
   |
 help: Remove definition: `FU`

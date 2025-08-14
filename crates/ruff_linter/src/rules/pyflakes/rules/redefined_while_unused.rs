@@ -192,7 +192,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 binding.range(),
             );
 
-            diagnostic.info(
+            diagnostic.secondary_annotation(
                 format_args!("previous definition of `{name}` here"),
                 shadowed,
             );

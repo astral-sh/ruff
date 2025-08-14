@@ -8,12 +8,11 @@ F811 Redefinition of unused `bar` from line 6
    |     ^^^
 11 |     pass
    |
-info: previous definition of `bar` here
- --> F811_0.py:6:5
-  |
-5 | @foo
-6 | def bar():
-  |     ^^^
-7 |     pass
-  |
+  ::: F811_0.py:6:5
+   |
+ 5 | @foo
+ 6 | def bar():
+   |     --- previous definition of `bar` here
+ 7 |     pass
+   |
 help: Remove definition: `bar`

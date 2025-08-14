@@ -10,12 +10,11 @@ F811 Redefinition of unused `fu` from line 3
   |             ^^
 9 |             pass
   |
-info: previous definition of `fu` here
- --> F811_16.py:3:8
+ ::: F811_16.py:3:8
   |
 1 | """Test that shadowing a global with a nested function generates a warning."""
 2 |
 3 | import fu
-  |        ^^
+  |        -- previous definition of `fu` here
   |
 help: Remove definition: `fu`
