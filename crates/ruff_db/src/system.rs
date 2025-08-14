@@ -46,7 +46,7 @@ pub type Result<T> = std::io::Result<T>;
 ///    * File watching isn't supported.
 ///
 /// Abstracting the system also enables tests to use a more efficient in-memory file system.
-pub trait System: Debug + Sync {
+pub trait System: Debug {
     /// Reads the metadata of the file or directory at `path`.
     ///
     /// This function will traverse symbolic links to query information about the destination file.
