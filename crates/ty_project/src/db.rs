@@ -21,6 +21,8 @@ mod changes;
 #[salsa::db]
 pub trait Db: SemanticDb {
     fn project(&self) -> Project;
+
+    fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
 #[salsa::db]
@@ -484,6 +486,10 @@ impl Db for ProjectDatabase {
     fn project(&self) -> Project {
         self.project.unwrap()
     }
+
+    fn dyn_clone(&self) -> Box<dyn Db> {
+        Box::new(self.clone())
+    }
 }
 
 #[cfg(feature = "format")]
@@ -610,6 +616,10 @@ pub(crate) mod tests {
     impl Db for TestDb {
         fn project(&self) -> Project {
             self.project.unwrap()
+        }
+
+        fn dyn_clone(&self) -> Box<dyn Db> {
+            Box::new(self.clone())
         }
     }
 

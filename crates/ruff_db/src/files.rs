@@ -89,66 +89,30 @@ impl Files {
             .or_insert_with(|| {
                 let metadata = db.system().path_metadata(path);
 
-                self.create_system_entry(db, absolute, metadata)
+                tracing::trace!("Adding file '{absolute}'");
+
+                let durability = self
+                    .root(db, &absolute)
+                    .map_or(Durability::default(), |root| root.durability(db));
+
+                let builder = File::builder(FilePath::System(absolute))
+                    .durability(durability)
+                    .path_durability(Durability::HIGH);
+
+                let builder = match metadata {
+                    Ok(metadata) if metadata.file_type().is_file() => builder
+                        .permissions(metadata.permissions())
+                        .revision(metadata.revision()),
+                    Ok(metadata) if metadata.file_type().is_directory() => {
+                        builder.status(FileStatus::IsADirectory)
+                    }
+                    _ => builder
+                        .status(FileStatus::NotFound)
+                        .status_durability(Durability::MEDIUM.max(durability)),
+                };
+
+                builder.new(db)
             })
-    }
-
-    /// Looks up or inserts a [`File`] at the given path using the provided metadata.
-    ///
-    ///
-    /// Prefer using [`system_path_to_file`] unless its `stats` call when inserting a new file is a performance
-    /// concern because the metadata is already available or when computing the metadata on different threads.
-    ///
-    /// The metadata is only used when inserting a new file. It doesn't
-    /// update the metadata if a [`File`] for `path` already exists.
-    ///
-    /// This function differs from [`system_path_to_file`] in that it doesn't add a dependency
-    /// on `File.status` and always returns a `File`, even
-    /// if `path` doesn't point to a file (e.g. if `path` is a directory).
-    pub fn system_from_metadata(
-        &self,
-        db: &dyn Db,
-        path: &SystemPath,
-        metadata: crate::system::Metadata,
-    ) -> File {
-        let absolute = SystemPath::absolute(path, db.system().current_directory());
-
-        *self
-            .inner
-            .system_by_path
-            .entry(absolute.clone())
-            .or_insert_with(|| self.create_system_entry(db, absolute, Ok(metadata)))
-    }
-
-    fn create_system_entry(
-        &self,
-        db: &dyn Db,
-        absolute_path: SystemPathBuf,
-        metadata: crate::system::Result<crate::system::Metadata>,
-    ) -> File {
-        tracing::trace!("Adding file '{absolute_path}'");
-
-        let durability = self
-            .root(db, &absolute_path)
-            .map_or(Durability::default(), |root| root.durability(db));
-
-        let builder = File::builder(FilePath::System(absolute_path))
-            .durability(durability)
-            .path_durability(Durability::HIGH);
-
-        let builder = match metadata {
-            Ok(metadata) if metadata.file_type().is_file() => builder
-                .permissions(metadata.permissions())
-                .revision(metadata.revision()),
-            Ok(metadata) if metadata.file_type().is_directory() => {
-                builder.status(FileStatus::IsADirectory)
-            }
-            _ => builder
-                .status(FileStatus::NotFound)
-                .status_durability(Durability::MEDIUM.max(durability)),
-        };
-
-        builder.new(db)
     }
 
     /// Tries to look up the file for the given system path, returns `None` if no such file exists yet

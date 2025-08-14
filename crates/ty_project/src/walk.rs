@@ -1,8 +1,8 @@
 use crate::glob::IncludeExcludeFilter;
 use crate::{Db, GlobFilterCheckMode, IOErrorDiagnostic, IOErrorKind, IncludeResult, Project};
-use ruff_db::files::File;
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
-use ruff_db::system::{Metadata, SystemPath, SystemPathBuf};
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use rustc_hash::FxHashSet;
 use std::path::PathBuf;
@@ -163,25 +163,24 @@ impl<'a> ProjectFilesWalker<'a> {
 
     /// Walks the project paths and collects the paths of all files that
     /// are included in the project.
-    pub(crate) fn walk_paths(
-        self,
-        db: &dyn Db,
-    ) -> (Vec<(SystemPathBuf, Metadata)>, Vec<IOErrorDiagnostic>) {
-        let paths = std::sync::Mutex::new(Vec::new());
+    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
+        let files = std::sync::Mutex::new(Vec::new());
         let diagnostics = std::sync::Mutex::new(Vec::new());
 
-        let system = db.system();
-
         self.walker.run(|| {
-            Box::new(|entry| {
+            let db = db.dyn_clone();
+            let filter = &self.filter;
+            let files = &files;
+            let diagnostics = &diagnostics;
+
+            Box::new(move |entry| {
                 match entry {
                     Ok(entry) => {
                         // Skip excluded directories unless they were explicitly passed to the walker
                         // (which is the case passed to `ty check <paths>`).
                         if entry.file_type().is_directory() {
                             if entry.depth() > 0 {
-                                let directory_included = self
-                                    .filter
+                                let directory_included = filter
                                     .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
                                 return match directory_included {
                                     IncludeResult::Included => WalkState::Continue,
@@ -215,8 +214,7 @@ impl<'a> ProjectFilesWalker<'a> {
                             // For all files, except the ones that were explicitly passed to the walker (CLI),
                             // check if they're included in the project.
                             if entry.depth() > 0 {
-                                match self
-                                    .filter
+                                match filter
                                     .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
                                 {
                                     IncludeResult::Included => {},
@@ -239,9 +237,8 @@ impl<'a> ProjectFilesWalker<'a> {
 
                             // If this returns `Err`, then the file was deleted between now and when the walk callback was called.
                             // We can ignore this.
-                            if let Ok(metadata) = system.path_metadata(entry.path()) {
-                                let mut paths = paths.lock().unwrap();
-                                paths.push((entry.into_path(), metadata));
+                            if let Ok(file) = system_path_to_file(&*db, entry.path()) {
+                                files.lock().unwrap().push(file);
                             }
                         }
                     }
@@ -283,32 +280,14 @@ impl<'a> ProjectFilesWalker<'a> {
         });
 
         (
-            paths.into_inner().unwrap(),
+            files.into_inner().unwrap(),
             diagnostics.into_inner().unwrap(),
         )
     }
 
-    pub(crate) fn collect_vec(self, db: &dyn Db) -> (Vec<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths(db);
-
-        (
-            paths
-                .into_iter()
-                .map(|(path, metadata)| db.files().system_from_metadata(db, &path, metadata))
-                .collect(),
-            diagnostics,
-        )
-    }
-
     pub(crate) fn collect_set(self, db: &dyn Db) -> (FxHashSet<File>, Vec<IOErrorDiagnostic>) {
-        let (paths, diagnostics) = self.walk_paths(db);
-
-        let files: FxHashSet<_> = paths
-            .into_iter()
-            .map(|(path, metadata)| db.files().system_from_metadata(db, &path, metadata))
-            .collect();
-
-        (files, diagnostics)
+        let (files, diagnostics) = self.collect_vec(db);
+        (files.into_iter().collect(), diagnostics)
     }
 }
 
