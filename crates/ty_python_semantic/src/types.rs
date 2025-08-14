@@ -6787,6 +6787,9 @@ pub struct FieldInstance<'db> {
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
+
+    /// Whether or not this field can only be passed as a keyword argument to `__init__`.
+    pub kw_only: Option<bool>,
 }
 
 // The Salsa heap is tracked separately.
@@ -6798,6 +6801,7 @@ impl<'db> FieldInstance<'db> {
             db,
             self.default_type(db).normalized_impl(db, visitor),
             self.init(db),
+            self.kw_only(db),
         )
     }
 }
