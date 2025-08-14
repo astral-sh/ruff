@@ -263,7 +263,7 @@ impl Printer {
                     .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.format == OutputFormat::Full)
-                    .with_unsafe_fixes(self.unsafe_fixes)
+                    .with_fix_applicability(self.unsafe_fixes.required_applicability())
                     .with_preview(preview)
                     .emit(writer, &diagnostics.inner, &context)?;
 
@@ -461,7 +461,7 @@ impl Printer {
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_show_source(preview)
-                .with_unsafe_fixes(self.unsafe_fixes)
+                .with_fix_applicability(self.unsafe_fixes.required_applicability())
                 .emit(writer, &diagnostics.inner, &context)?;
         }
         writer.flush()?;
