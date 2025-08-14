@@ -110,13 +110,21 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
-`TypeError` will be raised at runtime. Ideally, we would emit a diagnostic in that case:
+`TypeError` will be raised at runtime. We emit a diagnostic in that case:
 
 ```py
+from dataclasses import field
+
 @dataclass
 class D:
     x: int = 1
     # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: str
+
+@dataclass
+class E:
+    x: int = field(default=3)
+    # error: [dataclass-field-order]
     y: str
 ```
 
