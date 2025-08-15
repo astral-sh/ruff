@@ -32,9 +32,9 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{Boundness, Place, PlaceAndQualifiers, imported_symbol};
-use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
+use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
@@ -7170,62 +7170,6 @@ impl<'db> TypeVarInstance<'db> {
             typevar_node.default.as_ref()?,
         ))
     }
-
-    fn inferred_variance(self, db: &'db dyn Db) -> TypeVarVariance {
-        let _span = tracing::trace_span!("inferred_variance").entered();
-        assert_eq!(self.kind(db), TypeVarKind::Pep695);
-        match self.definition(db) {
-            Some(definition) => {
-                let file = definition.file(db);
-                let module = parsed_module(db, file).load(db);
-                let defn_key: DefinitionNodeKey = match definition.scope(db).node(db) {
-                    NodeWithScopeKind::ClassTypeParameters(ast_node_ref) => {
-                        // For class type parameters, we can infer variance from the class's
-                        // base classes and their type parameters.
-                        ast_node_ref.node(&module).into()
-                    }
-                    NodeWithScopeKind::FunctionTypeParameters(_) => {
-                        // variance isn't meaningful in function type
-                        // parameters, as there's no notion of assignment
-                        // between specializations of the function
-                        return TypeVarVariance::Invariant;
-                    }
-                    NodeWithScopeKind::TypeAliasTypeParameters(ast_node_ref) => {
-                        ast_node_ref.node(&module).into()
-                    }
-                    NodeWithScopeKind::TypeAlias(_)
-                    | NodeWithScopeKind::Lambda(_)
-                    | NodeWithScopeKind::Function(_)
-                    | NodeWithScopeKind::ListComprehension(_)
-                    | NodeWithScopeKind::SetComprehension(_)
-                    | NodeWithScopeKind::DictComprehension(_)
-                    | NodeWithScopeKind::GeneratorExpression(_)
-                    | NodeWithScopeKind::Module
-                    | NodeWithScopeKind::Class(_) => {
-                        panic!("invalid definition kind for type variable")
-                    }
-                };
-                let semantic = semantic_index(db, file);
-                let defn = semantic.expect_single_definition(defn_key);
-                let type_inference = infer_definition_types(db, defn);
-                let bound_self =
-                    BoundTypeVarInstance::new(db, self, BindingContext::Definition(defn));
-                type_inference
-                    .binding_type(defn)
-                    .variance_of(db, bound_self)
-            }
-            None => {
-                // For synthesized type variables, we'll specify variance
-                // explicitly if we care about it
-                TypeVarVariance::Invariant
-            }
-        }
-    }
-
-    pub(crate) fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
-        self.explicit_variance(db)
-            .unwrap_or_else(|| self.inferred_variance(db))
-    }
 }
 
 /// Where a type variable is bound and usable.
@@ -7258,6 +7202,33 @@ pub struct BoundTypeVarInstance<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn variance_with_polarity(
+        self,
+        db: &'db dyn Db,
+        polarity: TypeVarVariance,
+    ) -> TypeVarVariance {
+        let _span = tracing::trace_span!("variance_with_polarity").entered();
+        match self.typevar(db).explicit_variance(db) {
+            Some(explicit_variance) => explicit_variance.compose(polarity),
+            None => match self.binding_context(db) {
+                BindingContext::Definition(definition) => {
+                    let type_inference = infer_definition_types(db, definition);
+                    type_inference
+                        .binding_type(definition)
+                        .with_polarity(polarity)
+                        .variance_of(db, self)
+                }
+                BindingContext::Synthetic => TypeVarVariance::Invariant,
+            },
+        }
+    }
+
+    pub(crate) fn variance(self, db: &'db dyn Db) -> TypeVarVariance {
+        self.variance_with_polarity(db, TypeVarVariance::Covariant)
+    }
+}
 
 fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,

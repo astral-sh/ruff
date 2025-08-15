@@ -29,9 +29,51 @@ impl TypeVarVariance {
             (Bivariant, other) | (other, Bivariant) => other,
         }
     }
-}
 
-impl TypeVarVariance {
+    /// Compose two variances: useful for combining use-site and definition-site variances, e.g.
+    /// C[D[T]] or function argument/return position variances.
+    ///
+    /// `other` is a thunk to avoid unnecessary computation when `self` is `Bivariant`.
+    ///
+    /// Based on the variance composition/transformation operator in
+    /// https://people.cs.umass.edu/~yannis/variance-extended2011.pdf, page 5
+    ///
+    /// While their operation would have `compose(Invariant, Bivariant) ==
+    /// Invariant`, we instead have it evaluate to `Bivariant`. This is a valid
+    /// choice, as discussed on that same page, where type equality is semantic
+    /// rather than syntactic. To see that this holds for our setting consider
+    /// the type
+    /// ```python
+    /// type ConstantInt[T] = int
+    /// ```     
+    /// We would say `ConstantInt[str]` = `ConstantInt[float]`, so we qualify as
+    /// using semantic equivalence.
+    #[must_use]
+    pub(crate) fn compose(self, other: Self) -> Self {
+        self.compose_thunk(|| other)
+    }
+
+    /// Like `compose`, but takes `other` as a thunk to avoid unnecessary
+    /// computation when `self` is `Bivariant`.
+    #[must_use]
+    pub(crate) fn compose_thunk<F>(self, other: F) -> Self
+    where
+        F: FnOnce() -> Self,
+    {
+        match self {
+            TypeVarVariance::Covariant => other(),
+            TypeVarVariance::Contravariant => other().flip(),
+            TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
+            TypeVarVariance::Invariant => {
+                if TypeVarVariance::Bivariant == other() {
+                    TypeVarVariance::Bivariant
+                } else {
+                    TypeVarVariance::Invariant
+                }
+            }
+        }
+    }
+
     /// Flips the polarity of the variance.
     ///
     /// Covariant becomes contravariant, contravariant becomes covariant, others remain unchanged.
@@ -85,34 +127,12 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    // Based on the variance composition/transformation operator in
-    // https://people.cs.umass.edu/~yannis/variance-extended2011.pdf, page 5
-    //
-    // While their operation has compose(invariant, bivariant) = invariant, we
-    // instead have it evaluate to bivariant. This is a valid choice, as
-    // discussed on that same page, where type equality is semantic rather than
-    // syntactic. To see that this holds for our setting consider the type
-    // ```python
-    // type ConstantInt[T] = int
-    // ```
-    // We would say `ConstantInt[str]` = `ConstantInt[float]`, so we qualify as
-    // using semantic equivalence.
     fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
-        match polarity {
-            TypeVarVariance::Covariant => variance_inferable.variance_of(db, type_var),
-            TypeVarVariance::Contravariant => variance_inferable.variance_of(db, type_var).flip(),
-            TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
-            TypeVarVariance::Invariant => {
-                if TypeVarVariance::Bivariant == variance_inferable.variance_of(db, type_var) {
-                    TypeVarVariance::Bivariant
-                } else {
-                    TypeVarVariance::Invariant
-                }
-            }
-        }
+
+        polarity.compose_thunk(|| variance_inferable.variance_of(db, type_var))
     }
 }
