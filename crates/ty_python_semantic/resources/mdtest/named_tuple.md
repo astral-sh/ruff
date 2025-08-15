@@ -219,9 +219,9 @@ At runtime, `NamedTuple` is a function, and we understand this:
 import types
 import typing
 
-def f(x: types.FunctionType): ...
+def expects_functiontype(x: types.FunctionType): ...
 
-f(typing.NamedTuple)
+expects_functiontype(typing.NamedTuple)
 ```
 
 This means we also understand that all attributes on function objects are available on the symbol
@@ -245,14 +245,15 @@ in type expressions and understand it as describing an interface that all `Named
 satisfy:
 
 ```py
-def f(x: typing.NamedTuple):
-    reveal_type(x)  # revealed: NamedTupleLike
+def expects_named_tuple(x: typing.NamedTuple):
+    reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> Self@_make
     reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> Self@_replace
-    reveal_type(x.__add__)  # revealed: bound method NamedTupleLike.__add__(value: tuple[Any, ...], /) -> tuple[object, ...]
-    reveal_type(x.__iter__)  # revealed: bound method NamedTupleLike.__iter__() -> Iterator[object]
+    # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
+    reveal_type(x.__add__)
+    reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
 
-def g(y: type[typing.NamedTuple]):
+def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
 ```
 
@@ -272,7 +273,24 @@ reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
 static_assert(is_assignable_to(Point, NamedTuple))
-f(Point(x=42, y=56))
+
+expects_named_tuple(Point(x=42, y=56))  # fine
+
+# error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `tuple[Literal[1], Literal[2]]`"
+expects_named_tuple((1, 2))
+```
+
+The type described by `NamedTuple` in type expressions is understood as being assignable to
+`tuple[object, ...]` and `tuple[Any, ...]`:
+
+```py
+static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
+static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
+
+def expects_tuple(x: tuple[object, ...]): ...
+def _(x: NamedTuple):
+    expects_tuple(x)  # fine
 ```
 
 ## NamedTuple with custom `__getattr__`

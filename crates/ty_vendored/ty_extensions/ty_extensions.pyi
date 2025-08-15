@@ -1,14 +1,12 @@
 import sys
-from collections.abc import Collection, Iterable, Reversible
+from collections.abc import Iterable
 from enum import Enum
 from typing import (
     Any,
     ClassVar,
     LiteralString,
     Protocol,
-    SupportsIndex,
     _SpecialForm,
-    overload,
 )
 
 from typing_extensions import Self  # noqa: UP035
@@ -84,7 +82,7 @@ def reveal_protocol_interface(protocol: type) -> None: ...
 
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
-class NamedTupleLike(Reversible[object], Collection[object], Protocol):
+class NamedTupleLike(Protocol):
     # from typing.NamedTuple stub
     _field_defaults: ClassVar[dict[str, Any]]
     _fields: ClassVar[tuple[str, ...]]
@@ -94,17 +92,3 @@ class NamedTupleLike(Reversible[object], Collection[object], Protocol):
     def _replace(self: Self, /, **kwargs) -> Self: ...
     if sys.version_info >= (3, 13):
         def __replace__(self: Self, **kwargs) -> Self: ...
-
-    # from Sequence stub
-    @overload
-    def __getitem__(self, index: int, /) -> object: ...
-    @overload
-    def __getitem__(self, index: slice, /) -> tuple[object, ...]: ...
-    def index(self, value, start: int = 0, stop: int = ..., /) -> int: ...
-    def count(self, value, /) -> int: ...
-
-    # from tuple stub
-    def __add__(self, value: tuple[Any, ...], /) -> tuple[object, ...]: ...
-    def __mul__(self, value: SupportsIndex, /) -> tuple[object, ...]: ...
-    def __rmul__(self, value: SupportsIndex, /) -> tuple[object, ...]: ...
-    def __hash__(self, /) -> int: ...
