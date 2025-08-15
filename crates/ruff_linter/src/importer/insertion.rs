@@ -64,8 +64,7 @@ impl<'a> Insertion<'a> {
             }
 
             // While the first token after the docstring is a continuation character (i.e. "\"), advance
-            // additional rows to prevent inserting in the same logical line. Continue advancing
-            // while subsequent lines also contain a continuation.
+            // additional rows to prevent inserting in the same logical line.
             while match_continuation(locator.after(location)).is_some() {
                 location = locator.full_line_end(location);
             }
