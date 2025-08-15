@@ -28,6 +28,7 @@ targets = [
     "x86_64-apple-darwin",
     "powerpc64-unknown-linux-gnu",
     "powerpc64le-unknown-linux-gnu",
+    "riscv64gc-unknown-linux-gnu",
     "s390x-unknown-linux-gnu",
     "x86_64-unknown-linux-gnu",
     "x86_64-unknown-linux-musl",
@@ -71,5 +72,5 @@ global = "depot-ubuntu-latest-4"
 [dist.github-action-commits]
 "actions/checkout" = "09d2acae674a48949e3602304ab46fd20ae0c42f" # v4
 "actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
-"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
+"actions/download-artifact" = "634f93cb2916e3fdff6788551b99b062d0335ce0" # v5.0.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

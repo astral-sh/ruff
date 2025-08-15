@@ -147,8 +147,8 @@ import sys
 from _typeshed import MaybeNone, StrOrBytesPath, SupportsWrite
 from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from re import Pattern
-from typing import Any, ClassVar, Final, Literal, TypeVar, overload
-from typing_extensions import TypeAlias
+from typing import Any, ClassVar, Final, Literal, TypeVar, overload, type_check_only
+from typing_extensions import TypeAlias, deprecated
 
 if sys.version_info >= (3, 14):
     __all__ = (
@@ -249,7 +249,9 @@ else:
     ]
 
 if sys.version_info >= (3, 13):
+    @type_check_only
     class _UNNAMED_SECTION: ...
+
     UNNAMED_SECTION: _UNNAMED_SECTION
 
     _SectionName: TypeAlias = str | _UNNAMED_SECTION
@@ -300,6 +302,9 @@ class ExtendedInterpolation(Interpolation):
     """
 
 if sys.version_info < (3, 13):
+    @deprecated(
+        "Deprecated since Python 3.2; removed in Python 3.13. Use `BasicInterpolation` or `ExtendedInterpolation` instead."
+    )
     class LegacyInterpolation(Interpolation):
         """Deprecated interpolation used in old versions of ConfigParser.
         Use BasicInterpolation or ExtendedInterpolation instead.
@@ -494,6 +499,7 @@ class RawConfigParser(_Parser):
         dictionary being read.
         """
     if sys.version_info < (3, 12):
+        @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `parser.read_file()` instead.")
         def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:
             """Deprecated, use read_file instead."""
     # These get* methods are partially applied (with the same names) in
@@ -613,7 +619,8 @@ class ConfigParser(RawConfigParser):
     ) -> str | _T: ...
 
 if sys.version_info < (3, 12):
-    class SafeConfigParser(ConfigParser):  # deprecated alias
+    @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `ConfigParser` instead.")
+    class SafeConfigParser(ConfigParser):
         """ConfigParser alias for backwards compatibility purposes."""
 
 class SectionProxy(MutableMapping[str, str]):
@@ -776,9 +783,23 @@ class ParsingError(Error):
     elif sys.version_info >= (3, 12):
         def __init__(self, source: str) -> None: ...
     else:
-        def __init__(self, source: str | None = None, filename: str | None = None) -> None: ...
+        @overload
+        def __init__(self, source: str, filename: None = None) -> None: ...
+        @overload
+        @deprecated("The `filename` parameter removed in Python 3.12. Use `source` instead.")
+        def __init__(self, source: None = None, filename: str = ...) -> None: ...
 
     def append(self, lineno: int, line: str) -> None: ...
+
+    if sys.version_info < (3, 12):
+        @property
+        @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `source` instead.")
+        def filename(self) -> str:
+            """Deprecated, use `source'."""
+
+        @filename.setter
+        @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `source` instead.")
+        def filename(self, value: str) -> None: ...
 
 class MissingSectionHeaderError(ParsingError):
     """Raised when a key-value pair is found before any section header."""

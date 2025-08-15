@@ -12,11 +12,13 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true, features = ["os"] }
+ruff_macros = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
+ty_combine = { workspace = true }
 ty_ide = { workspace = true }
 ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }

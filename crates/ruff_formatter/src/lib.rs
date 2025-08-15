@@ -193,7 +193,7 @@ pub trait FormatContext {
     fn options(&self) -> &Self::Options;
 
     /// Returns the source code from the document that gets formatted.
-    fn source_code(&self) -> SourceCode;
+    fn source_code(&self) -> SourceCode<'_>;
 }
 
 /// Options customizing how the source code should be formatted.
@@ -239,7 +239,7 @@ impl FormatContext for SimpleFormatContext {
         &self.options
     }
 
-    fn source_code(&self) -> SourceCode {
+    fn source_code(&self) -> SourceCode<'_> {
         SourceCode::new(&self.source_code)
     }
 }
@@ -326,7 +326,7 @@ where
         printer.print_with_indent(&self.document, indent)
     }
 
-    fn create_printer(&self) -> Printer {
+    fn create_printer(&self) -> Printer<'_> {
         let source_code = self.context.source_code();
         let print_options = self.context.options().as_print_options();
 

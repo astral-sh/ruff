@@ -26,17 +26,29 @@ pub(super) struct Diagnostics<'a> {
 }
 
 impl Diagnostics<'_> {
-    pub(super) fn result_id_from_hash(diagnostics: &[ruff_db::diagnostic::Diagnostic]) -> String {
+    /// Computes the result ID for `diagnostics`.
+    ///
+    /// Returns `None` if there are no diagnostics.
+    pub(super) fn result_id_from_hash(
+        diagnostics: &[ruff_db::diagnostic::Diagnostic],
+    ) -> Option<String> {
+        if diagnostics.is_empty() {
+            return None;
+        }
+
         // Generate result ID based on raw diagnostic content only
         let mut hasher = DefaultHasher::new();
 
         // Hash the length first to ensure different numbers of diagnostics produce different hashes
         diagnostics.hash(&mut hasher);
 
-        format!("{:x}", hasher.finish())
+        Some(format!("{:016x}", hasher.finish()))
     }
 
-    pub(super) fn result_id(&self) -> String {
+    /// Computes the result ID for the diagnostics.
+    ///
+    /// Returns `None` if there are no diagnostics.
+    pub(super) fn result_id(&self) -> Option<String> {
         Self::result_id_from_hash(&self.items)
     }
 
@@ -187,12 +199,7 @@ pub(crate) fn publish_settings_diagnostics(
     // Note we DO NOT respect the fact that clients support pulls because these are
     // files they *specifically* won't pull diagnostics from us for, because we don't
     // claim to be an LSP for them.
-    let has_workspace_diagnostics = session
-        .workspaces()
-        .for_path(&path)
-        .map(|workspace| workspace.settings().diagnostic_mode().is_workspace())
-        .unwrap_or(false);
-    if has_workspace_diagnostics {
+    if session.global_settings().diagnostic_mode().is_workspace() {
         return;
     }
 

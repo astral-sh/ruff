@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+ --> E731.py:3:5
   |
 1 | def scope():
 2 |     # E731
 3 |     f = lambda x: 2 * x
-  |     ^^^^^^^^^^^^^^^^^^^ E731
+  |     ^^^^^^^^^^^^^^^^^^^
   |
-  = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 1 1 | def scope():
@@ -20,14 +21,15 @@ E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 5 6 | 
 6 7 | def scope():
 
-E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+ --> E731.py:8:5
   |
 6 | def scope():
 7 |     # E731
 8 |     f = lambda x: 2 * x
-  |     ^^^^^^^^^^^^^^^^^^^ E731
+  |     ^^^^^^^^^^^^^^^^^^^
   |
-  = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 5  5  | 
@@ -40,14 +42,15 @@ E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 10 11 | 
 11 12 | def scope():
 
-E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:14:9
    |
 12 |     # E731
 13 |     while False:
 14 |         this = lambda y, z: 2 * x
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `this` as a `def`
+help: Rewrite `this` as a `def`
 
 ℹ Unsafe fix
 11 11 | def scope():
@@ -60,14 +63,15 @@ E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
 16 17 | 
 17 18 | def scope():
 
-E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:19:5
    |
 17 | def scope():
 18 |     # E731
 19 |     f = lambda: (yield 1)
-   |     ^^^^^^^^^^^^^^^^^^^^^ E731
+   |     ^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 16 16 | 
@@ -80,14 +84,15 @@ E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 21 22 | 
 22 23 | def scope():
 
-E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:24:5
    |
 22 | def scope():
 23 |     # E731
 24 |     f = lambda: (yield from g())
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 21 21 | 
@@ -100,14 +105,15 @@ E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 26 27 | 
 27 28 | def scope():
 
-E731.py:57:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:57:5
    |
 55 | class Scope:
 56 |     # E731
 57 |     f = lambda x: 2 * x
-   |     ^^^^^^^^^^^^^^^^^^^ E731
+   |     ^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 54 54 | 
@@ -120,16 +126,17 @@ E731.py:57:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 59 60 | 
 60 61 | class Scope:
 
-E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
+E731 Do not assign a `lambda` expression, use a `def`
+  --> E731.py:73:9
    |
 71 |     x: Callable[[int], int]
 72 |     if True:
 73 |         x = lambda: 1
-   |         ^^^^^^^^^^^^^ E731
+   |         ^^^^^^^^^^^^^
 74 |     else:
 75 |         x = lambda: 2
    |
-   = help: Rewrite `x` as a `def`
+help: Rewrite `x` as a `def`
 
 ℹ Display-only fix
 70 70 | 
@@ -142,15 +149,16 @@ E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
 75 76 |         x = lambda: 2
 76 77 |     return x
 
-E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
+E731 Do not assign a `lambda` expression, use a `def`
+  --> E731.py:75:9
    |
 73 |         x = lambda: 1
 74 |     else:
 75 |         x = lambda: 2
-   |         ^^^^^^^^^^^^^ E731
+   |         ^^^^^^^^^^^^^
 76 |     return x
    |
-   = help: Rewrite `x` as a `def`
+help: Rewrite `x` as a `def`
 
 ℹ Display-only fix
 72 72 |     if True:
@@ -163,14 +171,15 @@ E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
 77 78 | 
 78 79 | 
 
-E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:86:5
    |
 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 |     P = ParamSpec("P")
 86 |     f: Callable[P, int] = lambda *args: len(args)
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 83 83 | 
@@ -183,14 +192,15 @@ E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 88 89 | 
 89 90 | def scope():
 
-E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+  --> E731.py:94:5
    |
 92 |     from typing import Callable
 93 |
 94 |     f: Callable[[], None] = lambda: None
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-   = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 91 91 | 
@@ -203,14 +213,15 @@ E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 96 97 | 
 97 98 | def scope():
 
-E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:102:5
     |
 100 |     from typing import Callable
 101 |
 102 |     f: Callable[..., None] = lambda a, b: None
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 99  99  | 
@@ -223,14 +234,15 @@ E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 104 105 | 
 105 106 | def scope():
 
-E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:110:5
     |
 108 |     from typing import Callable
 109 |
 110 |     f: Callable[[int], int] = lambda x: 2 * x
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 107 107 | 
@@ -243,14 +255,15 @@ E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 112 113 | 
 113 114 | # Let's use the `Callable` type from `collections.abc` instead.
 
-E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:119:5
     |
 117 |     from collections.abc import Callable
 118 |
 119 |     f: Callable[[str, int], str] = lambda a, b: a * b
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 116 116 | 
@@ -263,14 +276,15 @@ E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 121 122 | 
 122 123 | def scope():
 
-E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:127:5
     |
 125 |     from collections.abc import Callable
 126 |
 127 |     f: Callable[[str, int], tuple[str, int]] = lambda a, b: (a, b)
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 124 124 | 
@@ -283,14 +297,15 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 129 130 | 
 130 131 | def scope():
 
-E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:135:5
     |
 133 |     from collections.abc import Callable
 134 |
 135 |     f: Callable[[str, int, list[str]], list[str]] = lambda a, b, /, c: [*c, a * b]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 132 132 | 
@@ -303,14 +318,15 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 137 138 | 
 138 139 | class TemperatureScales(Enum):
 
-E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:139:5
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 140 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
     |
-    = help: Rewrite `CELSIUS` as a `def`
+help: Rewrite `CELSIUS` as a `def`
 
 ℹ Unsafe fix
 136 136 | 
@@ -323,14 +339,15 @@ E731.py:139:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 141 142 | 
 142 143 | 
 
-E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:140:5
     |
 138 | class TemperatureScales(Enum):
 139 |     CELSIUS = (lambda deg_c: deg_c)
 140 |     FAHRENHEIT = (lambda deg_c: deg_c * 9 / 5 + 32)
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
-    = help: Rewrite `FAHRENHEIT` as a `def`
+help: Rewrite `FAHRENHEIT` as a `def`
 
 ℹ Unsafe fix
 137 137 | 
@@ -343,16 +360,17 @@ E731.py:140:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 142 143 | 
 143 144 | # Regression test for: https://github.com/astral-sh/ruff/issues/7141
 
-E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:147:5
     |
 145 |       # E731
 146 |
 147 | /     f = lambda: (
 148 | |         i := 1,
 149 | |     )
-    | |_____^ E731
+    | |_____^
     |
-    = help: Rewrite `f` as a `def`
+help: Rewrite `f` as a `def`
 
 ℹ Unsafe fix
 144 144 | def scope():
@@ -369,7 +387,8 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
 151 152 | 
 152 153 | from dataclasses import dataclass
 
-E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:163:1
     |
 161 |   # Regression tests for:
 162 |   # * https://github.com/astral-sh/ruff/issues/7720
@@ -377,11 +396,11 @@ E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 164 | |         a
 165 | |     b
 166 | | """
-    | |___^ E731
+    | |___^
 167 |
 168 |   # * https://github.com/astral-sh/ruff/issues/10277
     |
-    = help: Rewrite `x` as a `def`
+help: Rewrite `x` as a `def`
 
 ℹ Unsafe fix
 160 160 | 
@@ -394,15 +413,16 @@ E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 165 166 |     b
 166 167 | """
 
-E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:169:1
     |
 168 | # * https://github.com/astral-sh/ruff/issues/10277
 169 | at_least_one_million = lambda _: _ >= 1_000_000
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 170 |
 171 | x = lambda: (
     |
-    = help: Rewrite `at_least_one_million` as a `def`
+help: Rewrite `at_least_one_million` as a `def`
 
 ℹ Unsafe fix
 166 166 | """
@@ -415,7 +435,8 @@ E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 171 172 | x = lambda: (
 172 173 |     # comment
 
-E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:171:1
     |
 169 |   at_least_one_million = lambda _: _ >= 1_000_000
 170 |
@@ -423,11 +444,11 @@ E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 172 | |     # comment
 173 | |     5 + 10
 174 | | )
-    | |_^ E731
+    | |_^
 175 |
 176 |   x = lambda: (
     |
-    = help: Rewrite `x` as a `def`
+help: Rewrite `x` as a `def`
 
 ℹ Unsafe fix
 168 168 | # * https://github.com/astral-sh/ruff/issues/10277
@@ -440,7 +461,8 @@ E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 173 174 |     5 + 10
 174 175 | )
 
-E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:176:1
     |
 174 |   )
 175 |
@@ -448,11 +470,11 @@ E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 177 | |     # comment
 178 | |     y := 10
 179 | | )
-    | |_^ E731
+    | |_^
 180 |
 181 |   # https://github.com/astral-sh/ruff/issues/18475
     |
-    = help: Rewrite `x` as a `def`
+help: Rewrite `x` as a `def`
 
 ℹ Unsafe fix
 173 173 |     5 + 10
@@ -465,7 +487,8 @@ E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 178 179 |     y := 10
 179 180 | )
 
-E731.py:182:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:182:1
     |
 181 |   # https://github.com/astral-sh/ruff/issues/18475
 182 | / foo_tooltip = (
@@ -473,11 +496,11 @@ E731.py:182:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 184 | |     if data["foo"] is not None
 185 | |     else ""
 186 | | )
-    | |_^ E731
+    | |_^
 187 |
 188 |   foo_tooltip = (
     |
-    = help: Rewrite `foo_tooltip` as a `def`
+help: Rewrite `foo_tooltip` as a `def`
 
 ℹ Unsafe fix
 179 179 | )
@@ -495,7 +518,8 @@ E731.py:182:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 188 187 | foo_tooltip = (
 189 188 |     lambda x, data: f"\nfoo: {data['foo'][int(x)]}" +
 
-E731.py:188:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731 [*] Do not assign a `lambda` expression, use a `def`
+   --> E731.py:188:1
     |
 186 |   )
 187 |
@@ -504,9 +528,9 @@ E731.py:188:1: E731 [*] Do not assign a `lambda` expression, use a `def`
 190 | |     more
 191 | |
 192 | | )
-    | |_^ E731
+    | |_^
     |
-    = help: Rewrite `foo_tooltip` as a `def`
+help: Rewrite `foo_tooltip` as a `def`
 
 ℹ Unsafe fix
 185 185 |     else ""

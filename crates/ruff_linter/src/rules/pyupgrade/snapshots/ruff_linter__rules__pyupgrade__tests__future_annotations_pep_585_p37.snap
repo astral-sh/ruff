@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
-snapshot_kind: text
 ---
-future_annotations.py:34:18: UP006 [*] Use `list` instead of `List` for type annotation
+UP006 [*] Use `list` instead of `List` for type annotation
+  --> future_annotations.py:34:18
    |
 34 | def f(x: int) -> List[int]:
-   |                  ^^^^ UP006
+   |                  ^^^^
 35 |     y = List[int]()
 36 |     y.append(x)
    |
-   = help: Replace with `list`
+help: Replace with `list`
 
 ℹ Unsafe fix
 31 31 |         return cls(x=0, y=0)

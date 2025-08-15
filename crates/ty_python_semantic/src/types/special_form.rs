@@ -117,6 +117,11 @@ pub enum SpecialFormType {
     /// Note that instances of subscripted `typing.Generic` are not represented by this type;
     /// see also [`super::KnownInstanceType::SubscriptedGeneric`].
     Generic,
+
+    /// The symbol `typing.NamedTuple` (which can also be found as `typing_extensions.NamedTuple`).
+    /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
+    /// at runtime. We therefore represent it as a special form internally.
+    NamedTuple,
 }
 
 impl SpecialFormType {
@@ -163,6 +168,8 @@ impl SpecialFormType {
             | Self::OrderedDict => KnownClass::StdlibAlias,
 
             Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
+
+            Self::NamedTuple => KnownClass::FunctionType,
         }
     }
 
@@ -171,7 +178,7 @@ impl SpecialFormType {
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `SpecialFormType::Literal.instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
+    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
         self.class().to_instance(db)
     }
 
@@ -230,6 +237,7 @@ impl SpecialFormType {
             | Self::TypeIs
             | Self::TypingSelf
             | Self::Protocol
+            | Self::NamedTuple
             | Self::ReadOnly => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -244,7 +252,7 @@ impl SpecialFormType {
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type {
+    pub(super) fn to_meta_type(self, db: &dyn Db) -> Type<'_> {
         self.class().to_class_literal(db)
     }
 
@@ -261,6 +269,7 @@ impl SpecialFormType {
             | Self::Counter
             | Self::DefaultDict
             | Self::Deque
+            | Self::NamedTuple
             | Self::OrderedDict => true,
 
             // All other special forms are not callable
@@ -344,6 +353,7 @@ impl SpecialFormType {
             SpecialFormType::CallableTypeOf => "ty_extensions.CallableTypeOf",
             SpecialFormType::Protocol => "typing.Protocol",
             SpecialFormType::Generic => "typing.Generic",
+            SpecialFormType::NamedTuple => "typing.NamedTuple",
         }
     }
 }

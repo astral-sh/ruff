@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::{
     Expr, ExprCall, ExprContext, ExprList, ExprUnaryOp, StringLiteral, StringLiteralFlags,
     StringLiteralValue, UnaryOp, str::TripleQuotes,
@@ -116,26 +117,50 @@ pub(crate) fn split_static_string(
     }
 }
 
+fn replace_flags(elt: &str, flags: StringLiteralFlags) -> StringLiteralFlags {
+    // In the ideal case we can wrap the element in _single_ quotes of the same
+    // style. For example, both of these are okay:
+    //
+    // ```python
+    // """itemA
+    // itemB
+    // itemC""".split() # -> ["itemA", "itemB", "itemC"]
+    // ```
+    //
+    // ```python
+    // r"""itemA
+    // 'single'quoted
+    // """.split() # -> [r"itemA",r"'single'quoted'"]
+    // ```
+    if !flags.prefix().is_raw() || !elt.contains(flags.quote_style().as_char()) {
+        flags.with_triple_quotes(TripleQuotes::No)
+    }
+    // If we have a raw string containing a quotation mark of the same style,
+    // then we have to swap the style of quotation marks used
+    else if !elt.contains(flags.quote_style().opposite().as_char()) {
+        flags
+            .with_quote_style(flags.quote_style().opposite())
+            .with_triple_quotes(TripleQuotes::No)
+    } else
+    // If both types of quotes are used in the raw, triple-quoted string, then
+    // we are forced to either add escapes or keep the triple quotes. We opt for
+    // the latter.
+    {
+        flags
+    }
+}
+
 fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     Expr::List(ExprList {
         elts: elts
             .iter()
             .map(|elt| {
+                let element_flags = replace_flags(elt, flags);
                 Expr::from(StringLiteral {
                     value: Box::from(*elt),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
-                    // intentionally omit the triple quote flag, if set, to avoid strange
-                    // replacements like
-                    //
-                    // ```python
-                    // """
-                    // itemA
-                    // itemB
-                    // itemC
-                    // """.split() # -> ["""itemA""", """itemB""", """itemC"""]
-                    // ```
-                    flags: flags.with_triple_quotes(TripleQuotes::No),
+                    flags: element_flags,
                 })
             })
             .collect(),
@@ -174,9 +199,9 @@ fn split_default(
             //   - "".split(maxsplit=0) -> []
             //   - " ".split(maxsplit=0) -> []
             let processed_str = if direction == Direction::Left {
-                string_val.trim_start()
+                string_val.trim_start_matches(py_unicode_is_whitespace)
             } else {
-                string_val.trim_end()
+                string_val.trim_end_matches(py_unicode_is_whitespace)
             };
             let list_items: &[_] = if processed_str.is_empty() {
                 &[]
@@ -189,7 +214,10 @@ fn split_default(
             ))
         }
         Ordering::Less => {
-            let list_items: Vec<&str> = string_val.split_whitespace().collect();
+            let list_items: Vec<&str> = string_val
+                .split(py_unicode_is_whitespace)
+                .filter(|s| !s.is_empty())
+                .collect();
             Some(construct_replacement(
                 &list_items,
                 str_value.first_literal_flags(),
@@ -266,4 +294,35 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
 enum Direction {
     Left,
     Right,
+}
+
+/// Like [`char::is_whitespace`] but with Python's notion of whitespace.
+///
+/// <https://github.com/astral-sh/ruff/issues/19845>
+/// <https://github.com/python/cpython/blob/v3.14.0rc1/Objects/unicodetype_db.h#L6673-L6711>
+#[rustfmt::skip]
+#[inline]
+const fn py_unicode_is_whitespace(ch: char) -> bool {
+    matches!(
+        ch,
+        | '\u{0009}'
+        | '\u{000A}'
+        | '\u{000B}'
+        | '\u{000C}'
+        | '\u{000D}'
+        | '\u{001C}'
+        | '\u{001D}'
+        | '\u{001E}'
+        | '\u{001F}'
+        | '\u{0020}'
+        | '\u{0085}'
+        | '\u{00A0}'
+        | '\u{1680}'
+        | '\u{2000}'..='\u{200A}'
+        | '\u{2028}'
+        | '\u{2029}'
+        | '\u{202F}'
+        | '\u{205F}'
+        | '\u{3000}'
+    )
 }
