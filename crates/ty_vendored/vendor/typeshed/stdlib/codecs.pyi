@@ -12,7 +12,7 @@ from _codecs import *
 from _typeshed import ReadableBuffer
 from abc import abstractmethod
 from collections.abc import Callable, Generator, Iterable
-from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload
+from typing import Any, BinaryIO, ClassVar, Final, Literal, Protocol, TextIO, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -82,16 +82,19 @@ _BufferedEncoding: TypeAlias = Literal[
     "utf-8-sig",
 ]
 
+@type_check_only
 class _WritableStream(Protocol):
     def write(self, data: bytes, /) -> object: ...
     def seek(self, offset: int, whence: int, /) -> object: ...
     def close(self) -> object: ...
 
+@type_check_only
 class _ReadableStream(Protocol):
     def read(self, size: int = ..., /) -> bytes: ...
     def seek(self, offset: int, whence: int, /) -> object: ...
     def close(self) -> object: ...
 
+@type_check_only
 class _Stream(_WritableStream, _ReadableStream, Protocol): ...
 
 # TODO: this only satisfies the most common interface, where
@@ -100,24 +103,31 @@ class _Stream(_WritableStream, _ReadableStream, Protocol): ...
 # There *are* bytes->bytes and str->str encodings in the standard library.
 # They were much more common in Python 2 than in Python 3.
 
+@type_check_only
 class _Encoder(Protocol):
     def __call__(self, input: str, errors: str = ..., /) -> tuple[bytes, int]: ...  # signature of Codec().encode
 
+@type_check_only
 class _Decoder(Protocol):
     def __call__(self, input: ReadableBuffer, errors: str = ..., /) -> tuple[str, int]: ...  # signature of Codec().decode
 
+@type_check_only
 class _StreamReader(Protocol):
     def __call__(self, stream: _ReadableStream, errors: str = ..., /) -> StreamReader: ...
 
+@type_check_only
 class _StreamWriter(Protocol):
     def __call__(self, stream: _WritableStream, errors: str = ..., /) -> StreamWriter: ...
 
+@type_check_only
 class _IncrementalEncoder(Protocol):
     def __call__(self, errors: str = ...) -> IncrementalEncoder: ...
 
+@type_check_only
 class _IncrementalDecoder(Protocol):
     def __call__(self, errors: str = ...) -> IncrementalDecoder: ...
 
+@type_check_only
 class _BufferedIncrementalDecoder(Protocol):
     def __call__(self, errors: str = ...) -> BufferedIncrementalDecoder: ...
 

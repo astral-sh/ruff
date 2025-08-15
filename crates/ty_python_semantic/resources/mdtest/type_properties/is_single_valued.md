@@ -16,6 +16,19 @@ static_assert(is_single_valued(Literal[b"abc"]))
 static_assert(is_single_valued(tuple[()]))
 static_assert(is_single_valued(tuple[Literal[True], Literal[1]]))
 
+class EmptyTupleSubclass(tuple[()]): ...
+class HeterogeneousTupleSubclass(tuple[Literal[True], Literal[1]]): ...
+
+# N.B. this follows from the fact that `EmptyTupleSubclass` is a subtype of `tuple[()]`,
+# and any property recognised for `tuple[()]` should therefore also be recognised for
+# `EmptyTupleSubclass` since an `EmptyTupleSubclass` instance can be used anywhere where
+# `tuple[()]` is accepted. This is only sound, however, if we ban `__eq__` and `__ne__`
+# from being overridden on a tuple subclass. This is something we plan to do as part of
+# our implementation of the Liskov Substitution Principle
+# (https://github.com/astral-sh/ty/issues/166)
+static_assert(is_single_valued(EmptyTupleSubclass))
+static_assert(is_single_valued(HeterogeneousTupleSubclass))
+
 static_assert(not is_single_valued(str))
 static_assert(not is_single_valued(Never))
 static_assert(not is_single_valued(Any))
@@ -23,6 +36,10 @@ static_assert(not is_single_valued(Any))
 static_assert(not is_single_valued(Literal[1, 2]))
 
 static_assert(not is_single_valued(tuple[None, int]))
+
+class MultiValuedHeterogeneousTupleSubclass(tuple[None, int]): ...
+
+static_assert(not is_single_valued(MultiValuedHeterogeneousTupleSubclass))
 
 static_assert(not is_single_valued(Callable[..., None]))
 static_assert(not is_single_valued(Callable[[int, str], None]))

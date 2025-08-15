@@ -1,0 +1,133 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: typed_dict.md - `TypedDict` - Diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict, Final
+ 2 | 
+ 3 | class Person(TypedDict):
+ 4 |     name: str
+ 5 |     age: int | None
+ 6 | 
+ 7 | def access_invalid_literal_string_key(person: Person):
+ 8 |     person["naem"]  # error: [invalid-key]
+ 9 | 
+10 | NAME_KEY: Final = "naem"
+11 | 
+12 | def access_invalid_key(person: Person):
+13 |     person[NAME_KEY]  # error: [invalid-key]
+14 | 
+15 | def access_with_str_key(person: Person, str_key: str):
+16 |     person[str_key]  # error: [invalid-key]
+17 | 
+18 | def write_to_key_with_wrong_type(person: Person):
+19 |     person["age"] = "42"  # error: [invalid-assignment]
+20 | 
+21 | def write_to_non_existing_key(person: Person):
+22 |     person["naem"] = "Alice"  # error: [invalid-key]
+23 | 
+24 | def write_to_non_literal_string_key(person: Person, str_key: str):
+25 |     person[str_key] = "Alice"  # error: [invalid-key]
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: Invalid key access on TypedDict `Person`
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | def access_invalid_literal_string_key(person: Person):
+ 8 |     person["naem"]  # error: [invalid-key]
+   |     ------ ^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     |
+   |     TypedDict `Person`
+ 9 |
+10 | NAME_KEY: Final = "naem"
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: Invalid key access on TypedDict `Person`
+  --> src/mdtest_snippet.py:13:5
+   |
+12 | def access_invalid_key(person: Person):
+13 |     person[NAME_KEY]  # error: [invalid-key]
+   |     ------ ^^^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     |
+   |     TypedDict `Person`
+14 |
+15 | def access_with_str_key(person: Person, str_key: str):
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: TypedDict `Person` cannot be indexed with a key of type `str`
+  --> src/mdtest_snippet.py:16:12
+   |
+15 | def access_with_str_key(person: Person, str_key: str):
+16 |     person[str_key]  # error: [invalid-key]
+   |            ^^^^^^^
+17 |
+18 | def write_to_key_with_wrong_type(person: Person):
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Invalid assignment to key "age" with declared type `int | None` on TypedDict `Person`
+  --> src/mdtest_snippet.py:19:5
+   |
+18 | def write_to_key_with_wrong_type(person: Person):
+19 |     person["age"] = "42"  # error: [invalid-assignment]
+   |     ------ -----    ^^^^ value of type `Literal["42"]`
+   |     |      |
+   |     |      key has declared type `int | None`
+   |     TypedDict `Person`
+20 |
+21 | def write_to_non_existing_key(person: Person):
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-key]: Invalid key access on TypedDict `Person`
+  --> src/mdtest_snippet.py:22:5
+   |
+21 | def write_to_non_existing_key(person: Person):
+22 |     person["naem"] = "Alice"  # error: [invalid-key]
+   |     ------ ^^^^^^ Unknown key "naem" - did you mean "name"?
+   |     |
+   |     TypedDict `Person`
+23 |
+24 | def write_to_non_literal_string_key(person: Person, str_key: str):
+   |
+info: rule `invalid-key` is enabled by default
+
+```
+
+```
+error[invalid-key]: Cannot access `Person` with a key of type `str`. Only string literals are allowed as keys on TypedDicts.
+  --> src/mdtest_snippet.py:25:12
+   |
+24 | def write_to_non_literal_string_key(person: Person, str_key: str):
+25 |     person[str_key] = "Alice"  # error: [invalid-key]
+   |            ^^^^^^^
+   |
+info: rule `invalid-key` is enabled by default
+
+```

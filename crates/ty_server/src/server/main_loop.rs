@@ -5,7 +5,7 @@ use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
-use lsp_types::notification::Notification;
+use lsp_types::notification::{DidChangeWatchedFiles, Notification};
 use lsp_types::{
     ConfigurationParams, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Url,
 };
@@ -194,12 +194,43 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
+        self.request_workspace_configurations(client);
+        self.try_register_file_watcher(client);
+    }
+
+    /// Requests workspace configurations from the client for all the workspaces in the session.
+    ///
+    /// If the client does not support workspace configuration, it initializes the workspaces
+    /// using the initialization options provided by the client.
+    fn request_workspace_configurations(&mut self, client: &Client) {
+        if !self
+            .session
+            .client_capabilities()
+            .supports_workspace_configuration()
+        {
+            tracing::info!(
+                "Client does not support workspace configuration, initializing workspaces \
+                using the initialization options"
+            );
+            self.session.initialize_workspaces(
+                self.session
+                    .workspaces()
+                    .urls()
+                    .cloned()
+                    .map(|url| (url, self.session.initialization_options().options.clone()))
+                    .collect::<Vec<_>>(),
+                client,
+            );
+            return;
+        }
+
         let urls = self
             .session
             .workspaces()
             .urls()
             .cloned()
             .collect::<Vec<_>>();
+
         let items = urls
             .iter()
             .map(|root| lsp_types::ConfigurationItem {
@@ -209,95 +240,109 @@ impl Server {
             .collect();
 
         tracing::debug!("Requesting workspace configuration for workspaces");
-        client
-            .send_request::<lsp_types::request::WorkspaceConfiguration>(
-                &self.session,
-                ConfigurationParams { items },
-                |client, result: Vec<Value>| {
-                    tracing::debug!("Received workspace configurations, initializing workspaces");
-                    assert_eq!(result.len(), urls.len());
+        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
+            &self.session,
+            ConfigurationParams { items },
+            |client, result: Vec<Value>| {
+                tracing::debug!("Received workspace configurations, initializing workspaces");
 
-                    let workspaces_with_options: Vec<_> = urls
-                        .into_iter()
-                        .zip(result)
-                        .map(|(url, value)| {
-                            let options: ClientOptions = serde_json::from_value(value).unwrap_or_else(|err| {
-                                tracing::warn!("Failed to deserialize workspace options for {url}: {err}. Using default options.");
+                // This shouldn't fail because, as per the spec, the client needs to provide a
+                // `null` value even if it cannot provide a configuration for a workspace.
+                assert_eq!(
+                    result.len(),
+                    urls.len(),
+                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
+                    urls.len(),
+                    result.len()
+                );
+
+                let workspaces_with_options: Vec<_> = urls
+                    .into_iter()
+                    .zip(result)
+                    .map(|(url, value)| {
+                        if value.is_null() {
+                            tracing::debug!(
+                                "No workspace options provided for {url}, using default options"
+                            );
+                            return (url, ClientOptions::default());
+                        }
+                        let options: ClientOptions =
+                            serde_json::from_value(value).unwrap_or_else(|err| {
+                                tracing::error!(
+                                    "Failed to deserialize workspace options for {url}: {err}. \
+                                        Using default options"
+                                );
                                 ClientOptions::default()
                             });
-
-                            (url, options)
-                        })
-                        .collect();
-
-
-                    client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
-                },
-            );
-
-        let fs_watcher = self
-            .session
-            .client_capabilities()
-            .supports_did_change_watched_files_dynamic_registration();
-
-        if fs_watcher {
-            let registration = lsp_types::Registration {
-                id: "workspace/didChangeWatchedFiles".to_owned(),
-                method: "workspace/didChangeWatchedFiles".to_owned(),
-                register_options: Some(
-                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                        watchers: vec![
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/.gitignore".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String(
-                                    "**/pyproject.toml".into(),
-                                ),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
-                                kind: None,
-                            },
-                            FileSystemWatcher {
-                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
-                                kind: None,
-                            },
-                        ],
+                        (url, options)
                     })
-                    .unwrap(),
-                ),
-            };
-            let response_handler = move |_: &Client, ()| {
-                tracing::info!("File watcher successfully registered");
-            };
+                    .collect();
 
-            client.send_request::<lsp_types::request::RegisterCapability>(
-                &self.session,
-                lsp_types::RegistrationParams {
-                    registrations: vec![registration],
-                },
-                response_handler,
-            );
-        } else {
-            tracing::warn!("The client does not support file system watching.");
+                client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
+            },
+        );
+    }
+
+    /// Try to register the file watcher provided by the client if the client supports it.
+    fn try_register_file_watcher(&mut self, client: &Client) {
+        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
+
+        if !self.session.client_capabilities().supports_file_watcher() {
+            tracing::warn!("Client does not support file system watching");
+            return;
         }
+
+        let registration = lsp_types::Registration {
+            id: FILE_WATCHER_REGISTRATION_ID.to_owned(),
+            method: DidChangeWatchedFiles::METHOD.to_owned(),
+            register_options: Some(
+                serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
+                    watchers: vec![
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/.gitignore".into()),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String(
+                                "**/pyproject.toml".into(),
+                            ),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
+                            kind: None,
+                        },
+                        FileSystemWatcher {
+                            glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
+                            kind: None,
+                        },
+                    ],
+                })
+                .unwrap(),
+            ),
+        };
+
+        client.send_request::<lsp_types::request::RegisterCapability>(
+            &self.session,
+            lsp_types::RegistrationParams {
+                registrations: vec![registration],
+            },
+            |_: &Client, ()| {
+                tracing::info!("File watcher registration completed successfully");
+            },
+        );
     }
 }
 

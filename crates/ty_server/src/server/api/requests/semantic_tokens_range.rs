@@ -18,7 +18,7 @@ impl RequestHandler for SemanticTokensRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
-    fn document_url(params: &SemanticTokensRangeParams) -> Cow<Url> {
+    fn document_url(params: &SemanticTokensRangeParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -28,7 +28,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRangeRequestHandler {
         _client: &Client,
         params: SemanticTokensRangeParams,
     ) -> crate::server::Result<Option<SemanticTokensRangeResult>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

@@ -338,3 +338,32 @@ def no_invalid_return_diagnostic_here_either[T](x: A[T]) -> ASub[T]:
         # is null and void (and therefore we don't emit a diagnostic)
         return x
 ```
+
+## More `match` pattern types
+
+### `as` patterns
+
+```py
+from typing import assert_never
+
+def as_pattern_exhaustive(subject: int | str):
+    match subject:
+        case int() as x:
+            pass
+        case str() as y:
+            pass
+        case _:
+            no_diagnostic_here
+
+            assert_never(subject)
+
+def as_pattern_non_exhaustive(subject: int | str):
+    match subject:
+        case int() as x:
+            pass
+        case _:
+            this_should_be_an_error  # error: [unresolved-reference]
+
+            # this diagnostic is correct: the inferred type of `subject` is `str`
+            assert_never(subject)  # error: [type-assertion-failure]
+```

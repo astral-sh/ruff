@@ -9,6 +9,7 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
 
 class Person(NamedTuple):
     id: int
@@ -24,10 +25,45 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# TODO: These should reveal the types of the fields
-reveal_type(alice[0])  # revealed: Unknown
-reveal_type(alice[1])  # revealed: Unknown
-reveal_type(alice[2])  # revealed: Unknown
+# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(Person.__mro__)
+
+static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
+static_assert(is_subtype_of(Person, tuple[object, ...]))
+static_assert(not is_assignable_to(Person, tuple[int, str, int]))
+static_assert(not is_assignable_to(Person, tuple[int, str]))
+
+reveal_type(len(alice))  # revealed: Literal[3]
+reveal_type(bool(alice))  # revealed: Literal[True]
+
+reveal_type(alice[0])  # revealed: int
+reveal_type(alice[1])  # revealed: str
+reveal_type(alice[2])  # revealed: int | None
+
+# error: [index-out-of-bounds] "Index 3 is out of bounds for tuple `Person` with length 3"
+reveal_type(alice[3])  # revealed: Unknown
+
+reveal_type(alice[-1])  # revealed: int | None
+reveal_type(alice[-2])  # revealed: str
+reveal_type(alice[-3])  # revealed: int
+
+# error: [index-out-of-bounds] "Index -4 is out of bounds for tuple `Person` with length 3"
+reveal_type(alice[-4])  # revealed: Unknown
+
+reveal_type(alice[1:])  # revealed: tuple[str, int | None]
+reveal_type(alice[::-1])  # revealed: tuple[int | None, str, int]
+
+alice_id, alice_name, alice_age = alice
+reveal_type(alice_id)  # revealed: int
+reveal_type(alice_name)  # revealed: str
+reveal_type(alice_age)  # revealed: int | None
+
+# error: [invalid-assignment] "Not enough values to unpack: Expected 4"
+a, b, c, d = alice
+# error: [invalid-assignment] "Too many values to unpack: Expected 2"
+a, b = alice
+*_, age = alice
+reveal_type(age)  # revealed: int | None
 
 # error: [missing-argument]
 Person(3)
@@ -38,8 +74,16 @@ Person(3, "Eve", 99, "extra")
 # error: [invalid-argument-type]
 Person(id="3", name="Eve")
 
-# TODO: over-writing NamedTuple fields should be an error
+reveal_type(Person.id)  # revealed: property
+reveal_type(Person.name)  # revealed: property
+reveal_type(Person.age)  # revealed: property
+
+# TODO... the error is correct, but this is not the friendliest error message
+# for assigning to a read-only property :-)
+#
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `id` on type `Person` with custom `__set__` method"
 alice.id = 42
+# error: [invalid-assignment]
 bob.age = None
 ```
 
@@ -115,9 +159,42 @@ from typing import NamedTuple
 class User(NamedTuple):
     id: int
     name: str
+    age: int | None
+    nickname: str
 
 class SuperUser(User):
-    id: int  # this should be an error
+    # TODO: this should be an error because it implies that the `id` attribute on
+    # `SuperUser` is mutable, but the read-only `id` property from the superclass
+    # has not been overridden in the class body
+    id: int
+
+    # this is fine; overriding a read-only attribute with a mutable one
+    # does not conflict with the Liskov Substitution Principle
+    name: str = "foo"
+
+    # this is also fine
+    @property
+    def age(self) -> int:
+        return super().age or 42
+
+    def now_called_robert(self):
+        self.name = "Robert"  # fine because overridden with a mutable attribute
+
+        # TODO: this should cause us to emit an error as we're assigning to a read-only property
+        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        self.nickname = "Bob"
+
+james = SuperUser(0, "James", 42, "Jimmy")
+
+# fine because the property on the superclass was overridden with a mutable attribute
+# on the subclass
+james.name = "Robert"
+
+# TODO: the error is correct (can't assign to the read-only property inherited from the superclass)
+# but the error message could be friendlier :-)
+#
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `nickname` on type `SuperUser` with custom `__set__` method"
+james.nickname = "Bob"
 ```
 
 ### Generic named tuples
@@ -128,13 +205,29 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Generic, TypeVar
 
 class Property[T](NamedTuple):
     name: str
     value: T
 
 reveal_type(Property("height", 3.4))  # revealed: Property[float]
+reveal_type(Property.value)  # revealed: property
+reveal_type(Property.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(Property[str].value.fget)  # revealed: (self, /) -> str
+reveal_type(Property("height", 3.4).value)  # revealed: float
+
+T = TypeVar("T")
+
+class LegacyProperty(NamedTuple, Generic[T]):
+    name: str
+    value: T
+
+reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
+reveal_type(LegacyProperty.value)  # revealed: property
+reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
+reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
 ```
 
 ## Attributes on `NamedTuple`
@@ -150,9 +243,9 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
-reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@NamedTupleFallback
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Self@_make
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@NamedTupleFallback
+reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
 # TODO: should be `Person` once we support `Self`
 reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown

@@ -115,7 +115,7 @@ enum ParamKind {
     KeywordVariadic,
 }
 
-#[salsa::tracked(heap_size=get_size2::heap_size)]
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 fn create_bound_method<'db>(
     db: &'db dyn Db,
     function: Type<'db>,
@@ -153,7 +153,7 @@ impl Ty {
                     .place
                     .expect_type();
                 debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class.class_literal(db).0))
+                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class(db).class_literal(db).0))
                 );
                 ty
             }

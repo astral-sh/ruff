@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use crate::place::{
     Place, builtins_module_scope, imported_symbol, place_from_bindings, place_from_declarations,
@@ -15,12 +16,12 @@ use crate::types::{ClassBase, ClassLiteral, DynamicType, KnownClass, KnownInstan
 use crate::{Db, HasType, NameKind, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
-pub use resolve_definition::{ResolvedDefinition, map_stub_definition};
+pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
 pub(crate) fn all_declarations_and_bindings<'db>(
@@ -34,15 +35,15 @@ pub(crate) fn all_declarations_and_bindings<'db>(
         .all_end_of_scope_symbol_declarations()
         .filter_map(move |(symbol_id, declarations)| {
             place_from_declarations(db, declarations)
-                .ok()
-                .and_then(|result| {
-                    result.place.ignore_possibly_unbound().map(|ty| {
-                        let symbol = table.symbol(symbol_id);
-                        Member {
-                            name: symbol.name().clone(),
-                            ty,
-                        }
-                    })
+                .ignore_conflicting_declarations()
+                .place
+                .ignore_possibly_unbound()
+                .map(|ty| {
+                    let symbol = table.symbol(symbol_id);
+                    Member {
+                        name: symbol.name().clone(),
+                        ty,
+                    }
                 })
         })
         .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
@@ -94,8 +95,20 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class.class_literal(db);
-                self.extend_with_instance_members(db, class_literal);
+                let (class_literal, _specialization) = instance.class(db).class_literal(db);
+                self.extend_with_instance_members(db, ty, class_literal);
+            }
+
+            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+            }
+
+            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
             Type::ClassLiteral(class_literal) => {
@@ -119,13 +132,14 @@ impl<'db> AllMembers<'db> {
 
             Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {}
 
+            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::LiteralString
-            | Type::Tuple(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -154,6 +168,18 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {}
             },
+
+            Type::TypedDict(_) => {
+                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                    self.extend_with_class_members(db, ty, class_literal);
+                }
+
+                if let Type::ClassLiteral(class) =
+                    KnownClass::TypedDictFallback.to_class_literal(db)
+                {
+                    self.extend_with_instance_members(db, ty, class);
+                }
+            }
 
             Type::ModuleLiteral(literal) => {
                 self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
@@ -184,7 +210,7 @@ impl<'db> AllMembers<'db> {
                         match ty {
                             Type::NominalInstance(instance)
                                 if matches!(
-                                    instance.class.known(db),
+                                    instance.class(db).known(db),
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
@@ -265,13 +291,17 @@ impl<'db> AllMembers<'db> {
         }
     }
 
-    fn extend_with_instance_members(&mut self, db: &'db dyn Db, class_literal: ClassLiteral<'db>) {
+    fn extend_with_instance_members(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
             .map(|class| class.class_literal(db).0)
         {
-            let parent_instance = Type::instance(db, parent.default_specialization(db));
             let class_body_scope = parent.body_scope(db);
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
@@ -281,12 +311,12 @@ impl<'db> AllMembers<'db> {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
-                    let result = parent_instance.member(db, name.as_str());
+                    let result = ty.member(db, name);
                     let Some(ty) = result.place.ignore_possibly_unbound() else {
                         continue;
                     };
                     self.members.insert(Member {
-                        name: name.clone(),
+                        name: Name::new(name),
                         ty,
                     });
                 }
@@ -298,7 +328,7 @@ impl<'db> AllMembers<'db> {
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
             for Member { name, .. } in all_declarations_and_bindings(db, class_body_scope) {
-                let result = parent_instance.member(db, name.as_str());
+                let result = ty.member(db, name.as_str());
                 let Some(ty) = result.place.ignore_possibly_unbound() else {
                     continue;
                 };
@@ -489,7 +519,12 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(db, *definition, Some(name_str));
+        let resolved = resolve_definition(
+            db,
+            *definition,
+            Some(name_str),
+            ImportAliasResolution::ResolveAliases,
+        );
         resolved_definitions.extend(resolved);
     }
 
@@ -500,7 +535,14 @@ pub fn definitions_for_name<'db>(
         };
         find_symbol_in_scope(db, builtins_scope, name_str)
             .into_iter()
-            .flat_map(|def| resolve_definition(db, def, Some(name_str)))
+            .flat_map(|def| {
+                resolve_definition(
+                    db,
+                    def,
+                    Some(name_str),
+                    ImportAliasResolution::ResolveAliases,
+                )
+            })
             .collect()
     } else {
         resolved_definitions
@@ -549,7 +591,12 @@ pub fn definitions_for_attribute<'db>(
             if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
-                    resolved.extend(resolve_definition(db, def, Some(name_str)));
+                    resolved.extend(resolve_definition(
+                        db,
+                        def,
+                        Some(name_str),
+                        ImportAliasResolution::ResolveAliases,
+                    ));
                 }
             }
             continue;
@@ -585,7 +632,12 @@ pub fn definitions_for_attribute<'db>(
                 // Check declarations first
                 for decl in use_def.all_reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
@@ -593,7 +645,12 @@ pub fn definitions_for_attribute<'db>(
                 // If no declarations found, check bindings
                 for binding in use_def.all_reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
-                        resolved.extend(resolve_definition(db, def, Some(name_str)));
+                        resolved.extend(resolve_definition(
+                            db,
+                            def,
+                            Some(name_str),
+                            ImportAliasResolution::ResolveAliases,
+                        ));
                         break 'scopes;
                     }
                 }
@@ -612,7 +669,12 @@ pub fn definitions_for_attribute<'db>(
                     // Check declarations first
                     for decl in use_def.all_reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
@@ -620,7 +682,12 @@ pub fn definitions_for_attribute<'db>(
                     // If no declarations found, check bindings
                     for binding in use_def.all_reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
-                            resolved.extend(resolve_definition(db, def, Some(name_str)));
+                            resolved.extend(resolve_definition(
+                                db,
+                                def,
+                                Some(name_str),
+                                ImportAliasResolution::ResolveAliases,
+                            ));
                             break 'scopes;
                         }
                     }
@@ -687,11 +754,15 @@ pub fn definitions_for_keyword_argument<'db>(
 /// Find the definitions for a symbol imported via `from x import y as z` statement.
 /// This function handles the case where the cursor is on the original symbol name `y`.
 /// Returns the same definitions as would be found for the alias `z`.
+/// The `alias_resolution` parameter controls whether symbols imported with local import
+/// aliases (like "x" in "from a import b as x") are resolved to their targets or kept
+/// as aliases.
 pub fn definitions_for_imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     import_node: &ast::StmtImportFrom,
     symbol_name: &str,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut visited = FxHashSet::default();
     resolve_definition::resolve_from_import_definitions(
@@ -700,6 +771,7 @@ pub fn definitions_for_imported_symbol<'db>(
         import_node,
         symbol_name,
         &mut visited,
+        alias_resolution,
     )
 }
 
@@ -736,17 +808,16 @@ pub struct CallSignatureDetails<'db> {
 /// (in case of overloads or union types).
 pub fn call_signature_details<'db>(
     db: &'db dyn Db,
-    file: File,
+    model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let model = SemanticModel::new(db, file);
-    let func_type = call_expr.func.inferred_type(&model);
+    let func_type = call_expr.func.inferred_type(model);
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type.into_callable(db) {
         let call_arguments =
             CallArguments::from_arguments(db, &call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(&model)
+                splatted_value.inferred_type(model)
             });
         let bindings = callable_type.bindings(db).match_parameters(&call_arguments);
 
@@ -776,6 +847,102 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Find the active signature index from `CallSignatureDetails`.
+/// The active signature is the first signature where all arguments present in the call
+/// have valid mappings to parameters (i.e., none of the mappings are None).
+pub fn find_active_signature_from_details(
+    signature_details: &[CallSignatureDetails],
+) -> Option<usize> {
+    let first = signature_details.first()?;
+
+    // If there are no arguments in the mapping, just return the first signature.
+    if first.argument_to_parameter_mapping.is_empty() {
+        return Some(0);
+    }
+
+    // First, try to find a signature where all arguments have valid parameter mappings.
+    let perfect_match = signature_details.iter().position(|details| {
+        // Check if all arguments have valid parameter mappings.
+        details
+            .argument_to_parameter_mapping
+            .iter()
+            .all(|mapping| mapping.matched)
+    });
+
+    if let Some(index) = perfect_match {
+        return Some(index);
+    }
+
+    // If no perfect match, find the signature with the most valid argument mappings.
+    let (best_index, _) = signature_details
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, details)| {
+            details
+                .argument_to_parameter_mapping
+                .iter()
+                .filter(|mapping| mapping.matched)
+                .count()
+        })?;
+
+    Some(best_index)
+}
+
+#[derive(Default)]
+pub struct InlayHintFunctionArgumentDetails {
+    pub argument_names: HashMap<usize, String>,
+}
+
+pub fn inlay_hint_function_argument_details<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<InlayHintFunctionArgumentDetails> {
+    let signature_details = call_signature_details(db, model, call_expr);
+
+    if signature_details.is_empty() {
+        return None;
+    }
+
+    let active_signature_index = find_active_signature_from_details(&signature_details)?;
+
+    let call_signature_details = signature_details.get(active_signature_index)?;
+
+    let parameters = call_signature_details.signature.parameters();
+    let mut argument_names = HashMap::new();
+
+    for arg_index in 0..call_expr.arguments.args.len() {
+        let Some(arg_mapping) = call_signature_details
+            .argument_to_parameter_mapping
+            .get(arg_index)
+        else {
+            continue;
+        };
+
+        if !arg_mapping.matched {
+            continue;
+        }
+
+        let Some(param_index) = arg_mapping.parameters.first() else {
+            continue;
+        };
+
+        let Some(param) = parameters.get(*param_index) else {
+            continue;
+        };
+
+        // Only add hints for parameters that can be specified by name
+        if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
+            let Some(name) = param.name() else {
+                continue;
+            };
+            argument_names.insert(arg_index, name.to_string());
+        }
+    }
+
+    Some(InlayHintFunctionArgumentDetails { argument_names })
+}
+
 /// Find the text range of a specific parameter in function parameters by name.
 /// Only searches for parameters that can be addressed by name in keyword arguments.
 fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> Option<TextRange> {
@@ -793,16 +960,24 @@ mod resolve_definition {
     //! "resolved definitions". This is done recursively to find the original
     //! definition targeted by the import.
 
+    /// Controls whether local import aliases should be resolved to their targets or returned as-is.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ImportAliasResolution {
+        /// Resolve import aliases to their original definitions
+        ResolveAliases,
+        /// Keep import aliases as-is, don't resolve to original definitions
+        PreserveAliases,
+    }
+
     use indexmap::IndexSet;
     use ruff_db::files::{File, FileRange};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_python_ast as ast;
-    use ruff_text_size::{Ranged, TextRange};
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
     use crate::module_resolver::file_to_module;
-    use crate::semantic_index::definition::{Definition, DefinitionKind};
+    use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
     use crate::{Db, ModuleName, resolve_module, resolve_real_module};
@@ -816,6 +991,8 @@ mod resolve_definition {
     pub enum ResolvedDefinition<'db> {
         /// The import resolved to a specific definition within a module
         Definition(Definition<'db>),
+        /// The import resolved to an entire module
+        Module(File),
         /// The import resolved to a file with a specific range
         FileWithRange(FileRange),
     }
@@ -824,7 +1001,16 @@ mod resolve_definition {
         fn file(&self, db: &'db dyn Db) -> File {
             match self {
                 ResolvedDefinition::Definition(definition) => definition.file(db),
+                ResolvedDefinition::Module(file) => *file,
                 ResolvedDefinition::FileWithRange(file_range) => file_range.file(),
+            }
+        }
+
+        pub fn docstring(&self, db: &'db dyn Db) -> Option<String> {
+            match self {
+                ResolvedDefinition::Definition(definition) => definition.docstring(db),
+                ResolvedDefinition::Module(file) => module_docstring(db, *file),
+                ResolvedDefinition::FileWithRange(_) => None,
             }
         }
     }
@@ -837,9 +1023,16 @@ mod resolve_definition {
         db: &'db dyn Db,
         definition: Definition<'db>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         let mut visited = FxHashSet::default();
-        let resolved = resolve_definition_recursive(db, definition, &mut visited, symbol_name);
+        let resolved = resolve_definition_recursive(
+            db,
+            definition,
+            &mut visited,
+            symbol_name,
+            alias_resolution,
+        );
 
         // If resolution failed, return the original definition as fallback
         if resolved.is_empty() {
@@ -855,6 +1048,7 @@ mod resolve_definition {
         definition: Definition<'db>,
         visited: &mut FxHashSet<Definition<'db>>,
         symbol_name: Option<&str>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
         // Prevent infinite recursion if there are circular imports
         if visited.contains(&definition) {
@@ -886,10 +1080,7 @@ mod resolve_definition {
 
                 // For simple imports like "import os", we want to navigate to the module itself.
                 // Return the module file directly instead of trying to find definitions within it.
-                vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                    module_file,
-                    TextRange::default(),
-                ))]
+                vec![ResolvedDefinition::Module(module_file)]
             }
 
             DefinitionKind::ImportFrom(import_from_def) => {
@@ -900,7 +1091,14 @@ mod resolve_definition {
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
-                resolve_from_import_definitions(db, file, import_node, &alias.name, visited)
+                resolve_from_import_definitions(
+                    db,
+                    file,
+                    import_node,
+                    &alias.name,
+                    visited,
+                    alias_resolution,
+                )
             }
 
             // For star imports, try to resolve to the specific symbol being accessed
@@ -911,7 +1109,14 @@ mod resolve_definition {
 
                 // If we have a symbol name, use the helper to resolve it in the target module
                 if let Some(symbol_name) = symbol_name {
-                    resolve_from_import_definitions(db, file, import_node, symbol_name, visited)
+                    resolve_from_import_definitions(
+                        db,
+                        file,
+                        import_node,
+                        symbol_name,
+                        visited,
+                        alias_resolution,
+                    )
                 } else {
                     // No symbol context provided, can't resolve star import
                     Vec::new()
@@ -930,7 +1135,21 @@ mod resolve_definition {
         import_node: &ast::StmtImportFrom,
         symbol_name: &str,
         visited: &mut FxHashSet<Definition<'db>>,
+        alias_resolution: ImportAliasResolution,
     ) -> Vec<ResolvedDefinition<'db>> {
+        if alias_resolution == ImportAliasResolution::PreserveAliases {
+            for alias in &import_node.names {
+                if let Some(asname) = &alias.asname {
+                    if asname.as_str() == symbol_name {
+                        return vec![ResolvedDefinition::FileWithRange(FileRange::new(
+                            file,
+                            asname.range,
+                        ))];
+                    }
+                }
+            }
+        }
+
         // Resolve the target module file
         let module_file = {
             // Resolve the module being imported from (handles both relative and absolute imports)
@@ -959,7 +1178,13 @@ mod resolve_definition {
         } else {
             let mut resolved_definitions = Vec::new();
             for def in definitions_in_module {
-                let resolved = resolve_definition_recursive(db, def, visited, Some(symbol_name));
+                let resolved = resolve_definition_recursive(
+                    db,
+                    def,
+                    visited,
+                    Some(symbol_name),
+                    alias_resolution,
+                );
                 resolved_definitions.extend(resolved);
             }
             resolved_definitions
@@ -1065,24 +1290,19 @@ mod resolve_definition {
                 }
                 trace!("Built Definition Path: {path:?}");
             }
-            ResolvedDefinition::FileWithRange(file_range) => {
-                return if file_range.range() == TextRange::default() {
-                    trace!(
-                        "Found module mapping: {} => {}",
-                        stub_file.path(db),
-                        real_file.path(db)
-                    );
-                    // This is just a reference to a module, no need to do paths
-                    Some(vec![ResolvedDefinition::FileWithRange(FileRange::new(
-                        real_file,
-                        TextRange::default(),
-                    ))])
-                } else {
-                    // Not yet implemented -- in this case we want to recover something like a Definition
-                    // and build a Definition Path, but this input is a bit too abstract for now.
-                    trace!("Found arbitrary FileWithRange by stub mapping, giving up");
-                    None
-                };
+            ResolvedDefinition::Module(_) => {
+                trace!(
+                    "Found module mapping: {} => {}",
+                    stub_file.path(db),
+                    real_file.path(db)
+                );
+                return Some(vec![ResolvedDefinition::Module(real_file)]);
+            }
+            ResolvedDefinition::FileWithRange(_) => {
+                // Not yet implemented -- in this case we want to recover something like a Definition
+                // and build a Definition Path, but this input is a bit too abstract for now.
+                trace!("Found arbitrary FileWithRange while stub mapping, giving up");
+                return None;
             }
         }
 

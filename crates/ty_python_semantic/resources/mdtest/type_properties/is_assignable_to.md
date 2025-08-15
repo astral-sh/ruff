@@ -1052,8 +1052,7 @@ class FooLegacy(Generic[T]):
 class Bar[T, **P]:
     def __call__(self): ...
 
-# TODO: should not error
-class BarLegacy(Generic[T, P]):  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+class BarLegacy(Generic[T, P]):
     def __call__(self): ...
 
 static_assert(is_assignable_to(Foo, Callable[..., Any]))
@@ -1064,9 +1063,7 @@ static_assert(is_assignable_to(BarLegacy, Callable[..., Any]))
 class Spam[T]: ...
 class SpamLegacy(Generic[T]): ...
 class Eggs[T, **P]: ...
-
-# TODO: should not error
-class EggsLegacy(Generic[T, P]): ...  # error: [invalid-argument-type] "`ParamSpec` is not a valid argument to `Generic`"
+class EggsLegacy(Generic[T, P]): ...
 
 static_assert(not is_assignable_to(Spam, Callable[..., Any]))
 static_assert(not is_assignable_to(SpamLegacy, Callable[..., Any]))

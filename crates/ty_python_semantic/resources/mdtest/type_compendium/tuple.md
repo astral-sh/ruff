@@ -477,4 +477,52 @@ class NotAlwaysTruthyTuple(tuple[int]):
 t: tuple[int] = NotAlwaysTruthyTuple((1,))
 ```
 
+## Unspecialized
+
+An unspecialized tuple is equivalent to `tuple[Any, ...]` and `tuple[Unknown, ...]`.
+
+```py
+from typing_extensions import Any, assert_type
+from ty_extensions import Unknown, is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(tuple[Any, ...], tuple[Unknown, ...]))
+
+def f(x: tuple, y: tuple[Unknown, ...]):
+    reveal_type(x)  # revealed: tuple[Unknown, ...]
+    assert_type(x, tuple[Any, ...])
+    assert_type(x, tuple[Unknown, ...])
+    reveal_type(y)  # revealed: tuple[Unknown, ...]
+    assert_type(y, tuple[Any, ...])
+    assert_type(y, tuple[Unknown, ...])
+```
+
+## Converting a `tuple` to another `Sequence` type
+
+For covariant types, such as `frozenset`, the ideal behaviour would be to not promote `Literal`
+types to their instance supertypes: doing so causes more false positives than it fixes:
+
+```py
+# TODO: better here would be `frozenset[Literal[1, 2, 3]]`
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[int]
+# TODO: better here would be `frozenset[tuple[Literal[1], Literal[2], Literal[3]]]`
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[int, int, int]]
+```
+
+Literals are always promoted for invariant containers such as `list`, however, even though this can
+in some cases cause false positives:
+
+```py
+from typing import Literal
+
+reveal_type(list((1, 2, 3)))  # revealed: list[int]
+reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
+
+# TODO: we could bidirectionally infer that the user does not want literals to be promoted here,
+# and avoid this diagnostic
+#
+# error: [invalid-assignment] "`list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
+x: list[Literal[1, 2, 3]] = list((1, 2, 3))
+reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
+```
+
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

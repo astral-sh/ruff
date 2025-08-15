@@ -12,6 +12,7 @@ use ruff_db::parsed::parsed_module;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
+use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Boundness, Place};
@@ -33,7 +34,7 @@ use crate::types::{
     WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -397,7 +398,7 @@ impl<'db> Bindings<'db> {
                                     }
                                     Some("__default__") => {
                                         overload.set_return_type(
-                                            typevar.default_ty(db).unwrap_or_else(|| {
+                                            typevar.default_type(db).unwrap_or_else(|| {
                                                 KnownClass::NoDefaultType.to_instance(db)
                                             }),
                                         );
@@ -860,7 +861,11 @@ impl<'db> Bindings<'db> {
                                     params |= DataclassParams::MATCH_ARGS;
                                 }
                                 if to_bool(kw_only, false) {
-                                    params |= DataclassParams::KW_ONLY;
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        params |= DataclassParams::KW_ONLY;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
                                 }
                                 if to_bool(slots, false) {
                                     params |= DataclassParams::SLOTS;
@@ -919,7 +924,9 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Field) => {
-                            if let [default, default_factory, init, ..] = overload.parameter_types()
+                            // TODO this will break on Python 3.14 -- we should match by parameter name instead
+                            if let [default, default_factory, init, .., kw_only] =
+                                overload.parameter_types()
                             {
                                 let default_ty = match (default, default_factory) {
                                     (Some(default_ty), _) => *default_ty,
@@ -933,6 +940,14 @@ impl<'db> Bindings<'db> {
                                     .map(|init| !init.bool(db).is_always_false())
                                     .unwrap_or(true);
 
+                                let kw_only = if Program::get(db).python_version(db)
+                                    >= PythonVersion::PY310
+                                {
+                                    kw_only.map(|kw_only| !kw_only.bool(db).is_always_false())
+                                } else {
+                                    None
+                                };
+
                                 // `typeshed` pretends that `dataclasses.field()` returns the type of the
                                 // default value directly. At runtime, however, this function returns an
                                 // instance of `dataclasses.Field`. We also model it this way and return
@@ -942,7 +957,7 @@ impl<'db> Bindings<'db> {
                                 // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::Field(FieldInstance::new(
-                                        db, default_ty, init,
+                                        db, default_ty, init, kw_only,
                                     )),
                                 ));
                             }
@@ -1010,7 +1025,7 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownClass::Type) if overload_index == 0 => {
                             if let [Some(arg)] = overload.parameter_types() {
-                                overload.set_return_type(arg.to_meta_type(db));
+                                overload.set_return_type(arg.dunder_class(db));
                             }
                         }
 
@@ -2857,7 +2872,7 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let typevar = error.typevar();
+                let typevar = error.bound_typevar().typevar(context.db());
                 let argument_type = error.argument_type();
                 let argument_ty_display = argument_type.display(context.db());
 

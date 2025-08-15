@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
-snapshot_kind: text
 ---
-FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
+FURB132 [*] Use `s.discard("x")` instead of check and `remove`
+  --> FURB132.py:12:1
    |
 11 |   # FURB132
 12 | / if "x" in s:
 13 | |     s.remove("x")
-   | |_________________^ FURB132
+   | |_________________^
    |
-   = help: Replace with `s.discard("x")`
+help: Replace with `s.discard("x")`
 
 ℹ Unsafe fix
 9  9  | # these should match
@@ -22,14 +22,15 @@ FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
 15 14 | 
 16 15 | # FURB132
 
-FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
+FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
+  --> FURB132.py:22:1
    |
 21 |   # FURB132
 22 | / if "x" in s3:
 23 | |     s3.remove("x")
-   | |__________________^ FURB132
+   | |__________________^
    |
-   = help: Replace with `s3.discard("x")`
+help: Replace with `s3.discard("x")`
 
 ℹ Unsafe fix
 19 19 | 
@@ -42,15 +43,16 @@ FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
 25 24 | 
 26 25 | var = "y"
 
-FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
+FURB132 [*] Use `s.discard(var)` instead of check and `remove`
+  --> FURB132.py:28:1
    |
 26 |   var = "y"
 27 |   # FURB132
 28 | / if var in s:
 29 | |     s.remove(var)
-   | |_________________^ FURB132
+   | |_________________^
    |
-   = help: Replace with `s.discard(var)`
+help: Replace with `s.discard(var)`
 
 ℹ Unsafe fix
 25 25 | 
@@ -63,13 +65,14 @@ FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
 31 30 | 
 32 31 | if f"{var}:{var}" in s:
 
-FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
+FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`
+  --> FURB132.py:32:1
    |
 32 | / if f"{var}:{var}" in s:
 33 | |     s.remove(f"{var}:{var}")
-   | |____________________________^ FURB132
+   | |____________________________^
    |
-   = help: Replace with `s.discard(f"{var}:{var}")`
+help: Replace with `s.discard(f"{var}:{var}")`
 
 ℹ Unsafe fix
 29 29 |     s.remove(var)

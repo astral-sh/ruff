@@ -340,6 +340,10 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         PatternPredicateKind::Or(predicates) => {
             UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
         }
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|p| pattern_kind_to_type(db, p))
+            .unwrap_or_else(|| Type::object(db)),
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -761,6 +765,10 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::As(pattern, _) => pattern
+                .as_deref()
+                .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
+                .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
         }
     }
@@ -806,6 +814,17 @@ impl ReachabilityConstraints {
                 // Avoiding this on the happy-path is important because these constraints can be
                 // very large in number, since we add them on all statement level function calls.
                 let ty = infer_expression_type(db, callable);
+
+                // Short-circuit for well known types that are known not to return `Never` when called.
+                // Without the short-circuit, we've seen that threads keep blocking each other
+                // because they all try to acquire Salsa's `CallableType` lock that ensures each type
+                // is only interned once. The lock is so heavily congested because there are only
+                // very few dynamic types, in which case Salsa's sharding the locks by value
+                // doesn't help much.
+                // See <https://github.com/astral-sh/ty/issues/968>.
+                if matches!(ty, Type::Dynamic(_)) {
+                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                }
 
                 let overloads_iterator =
                     if let Some(Type::Callable(callable)) = ty.into_callable(db) {

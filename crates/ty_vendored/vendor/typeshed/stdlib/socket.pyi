@@ -1098,14 +1098,12 @@ if sys.version_info >= (3, 14):
 
     if sys.platform == "linux":
         from _socket import (
-            CAN_RAW_ERR_FILTER as CAN_RAW_ERR_FILTER,
             IP_FREEBIND as IP_FREEBIND,
             IP_RECVORIGDSTADDR as IP_RECVORIGDSTADDR,
-            SO_ORIGINAL_DST as SO_ORIGINAL_DST,
             VMADDR_CID_LOCAL as VMADDR_CID_LOCAL,
         )
 
-        __all__ += ["CAN_RAW_ERR_FILTER", "IP_FREEBIND", "IP_RECVORIGDSTADDR", "VMADDR_CID_LOCAL"]
+        __all__ += ["IP_FREEBIND", "IP_RECVORIGDSTADDR", "VMADDR_CID_LOCAL"]
 
 # Re-exported from errno
 EBADF: int

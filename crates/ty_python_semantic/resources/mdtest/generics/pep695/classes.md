@@ -7,19 +7,30 @@ python-version = "3.13"
 
 ## Defining a generic class
 
-At its simplest, to define a generic class using PEP 695 syntax, you add a list of typevars after
-the class name.
+At its simplest, to define a generic class using PEP 695 syntax, you add a list of `TypeVar`s,
+`ParamSpec`s or `TypeVarTuple`s after the class name.
 
 ```py
 from ty_extensions import generic_context
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
+class SingleParamSpec[**P]: ...
+class TypeVarAndParamSpec[T, **P]: ...
+class SingleTypeVarTuple[*Ts]: ...
+class TypeVarAndTypeVarTuple[T, *Ts]: ...
 
 # revealed: tuple[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
 # revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
+
+# TODO: support `ParamSpec`/`TypeVarTuple` properly
+# (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
+reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
+reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
 ```
 
 You cannot use the same typevar more than once.
@@ -344,6 +355,25 @@ class C[T, U](tuple[T, U]): ...
 reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
 
+### Upcasting a `tuple` to its `Sequence` supertype
+
+This test is taken from the
+[typing spec conformance suite](https://github.com/python/typing/blob/c141cdfb9d7085c1aafa76726c8ce08362837e8b/conformance/tests/tuples_type_compat.py#L133-L153)
+
+```py
+from typing import Sequence, Never
+
+def test_seq[T](x: Sequence[T]) -> Sequence[T]:
+    return x
+
+def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
+    # TODO: this should be `Sequence[Never]`
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
+```
+
 ### `__init__` is itself generic
 
 ```py
@@ -361,6 +391,7 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
+from __future__ import annotations
 from typing import overload
 
 class C[T]:
@@ -511,6 +542,23 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Scoping of typevars
+
+### No back-references
+
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+
+```py
+# TODO error
+class C[S: T, T]:
+    pass
+
+class D[S: X]:
+    pass
+
+X = int
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
@@ -561,7 +609,7 @@ class Derived[T](list[Derived[T]]): ...
 
 Inheritance that would result in a cyclic MRO is detected as an error.
 
-```py
+```pyi
 # error: [cyclic-class-definition]
 class C[T](C): ...
 

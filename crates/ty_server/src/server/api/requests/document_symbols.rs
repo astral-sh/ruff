@@ -22,7 +22,7 @@ impl RequestHandler for DocumentSymbolRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
-    fn document_url(params: &DocumentSymbolParams) -> Cow<Url> {
+    fn document_url(params: &DocumentSymbolParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -32,7 +32,10 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
         _client: &Client,
         params: DocumentSymbolParams,
     ) -> crate::server::Result<Option<lsp_types::DocumentSymbolResponse>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 

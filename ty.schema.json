@@ -461,6 +461,16 @@
             }
           ]
         },
+        "invalid-await": {
+          "title": "detects awaiting on types that don't support it",
+          "description": "## What it does\nChecks for `await` being used with types that are not [Awaitable].\n\n## Why is this bad?\nSuch expressions will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nimport asyncio\n\nclass InvalidAwait:\n    def __await__(self) -> int:\n        return 5\n\nasync def main() -> None:\n    await InvalidAwait()  # error: [invalid-await]\n    await 42  # error: [invalid-await]\n\nasyncio.run(main())\n```\n\n[Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-base": {
           "title": "detects class bases that will cause the class definition to raise an exception at runtime",
           "description": "## What it does\nChecks for class definitions that have bases which are not instances of `type`.\n\n## Why is this bad?\nClass definitions with bases like this will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nclass A(42): ...  # error: [invalid-base]\n```",
@@ -493,7 +503,7 @@
         },
         "invalid-exception-caught": {
           "title": "detects exception handlers that catch classes that do not inherit from `BaseException`",
-          "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a TypeError at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
+          "description": "## What it does\nChecks for exception handlers that catch non-exception classes.\n\n## Why is this bad?\nCatching classes that do not inherit from `BaseException` will raise a `TypeError` at runtime.\n\n## Example\n```python\ntry:\n    1 / 0\nexcept 1:\n    ...\n```\n\nUse instead:\n```python\ntry:\n    1 / 0\nexcept ZeroDivisionError:\n    ...\n```\n\n## References\n- [Python documentation: except clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)\n\n## Ruff rule\n This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)",
           "default": "error",
           "oneOf": [
             {
@@ -515,6 +525,16 @@
           "title": "detects ignore comments that use invalid syntax",
           "description": "## What it does\nChecks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.\n\n## Why is this bad?\nA syntactically incorrect ignore comment is probably a mistake and is useless.\n\n## Examples\n```py\na = 20 / 0  # type: ignoree\n```\n\nUse instead:\n\n```py\na = 20 / 0  # type: ignore\n```",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-key": {
+          "title": "detects invalid subscript accesses",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys.\n\n## Why is this bad?\nUsing an invalid key will raise a `KeyError` at runtime.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n```",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

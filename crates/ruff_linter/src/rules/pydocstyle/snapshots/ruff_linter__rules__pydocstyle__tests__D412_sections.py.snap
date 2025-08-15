@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
 ---
-sections.py:218:5: D412 [*] No blank lines allowed between a section header and its content ("Short summary")
+D412 [*] No blank lines allowed between a section header and its content ("Short summary")
+   --> sections.py:218:5
     |
 216 |     """Toggle the gizmo.
 217 |
 218 |     Short summary
-    |     ^^^^^^^^^^^^^ D412
+    |     ^^^^^^^^^^^^^
 219 |     -------------
     |
-    = help: Remove blank line(s)
+help: Remove blank line(s)
 
 ℹ Safe fix
 217 217 | 
