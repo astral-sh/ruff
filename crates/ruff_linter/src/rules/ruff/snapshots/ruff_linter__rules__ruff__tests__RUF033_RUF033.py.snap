@@ -455,3 +455,26 @@ help: Use `dataclasses.InitVar` instead
 122 123 |             ,
 123 124 |         ) -> None:
 124 125 |             ...
+
+## Concise Output
+RUF033.py:19:35: RUF033 `__post_init__` method with argument defaults
+RUF033.py:19:45: RUF033 `__post_init__` method with argument defaults
+RUF033.py:25:35: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:25:45: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:46:40: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:46:78: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:59:40: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:59:55: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:67:40: RUF033 `__post_init__` method with argument defaults
+RUF033.py:67:59: RUF033 `__post_init__` method with argument defaults
+RUF033.py:73:41: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:81:21: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:83:21: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:84:16: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:86:16: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:95:20: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:96:20: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:105:22: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:107:23: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:109:21: RUF033 [*] `__post_init__` method with argument defaults
+RUF033.py:121:27: RUF033 [*] `__post_init__` method with argument defaults

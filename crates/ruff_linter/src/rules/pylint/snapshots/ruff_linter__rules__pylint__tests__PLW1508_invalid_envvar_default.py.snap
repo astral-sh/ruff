@@ -66,3 +66,11 @@ PLW1508 Invalid type for environment variable default; expected `str` or `None`
 16 | os.environ.get("TEST", "AA" * 12)
 17 | os.environ.get("TEST", 13 * "AA")
    |
+
+## Concise Output
+invalid_envvar_default.py:3:29: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+invalid_envvar_default.py:5:31: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+invalid_envvar_default.py:6:25: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+invalid_envvar_default.py:10:17: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+invalid_envvar_default.py:14:17: PLW1508 Invalid type for environment variable default; expected `str` or `None`
+invalid_envvar_default.py:15:24: PLW1508 Invalid type for environment variable default; expected `str` or `None`

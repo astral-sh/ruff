@@ -150,3 +150,19 @@ S103 `os.chmod` setting an invalid mask on file or directory
 23 | os.chmod("/etc/passwd", 0o100000000)  # Error
    |                         ^^^^^^^^^^^
    |
+
+## Concise Output
+S103.py:6:25: S103 `os.chmod` setting a permissive mask `0o227` on file or directory
+S103.py:7:25: S103 `os.chmod` setting a permissive mask `0o7` on file or directory
+S103.py:9:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:10:25: S103 `os.chmod` setting a permissive mask `0o770` on file or directory
+S103.py:11:25: S103 `os.chmod` setting a permissive mask `0o776` on file or directory
+S103.py:13:23: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:14:24: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:15:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:17:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:18:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:19:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:20:27: S103 `os.chmod` setting a permissive mask `0o10` on file or directory
+S103.py:22:25: S103 `os.chmod` setting a permissive mask `0o2` on file or directory
+S103.py:23:25: S103 `os.chmod` setting an invalid mask on file or directory

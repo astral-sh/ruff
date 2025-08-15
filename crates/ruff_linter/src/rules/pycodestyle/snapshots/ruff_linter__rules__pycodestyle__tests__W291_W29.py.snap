@@ -66,3 +66,8 @@ help: Remove trailing whitespace
 14 14 | #: W191 W292 noeol
 15 15 | if False:
 16 16 | 	pass  # indented with tabs
+
+## Concise Output
+W29.py:4:6: W291 [*] Trailing whitespace
+W29.py:11:35: W291 [*] Trailing whitespace
+W29.py:13:6: W291 [*] Trailing whitespace

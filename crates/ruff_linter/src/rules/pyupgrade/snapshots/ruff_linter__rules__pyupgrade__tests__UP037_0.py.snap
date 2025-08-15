@@ -654,3 +654,36 @@ help: Remove quotes
 121     |-    """:
     121 |+    ):
 122 122 |     return 0
+
+## Concise Output
+UP037_0.py:18:14: UP037 [*] Remove quotes from type annotation
+UP037_0.py:18:28: UP037 [*] Remove quotes from type annotation
+UP037_0.py:19:8: UP037 [*] Remove quotes from type annotation
+UP037_0.py:22:21: UP037 [*] Remove quotes from type annotation
+UP037_0.py:26:16: UP037 [*] Remove quotes from type annotation
+UP037_0.py:26:33: UP037 [*] Remove quotes from type annotation
+UP037_0.py:30:10: UP037 [*] Remove quotes from type annotation
+UP037_0.py:32:14: UP037 [*] Remove quotes from type annotation
+UP037_0.py:36:8: UP037 [*] Remove quotes from type annotation
+UP037_0.py:40:27: UP037 [*] Remove quotes from type annotation
+UP037_0.py:44:31: UP037 [*] Remove quotes from type annotation
+UP037_0.py:47:14: UP037 [*] Remove quotes from type annotation
+UP037_0.py:49:8: UP037 [*] Remove quotes from type annotation
+UP037_0.py:51:15: UP037 [*] Remove quotes from type annotation
+UP037_0.py:53:13: UP037 [*] Remove quotes from type annotation
+UP037_0.py:55:20: UP037 [*] Remove quotes from type annotation
+UP037_0.py:57:20: UP037 [*] Remove quotes from type annotation
+UP037_0.py:59:11: UP037 [*] Remove quotes from type annotation
+UP037_0.py:61:19: UP037 [*] Remove quotes from type annotation
+UP037_0.py:63:29: UP037 [*] Remove quotes from type annotation
+UP037_0.py:63:45: UP037 [*] Remove quotes from type annotation
+UP037_0.py:65:29: UP037 [*] Remove quotes from type annotation
+UP037_0.py:65:36: UP037 [*] Remove quotes from type annotation
+UP037_0.py:65:45: UP037 [*] Remove quotes from type annotation
+UP037_0.py:65:52: UP037 [*] Remove quotes from type annotation
+UP037_0.py:67:24: UP037 [*] Remove quotes from type annotation
+UP037_0.py:67:38: UP037 [*] Remove quotes from type annotation
+UP037_0.py:67:45: UP037 [*] Remove quotes from type annotation
+UP037_0.py:112:12: UP037 [*] Remove quotes from type annotation
+UP037_0.py:115:10: UP037 [*] Remove quotes from type annotation
+UP037_0.py:118:12: UP037 [*] Remove quotes from type annotation

@@ -225,3 +225,15 @@ UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
 50 |   # OK
    |
 help: Replace with `capture_output` keyword argument
+
+## Concise Output
+UP022.py:4:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:6:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:8:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:10:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:14:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:18:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:29:14: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:38:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:42:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
+UP022.py:46:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`

@@ -81,3 +81,9 @@ help: Remove default argument
 9 9 | 
 10 10 | 
 11 11 | # No errors
+
+## Concise Output
+is_pytest_test.py:3:27: PT028 Test function parameter `a` has default argument
+is_pytest_test.py:4:27: PT028 Test function parameter `a` has default argument
+is_pytest_test.py:7:41: PT028 Test function parameter `a` has default argument
+is_pytest_test.py:8:37: PT028 Test function parameter `a` has default argument

@@ -18,3 +18,7 @@ YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
 5 | print(version[:1])
   |       ^^^^^^^
   |
+
+## Concise Output
+YTT303.py:4:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`
+YTT303.py:5:7: YTT303 `sys.version[:1]` referenced (python10), use `sys.version_info`

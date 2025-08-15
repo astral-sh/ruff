@@ -52,3 +52,10 @@ TD004 Missing colon in TODO
 8 | # TODO this has a colon but it doesn't terminate the tag, so this should throw. https://www.google.com
   |   ^^^^
   |
+
+## Concise Output
+TD004.py:4:3: TD004 Missing colon in TODO
+TD004.py:5:3: TD004 Missing colon in TODO
+TD004.py:6:3: TD004 Missing colon in TODO
+TD004.py:7:9: TD004 Missing colon in TODO
+TD004.py:8:3: TD004 Missing colon in TODO

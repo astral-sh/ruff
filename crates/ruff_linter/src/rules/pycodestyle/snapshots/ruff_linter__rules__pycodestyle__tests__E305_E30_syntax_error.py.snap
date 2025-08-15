@@ -48,3 +48,10 @@ invalid-syntax: Expected ')', found newline
 22 |     def nested1():
 23 |         pass
    |
+
+## Concise Output
+E30_syntax_error.py:4:15: invalid-syntax: Expected ']', found '('
+E30_syntax_error.py:13:18: invalid-syntax: Expected ')', found newline
+E30_syntax_error.py:18:1: E305 Expected 2 blank lines after class or function definition, found (1)
+E30_syntax_error.py:18:11: invalid-syntax: Expected ')', found newline
+E30_syntax_error.py:21:9: invalid-syntax: Expected ')', found newline

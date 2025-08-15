@@ -110,3 +110,10 @@ help: Remove unnecessary semicolon
    71 |+  5
 72 72 | #:
 73 73 | with x(y) as z: ...
+
+## Concise Output
+E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon

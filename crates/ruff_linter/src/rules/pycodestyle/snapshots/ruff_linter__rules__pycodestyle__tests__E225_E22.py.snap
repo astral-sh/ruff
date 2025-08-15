@@ -263,3 +263,17 @@ help: Add missing whitespace
 97 97 | #: E225 E226
 98 98 | c = (a +b)*(a - b)
 99 99 | #: E225 E226
+
+## Concise Output
+E22.py:54:11: E225 [*] Missing whitespace around operator
+E22.py:56:10: E225 [*] Missing whitespace around operator
+E22.py:58:3: E225 [*] Missing whitespace around operator
+E22.py:76:2: E225 [*] Missing whitespace around operator
+E22.py:78:2: E225 [*] Missing whitespace around operator
+E22.py:80:6: E225 [*] Missing whitespace around operator
+E22.py:82:6: E225 [*] Missing whitespace around operator
+E22.py:84:2: E225 [*] Missing whitespace around operator
+E22.py:86:2: E225 [*] Missing whitespace around operator
+E22.py:92:2: E225 [*] Missing whitespace around operator
+E22.py:94:3: E225 [*] Missing whitespace around operator
+E22.py:96:2: E225 [*] Missing whitespace around operator

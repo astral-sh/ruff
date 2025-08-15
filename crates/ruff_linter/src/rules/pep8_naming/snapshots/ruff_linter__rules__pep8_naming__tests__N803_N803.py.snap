@@ -40,3 +40,10 @@ N803 Argument name `A` should be lowercase
 29 |     method = override(lambda self, _, a, A: ...)  # Incorrect usage
    |                                          ^
    |
+
+## Concise Output
+N803.py:1:16: N803 Argument name `A` should be lowercase
+N803.py:6:28: N803 Argument name `A` should be lowercase
+N803.py:22:16: N803 Argument name `A` should be lowercase
+N803.py:25:21: N803 Argument name `A` should be lowercase
+N803.py:29:42: N803 Argument name `A` should be lowercase

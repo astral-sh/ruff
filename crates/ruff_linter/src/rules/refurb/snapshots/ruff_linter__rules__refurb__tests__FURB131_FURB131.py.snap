@@ -179,4 +179,16 @@ help: Replace with `clear()`
    58 |+sneaky.clear()
 59 59 | 
 60 60 | # these should not
-61 61 |
+61 61 | 
+
+## Concise Output
+FURB131.py:11:1: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:15:1: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:19:1: FURB131 Prefer `clear` over deleting a full slice
+FURB131.py:23:1: FURB131 Prefer `clear` over deleting a full slice
+FURB131.py:28:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:33:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:38:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:43:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:48:5: FURB131 [*] Prefer `clear` over deleting a full slice
+FURB131.py:58:1: FURB131 [*] Prefer `clear` over deleting a full slice

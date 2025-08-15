@@ -21,3 +21,6 @@ help: Add missing blank line(s)
 21 22 | def b():
 22 23 |     pass
 23 24 | # end
+
+## Concise Output
+E30.ipynb:21:1: E302 [*] Expected 2 blank lines, found 1

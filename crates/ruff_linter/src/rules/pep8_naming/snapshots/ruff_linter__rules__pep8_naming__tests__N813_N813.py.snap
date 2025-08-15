@@ -27,3 +27,8 @@ N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
 3 | from mod import AnotherCamelCase as another_camelcase
   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+N813.py:1:8: N813 Camelcase `Camel` imported as lowercase `camel`
+N813.py:2:17: N813 Camelcase `CamelCase` imported as lowercase `camelcase`
+N813.py:3:17: N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`

@@ -15,4 +15,7 @@ help: Add `from __future__ import annotations`
   1 |+from __future__ import annotations
 1 2 | from typing import List
 2 3 | 
-3 4 |
+3 4 | 
+
+## Concise Output
+from_typing_import.py:5:13: FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`

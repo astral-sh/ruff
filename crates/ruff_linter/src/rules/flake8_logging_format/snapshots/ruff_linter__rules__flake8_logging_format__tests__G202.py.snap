@@ -44,3 +44,9 @@ G202 Logging statement has redundant `exc_info`
 34 |
 35 | # OK
    |
+
+## Concise Output
+G202.py:8:38: G202 Logging statement has redundant `exc_info`
+G202.py:13:38: G202 Logging statement has redundant `exc_info`
+G202.py:28:30: G202 Logging statement has redundant `exc_info`
+G202.py:33:30: G202 Logging statement has redundant `exc_info`

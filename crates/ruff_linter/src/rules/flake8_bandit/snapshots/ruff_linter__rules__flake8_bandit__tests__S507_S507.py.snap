@@ -86,3 +86,13 @@ S507 Paramiko call with policy set to automatically trust the unknown host key
 23 |
 24 | # Unrelated
    |
+
+## Concise Output
+S507.py:15:40: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:16:40: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:17:40: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:18:40: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:19:47: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:20:47: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:21:47: S507 Paramiko call with policy set to automatically trust the unknown host key
+S507.py:22:54: S507 Paramiko call with policy set to automatically trust the unknown host key

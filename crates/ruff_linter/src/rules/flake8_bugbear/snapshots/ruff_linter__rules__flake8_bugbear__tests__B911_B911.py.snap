@@ -182,3 +182,21 @@ B911 `itertools.batched()` without an explicit `strict` parameter
 48 | # No errors
    |
 help: Add an explicit `strict` parameter
+
+## Concise Output
+B911.py:5:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:6:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:7:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:8:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:9:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:12:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:13:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:16:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:35:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:36:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:37:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:38:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:39:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:42:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:43:1: B911 `itertools.batched()` without an explicit `strict` parameter
+B911.py:46:1: B911 `itertools.batched()` without an explicit `strict` parameter

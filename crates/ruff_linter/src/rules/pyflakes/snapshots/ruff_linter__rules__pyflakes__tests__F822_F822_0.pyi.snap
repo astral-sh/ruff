@@ -9,3 +9,6 @@ F822 Undefined name `c` in `__all__`
 4 | __all__ = ["a", "b", "c"]  # c is flagged as missing; b is not
   |                      ^^^
   |
+
+## Concise Output
+F822_0.pyi:4:22: F822 Undefined name `c` in `__all__`

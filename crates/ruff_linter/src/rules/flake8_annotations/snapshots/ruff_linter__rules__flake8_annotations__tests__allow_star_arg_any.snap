@@ -36,3 +36,9 @@ ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo_method`
    |                                                                   ^^^
 45 |         pass
    |
+
+## Concise Output
+allow_star_arg_any.py:10:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+allow_star_arg_any.py:15:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+allow_star_arg_any.py:40:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+allow_star_arg_any.py:44:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo_method`

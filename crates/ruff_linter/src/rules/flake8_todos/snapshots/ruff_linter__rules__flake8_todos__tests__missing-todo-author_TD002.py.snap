@@ -41,3 +41,9 @@ TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<aut
 14 | # foo # TODO: this doesn't either
    |         ^^^^
    |
+
+## Concise Output
+TD002.py:11:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+TD002.py:12:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+TD002.py:13:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+TD002.py:14:9: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`

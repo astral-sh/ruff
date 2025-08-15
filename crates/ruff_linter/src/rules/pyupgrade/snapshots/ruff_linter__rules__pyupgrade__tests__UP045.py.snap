@@ -171,3 +171,16 @@ UP045 Use `X | None` for type annotations
    |      ^^^^^^^^^^^^^^
    |
 help: Convert to `X | None`
+
+## Concise Output
+UP045.py:5:10: UP045 [*] Use `X | None` for type annotations
+UP045.py:9:10: UP045 [*] Use `X | None` for type annotations
+UP045.py:14:8: UP045 [*] Use `X | None` for type annotations
+UP045.py:15:9: UP045 Use `X | None` for type annotations
+UP045.py:18:15: UP045 [*] Use `X | None` for type annotations
+UP045.py:22:10: UP045 Use `X | None` for type annotations
+UP045.py:26:10: UP045 Use `X | None` for type annotations
+UP045.py:30:10: UP045 Use `X | None` for type annotations
+UP045.py:36:28: UP045 [*] Use `X | None` for type annotations
+UP045.py:44:28: UP045 [*] Use `X | None` for type annotations
+UP045.py:49:6: UP045 Use `X | None` for type annotations

@@ -76,3 +76,14 @@ PLR0913 Too many arguments in function definition (6 > 5)
    |         ^
 71 |         pass
    |
+
+## Concise Output
+too_many_arguments.py:1:5: PLR0913 Too many arguments in function definition (8 > 5)
+too_many_arguments.py:17:5: PLR0913 Too many arguments in function definition (6 > 5)
+too_many_arguments.py:25:5: PLR0913 Too many arguments in function definition (6 > 5)
+too_many_arguments.py:29:5: PLR0913 Too many arguments in function definition (6 > 5)
+too_many_arguments.py:33:5: PLR0913 Too many arguments in function definition (9 > 5)
+too_many_arguments.py:51:9: PLR0913 Too many arguments in function definition (8 > 5)
+too_many_arguments.py:58:9: PLR0913 Too many arguments in function definition (8 > 5)
+too_many_arguments.py:66:9: PLR0913 Too many arguments in function definition (8 > 5)
+too_many_arguments.py:70:9: PLR0913 Too many arguments in function definition (6 > 5)

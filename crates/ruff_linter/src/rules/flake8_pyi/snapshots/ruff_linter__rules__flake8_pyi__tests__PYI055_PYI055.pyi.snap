@@ -286,3 +286,18 @@ help: Combine multiple `type` members
 32 30 | 
 33 31 | 
 34 32 | # OK
+
+## Concise Output
+PYI055.pyi:4:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
+PYI055.pyi:5:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | float]`.
+PYI055.pyi:6:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | str | complex]`.
+PYI055.pyi:7:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[float, complex]]`.
+PYI055.pyi:8:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:9:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:10:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[Union[float, int], complex]]`.
+PYI055.pyi:11:4: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[complex, Union[float, int]]]`.
+PYI055.pyi:13:15: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[int | float]`.
+PYI055.pyi:23:7: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty]`.
+PYI055.pyi:27:11: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[requests_mock.Mocker | httpretty | str]`.
+PYI055.pyi:28:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.
+PYI055.pyi:29:12: PYI055 [*] Multiple `type` members in a union. Combine them into one, e.g., `type[Union[requests_mock.Mocker, httpretty, str]]`.

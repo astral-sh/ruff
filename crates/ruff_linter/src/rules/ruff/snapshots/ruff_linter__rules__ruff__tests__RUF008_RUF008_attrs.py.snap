@@ -44,3 +44,9 @@ RUF008 Do not use mutable default values for dataclass attributes
 43 |     immutable_annotation: Sequence[int] = []
 44 |     without_annotation = []
    |
+
+## Concise Output
+RUF008_attrs.py:13:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:23:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:33:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:42:34: RUF008 Do not use mutable default values for dataclass attributes

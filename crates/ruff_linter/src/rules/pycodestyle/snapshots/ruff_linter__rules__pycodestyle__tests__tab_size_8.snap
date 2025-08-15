@@ -117,3 +117,16 @@ E501 Line too long (14 > 6)
 16 |     [1, 2]
    |     ^^^^^^
    |
+
+## Concise Output
+E501_2.py:2:7: E501 Line too long (7 > 6)
+E501_2.py:3:7: E501 Line too long (7 > 6)
+E501_2.py:4:2: E501 Line too long (11 > 6)
+E501_2.py:5:2: E501 Line too long (12 > 6)
+E501_2.py:6:2: E501 Line too long (13 > 6)
+E501_2.py:7:2: E501 Line too long (14 > 6)
+E501_2.py:8:2: E501 Line too long (19 > 6)
+E501_2.py:9:2: E501 Line too long (20 > 6)
+E501_2.py:10:2: E501 Line too long (21 > 6)
+E501_2.py:14:2: E501 Line too long (13 > 6)
+E501_2.py:16:2: E501 Line too long (14 > 6)

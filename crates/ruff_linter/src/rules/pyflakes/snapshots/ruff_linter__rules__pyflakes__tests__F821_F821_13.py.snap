@@ -9,3 +9,6 @@ F821 Undefined name `List`
 8 | Z = TypeVar("X", "List[int]", "int")
   |                   ^^^^
   |
+
+## Concise Output
+F821_13.py:8:19: F821 Undefined name `List`

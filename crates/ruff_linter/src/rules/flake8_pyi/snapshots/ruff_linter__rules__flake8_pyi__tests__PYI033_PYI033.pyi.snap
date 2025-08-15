@@ -113,3 +113,16 @@ PYI033 Don't use type comments in stub file
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 33 |     # This whole line is commented out and indented # type: str
    |
+
+## Concise Output
+PYI033.pyi:6:22: PYI033 Don't use type comments in stub file
+PYI033.pyi:7:22: PYI033 Don't use type comments in stub file
+PYI033.pyi:8:22: PYI033 Don't use type comments in stub file
+PYI033.pyi:9:22: PYI033 Don't use type comments in stub file
+PYI033.pyi:10:20: PYI033 Don't use type comments in stub file
+PYI033.pyi:11:20: PYI033 Don't use type comments in stub file
+PYI033.pyi:14:12: PYI033 Don't use type comments in stub file
+PYI033.pyi:15:11: PYI033 Don't use type comments in stub file
+PYI033.pyi:19:29: PYI033 Don't use type comments in stub file
+PYI033.pyi:29:22: PYI033 Don't use type comments in stub file
+PYI033.pyi:32:26: PYI033 Don't use type comments in stub file

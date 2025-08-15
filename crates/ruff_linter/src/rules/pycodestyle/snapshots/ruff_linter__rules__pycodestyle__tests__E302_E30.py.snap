@@ -299,3 +299,19 @@ help: Add missing blank line(s)
 961 963 | # comment
 962 964 | def test_clientmodel():
 963 965 |     pass
+
+## Concise Output
+E30.py:533:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:540:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:549:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:560:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:569:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:578:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:586:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:592:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:602:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:624:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:634:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:944:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:953:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:962:1: E302 [*] Expected 2 blank lines, found 0

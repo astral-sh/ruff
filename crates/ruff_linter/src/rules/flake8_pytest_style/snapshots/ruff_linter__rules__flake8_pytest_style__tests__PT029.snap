@@ -9,3 +9,6 @@ PT029 Set the expected warning in `pytest.warns()`
   |          ^^^^^^^^^^^^
 6 |         pass
   |
+
+## Concise Output
+PT029.py:5:10: PT029 Set the expected warning in `pytest.warns()`

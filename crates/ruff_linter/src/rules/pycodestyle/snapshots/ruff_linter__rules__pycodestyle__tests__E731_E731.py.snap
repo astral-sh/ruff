@@ -544,3 +544,29 @@ help: Rewrite `foo_tooltip` as a `def`
     188 |+def foo_tooltip(x, data):
     189 |+    return (f"\nfoo: {data['foo'][int(x)]}" +
     190 |+    more)
+
+## Concise Output
+E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
+E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
+E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
+E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
+E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
+E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:163:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:169:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:171:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:176:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:182:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+E731.py:188:1: E731 [*] Do not assign a `lambda` expression, use a `def`

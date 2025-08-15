@@ -7,3 +7,6 @@ invalid-syntax: duplicate type parameter
 1 | class C[T, T]: pass
   |            ^
   |
+
+## Concise Output
+<filename>:1:12: invalid-syntax: duplicate type parameter

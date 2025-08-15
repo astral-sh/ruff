@@ -196,3 +196,14 @@ help: Remove duplicate item
 23 23 | 
 24 24 | ###
 25 25 | # Non-errors.
+
+## Concise Output
+B033.py:4:35: B033 [*] Sets should not contain duplicate item `"value1"`
+B033.py:5:21: B033 [*] Sets should not contain duplicate item `1`
+B033.py:10:5: B033 [*] Sets should not contain duplicate item `"value1"`
+B033.py:13:21: B033 [*] Sets should not contain duplicate item `1`
+B033.py:14:21: B033 [*] Sets should not contain duplicate item `1`
+B033.py:15:24: B033 [*] Sets should not contain duplicate item `1`
+B033.py:16:24: B033 [*] Sets should not contain duplicate item `1`
+B033.py:20:5: B033 [*] Sets should not contain duplicate item `1`
+B033.py:22:28: B033 [*] Sets should not contain duplicate items, but `False` and `0` has the same value

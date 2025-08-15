@@ -234,3 +234,17 @@ help: Prefix it with an underscore or any other dummy variable pattern
 30 30 | def f():
 31    |-    (a, b) = toplevel = lexer.get_token()
    31 |+    (a, _b) = toplevel = lexer.get_token()
+
+## Concise Output
+RUF059_2.py:8:20: RUF059 [*] Unpacked variable `x2` is never used
+RUF059_2.py:8:24: RUF059 [*] Unpacked variable `y2` is never used
+RUF059_2.py:17:6: RUF059 [*] Unpacked variable `x2` is never used
+RUF059_2.py:17:10: RUF059 [*] Unpacked variable `y2` is never used
+RUF059_2.py:18:16: RUF059 [*] Unpacked variable `x3` is never used
+RUF059_2.py:18:20: RUF059 [*] Unpacked variable `y3` is never used
+RUF059_2.py:22:24: RUF059 [*] Unpacked variable `x` is never used
+RUF059_2.py:22:27: RUF059 [*] Unpacked variable `y` is never used
+RUF059_2.py:27:17: RUF059 [*] Unpacked variable `a` is never used
+RUF059_2.py:27:20: RUF059 [*] Unpacked variable `b` is never used
+RUF059_2.py:31:6: RUF059 [*] Unpacked variable `a` is never used
+RUF059_2.py:31:9: RUF059 [*] Unpacked variable `b` is never used

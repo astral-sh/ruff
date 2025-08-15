@@ -122,4 +122,14 @@ help: Replace `foo` with `FOO`
    19 |+if env := os.environ['FOO']:
 20 20 |     pass
 21 21 | 
-22 22 |
+22 22 | 
+
+## Concise Output
+SIM112.py:4:12: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:6:16: SIM112 Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:8:16: SIM112 Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:10:11: SIM112 Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:12:22: SIM112 Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:14:18: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:16:26: SIM112 Use capitalized environment variable `FOO` instead of `foo`
+SIM112.py:19:22: SIM112 [*] Use capitalized environment variable `FOO` instead of `foo`

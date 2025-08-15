@@ -89,3 +89,15 @@ B008 Do not perform function call `dt.datetime.now` in argument defaults; instea
     |                                     ^^^^^^^^^^^^^^^^^
 251 |     pass
     |
+
+## Concise Output
+B006_B008.py:102:61: B008 Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:106:64: B008 Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:110:60: B008 Do not perform function call `range` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:126:39: B008 Do not perform function call `time.time` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:130:12: B008 Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:134:30: B008 Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:239:31: B008 Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:245:22: B008 Do not perform function call `map` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:250:19: B008 Do not perform function call `random.randint` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+B006_B008.py:250:37: B008 Do not perform function call `dt.datetime.now` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable

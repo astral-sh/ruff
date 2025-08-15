@@ -42,3 +42,9 @@ RUF063 Use `annotationlib.get_annotations` instead of `__dict__` access
 8 |
 9 | # Cases that should NOT trigger the violation
   |
+
+## Concise Output
+RUF063.py:4:1: RUF063 Use `annotationlib.get_annotations` instead of `__dict__` access
+RUF063.py:5:1: RUF063 Use `annotationlib.get_annotations` instead of `__dict__` access
+RUF063.py:6:1: RUF063 Use `annotationlib.get_annotations` instead of `__dict__` access
+RUF063.py:7:1: RUF063 Use `annotationlib.get_annotations` instead of `__dict__` access

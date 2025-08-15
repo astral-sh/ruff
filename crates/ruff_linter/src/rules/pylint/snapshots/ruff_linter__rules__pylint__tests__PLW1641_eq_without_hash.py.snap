@@ -146,3 +146,21 @@ PLW1641 Object does not implement `__hash__` method
 103 |     if ...:
 104 |         ...
     |
+
+## Concise Output
+eq_without_hash.py:3:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:11:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:16:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:23:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:30:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:35:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:40:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:47:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:52:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:59:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:66:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:73:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:82:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:89:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:95:7: PLW1641 Object does not implement `__hash__` method
+eq_without_hash.py:102:7: PLW1641 Object does not implement `__hash__` method

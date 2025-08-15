@@ -433,3 +433,25 @@ help: Remove `.keys()`
 64 64 | d = SneakyDict()
 65    |-key in d.keys()  # SIM118
    65 |+key in d  # SIM118
+
+## Concise Output
+SIM118.py:3:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:5:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
+SIM118.py:7:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:9:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
+SIM118.py:11:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:13:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
+SIM118.py:15:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:17:1: SIM118 [*] Use `key not in dict` instead of `key not in dict.keys()`
+SIM118.py:19:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:26:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:28:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:30:11: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:32:8: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:34:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:36:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:50:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:51:2: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:52:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:55:5: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`
+SIM118.py:65:1: SIM118 [*] Use `key in dict` instead of `key in dict.keys()`

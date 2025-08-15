@@ -26,3 +26,8 @@ AIR311 `sla` is removed in Airflow 3.0; It still works in Airflow 3.0 but is exp
    |         ^^^
 26 |     )
    |
+
+## Concise Output
+AIR311_args.py:13:34: AIR311 `sla_miss_callback` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_args.py:16:6: AIR311 `sla_miss_callback` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_args.py:25:9: AIR311 `sla` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.

@@ -251,3 +251,17 @@ help: Replace `is not` with `!=`
 33 33 | # Regression test for https://github.com/astral-sh/ruff/issues/11736
 34    |-variable: "123 is not y"
    34 |+variable: "123 != y"
+
+## Concise Output
+F632.py:1:4: F632 [*] Use `==` to compare constant literals
+F632.py:4:4: F632 [*] Use `!=` to compare constant literals
+F632.py:7:4: F632 [*] Use `!=` to compare constant literals
+F632.py:11:4: F632 [*] Use `==` to compare constant literals
+F632.py:14:4: F632 [*] Use `==` to compare constant literals
+F632.py:17:4: F632 [*] Use `==` to compare constant literals
+F632.py:20:14: F632 [*] Use `==` to compare constant literals
+F632.py:23:2: F632 [*] Use `!=` to compare constant literals
+F632.py:26:2: F632 [*] Use `!=` to compare constant literals
+F632.py:30:4: F632 [*] Use `!=` to compare constant literals
+F632.py:30:11: F632 [*] Use `!=` to compare constant literals
+F632.py:34:12: F632 [*] Use `!=` to compare constant literals

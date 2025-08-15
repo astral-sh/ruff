@@ -39,3 +39,7 @@ help: Remove `usefixtures` decorator or pass parameters
    24 |+
 25 25 | def test_error_no_parens():
 26 26 |     pass
+
+## Concise Output
+PT026.py:19:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
+PT026.py:24:1: PT026 [*] Useless `pytest.mark.usefixtures` without parameters

@@ -24,3 +24,6 @@ help: Move into type-checking block
 6  10 | 
 7  11 | 
 8  12 | @dataclass
+
+## Concise Output
+kw_only.py:5:45: TC003 [*] Move standard library import `dataclasses.Field` into a type-checking block

@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `DaskExecut
   3 |+from airflow.providers.daskexecutor.executors.dask_executor import DaskExecutor
 4 4 | 
 5 5 | DaskExecutor()
+
+## Concise Output
+AIR302_daskexecutor.py:5:1: AIR302 [*] `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexecutor` provider in Airflow 3.0;

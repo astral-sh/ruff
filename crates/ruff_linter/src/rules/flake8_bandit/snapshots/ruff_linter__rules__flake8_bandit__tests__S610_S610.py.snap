@@ -114,3 +114,16 @@ S610 Use of Django `extra` can lead to SQL injection vulnerabilities
 25 |
 26 | # OK
    |
+
+## Concise Output
+S610.py:4:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:5:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:6:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:7:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:8:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:9:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:12:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:15:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:18:44: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:21:25: S610 Use of Django `extra` can lead to SQL injection vulnerabilities
+S610.py:24:25: S610 Use of Django `extra` can lead to SQL injection vulnerabilities

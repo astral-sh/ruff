@@ -30,3 +30,6 @@ help: Move into type-checking block
 12 15 | 
 13 16 | 
 14 17 | @attrs.define(auto_attribs=True)
+
+## Concise Output
+runtime_evaluated_decorators_3.py:6:18: TC003 [*] Move standard library import `uuid.UUID` into a type-checking block

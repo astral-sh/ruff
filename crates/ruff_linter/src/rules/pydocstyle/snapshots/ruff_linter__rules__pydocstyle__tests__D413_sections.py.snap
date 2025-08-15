@@ -187,4 +187,15 @@ help: Add blank line after "Parameters"
     607 |+
 607 608 |     """
 608 609 | 
-609 610 |
+609 610 | 
+
+## Concise Output
+sections.py:67:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:122:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:172:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:521:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:529:5: D413 [*] Missing blank line after last section ("Parameters")
+sections.py:550:5: D413 [*] Missing blank line after last section ("Args")
+sections.py:563:9: D413 [*] Missing blank line after last section ("Returns")
+sections.py:573:5: D413 [*] Missing blank line after last section ("returns")
+sections.py:601:5: D413 [*] Missing blank line after last section ("Parameters")

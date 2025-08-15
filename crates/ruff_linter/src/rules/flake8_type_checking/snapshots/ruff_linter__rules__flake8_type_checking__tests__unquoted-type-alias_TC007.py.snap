@@ -199,3 +199,14 @@ help: Add quotes
 23 22 | 
 24 23 | type C = Foo   # OK
 25 24 | type D = Foo | None  # OK
+
+## Concise Output
+TC007.py:15:16: TC007 [*] Add quotes to type alias
+TC007.py:16:16: TC007 [*] Add quotes to type alias
+TC007.py:17:16: TC007 [*] Add quotes to type alias
+TC007.py:18:16: TC007 [*] Add quotes to type alias
+TC007.py:19:16: TC007 [*] Add quotes to type alias
+TC007.py:19:22: TC007 [*] Add quotes to type alias
+TC007.py:20:16: TC007 [*] Add quotes to type alias
+TC007.py:21:17: TC007 [*] Add quotes to type alias
+TC007.py:22:5: TC007 [*] Add quotes to type alias

@@ -21,3 +21,6 @@ help: Remove assignment to unused variable `x`
 8 8 |         pass
 9 9 | 
 10 10 |     # This should resolve to the `x` in `x = 1`.
+
+## Concise Output
+<filename>:7:26: F841 [*] Local variable `x` is assigned to but never used

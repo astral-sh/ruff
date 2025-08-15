@@ -9,3 +9,6 @@ invalid-syntax: attribute name `x` repeated in class pattern
   |                     ^
 4 |         pass
   |
+
+## Concise Output
+<filename>:3:21: invalid-syntax: attribute name `x` repeated in class pattern

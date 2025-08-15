@@ -420,3 +420,24 @@ RUF052 Local dummy variable `_dummy_var` is accessed
 194 |     def bar():
     |
 help: Prefer using trailing underscores to avoid shadowing a variable
+
+## Concise Output
+RUF052.py:92:9: RUF052 [*] Local dummy variable `_var` is accessed
+RUF052.py:99:5: RUF052 [*] Local dummy variable `_list` is accessed
+RUF052.py:106:5: RUF052 [*] Local dummy variable `_x` is accessed
+RUF052.py:113:5: RUF052 [*] Local dummy variable `_x` is accessed
+RUF052.py:120:5: RUF052 [*] Local dummy variable `_x` is accessed
+RUF052.py:128:5: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+RUF052.py:136:5: RUF052 Local dummy variable `_local` is accessed
+RUF052.py:140:9: RUF052 Local dummy variable `_GLOBAL_1` is accessed
+RUF052.py:145:9: RUF052 Local dummy variable `_local` is accessed
+RUF052.py:153:5: RUF052 [*] Local dummy variable `_P` is accessed
+RUF052.py:154:5: RUF052 [*] Local dummy variable `_T` is accessed
+RUF052.py:155:5: RUF052 [*] Local dummy variable `_NT` is accessed
+RUF052.py:156:5: RUF052 [*] Local dummy variable `_E` is accessed
+RUF052.py:157:5: RUF052 [*] Local dummy variable `_NT2` is accessed
+RUF052.py:158:5: RUF052 [*] Local dummy variable `_NT3` is accessed
+RUF052.py:159:5: RUF052 [*] Local dummy variable `_DynamicClass` is accessed
+RUF052.py:160:5: RUF052 [*] Local dummy variable `_NotADynamicClass` is accessed
+RUF052.py:182:5: RUF052 [*] Local dummy variable `_dummy_var` is accessed
+RUF052.py:192:5: RUF052 Local dummy variable `_dummy_var` is accessed

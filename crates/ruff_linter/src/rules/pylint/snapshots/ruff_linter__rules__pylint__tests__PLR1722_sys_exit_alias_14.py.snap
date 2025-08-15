@@ -9,3 +9,6 @@ PLR1722 Use `sys.exit()` instead of `exit`
   | ^^^^
   |
 help: Replace `exit` with `sys.exit()`
+
+## Concise Output
+sys_exit_alias_14.py:2:1: PLR1722 Use `sys.exit()` instead of `exit`

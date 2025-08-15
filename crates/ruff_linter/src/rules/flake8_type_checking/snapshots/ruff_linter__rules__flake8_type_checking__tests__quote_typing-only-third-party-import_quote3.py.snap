@@ -218,3 +218,12 @@ help: Move into type-checking block
 69    |-    def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
    72 |+    def test_quote_contains_backslash(self, type1: 'Type[Literal["\\n"]]', type2: 'Type[Literal[\'"\']]'):
 70 73 |         pass
+
+## Concise Output
+quote3.py:4:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote3.py:13:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote3.py:22:44: TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
+quote3.py:31:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+quote3.py:40:37: TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
+quote3.py:59:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block
+quote3.py:67:29: TC002 [*] Move third-party import `third_party.Type` into a type-checking block

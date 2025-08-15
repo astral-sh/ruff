@@ -18,3 +18,7 @@ S307 Use of possibly insecure function; consider using `ast.literal_eval`
 4 | print(eval("os.getcwd()"))  # S307
   |       ^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S307.py:3:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+S307.py:4:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`

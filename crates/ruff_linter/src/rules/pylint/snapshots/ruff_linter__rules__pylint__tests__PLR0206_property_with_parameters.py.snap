@@ -85,3 +85,14 @@ PLR0206 Cannot have defined parameters for properties
    |         ^^^^^
 68 |         return None
    |
+
+## Concise Output
+property_with_parameters.py:7:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:11:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:15:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:35:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:39:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:48:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:59:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:63:9: PLR0206 Cannot have defined parameters for properties
+property_with_parameters.py:67:9: PLR0206 Cannot have defined parameters for properties

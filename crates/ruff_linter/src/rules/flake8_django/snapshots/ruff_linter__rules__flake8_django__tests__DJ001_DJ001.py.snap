@@ -186,3 +186,23 @@ DJ001 Avoid using `null=True` on string-based fields such as `URLField`
 30 |     urlfield = models.URLField(max_length=255, null=True)
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+DJ001.py:7:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+DJ001.py:8:17: DJ001 Avoid using `null=True` on string-based fields such as `TextField`
+DJ001.py:9:17: DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
+DJ001.py:10:18: DJ001 Avoid using `null=True` on string-based fields such as `EmailField`
+DJ001.py:11:21: DJ001 Avoid using `null=True` on string-based fields such as `FilePathField`
+DJ001.py:12:16: DJ001 Avoid using `null=True` on string-based fields such as `URLField`
+DJ001.py:16:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+DJ001.py:17:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+DJ001.py:18:17: DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
+DJ001.py:19:18: DJ001 Avoid using `null=True` on string-based fields such as `EmailField`
+DJ001.py:20:21: DJ001 Avoid using `null=True` on string-based fields such as `FilePathField`
+DJ001.py:21:16: DJ001 Avoid using `null=True` on string-based fields such as `URLField`
+DJ001.py:25:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+DJ001.py:26:17: DJ001 Avoid using `null=True` on string-based fields such as `CharField`
+DJ001.py:27:17: DJ001 Avoid using `null=True` on string-based fields such as `SlugField`
+DJ001.py:28:18: DJ001 Avoid using `null=True` on string-based fields such as `EmailField`
+DJ001.py:29:21: DJ001 Avoid using `null=True` on string-based fields such as `FilePathField`
+DJ001.py:30:16: DJ001 Avoid using `null=True` on string-based fields such as `URLField`

@@ -9,3 +9,6 @@ UP006 Use `collections.defaultdict` instead of `typing.DefaultDict` for type ann
 8 |     ...
   |
 help: Replace with `collections.defaultdict`
+
+## Concise Output
+UP006_2.py:7:10: UP006 Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation

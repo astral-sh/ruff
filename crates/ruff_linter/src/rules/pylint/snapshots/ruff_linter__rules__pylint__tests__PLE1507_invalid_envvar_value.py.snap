@@ -55,3 +55,10 @@ PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
 15 |
 16 | AA = "aa"
    |
+
+## Concise Output
+invalid_envvar_value.py:3:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:7:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:8:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:12:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:14:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`

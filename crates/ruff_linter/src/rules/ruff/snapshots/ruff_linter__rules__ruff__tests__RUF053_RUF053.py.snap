@@ -507,3 +507,39 @@ help: Remove `Generic` base class
 97 97 | 
 98 98 | 
 99 99 | # Existing bounds should not be deparenthesized.
+
+## Concise Output
+RUF053.py:23:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:24:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:25:17: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:26:19: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:27:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:28:22: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:30:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:31:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:32:14: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:33:44: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:36:14: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:37:14: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:38:14: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:41:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:47:35: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:51:16: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:55:16: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:60:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:61:30: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:66:3: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:69:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:70:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:71:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:72:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:73:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:74:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:77:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:78:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:79:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:83:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:84:12: RUF053 Class with type parameter list inherits from `Generic`
+RUF053.py:91:12: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:95:20: RUF053 [*] Class with type parameter list inherits from `Generic`
+RUF053.py:96:17: RUF053 [*] Class with type parameter list inherits from `Generic`

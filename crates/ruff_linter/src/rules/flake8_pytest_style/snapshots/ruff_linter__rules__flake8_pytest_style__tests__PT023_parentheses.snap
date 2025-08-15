@@ -103,4 +103,11 @@ help: Add parentheses
    43 |+        @pytest.mark.foo()
 44 44 |         def test_something():
 45 45 |             pass
-46 46 |
+46 46 | 
+
+## Concise Output
+PT023.py:17:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:22:1: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:29:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:35:5: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:43:9: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`

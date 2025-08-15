@@ -10,3 +10,6 @@ help: Insert required import: `from __future__ import annotations as _annotation
   2 |+from __future__ import annotations as _annotations
 2 3 | 
 3 4 | x = 1
+
+## Concise Output
+comment.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`

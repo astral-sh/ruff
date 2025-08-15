@@ -1315,3 +1315,64 @@ help: Remove unnecessary `int` call
 207     |-# unsafe fix because of this comment
 208     |-)
     205 |+    )
+
+## Concise Output
+RUF046.py:10:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:11:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:12:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:13:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:14:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:16:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:17:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:18:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:19:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:20:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:21:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:23:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:24:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:26:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:27:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:29:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:30:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:32:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:33:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:34:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:35:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:36:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:38:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:39:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:40:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:41:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:42:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:43:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:44:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:45:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:46:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:47:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:48:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:50:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:52:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:53:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:56:4: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:62:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:63:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:64:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:66:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:67:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:69:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:70:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:72:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:73:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:75:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:76:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:158:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:161:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:168:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:171:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:176:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:178:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:182:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:186:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:190:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:197:1: RUF046 [*] Value being cast to `int` is already an integer
+RUF046.py:203:1: RUF046 [*] Value being cast to `int` is already an integer

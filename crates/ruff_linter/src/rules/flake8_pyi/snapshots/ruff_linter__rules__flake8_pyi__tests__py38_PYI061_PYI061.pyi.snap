@@ -322,3 +322,25 @@ PYI061 Use `None` rather than `Literal[None]`
    |                            ^^^^
    |
 help: Replace with `None`
+
+## Concise Output
+PYI061.pyi:4:25: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:7:25: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:10:24: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:13:30: PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
+PYI061.pyi:16:25: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:16:31: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:21:5: PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
+PYI061.pyi:27:5: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:31:25: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:34:31: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:42:9: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:43:15: PYI061 [*] Use `Literal[...] | None` rather than `Literal[None, ...]` 
+PYI061.pyi:47:12: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:48:19: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:49:18: PYI061 [*] Use `None` rather than `Literal[None]`
+PYI061.pyi:51:18: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:52:19: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:53:20: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:54:20: PYI061 Use `None` rather than `Literal[None]`
+PYI061.pyi:55:28: PYI061 Use `None` rather than `Literal[None]`

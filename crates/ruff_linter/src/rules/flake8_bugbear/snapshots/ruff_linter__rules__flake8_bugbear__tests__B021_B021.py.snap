@@ -86,3 +86,15 @@ B021 f-string used as docstring. Python will interpret this as a joined string, 
 75 |     print(f"""I'm a normal string""")
 76 |     f"""Don't detect me!"""
    |
+
+## Concise Output
+B021.py:1:1: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:14:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:22:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:30:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:38:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:46:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:54:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:62:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:70:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.
+B021.py:74:5: B021 f-string used as docstring. Python will interpret this as a joined string, rather than a docstring.

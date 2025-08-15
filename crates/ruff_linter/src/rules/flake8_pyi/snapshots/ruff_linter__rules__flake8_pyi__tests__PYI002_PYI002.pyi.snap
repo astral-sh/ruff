@@ -40,3 +40,9 @@ PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.vers
 6 | if sys.maxsize == 42: ...  # Y002 If test must be a simple comparison against sys.platform or sys.version_info
   |    ^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+PYI002.pyi:3:4: PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+PYI002.pyi:4:4: PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+PYI002.pyi:5:4: PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.version_info`
+PYI002.pyi:6:4: PYI002 `if` test must be a simple comparison against `sys.platform` or `sys.version_info`

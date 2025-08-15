@@ -62,3 +62,11 @@ E402 Module level import not at top of file
 68 | x = 1; import re as regex, string
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+E40.py:56:1: E402 Module level import not at top of file
+E40.py:58:1: E402 Module level import not at top of file
+E40.py:62:1: E402 Module level import not at top of file
+E40.py:65:1: E402 Module level import not at top of file
+E40.py:66:1: E402 Module level import not at top of file
+E40.py:68:8: E402 Module level import not at top of file

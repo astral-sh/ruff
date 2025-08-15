@@ -161,3 +161,19 @@ B039 Do not use mutable data structures for `ContextVar` defaults
    |                          ^^^^^
    |
 help: Replace with `None`; initialize with `.set()``
+
+## Concise Output
+B039.py:21:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:22:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:23:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:24:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:25:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:26:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:27:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:28:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:29:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:30:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:31:36: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:36:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:37:26: B039 Do not use mutable data structures for `ContextVar` defaults
+B039.py:40:26: B039 Do not use mutable data structures for `ContextVar` defaults

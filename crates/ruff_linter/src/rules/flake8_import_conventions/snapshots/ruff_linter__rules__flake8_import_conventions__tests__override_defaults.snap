@@ -116,3 +116,15 @@ ICN001 `seaborn` should be imported as `sns`
 15 | import altair as alt  # conventional
    |
 help: Alias `seaborn` to `sns`
+
+## Concise Output
+override_default.py:3:8: ICN001 `altair` should be imported as `alt`
+override_default.py:4:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
+override_default.py:5:8: ICN001 `numpy` should be imported as `nmp`
+override_default.py:6:8: ICN001 `pandas` should be imported as `pd`
+override_default.py:7:8: ICN001 `seaborn` should be imported as `sns`
+override_default.py:9:18: ICN001 `altair` should be imported as `alt`
+override_default.py:10:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
+override_default.py:11:17: ICN001 `numpy` should be imported as `nmp`
+override_default.py:12:18: ICN001 `pandas` should be imported as `pd`
+override_default.py:13:19: ICN001 `seaborn` should be imported as `sns`

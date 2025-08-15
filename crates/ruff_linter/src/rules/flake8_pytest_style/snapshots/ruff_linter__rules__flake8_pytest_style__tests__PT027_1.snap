@@ -149,3 +149,11 @@ help: Replace `assertRaises` with `pytest.raises`
 35 35 |             raise ValueError
 36 36 | 
 37 37 |         print(e1.foo)
+
+## Concise Output
+PT027_1.py:11:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:15:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:22:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:23:13: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:33:14: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`
+PT027_1.py:34:17: PT027 [*] Use `pytest.raises` instead of unittest-style `assertRaises`

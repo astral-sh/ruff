@@ -239,3 +239,17 @@ help: Replace `.items()` with `.keys()`
 106     |-    for(B,D)in A.items():
     106 |+    for B in A.keys():
 107 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+
+## Concise Output
+PERF102.py:5:21: PERF102 [*] When using only the values of a dict use the `values()` method
+PERF102.py:10:19: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:15:30: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:20:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:30:30: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:35:36: PERF102 [*] When using only the values of a dict use the `values()` method
+PERF102.py:50:32: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:85:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:90:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:95:31: PERF102 [*] When using only the keys of a dict use the `keys()` method
+PERF102.py:100:31: PERF102 [*] When using only the values of a dict use the `values()` method
+PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys()` method

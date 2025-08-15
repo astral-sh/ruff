@@ -275,3 +275,32 @@ PLW2901 `for` loop variable `a.i` overwritten by assignment target
 180 |     a.i = 2  # error
     |     ^^^
     |
+
+## Concise Output
+redefined_loop_name.py:6:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:11:9: PLW2901 `with` statement variable `i` overwritten by `for` loop target
+redefined_loop_name.py:16:18: PLW2901 `for` loop variable `i` overwritten by `with` statement target
+redefined_loop_name.py:21:18: PLW2901 Outer `with` statement variable `i` overwritten by inner `with` statement target
+redefined_loop_name.py:36:18: PLW2901 Outer `with` statement variable `i` overwritten by inner `with` statement target
+redefined_loop_name.py:46:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:52:13: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:58:13: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:59:17: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
+redefined_loop_name.py:67:5: PLW2901 `for` loop variable `i` overwritten by assignment target
+redefined_loop_name.py:71:5: PLW2901 `for` loop variable `i` overwritten by assignment target
+redefined_loop_name.py:75:5: PLW2901 `for` loop variable `i` overwritten by assignment target
+redefined_loop_name.py:83:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:88:15: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:93:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:98:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:103:9: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:103:12: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
+redefined_loop_name.py:120:9: PLW2901 Outer `for` loop variable `j` overwritten by inner `for` loop target
+redefined_loop_name.py:137:13: PLW2901 `for` loop variable `i` overwritten by assignment target
+redefined_loop_name.py:143:17: PLW2901 Outer `for` loop variable `i` overwritten by inner `for` loop target
+redefined_loop_name.py:158:5: PLW2901 `for` loop variable `a[0]` overwritten by assignment target
+redefined_loop_name.py:163:5: PLW2901 `for` loop variable `a['i']` overwritten by assignment target
+redefined_loop_name.py:168:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
+redefined_loop_name.py:173:5: PLW2901 `for` loop variable `a.i.j` overwritten by assignment target
+redefined_loop_name.py:178:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target
+redefined_loop_name.py:180:5: PLW2901 `for` loop variable `a.i` overwritten by assignment target

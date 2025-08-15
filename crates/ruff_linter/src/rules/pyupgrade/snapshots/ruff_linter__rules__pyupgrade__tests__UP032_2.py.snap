@@ -461,3 +461,27 @@ help: Convert to f-string
 27 27 | "{.real}".format({1: 2, 3: 4})
 28    |-"{}".format((i for i in range(2)))
    28 |+f"{(i for i in range(2))}"
+
+## Concise Output
+UP032_2.py:2:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:3:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:4:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:6:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:7:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:8:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:10:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:11:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:12:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:14:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:15:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:16:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:18:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:19:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:20:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:21:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:22:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:24:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:25:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:26:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:27:1: UP032 [*] Use f-string instead of `format` call
+UP032_2.py:28:1: UP032 [*] Use f-string instead of `format` call

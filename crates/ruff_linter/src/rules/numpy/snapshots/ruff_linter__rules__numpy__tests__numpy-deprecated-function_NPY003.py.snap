@@ -231,3 +231,15 @@ help: Replace with `np.all`
 17 18 |     sometrue(np.random.rand(5, 5))
 18    |-    alltrue(np.random.rand(5, 5))
    19 |+    all(np.random.rand(5, 5))
+
+## Concise Output
+NPY003.py:4:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+NPY003.py:5:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+NPY003.py:6:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+NPY003.py:7:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+NPY003.py:8:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead
+NPY003.py:14:5: NPY003 [*] `np.round_` is deprecated; use `np.round` instead
+NPY003.py:15:5: NPY003 [*] `np.product` is deprecated; use `np.prod` instead
+NPY003.py:16:5: NPY003 [*] `np.cumproduct` is deprecated; use `np.cumprod` instead
+NPY003.py:17:5: NPY003 [*] `np.sometrue` is deprecated; use `np.any` instead
+NPY003.py:18:5: NPY003 [*] `np.alltrue` is deprecated; use `np.all` instead

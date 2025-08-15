@@ -27,3 +27,8 @@ S702 Mako templates allow HTML and JavaScript rendering by default and are inher
 9 | template.Template("hern")
   | ^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S702.py:6:1: S702 Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks
+S702.py:8:1: S702 Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks
+S702.py:9:1: S702 Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks

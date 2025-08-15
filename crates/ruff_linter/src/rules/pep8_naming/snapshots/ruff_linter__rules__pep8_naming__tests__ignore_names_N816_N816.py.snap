@@ -28,3 +28,8 @@ N816 Variable `still_Bad` in global scope should not be mixedCase
 8 | still_Bad = 0
   | ^^^^^^^^^
   |
+
+## Concise Output
+N816.py:2:1: N816 Variable `stillBad` in global scope should not be mixedCase
+N816.py:5:1: N816 Variable `_stillBad` in global scope should not be mixedCase
+N816.py:8:1: N816 Variable `still_Bad` in global scope should not be mixedCase

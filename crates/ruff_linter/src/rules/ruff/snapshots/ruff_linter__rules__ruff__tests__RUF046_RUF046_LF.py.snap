@@ -16,3 +16,6 @@ help: Remove unnecessary `int` call
 2   |-int(-
   2 |+(-
 3 3 |     1)
+
+## Concise Output
+RUF046_LF.py:2:1: RUF046 [*] Value being cast to `int` is already an integer

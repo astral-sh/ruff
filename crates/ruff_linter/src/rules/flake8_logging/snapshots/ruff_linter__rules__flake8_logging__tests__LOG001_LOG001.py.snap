@@ -38,3 +38,7 @@ help: Replace with `logging.getLogger()`
 4   |-logging.Logger()
   4 |+logging.getLogger()
 5 5 | logging.getLogger(__name__)
+
+## Concise Output
+LOG001.py:3:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
+LOG001.py:4:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers

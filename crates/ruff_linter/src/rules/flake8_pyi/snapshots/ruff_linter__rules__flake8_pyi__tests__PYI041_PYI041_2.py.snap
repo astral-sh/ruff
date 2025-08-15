@@ -11,3 +11,6 @@ PYI041 Use `float` instead of `int | float`
 8 |         pass
   |
 help: Remove redundant type
+
+## Concise Output
+PYI041_2.py:7:23: PYI041 Use `float` instead of `int | float`

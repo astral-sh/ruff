@@ -336,4 +336,27 @@ help: Convert to `X | Y`
    91 |+def myfunc(param: "tuple[int | 'AClass' | None, str]"):
 92 92 |     print(param)
 93 93 | 
-94 94 |
+94 94 | 
+
+## Concise Output
+UP007.py:5:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:5:26: UP007 [*] Use `X | Y` for type annotations
+UP007.py:9:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:13:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:17:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:21:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:25:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:29:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:29:27: UP007 [*] Use `X | Y` for type annotations
+UP007.py:33:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:46:9: UP007 Use `X | Y` for type annotations
+UP007.py:48:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:49:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:52:10: UP007 Use `X | Y` for type annotations
+UP007.py:56:10: UP007 Use `X | Y` for type annotations
+UP007.py:60:10: UP007 Use `X | Y` for type annotations
+UP007.py:64:10: UP007 Use `X | Y` for type annotations
+UP007.py:68:10: UP007 Use `X | Y` for type annotations
+UP007.py:72:10: UP007 Use `X | Y` for type annotations
+UP007.py:83:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:91:26: UP007 [*] Use `X | Y` for type annotations

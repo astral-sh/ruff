@@ -31,3 +31,8 @@ PLC0205 Class `__slots__` should be a non-string iterable
 18 |
 19 |     def __init__(self, bar):
    |
+
+## Concise Output
+single_string_slots.py:3:5: PLC0205 Class `__slots__` should be a non-string iterable
+single_string_slots.py:10:5: PLC0205 Class `__slots__` should be a non-string iterable
+single_string_slots.py:17:5: PLC0205 Class `__slots__` should be a non-string iterable

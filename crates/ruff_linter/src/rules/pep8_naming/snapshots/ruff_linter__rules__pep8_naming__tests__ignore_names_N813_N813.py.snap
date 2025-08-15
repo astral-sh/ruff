@@ -28,3 +28,8 @@ N813 Camelcase `StillBad` imported as lowercase `still_bad`
 8 | from mod import StillBad as still_bad
   |                 ^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+N813.py:2:8: N813 Camelcase `stillBad` imported as lowercase `stillbad`
+N813.py:5:17: N813 Camelcase `StillBad` imported as lowercase `stillbad`
+N813.py:8:17: N813 Camelcase `StillBad` imported as lowercase `still_bad`

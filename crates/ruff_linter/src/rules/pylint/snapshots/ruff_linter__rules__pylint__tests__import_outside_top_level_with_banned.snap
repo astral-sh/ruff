@@ -102,3 +102,15 @@ PLC0415 `import` should be at the top-level of a file
 40 |         from pkg import foo_allowed, bar_banned # [import-outside-toplevel]
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+import_outside_top_level_with_banned.py:9:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:10:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:11:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:12:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:13:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:14:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:24:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:27:5: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:30:9: PLC0415 `import` should be at the top-level of a file
+import_outside_top_level_with_banned.py:40:9: PLC0415 `import` should be at the top-level of a file

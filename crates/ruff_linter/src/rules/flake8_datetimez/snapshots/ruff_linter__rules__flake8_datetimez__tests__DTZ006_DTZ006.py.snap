@@ -55,3 +55,10 @@ DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
 20 | # uses `astimezone` method
    |
 help: Pass a `datetime.timezone` object to the `tz` parameter
+
+## Concise Output
+DTZ006.py:4:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
+DTZ006.py:7:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument
+DTZ006.py:10:1: DTZ006 `tz=None` passed to `datetime.datetime.fromtimestamp()`
+DTZ006.py:13:1: DTZ006 `tz=None` passed to `datetime.datetime.fromtimestamp()`
+DTZ006.py:18:1: DTZ006 `datetime.datetime.fromtimestamp()` called without a `tz` argument

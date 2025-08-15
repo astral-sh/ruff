@@ -552,3 +552,30 @@ help: Rewrite using `set()`
 46 46 | 
 47 47 | 
 48 48 | # Not built-in set.
+
+## Concise Output
+C401.py:2:13: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:3:12: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:11:16: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:12:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:16:5: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:17:5: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:20:16: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:21:10: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:21:34: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:22:11: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:22:35: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:25:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:26:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:27:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:31:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:32:1: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:40:16: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:41:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:42:17: C401 [*] Unnecessary generator (rewrite as a set comprehension)
+C401.py:43:16: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:44:10: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:44:34: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:45:11: C401 [*] Unnecessary generator (rewrite using `set()`)
+C401.py:45:35: C401 [*] Unnecessary generator (rewrite using `set()`)

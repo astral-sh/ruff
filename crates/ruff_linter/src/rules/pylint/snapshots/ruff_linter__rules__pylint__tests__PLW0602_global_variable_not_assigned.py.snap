@@ -19,3 +19,7 @@ PLW0602 Using global for `X` but no assignment is done
 10 |
 11 |     print(X)
    |
+
+## Concise Output
+global_variable_not_assigned.py:5:12: PLW0602 Using global for `X` but no assignment is done
+global_variable_not_assigned.py:9:12: PLW0602 Using global for `X` but no assignment is done

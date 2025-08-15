@@ -32,3 +32,9 @@ SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
    |       ^^^^^^^^^^^^^^^^^^
 35 |     pass
    |
+
+## Concise Output
+SLOT002.py:6:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
+SLOT002.py:10:7: SLOT002 Subclasses of call-based `typing.NamedTuple()` should define `__slots__`
+SLOT002.py:30:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`
+SLOT002.py:34:7: SLOT002 Subclasses of `collections.namedtuple()` should define `__slots__`

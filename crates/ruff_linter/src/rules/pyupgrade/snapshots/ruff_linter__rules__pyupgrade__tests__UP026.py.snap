@@ -628,3 +628,31 @@ help: Replace `mock.mock` with `mock`
 92 92 | # Error (`mock.Mock()`).
 93    |-x = mock.mock.Mock()
    93 |+x = mock.Mock()
+
+## Concise Output
+UP026.py:3:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:7:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:11:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:14:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:17:20: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:20:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:24:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:27:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:33:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:41:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:47:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:53:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:54:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:58:9: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:69:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:69:14: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:72:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:75:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:79:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:79:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:79:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:82:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:82:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:82:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:86:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
+UP026.py:93:5: UP026 [*] `mock` is deprecated, use `unittest.mock`

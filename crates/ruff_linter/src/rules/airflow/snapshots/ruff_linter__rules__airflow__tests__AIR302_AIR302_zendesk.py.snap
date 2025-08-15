@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `ZendeskHook` fr
   3 |+from airflow.providers.zendesk.hooks.zendesk import ZendeskHook
 4 4 | 
 5 5 | ZendeskHook()
+
+## Concise Output
+AIR302_zendesk.py:5:1: AIR302 [*] `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `zendesk` provider in Airflow 3.0;

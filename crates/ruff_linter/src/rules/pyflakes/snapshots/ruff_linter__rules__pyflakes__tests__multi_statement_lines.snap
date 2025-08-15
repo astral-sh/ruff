@@ -336,4 +336,22 @@ help: Remove unused import: `foo16`
 60 60 | # error.)
 61    |-x = 1; \
 62    |-import foo16
-   61 |+x = 1;
+   61 |+x = 1; 
+
+## Concise Output
+multi_statement_lines.py:2:12: F401 [*] `foo1` imported but unused
+multi_statement_lines.py:3:12: F401 [*] `foo2` imported but unused
+multi_statement_lines.py:6:12: F401 [*] `foo3` imported but unused
+multi_statement_lines.py:10:12: F401 [*] `foo4` imported but unused
+multi_statement_lines.py:14:19: F401 [*] `foo5` imported but unused
+multi_statement_lines.py:19:17: F401 [*] `foo6` imported but unused
+multi_statement_lines.py:23:18: F401 [*] `foo7` imported but unused
+multi_statement_lines.py:26:19: F401 [*] `foo8` imported but unused
+multi_statement_lines.py:27:23: F401 [*] `foo9` imported but unused
+multi_statement_lines.py:31:16: F401 [*] `foo10` imported but unused
+multi_statement_lines.py:36:17: F401 [*] `foo11` imported but unused
+multi_statement_lines.py:42:16: F401 [*] `foo12` imported but unused
+multi_statement_lines.py:47:12: F401 [*] `foo13` imported but unused
+multi_statement_lines.py:53:12: F401 [*] `foo14` imported but unused
+multi_statement_lines.py:57:8: F401 [*] `foo15` imported but unused
+multi_statement_lines.py:62:8: F401 [*] `foo16` imported but unused

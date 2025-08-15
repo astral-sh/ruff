@@ -66,3 +66,12 @@ FBT003 Boolean positional value in function call
 156 |     foo: bool = Field(True, exclude=True)
     |                       ^^^^
     |
+
+## Concise Output
+FBT.py:41:11: FBT003 Boolean positional value in function call
+FBT.py:56:11: FBT003 Boolean positional value in function call
+FBT.py:56:17: FBT003 Boolean positional value in function call
+FBT.py:120:10: FBT003 Boolean positional value in function call
+FBT.py:144:20: FBT003 Boolean positional value in function call
+FBT.py:146:19: FBT003 Boolean positional value in function call
+FBT.py:156:23: FBT003 Boolean positional value in function call

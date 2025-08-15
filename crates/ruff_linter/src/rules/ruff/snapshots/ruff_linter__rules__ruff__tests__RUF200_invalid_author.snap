@@ -12,3 +12,6 @@ RUF200 Failed to parse pyproject.toml: a table with 'name' and/or 'email' keys
 7 | | ]
   | |_^
   |
+
+## Concise Output
+pyproject.toml:5:11: RUF200 Failed to parse pyproject.toml: a table with 'name' and/or 'email' keys

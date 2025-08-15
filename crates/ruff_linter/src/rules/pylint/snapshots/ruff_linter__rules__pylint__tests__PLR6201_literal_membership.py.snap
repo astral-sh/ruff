@@ -90,3 +90,9 @@ help: Convert to `set`
 10 10 | 
 11 11 | # OK
 12 12 | fruits in [[1, 2, 3], [4, 5, 6]]
+
+## Concise Output
+literal_membership.py:2:6: PLR6201 [*] Use a set literal when testing for membership
+literal_membership.py:3:6: PLR6201 [*] Use a set literal when testing for membership
+literal_membership.py:4:6: PLR6201 [*] Use a set literal when testing for membership
+literal_membership.py:9:70: PLR6201 [*] Use a set literal when testing for membership

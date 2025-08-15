@@ -111,3 +111,11 @@ help: Remove useless `return` statement
 58 58 |     def get(self, key: str) -> None:
 59 59 |         print(f"{key} not found")
 60    |-        return None
+
+## Concise Output
+useless_return.py:6:5: PLR1711 [*] Useless `return` statement at end of function
+useless_return.py:11:5: PLR1711 [*] Useless `return` statement at end of function
+useless_return.py:16:5: PLR1711 [*] Useless `return` statement at end of function
+useless_return.py:22:9: PLR1711 [*] Useless `return` statement at end of function
+useless_return.py:50:5: PLR1711 [*] Useless `return` statement at end of function
+useless_return.py:60:9: PLR1711 [*] Useless `return` statement at end of function

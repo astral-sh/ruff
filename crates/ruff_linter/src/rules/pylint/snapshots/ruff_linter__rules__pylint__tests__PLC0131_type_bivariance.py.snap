@@ -40,3 +40,9 @@ PLC0131 `ParamSpec` "T" cannot be both covariant and contravariant
 10 |
 11 | # Non-errors.
    |
+
+## Concise Output
+type_bivariance.py:5:5: PLC0131 `TypeVar` "T" cannot be both covariant and contravariant
+type_bivariance.py:6:5: PLC0131 `TypeVar` "T" cannot be both covariant and contravariant
+type_bivariance.py:8:5: PLC0131 `ParamSpec` "T" cannot be both covariant and contravariant
+type_bivariance.py:9:5: PLC0131 `ParamSpec` "T" cannot be both covariant and contravariant

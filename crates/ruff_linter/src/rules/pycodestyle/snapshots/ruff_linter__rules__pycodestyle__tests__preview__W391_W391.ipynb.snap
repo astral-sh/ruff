@@ -73,3 +73,8 @@ help: Remove trailing newlines
 19    |-
 20    |-
 21    |-
+
+## Concise Output
+W391.ipynb:5:1: W391 [*] Too many newlines at end of cell
+W391.ipynb:11:1: W391 [*] Too many newlines at end of cell
+W391.ipynb:17:1: W391 [*] Too many newlines at end of cell

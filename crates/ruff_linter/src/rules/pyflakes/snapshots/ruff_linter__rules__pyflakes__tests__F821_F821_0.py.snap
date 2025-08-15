@@ -126,3 +126,18 @@ F821 Undefined name `bar`
 124 |         123,
 125 |     ]
     |
+
+## Concise Output
+F821_0.py:2:12: F821 Undefined name `self`
+F821_0.py:6:13: F821 Undefined name `self`
+F821_0.py:10:9: F821 Undefined name `self`
+F821_0.py:21:12: F821 Undefined name `numeric_string`
+F821_0.py:58:5: F821 Undefined name `Bar`
+F821_0.py:83:11: F821 Undefined name `TOMATO`
+F821_0.py:87:8: F821 Undefined name `B`
+F821_0.py:90:8: F821 Undefined name `B`
+F821_0.py:92:11: F821 Undefined name `B`
+F821_0.py:93:14: F821 Undefined name `B`
+F821_0.py:115:10: F821 Undefined name `PEP593Test123`
+F821_0.py:123:15: F821 Undefined name `foo`
+F821_0.py:123:22: F821 Undefined name `bar`

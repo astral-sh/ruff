@@ -40,3 +40,7 @@ help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `PigOperator`
 5 5 | 
 6 6 | PigCliHook()
 7 7 | PigOperator()
+
+## Concise Output
+AIR302_pig.py:6:1: AIR302 [*] `airflow.hooks.pig_hook.PigCliHook` is moved into `apache-pig` provider in Airflow 3.0;
+AIR302_pig.py:7:1: AIR302 [*] `airflow.operators.pig_operator.PigOperator` is moved into `apache-pig` provider in Airflow 3.0;

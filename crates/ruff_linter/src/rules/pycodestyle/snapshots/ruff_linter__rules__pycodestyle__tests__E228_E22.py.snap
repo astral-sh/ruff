@@ -65,3 +65,8 @@ help: Add missing whitespace
 136 136 | #:
 137 137 | 
 138 138 | #: Okay
+
+## Concise Output
+E22.py:131:6: E228 [*] Missing whitespace around modulo operator
+E22.py:133:10: E228 [*] Missing whitespace around modulo operator
+E22.py:135:26: E228 [*] Missing whitespace around modulo operator

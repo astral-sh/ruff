@@ -366,3 +366,21 @@ help: Replace with `is not None`
 44 42 | 
 45 43 | 
 46 44 | # Ok.
+
+## Concise Output
+FURB169.py:5:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:7:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:9:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:11:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:13:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:15:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:17:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:19:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:21:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:23:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:25:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:27:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:29:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:31:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`
+FURB169.py:37:1: FURB169 [*] When checking against `None`, use `is` instead of comparison with `type(None)`
+FURB169.py:41:1: FURB169 [*] When checking against `None`, use `is not` instead of comparison with `type(None)`

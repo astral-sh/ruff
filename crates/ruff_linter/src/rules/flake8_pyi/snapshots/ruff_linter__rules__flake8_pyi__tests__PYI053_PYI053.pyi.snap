@@ -173,4 +173,14 @@ help: Replace with `...`
    68 |+fbaz: str = ...  # Error: PYI053
 69 69 | 
 70 70 | from typing import TypeAlias, Literal, Annotated
-71 71 |
+71 71 | 
+
+## Concise Output
+PYI053.pyi:7:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:13:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:25:16: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:30:12: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:34:14: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:38:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:64:5: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+PYI053.pyi:68:13: PYI053 [*] String and bytes literals longer than 50 characters are not permitted

@@ -95,3 +95,8 @@ DOC502 Raised exception is not explicitly raised: `DivisionByZero`
 82 |           return distance / time
    |
 help: Remove `DivisionByZero` from the docstring
+
+## Concise Output
+DOC502_numpy.py:7:5: DOC502 Raised exception is not explicitly raised: `FasterThanLightError`
+DOC502_numpy.py:32:5: DOC502 Raised exceptions are not explicitly raised: `FasterThanLightError`, `DivisionByZero`
+DOC502_numpy.py:59:5: DOC502 Raised exception is not explicitly raised: `DivisionByZero`

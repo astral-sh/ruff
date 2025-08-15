@@ -116,3 +116,11 @@ help: Replace `type(...)` with `str`
 13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
 14    |-assert isinstance(fullname, type("")is not True)
    14 |+assert isinstance(fullname, str is not True)
+
+## Concise Output
+UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
+UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
+UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
+UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
+UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
+UP003.py:14:29: UP003 [*] Use `str` instead of `type(...)`

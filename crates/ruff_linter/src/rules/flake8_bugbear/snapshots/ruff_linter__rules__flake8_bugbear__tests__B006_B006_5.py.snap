@@ -325,3 +325,21 @@ B006 Do not use mutable data structures for argument defaults
 74 |     import os
    |
 help: Replace with `None`; initialize within function
+
+## Concise Output
+B006_5.py:5:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:9:61: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:15:50: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:21:54: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:25:55: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:30:66: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:35:59: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:40:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:45:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:50:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:55:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:59:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:63:49: B006 [*] Do not use mutable data structures for argument defaults
+B006_5.py:67:49: B006 Do not use mutable data structures for argument defaults
+B006_5.py:70:49: B006 Do not use mutable data structures for argument defaults
+B006_5.py:73:49: B006 Do not use mutable data structures for argument defaults

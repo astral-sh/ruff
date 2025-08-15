@@ -1295,3 +1295,66 @@ PYI016 Duplicate union member `None`
     |                                     ^^^^
     |
 help: Remove duplicate union member `None`
+
+## Concise Output
+PYI016.py:7:15: PYI016 [*] Duplicate union member `str`
+PYI016.py:10:23: PYI016 [*] Duplicate union member `int`
+PYI016.py:14:22: PYI016 [*] Duplicate union member `str`
+PYI016.py:18:15: PYI016 [*] Duplicate union member `str`
+PYI016.py:19:15: PYI016 [*] Duplicate union member `int`
+PYI016.py:20:21: PYI016 [*] Duplicate union member `str`
+PYI016.py:21:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:27:22: PYI016 [*] Duplicate union member `int`
+PYI016.py:30:16: PYI016 [*] Duplicate union member `int`
+PYI016.py:31:24: PYI016 [*] Duplicate union member `str`
+PYI016.py:34:21: PYI016 [*] Duplicate union member `int`
+PYI016.py:37:16: PYI016 [*] Duplicate union member `int`
+PYI016.py:37:22: PYI016 [*] Duplicate union member `int`
+PYI016.py:38:16: PYI016 [*] Duplicate union member `int`
+PYI016.py:38:22: PYI016 [*] Duplicate union member `int`
+PYI016.py:38:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:41:16: PYI016 [*] Duplicate union member `int`
+PYI016.py:41:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:44:30: PYI016 [*] Duplicate union member `typing.Literal[1]`
+PYI016.py:57:5: PYI016 [*] Duplicate union member `set[int]`
+PYI016.py:63:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:66:41: PYI016 [*] Duplicate union member `int`
+PYI016.py:69:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:72:41: PYI016 [*] Duplicate union member `int`
+PYI016.py:72:59: PYI016 [*] Duplicate union member `int`
+PYI016.py:72:64: PYI016 [*] Duplicate union member `int`
+PYI016.py:76:12: PYI016 [*] Duplicate union member `set[int]`
+PYI016.py:81:41: PYI016 [*] Duplicate union member `int`
+PYI016.py:81:46: PYI016 [*] Duplicate union member `int`
+PYI016.py:86:28: PYI016 [*] Duplicate union member `int`
+PYI016.py:86:34: PYI016 [*] Duplicate union member `int`
+PYI016.py:89:41: PYI016 [*] Duplicate union member `int`
+PYI016.py:92:54: PYI016 [*] Duplicate union member `int`
+PYI016.py:95:29: PYI016 [*] Duplicate union member `int`
+PYI016.py:98:54: PYI016 [*] Duplicate union member `int`
+PYI016.py:98:59: PYI016 [*] Duplicate union member `int`
+PYI016.py:101:54: PYI016 [*] Duplicate union member `int`
+PYI016.py:104:49: PYI016 [*] Duplicate union member `int`
+PYI016.py:107:49: PYI016 [*] Duplicate union member `int`
+PYI016.py:107:55: PYI016 [*] Duplicate union member `int`
+PYI016.py:110:42: PYI016 [*] Duplicate union member `int`
+PYI016.py:110:62: PYI016 [*] Duplicate union member `int`
+PYI016.py:110:68: PYI016 [*] Duplicate union member `int`
+PYI016.py:113:61: PYI016 [*] Duplicate union member `list[int]`
+PYI016.py:115:23: PYI016 [*] Duplicate union member `int`
+PYI016.py:130:26: PYI016 [*] Duplicate union member `None`
+PYI016.py:132:45: PYI016 [*] Duplicate union member `None`
+PYI016.py:133:44: PYI016 [*] Duplicate union member `None`
+PYI016.py:134:45: PYI016 [*] Duplicate union member `None`
+PYI016.py:134:61: PYI016 [*] Duplicate union member `int`
+PYI016.py:135:33: PYI016 [*] Duplicate union member `None`
+PYI016.py:136:32: PYI016 [*] Duplicate union member `None`
+PYI016.py:137:33: PYI016 [*] Duplicate union member `None`
+PYI016.py:137:49: PYI016 [*] Duplicate union member `int`
+PYI016.py:139:45: PYI016 [*] Duplicate union member `None`
+PYI016.py:140:33: PYI016 [*] Duplicate union member `None`
+PYI016.py:143:61: PYI016 [*] Duplicate union member `complex`
+PYI016.py:143:72: PYI016 [*] Duplicate union member `complex`
+PYI016.py:144:36: PYI016 [*] Duplicate union member `complex`
+PYI016.py:144:47: PYI016 [*] Duplicate union member `complex`
+PYI016.py:148:37: PYI016 Duplicate union member `None`

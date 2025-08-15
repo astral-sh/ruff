@@ -8,3 +8,6 @@ F821 Undefined name `display`
 4 | display(x)
   | ^^^^^^^
   |
+
+## Concise Output
+F821_21.py:4:1: F821 Undefined name `display`

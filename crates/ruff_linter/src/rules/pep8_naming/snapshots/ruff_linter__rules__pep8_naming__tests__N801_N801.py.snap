@@ -60,3 +60,12 @@ N801 Class name `BAD_CLASS` should use CapWords convention
    |       ^^^^^^^^^
 24 |     pass
    |
+
+## Concise Output
+N801.py:1:7: N801 Class name `bad` should use CapWords convention
+N801.py:5:7: N801 Class name `_bad` should use CapWords convention
+N801.py:9:7: N801 Class name `__bad` should use CapWords convention
+N801.py:13:7: N801 Class name `bad_class` should use CapWords convention
+N801.py:17:7: N801 Class name `Bad_Class` should use CapWords convention
+N801.py:20:7: N801 Class name `Bad__Class` should use CapWords convention
+N801.py:23:7: N801 Class name `BAD_CLASS` should use CapWords convention

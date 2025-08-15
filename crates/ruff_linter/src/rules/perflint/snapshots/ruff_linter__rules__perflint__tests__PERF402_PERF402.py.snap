@@ -9,3 +9,6 @@ PERF402 Use `list` or `list.copy` to create a copy of a list
 5 |         result.append(i)  # PERF402
   |         ^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+PERF402.py:5:9: PERF402 Use `list` or `list.copy` to create a copy of a list

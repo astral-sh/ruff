@@ -16,3 +16,6 @@ help: Organize imports
   1 |+from subprocess import STDOUT, A_constant, Class, First, Last, func, konst, var
   2 |+
   3 |+from sklearn.svm import XYZ, Const, Klass, constant, func, variable
+
+## Concise Output
+order_by_type_with_custom_constants.py:1:1: I001 [*] Import block is un-sorted or un-formatted

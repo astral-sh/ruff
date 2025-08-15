@@ -8,3 +8,6 @@ PD004 `.notna` is preferred to `.notnull`; functionality is equivalent
 3 | not_nulls = pd.notnull(val)
   |             ^^^^^^^^^^
   |
+
+## Concise Output
+<filename>:3:13: PD004 `.notna` is preferred to `.notnull`; functionality is equivalent

@@ -26,3 +26,8 @@ S101 Use of `assert` detected
 7 |     assert x == 2  # S101
   |     ^^^^^^
   |
+
+## Concise Output
+S101.py:1:1: S101 Use of `assert` detected
+S101.py:6:5: S101 Use of `assert` detected
+S101.py:7:5: S101 Use of `assert` detected

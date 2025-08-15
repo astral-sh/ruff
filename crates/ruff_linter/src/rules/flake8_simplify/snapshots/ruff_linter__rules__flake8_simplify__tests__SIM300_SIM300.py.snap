@@ -389,3 +389,23 @@ help: Rewrite as `DummyHandler.CONFIG == {}`
 22 22 | 
 23 23 | # Errors in stable
 24 24 | UPPER_LIST == ['upper']
+
+## Concise Output
+SIM300.py:2:1: SIM300 [*] Yoda condition detected
+SIM300.py:3:1: SIM300 [*] Yoda condition detected
+SIM300.py:4:1: SIM300 [*] Yoda condition detected
+SIM300.py:5:1: SIM300 [*] Yoda condition detected
+SIM300.py:6:1: SIM300 [*] Yoda condition detected
+SIM300.py:7:1: SIM300 [*] Yoda condition detected
+SIM300.py:8:1: SIM300 [*] Yoda condition detected
+SIM300.py:9:1: SIM300 [*] Yoda condition detected
+SIM300.py:10:1: SIM300 [*] Yoda condition detected
+SIM300.py:11:1: SIM300 [*] Yoda condition detected
+SIM300.py:12:1: SIM300 [*] Yoda condition detected
+SIM300.py:13:1: SIM300 [*] Yoda condition detected
+SIM300.py:14:1: SIM300 [*] Yoda condition detected
+SIM300.py:15:1: SIM300 [*] Yoda condition detected
+SIM300.py:16:5: SIM300 [*] Yoda condition detected
+SIM300.py:17:1: SIM300 [*] Yoda condition detected
+SIM300.py:20:1: SIM300 [*] Yoda condition detected
+SIM300.py:21:1: SIM300 [*] Yoda condition detected

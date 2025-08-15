@@ -48,3 +48,9 @@ AIR301 `executors` is removed in Airflow 3.0
 12 |     macros = [plugin_macro]
    |
 help: This extension should just be imported as a regular python module.
+
+## Concise Output
+AIR301_airflow_plugin.py:7:5: AIR301 `operators` is removed in Airflow 3.0
+AIR301_airflow_plugin.py:8:5: AIR301 `sensors` is removed in Airflow 3.0
+AIR301_airflow_plugin.py:9:5: AIR301 `hooks` is removed in Airflow 3.0
+AIR301_airflow_plugin.py:10:5: AIR301 `executors` is removed in Airflow 3.0

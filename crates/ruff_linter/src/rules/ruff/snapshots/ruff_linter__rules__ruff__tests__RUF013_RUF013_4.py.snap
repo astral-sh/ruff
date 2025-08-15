@@ -18,3 +18,6 @@ help: Convert to `T | None`
 16 16 | 
 17 17 | 
 18 18 | def return_type(arg: Optional = None) -> Optional: ...
+
+## Concise Output
+RUF013_4.py:15:61: RUF013 [*] PEP 484 prohibits implicit `Optional`

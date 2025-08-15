@@ -8,3 +8,6 @@ EXE005 Shebang should be at the beginning of the file
 4 | #!/usr/bin/python
   | ^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+EXE005_2.py:4:1: EXE005 Shebang should be at the beginning of the file

@@ -43,3 +43,10 @@ DJ008 Model does not define `__str__` method
 216 |     """Model with type-annotated abstract = False - should trigger DJ008"""
 217 |     new_field = models.CharField(max_length=10)
     |
+
+## Concise Output
+DJ008.py:6:7: DJ008 Model does not define `__str__` method
+DJ008.py:21:7: DJ008 Model does not define `__str__` method
+DJ008.py:36:7: DJ008 Model does not define `__str__` method
+DJ008.py:182:7: DJ008 Model does not define `__str__` method
+DJ008.py:215:7: DJ008 Model does not define `__str__` method

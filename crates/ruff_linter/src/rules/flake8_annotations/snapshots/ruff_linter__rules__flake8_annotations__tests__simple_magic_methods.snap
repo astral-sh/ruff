@@ -289,3 +289,19 @@ help: Add return type annotation: `int`
 41    |-    def __index__(self):
    41 |+    def __index__(self) -> int:
 42 42 |         ...
+
+## Concise Output
+simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for special method `__str__`
+simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for special method `__repr__`
+simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for special method `__len__`
+simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for special method `__length_hint__`
+simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for special method `__init__`
+simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for special method `__del__`
+simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for special method `__bool__`
+simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for special method `__bytes__`
+simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for special method `__format__`
+simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for special method `__contains__`
+simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for special method `__complex__`
+simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for special method `__int__`
+simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for special method `__float__`
+simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for special method `__index__`

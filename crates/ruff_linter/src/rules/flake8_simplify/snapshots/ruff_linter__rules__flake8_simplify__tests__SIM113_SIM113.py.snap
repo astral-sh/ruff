@@ -48,3 +48,10 @@ SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |         ^^^^^^^^
 45 |         h(x)
    |
+
+## Concise Output
+SIM113.py:6:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+SIM113.py:17:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+SIM113.py:27:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+SIM113.py:36:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
+SIM113.py:44:9: SIM113 Use `enumerate()` for index variable `idx` in `for` loop

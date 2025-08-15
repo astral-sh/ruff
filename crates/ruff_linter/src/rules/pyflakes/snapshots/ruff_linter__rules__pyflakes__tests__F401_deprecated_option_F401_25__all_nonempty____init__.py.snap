@@ -51,3 +51,8 @@ help: Remove unused import: `.renamed`
 40 39 | 
 41 40 | 
 42 41 | __all__ = ["argparse", "exported"]
+
+## Concise Output
+__init__.py:19:8: F401 [*] `sys` imported but unused
+__init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias

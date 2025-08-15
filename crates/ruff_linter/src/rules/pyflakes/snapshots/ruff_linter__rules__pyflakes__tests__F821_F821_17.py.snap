@@ -294,3 +294,34 @@ F821 Undefined name `T`
     |                                        ^
 117 |     pass
     |
+
+## Concise Output
+F821_17.py:16:12: F821 Undefined name `DoesNotExist`
+F821_17.py:17:17: F821 Undefined name `DoesNotExist`
+F821_17.py:22:1: F821 Undefined name `T`
+F821_17.py:39:17: F821 Undefined name `T`
+F821_17.py:42:1: F821 Undefined name `T`
+F821_17.py:64:17: F821 Undefined name `T`
+F821_17.py:67:1: F821 Undefined name `T`
+F821_17.py:71:13: F821 Undefined name `DoesNotExist`
+F821_17.py:72:12: F821 Undefined name `DoesNotExist`
+F821_17.py:73:14: F821 Undefined name `DoesNotExist`
+F821_17.py:75:14: F821 Undefined name `DoesNotExist1`
+F821_17.py:75:29: F821 Undefined name `DoesNotExist2`
+F821_17.py:76:13: F821 Undefined name `DoesNotExist1`
+F821_17.py:76:28: F821 Undefined name `DoesNotExist2`
+F821_17.py:77:15: F821 Undefined name `DoesNotExist1`
+F821_17.py:77:30: F821 Undefined name `DoesNotExist2`
+F821_17.py:81:14: F821 Undefined name `DoesNotExist`
+F821_17.py:82:13: F821 Undefined name `DoesNotExist`
+F821_17.py:83:15: F821 Undefined name `DoesNotExist`
+F821_17.py:85:15: F821 Undefined name `DoesNotExist1`
+F821_17.py:85:30: F821 Undefined name `DoesNotExist2`
+F821_17.py:86:14: F821 Undefined name `DoesNotExist1`
+F821_17.py:86:29: F821 Undefined name `DoesNotExist2`
+F821_17.py:87:16: F821 Undefined name `DoesNotExist1`
+F821_17.py:87:31: F821 Undefined name `DoesNotExist2`
+F821_17.py:102:52: F821 Undefined name `t`
+F821_17.py:102:58: F821 Undefined name `t`
+F821_17.py:103:17: F821 Undefined name `t`
+F821_17.py:116:40: F821 Undefined name `T`

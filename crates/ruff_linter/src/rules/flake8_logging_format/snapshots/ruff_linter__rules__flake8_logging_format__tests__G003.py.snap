@@ -38,3 +38,9 @@ G003 Logging statement uses `+`
 9 | log(logging.INFO, "Hello" + " " + "World!")
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+G003.py:3:14: G003 Logging statement uses `+`
+G003.py:4:27: G003 Logging statement uses `+`
+G003.py:8:6: G003 Logging statement uses `+`
+G003.py:9:19: G003 Logging statement uses `+`

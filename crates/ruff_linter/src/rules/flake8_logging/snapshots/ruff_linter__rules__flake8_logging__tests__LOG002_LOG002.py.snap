@@ -82,3 +82,9 @@ help: Replace with `__name__`
 16 16 | 
 17 17 | 
 18 18 | # Override `logging.getLogger`
+
+## Concise Output
+LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002.py:15:16: LOG002 [*] Use `__name__` with `logging.getLogger()`

@@ -36,3 +36,8 @@ PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`
 11 | )  # Y024 Use "typing.NamedTuple" instead of "collections.namedtuple"
    |
 help: Replace with `typing.NamedTuple`
+
+## Concise Output
+PYI024.pyi:3:9: PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`
+PYI024.pyi:7:9: PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`
+PYI024.pyi:9:10: PYI024 Use `typing.NamedTuple` instead of `collections.namedtuple`

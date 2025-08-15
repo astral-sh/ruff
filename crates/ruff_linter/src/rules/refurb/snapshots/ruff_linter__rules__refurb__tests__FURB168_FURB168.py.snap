@@ -229,4 +229,17 @@ help: Replace with `is` operator
    44 |+if foo is None:
 45 45 |     ...
 46 46 | 
-47 47 |
+47 47 | 
+
+## Concise Output
+FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:17:5: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:38:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:41:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+FURB168.py:44:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`

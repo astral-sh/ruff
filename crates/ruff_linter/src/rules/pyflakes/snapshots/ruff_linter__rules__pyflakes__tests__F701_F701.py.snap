@@ -35,3 +35,9 @@ F701 `break` outside loop
 23 | break
    | ^^^^^
    |
+
+## Concise Output
+F701.py:4:5: F701 `break` outside loop
+F701.py:16:5: F701 `break` outside loop
+F701.py:20:5: F701 `break` outside loop
+F701.py:23:1: F701 `break` outside loop

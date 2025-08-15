@@ -71,3 +71,11 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 26 |
 27 |   # # OK
    |
+
+## Concise Output
+dict_index_missing_items.py:9:1: PLC0206 Extracting value from dictionary without calling `.items()`
+dict_index_missing_items.py:12:1: PLC0206 Extracting value from dictionary without calling `.items()`
+dict_index_missing_items.py:15:1: PLC0206 Extracting value from dictionary without calling `.items()`
+dict_index_missing_items.py:18:1: PLC0206 Extracting value from dictionary without calling `.items()`
+dict_index_missing_items.py:21:1: PLC0206 Extracting value from dictionary without calling `.items()`
+dict_index_missing_items.py:24:1: PLC0206 Extracting value from dictionary without calling `.items()`

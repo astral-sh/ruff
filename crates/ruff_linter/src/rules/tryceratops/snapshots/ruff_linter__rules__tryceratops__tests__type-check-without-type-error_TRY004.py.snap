@@ -330,3 +330,41 @@ TRY004 Prefer `TypeError` exception for invalid type
 316 |         raise Exception(f"Unknown object type: {obj.__class__.__name__}")
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
+
+## Concise Output
+TRY004.py:12:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:19:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:30:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:37:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:44:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:51:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:58:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:65:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:72:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:79:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:86:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:95:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:104:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:111:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:118:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:125:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:132:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:139:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:146:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:153:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:160:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:167:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:174:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:181:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:188:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:195:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:202:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:209:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:216:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:223:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:230:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:239:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:276:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:286:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:297:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:316:9: TRY004 Prefer `TypeError` exception for invalid type

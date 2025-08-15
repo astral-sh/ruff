@@ -62,3 +62,8 @@ help: Use `map` instead
 8 8 | 
 9 9 | 
 10 10 | # No errors
+
+## Concise Output
+RUF058_2.py:5:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_2.py:6:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_2.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable

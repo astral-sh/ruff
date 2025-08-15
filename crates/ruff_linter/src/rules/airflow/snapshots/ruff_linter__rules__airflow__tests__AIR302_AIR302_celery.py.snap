@@ -67,4 +67,9 @@ help: Install `apache-airflow-providers-celery>=3.3.0` and use `CeleryExecutor` 
   7 |+from airflow.providers.celery.executors.celery_executor import CeleryExecutor
 8 8 | 
 9 9 | DEFAULT_CELERY_CONFIG
-10 10 |
+10 10 | 
+
+## Concise Output
+AIR302_celery.py:9:1: AIR302 [*] `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is moved into `celery` provider in Airflow 3.0;
+AIR302_celery.py:11:1: AIR302 [*] `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
+AIR302_celery.py:12:1: AIR302 [*] `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;

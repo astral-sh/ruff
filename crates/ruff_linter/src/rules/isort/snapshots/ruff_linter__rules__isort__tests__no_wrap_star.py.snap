@@ -12,3 +12,6 @@ help: Organize imports
 ℹ Safe fix
 1   |-from .subscription import * # type: ignore  # some very long comment explaining why this needs a type ignore
   1 |+from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore
+
+## Concise Output
+no_wrap_star.py:1:1: I001 [*] Import block is un-sorted or un-formatted

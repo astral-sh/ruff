@@ -139,3 +139,12 @@ help: Add missing blank line(s)
 61 61 | 
    62 |+
 62 63 | class MissingCommand(TypeError): ...  # noqa: N818
+
+## Concise Output
+E30_isort.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:23:1: E302 [*] Expected 2 blank lines, found 1
+E30_isort.py:26:5: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:35:1: E302 [*] Expected 2 blank lines, found 1
+E30_isort.py:41:1: E302 [*] Expected 2 blank lines, found 1
+E30_isort.py:60:1: I001 [*] Import block is un-sorted or un-formatted
+E30_isort.py:62:1: E302 [*] Expected 2 blank lines, found 1

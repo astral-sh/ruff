@@ -15,3 +15,6 @@ help: Remove `exc_info=`
 3 3 | 
 4   |-logger.info("", exc_info=True)
   4 |+logger.info("")
+
+## Concise Output
+LOG014_1.py:4:17: LOG014 [*] `exc_info=` outside exception handlers

@@ -16,4 +16,7 @@ help: Remove mode argument
 2 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 3   |-x: 'open("foo", "r")'
   3 |+x: 'open("foo")'
-4 4 |
+4 4 | 
+
+## Concise Output
+UP015_1.py:3:17: UP015 [*] Unnecessary mode argument

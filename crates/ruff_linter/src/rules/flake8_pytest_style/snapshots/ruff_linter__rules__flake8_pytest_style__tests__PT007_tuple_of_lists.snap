@@ -352,3 +352,20 @@ help: Use `tuple` of `list` for parameter values
 90 90 | )
 91 91 | def test_multiple_decorators(a, b, c, d, e):
 92 92 |     pass
+
+## Concise Output
+PT007.py:12:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:13:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:31:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:38:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:39:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:40:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:49:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:60:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:71:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:80:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:81:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:81:47: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:82:31: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:85:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`
+PT007.py:89:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `tuple` of `list`

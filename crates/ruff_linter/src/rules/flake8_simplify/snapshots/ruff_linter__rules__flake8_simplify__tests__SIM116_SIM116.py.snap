@@ -115,3 +115,12 @@ SIM116 Use a dictionary instead of consecutive `if` statements
 88 |
 89 |       # OK
    |
+
+## Concise Output
+SIM116.py:6:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:16:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:26:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:34:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:44:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:52:5: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:80:5: SIM116 Use a dictionary instead of consecutive `if` statements

@@ -206,4 +206,16 @@ help: Convert to triple double quotes
     665 |+    but continuations shouldn't be considered multi-line"""
 666 666 | 
 667 667 | 
-668 668 |
+668 668 | 
+
+## Concise Output
+D.py:307:5: D300 [*] Use triple double quotes `"""`
+D.py:312:5: D300 [*] Use triple double quotes `"""`
+D.py:317:5: D300 [*] Use triple double quotes `"""`
+D.py:322:5: D300 [*] Use triple double quotes `"""`
+D.py:328:5: D300 [*] Use triple double quotes `"""`
+D.py:645:5: D300 [*] Use triple double quotes `"""`
+D.py:649:5: D300 [*] Use triple double quotes `"""`
+D.py:654:5: D300 [*] Use triple double quotes `"""`
+D.py:658:5: D300 [*] Use triple double quotes `"""`
+D.py:664:5: D300 [*] Use triple double quotes `"""`

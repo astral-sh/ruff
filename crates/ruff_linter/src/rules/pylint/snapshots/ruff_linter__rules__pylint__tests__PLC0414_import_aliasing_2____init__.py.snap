@@ -17,3 +17,6 @@ help: Remove import alias
 2 2 | from collections import OrderedDict as OrderedDict
 3 3 | from . import foo as foo
 4 4 | from .foo import bar as bar
+
+## Concise Output
+__init__.py:1:8: PLC0414 [*] Import alias does not rename original package

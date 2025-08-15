@@ -117,3 +117,16 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 134 |     final_variable_without_subscript: 'Final' = []
     |                                                 ^^
     |
+
+## Concise Output
+RUF012.py:9:34: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:11:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:25:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:103:38: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:128:36: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:129:44: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:130:26: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:131:45: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:132:42: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:133:52: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012.py:134:49: RUF012 Mutable class attributes should be annotated with `typing.ClassVar`

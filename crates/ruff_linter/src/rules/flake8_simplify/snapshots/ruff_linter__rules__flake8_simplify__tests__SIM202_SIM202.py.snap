@@ -58,3 +58,8 @@ help: Replace with `==` operator
 11 11 |     pass
 12 12 | 
 13 13 | # OK
+
+## Concise Output
+SIM202.py:2:4: SIM202 [*] Use `a == b` instead of `not a != b`
+SIM202.py:6:4: SIM202 [*] Use `a == b + c` instead of `not a != b + c`
+SIM202.py:10:4: SIM202 [*] Use `a + b == c` instead of `not a + b != c`

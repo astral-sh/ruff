@@ -9,3 +9,6 @@ F821 Undefined name `InnerClass`
   |                               ^^^^^^^^^^
 6 |         pass
   |
+
+## Concise Output
+F821_5.py:5:31: F821 Undefined name `InnerClass`

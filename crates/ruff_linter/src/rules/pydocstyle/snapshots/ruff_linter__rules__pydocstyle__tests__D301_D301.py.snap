@@ -67,3 +67,9 @@ help: Add `r` prefix
     99  |+    r'''
 100 100 |     This is single quote escape \'.
 101 101 |     '''
+
+## Concise Output
+D301.py:2:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301.py:37:5: D301 Use `r"""` if any backslashes in a docstring
+D301.py:93:5: D301 [*] Use `r"""` if any backslashes in a docstring
+D301.py:99:5: D301 [*] Use `r"""` if any backslashes in a docstring

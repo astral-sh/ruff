@@ -443,3 +443,25 @@ UP028 Replace `yield` over `for` loop with `yield from`
     | |________________________________^
     |
 help: Replace with `yield from`
+
+## Concise Output
+UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:97:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:108:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:118:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:134:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:170:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:179:5: UP028 Replace `yield` over `for` loop with `yield from`
+UP028_0.py:187:9: UP028 Replace `yield` over `for` loop with `yield from`

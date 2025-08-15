@@ -58,3 +58,8 @@ help: Use `raise NotImplementedError`
 10 11 |     NotImplementedError = "foo"
 11    |-    raise NotImplemented
    12 |+    raise builtins.NotImplementedError
+
+## Concise Output
+F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+F901.py:11:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`

@@ -626,3 +626,29 @@ help: Use `get_parsing_context` from `airflow.sdk` instead.
 71 71 | 
 72 72 | # airflow.timetables.datasets
 73 73 | DatasetOrTimeSchedule()
+
+## Concise Output
+AIR311_names.py:20:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:23:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:24:1: AIR311 [*] `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:25:1: AIR311 [*] `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:26:1: AIR311 [*] `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:27:1: AIR311 [*] `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:28:1: AIR311 [*] `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:31:1: AIR311 [*] `airflow.decorators.dag` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:32:1: AIR311 [*] `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:33:1: AIR311 [*] `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:34:1: AIR311 [*] `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:48:1: AIR311 [*] `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:51:1: AIR311 [*] `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:52:1: AIR311 [*] `airflow.io.storage.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:55:1: AIR311 [*] `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:56:1: AIR311 [*] `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:57:1: AIR311 [*] `airflow.models.Variable` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:60:1: AIR311 [*] `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:61:1: AIR311 [*] `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:62:1: AIR311 [*] `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:65:1: AIR311 [*] `airflow.models.baseoperatorlink.BaseOperatorLink` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:68:1: AIR311 [*] `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:73:1: AIR311 [*] `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+AIR311_names.py:76:1: AIR311 [*] `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.

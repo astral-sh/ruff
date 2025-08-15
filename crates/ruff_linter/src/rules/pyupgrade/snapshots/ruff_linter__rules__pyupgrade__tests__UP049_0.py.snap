@@ -112,3 +112,10 @@ help: Rename type parameter to remove leading underscores
 29 29 |     cast("Literal['_T']")
 30    |-    cast("list[_T]", v)
    30 |+    cast("list[T]", v)
+
+## Concise Output
+UP049_0.py:2:15: UP049 [*] Generic class uses private type parameters
+UP049_0.py:10:12: UP049 [*] Generic function uses private type parameters
+UP049_0.py:17:5: UP049 [*] Generic function uses private type parameters
+UP049_0.py:18:5: UP049 [*] Generic function uses private type parameters
+UP049_0.py:27:7: UP049 [*] Generic function uses private type parameters

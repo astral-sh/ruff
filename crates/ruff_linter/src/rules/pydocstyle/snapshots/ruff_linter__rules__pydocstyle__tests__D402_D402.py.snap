@@ -18,3 +18,7 @@ D402 First line should not be the function's signature
 8 |     """"Use this function; foo()."""
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+D402.py:2:5: D402 First line should not be the function's signature
+D402.py:8:5: D402 First line should not be the function's signature

@@ -10,3 +10,6 @@ F821 Undefined name `Model`
 6 |
 7 | from typing_extensions import Literal
   |
+
+## Concise Output
+F821_2.py:5:13: F821 Undefined name `Model`

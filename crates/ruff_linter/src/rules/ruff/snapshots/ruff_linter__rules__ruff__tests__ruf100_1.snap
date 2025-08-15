@@ -158,3 +158,13 @@ help: Remove unused `noqa` directive
 88 88 |     # This should mark F501 as unused.
 89    |-    from typing import Awaitable, AwaitableGenerator  # noqa: F501
    89 |+    from typing import Awaitable, AwaitableGenerator
+
+## Concise Output
+RUF100_1.py:37:9: F401 [*] `typing.Union` imported but unused
+RUF100_1.py:52:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
+RUF100_1.py:59:20: RUF100 [*] Unused `noqa` directive (unused: `F401`)
+RUF100_1.py:66:16: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
+RUF100_1.py:72:27: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
+RUF100_1.py:89:24: F401 [*] `typing.Awaitable` imported but unused
+RUF100_1.py:89:35: F401 [*] `typing.AwaitableGenerator` imported but unused
+RUF100_1.py:89:55: RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)

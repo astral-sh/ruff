@@ -19,3 +19,6 @@ help: Organize imports
   6 |+    from distutils.command.sdist import sdist as _sdist
 6 7 |     from setuptools.command.sdist import sdist as _sdist
 7   |-    from distutils.command.sdist import sdist as _sdist
+
+## Concise Output
+if_elif_else.py:6:5: I001 [*] Import block is un-sorted or un-formatted

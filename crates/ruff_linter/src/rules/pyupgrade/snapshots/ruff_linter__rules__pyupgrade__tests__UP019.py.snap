@@ -74,3 +74,9 @@ help: Replace with `str`
 19    |-def print_fourth_word(word: Goodbye) -> None:
    19 |+def print_fourth_word(word: str) -> None:
 20 20 |     print(word)
+
+## Concise Output
+UP019.py:7:22: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:11:29: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:15:28: UP019 [*] `typing.Text` is deprecated, use `str`
+UP019.py:19:29: UP019 [*] `typing.Text` is deprecated, use `str`

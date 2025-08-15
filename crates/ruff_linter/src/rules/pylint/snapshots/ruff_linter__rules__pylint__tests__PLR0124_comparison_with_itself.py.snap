@@ -131,3 +131,17 @@ PLR0124 Name compared with itself, consider replacing `len(foo) == len(foo)`
 25 |
 26 | # Non-errors.
    |
+
+## Concise Output
+comparison_with_itself.py:2:1: PLR0124 Name compared with itself, consider replacing `foo == foo`
+comparison_with_itself.py:4:1: PLR0124 Name compared with itself, consider replacing `foo != foo`
+comparison_with_itself.py:6:1: PLR0124 Name compared with itself, consider replacing `foo > foo`
+comparison_with_itself.py:8:1: PLR0124 Name compared with itself, consider replacing `foo >= foo`
+comparison_with_itself.py:10:1: PLR0124 Name compared with itself, consider replacing `foo < foo`
+comparison_with_itself.py:12:1: PLR0124 Name compared with itself, consider replacing `foo <= foo`
+comparison_with_itself.py:14:1: PLR0124 Name compared with itself, consider replacing `foo is foo`
+comparison_with_itself.py:16:1: PLR0124 Name compared with itself, consider replacing `foo is not foo`
+comparison_with_itself.py:18:1: PLR0124 Name compared with itself, consider replacing `foo in foo`
+comparison_with_itself.py:20:1: PLR0124 Name compared with itself, consider replacing `foo not in foo`
+comparison_with_itself.py:22:1: PLR0124 Name compared with itself, consider replacing `id(foo) == id(foo)`
+comparison_with_itself.py:24:1: PLR0124 Name compared with itself, consider replacing `len(foo) == len(foo)`

@@ -110,3 +110,11 @@ help: Replace single quotes docstring with double quotes
 8 8 | 
 9   |-    class Nested(foo()[:]): 'Do not'" start with empty string" ' and lint docstring safely'; pass
   9 |+    class Nested(foo()[:]): 'Do not'" start with empty string" " and lint docstring safely"; pass
+
+## Concise Output
+docstring_singles_mixed_quotes_class_var_2.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_class_var_2.py:2:40: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_class_var_2.py:6:9: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_class_var_2.py:6:44: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_class_var_2.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred
+docstring_singles_mixed_quotes_class_var_2.py:9:64: Q002 [*] Single quote docstring found but double quotes preferred

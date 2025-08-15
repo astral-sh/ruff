@@ -141,3 +141,18 @@ PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
 24 |
 25 | __all__ = ["Hello"]
    |
+
+## Concise Output
+invalid_all_format.py:1:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:3:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:5:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:7:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:9:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:11:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:13:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:15:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:17:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:19:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:21:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:23:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:23:12: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`

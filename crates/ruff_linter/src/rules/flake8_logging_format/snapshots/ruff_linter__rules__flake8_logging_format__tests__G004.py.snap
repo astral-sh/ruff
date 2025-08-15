@@ -61,3 +61,11 @@ G004 Logging statement uses f-string
 16 |
 17 | # Don't trigger for t-strings
    |
+
+## Concise Output
+G004.py:4:14: G004 Logging statement uses f-string
+G004.py:5:27: G004 Logging statement uses f-string
+G004.py:8:14: G004 Logging statement uses f-string
+G004.py:10:26: G004 Logging statement uses f-string
+G004.py:14:6: G004 Logging statement uses f-string
+G004.py:15:6: G004 Logging statement uses f-string

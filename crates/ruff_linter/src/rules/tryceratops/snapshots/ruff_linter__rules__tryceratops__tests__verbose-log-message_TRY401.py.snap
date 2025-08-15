@@ -214,3 +214,27 @@ TRY401 Redundant exception object included in `logging.exception` call
 150 |             logger.exception(f"Found an error: {ex}")  # TRY401
     |                                                 ^^
     |
+
+## Concise Output
+TRY401.py:8:45: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:19:53: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:21:45: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:21:51: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:23:45: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:24:45: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:27:49: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:39:47: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:46:53: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:53:47: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:77:38: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:88:46: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:90:38: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:90:44: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:92:38: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:93:38: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:96:42: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:103:40: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:110:46: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:117:40: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:139:49: TRY401 Redundant exception object included in `logging.exception` call
+TRY401.py:150:49: TRY401 Redundant exception object included in `logging.exception` call

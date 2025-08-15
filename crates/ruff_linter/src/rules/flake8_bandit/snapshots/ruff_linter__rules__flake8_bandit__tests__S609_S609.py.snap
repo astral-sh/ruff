@@ -41,3 +41,9 @@ S609 Possible wildcard injection in call due to `*` usage
 8 | os.system("tar cf foo.tar bar/*")
   |           ^^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S609.py:4:10: S609 Possible wildcard injection in call due to `*` usage
+S609.py:5:18: S609 Possible wildcard injection in call due to `*` usage
+S609.py:6:18: S609 Possible wildcard injection in call due to `*` usage
+S609.py:8:11: S609 Possible wildcard injection in call due to `*` usage

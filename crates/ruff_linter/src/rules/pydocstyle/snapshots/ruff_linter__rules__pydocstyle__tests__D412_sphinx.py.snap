@@ -80,3 +80,9 @@ help: Remove blank line(s)
 64 62 |     .. code-block:: python
 65 63 | 
 66 64 |         import foo
+
+## Concise Output
+sphinx.py:13:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+sphinx.py:24:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+sphinx.py:47:5: D412 [*] No blank lines allowed between a section header and its content ("Example")
+sphinx.py:59:5: D412 [*] No blank lines allowed between a section header and its content ("Example")

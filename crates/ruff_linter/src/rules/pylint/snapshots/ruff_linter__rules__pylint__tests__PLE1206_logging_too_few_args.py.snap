@@ -22,3 +22,7 @@ PLE1206 Not enough arguments for `logging` format string
 34 |
 35 | # do not handle calls with kwargs (like pylint)
    |
+
+## Concise Output
+logging_too_few_args.py:3:1: PLE1206 Not enough arguments for `logging` format string
+logging_too_few_args.py:33:1: PLE1206 Not enough arguments for `logging` format string

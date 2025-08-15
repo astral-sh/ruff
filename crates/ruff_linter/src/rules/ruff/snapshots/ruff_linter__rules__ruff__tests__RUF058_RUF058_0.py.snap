@@ -226,4 +226,13 @@ help: Use `map` instead
    59 |+        
 60 60 | )
 61 61 | 
-62 62 |
+62 62 | 
+
+## Concise Output
+RUF058_0.py:7:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:8:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:11:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:14:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:22:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:31:1: RUF058 [*] `itertools.starmap` called on `zip` iterable
+RUF058_0.py:51:1: RUF058 [*] `itertools.starmap` called on `zip` iterable

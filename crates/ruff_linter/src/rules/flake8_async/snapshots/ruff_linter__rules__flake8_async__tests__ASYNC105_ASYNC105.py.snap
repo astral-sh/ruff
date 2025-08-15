@@ -535,3 +535,30 @@ ASYNC105 Call to `trio.open_file` is not immediately awaited
    |     ^^^^^^^^^^^^^^^^^^^
    |
 help: Add `await`
+
+## Concise Output
+ASYNC105.py:30:5: ASYNC105 [*] Call to `trio.aclose_forcefully` is not immediately awaited
+ASYNC105.py:31:5: ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
+ASYNC105.py:32:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_listeners` is not immediately awaited
+ASYNC105.py:33:5: ASYNC105 [*] Call to `trio.open_ssl_over_tcp_stream` is not immediately awaited
+ASYNC105.py:34:5: ASYNC105 [*] Call to `trio.open_tcp_listeners` is not immediately awaited
+ASYNC105.py:35:5: ASYNC105 [*] Call to `trio.open_tcp_stream` is not immediately awaited
+ASYNC105.py:36:5: ASYNC105 [*] Call to `trio.open_unix_socket` is not immediately awaited
+ASYNC105.py:37:5: ASYNC105 [*] Call to `trio.run_process` is not immediately awaited
+ASYNC105.py:38:5: ASYNC105 [*] Call to `trio.serve_listeners` is not immediately awaited
+ASYNC105.py:39:5: ASYNC105 [*] Call to `trio.serve_ssl_over_tcp` is not immediately awaited
+ASYNC105.py:40:5: ASYNC105 [*] Call to `trio.serve_tcp` is not immediately awaited
+ASYNC105.py:41:5: ASYNC105 [*] Call to `trio.sleep` is not immediately awaited
+ASYNC105.py:42:5: ASYNC105 [*] Call to `trio.sleep_forever` is not immediately awaited
+ASYNC105.py:44:5: ASYNC105 [*] Call to `trio.lowlevel.cancel_shielded_checkpoint` is not immediately awaited
+ASYNC105.py:45:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint` is not immediately awaited
+ASYNC105.py:46:5: ASYNC105 [*] Call to `trio.lowlevel.checkpoint_if_cancelled` is not immediately awaited
+ASYNC105.py:47:5: ASYNC105 [*] Call to `trio.lowlevel.open_process` is not immediately awaited
+ASYNC105.py:48:5: ASYNC105 [*] Call to `trio.lowlevel.permanently_detach_coroutine_object` is not immediately awaited
+ASYNC105.py:49:5: ASYNC105 [*] Call to `trio.lowlevel.reattach_detached_coroutine_object` is not immediately awaited
+ASYNC105.py:50:5: ASYNC105 [*] Call to `trio.lowlevel.temporarily_detach_coroutine_object` is not immediately awaited
+ASYNC105.py:51:5: ASYNC105 [*] Call to `trio.lowlevel.wait_readable` is not immediately awaited
+ASYNC105.py:52:5: ASYNC105 [*] Call to `trio.lowlevel.wait_task_rescheduled` is not immediately awaited
+ASYNC105.py:53:5: ASYNC105 [*] Call to `trio.lowlevel.wait_writable` is not immediately awaited
+ASYNC105.py:58:16: ASYNC105 [*] Call to `trio.open_file` is not immediately awaited
+ASYNC105.py:64:5: ASYNC105 Call to `trio.open_file` is not immediately awaited

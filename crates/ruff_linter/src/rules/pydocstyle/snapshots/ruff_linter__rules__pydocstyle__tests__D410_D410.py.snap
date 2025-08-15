@@ -42,3 +42,7 @@ help: Add blank line after "Parameters"
 23 24 |     Returns
 24 25 |     -------
 25 26 |     """
+
+## Concise Output
+D410.py:4:5: D410 [*] Missing blank line after section ("Parameters")
+D410.py:21:5: D410 [*] Missing blank line after section ("Parameters")

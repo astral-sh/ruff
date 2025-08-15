@@ -479,3 +479,24 @@ help: Remove unnecessary dict
 98 98 | 
 99 99 | 
 100 100 | {**foo,    "bar": True  }  # OK
+
+## Concise Output
+PIE800.py:1:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:3:4: PIE800 [*] Unnecessary spread `**`
+PIE800.py:5:15: PIE800 [*] Unnecessary spread `**`
+PIE800.py:7:11: PIE800 [*] Unnecessary spread `**`
+PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
+PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
+PIE800.py:24:8: PIE800 [*] Unnecessary spread `**`
+PIE800.py:30:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:37:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:44:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:54:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:65:1: PIE800 [*] Unnecessary spread `**`
+PIE800.py:77:9: PIE800 [*] Unnecessary spread `**`
+PIE800.py:86:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:87:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:89:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:90:14: PIE800 [*] Unnecessary spread `**`
+PIE800.py:92:13: PIE800 [*] Unnecessary spread `**`
+PIE800.py:95:14: PIE800 [*] Unnecessary spread `**`

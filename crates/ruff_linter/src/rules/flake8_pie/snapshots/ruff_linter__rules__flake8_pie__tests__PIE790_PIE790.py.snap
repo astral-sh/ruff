@@ -748,3 +748,43 @@ help: Remove unnecessary `...`
 247 247 | class PotentialDocstring2:
 248     |-    ...
 249 248 |     'Lorem ipsum dolor sit amet.'
+
+## Concise Output
+PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:130:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:136:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:140:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:141:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:144:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:146:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:149:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:155:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:161:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:165:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:166:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:169:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:171:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:174:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:175:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:178:5: PIE790 [*] Unnecessary `...` literal
+PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:209:9: PIE790 [*] Unnecessary `...` literal
+PIE790.py:241:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:248:5: PIE790 [*] Unnecessary `...` literal

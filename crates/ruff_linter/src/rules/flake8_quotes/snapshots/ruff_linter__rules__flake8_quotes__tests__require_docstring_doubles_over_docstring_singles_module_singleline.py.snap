@@ -16,3 +16,6 @@ help: Replace single quotes docstring with double quotes
 2 2 | ''' this is not a docstring '''
 3 3 | 
 4 4 | def foo():
+
+## Concise Output
+docstring_singles_module_singleline.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred

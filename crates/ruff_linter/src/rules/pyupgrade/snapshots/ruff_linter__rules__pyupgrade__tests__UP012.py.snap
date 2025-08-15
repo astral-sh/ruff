@@ -617,3 +617,32 @@ help: Rewrite as bytes literal
 87 87 | 
 88 88 | # AttributeError for t-strings so skip lint
 89 89 | (t"foo{bar}").encode("utf-8")
+
+## Concise Output
+UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:3:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:4:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:5:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:6:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:7:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:24:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:32:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:36:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:53:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:55:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:58:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:64:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:69:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:74:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:75:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:76:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:77:1: UP012 [*] Unnecessary UTF-8 `encoding` argument to `encode`
+UP012.py:82:17: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:86:5: UP012 [*] Unnecessary call to `encode` as UTF-8

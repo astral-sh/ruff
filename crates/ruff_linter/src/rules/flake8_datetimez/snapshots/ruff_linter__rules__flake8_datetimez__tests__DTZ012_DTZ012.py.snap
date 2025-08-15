@@ -20,3 +20,7 @@ DTZ012 `datetime.date.fromtimestamp()` used
   | ^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Use `datetime.datetime.fromtimestamp(ts, tz=...).date()` instead
+
+## Concise Output
+DTZ012.py:4:1: DTZ012 `datetime.date.fromtimestamp()` used
+DTZ012.py:9:1: DTZ012 `datetime.date.fromtimestamp()` used

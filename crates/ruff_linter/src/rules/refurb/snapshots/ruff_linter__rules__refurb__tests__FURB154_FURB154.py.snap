@@ -274,3 +274,17 @@ help: Merge `global` statements
 61 59 | 
 62 60 | 
 63 61 | # Ok
+
+## Concise Output
+FURB154.py:4:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:9:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:15:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:18:5: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:26:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:30:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:35:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:38:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:46:9: FURB154 [*] Use of repeated consecutive `global`
+FURB154.py:48:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:53:9: FURB154 [*] Use of repeated consecutive `nonlocal`
+FURB154.py:58:5: FURB154 [*] Use of repeated consecutive `global`

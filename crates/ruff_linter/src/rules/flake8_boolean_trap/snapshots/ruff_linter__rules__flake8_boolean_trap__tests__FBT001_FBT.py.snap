@@ -113,3 +113,16 @@ FBT001 Boolean-typed positional argument in function definition
     |          ^
 105 |     pass
     |
+
+## Concise Output
+FBT.py:4:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:5:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:10:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:11:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:14:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:15:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:18:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:19:5: FBT001 Boolean-typed positional argument in function definition
+FBT.py:90:19: FBT001 Boolean-typed positional argument in function definition
+FBT.py:100:10: FBT001 Boolean-typed positional argument in function definition
+FBT.py:104:10: FBT001 Boolean-typed positional argument in function definition

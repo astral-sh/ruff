@@ -110,3 +110,16 @@ D417 Missing argument description in the docstring for `test_incorrect_indent`: 
     |         ^^^^^^^^^^^^^^^^^^^^^
 499 |         """Reproducing issue #437.
     |
+
+## Concise Output
+sections.py:292:9: D417 Missing argument description in the docstring for `bar`: `y`
+sections.py:309:5: D417 Missing argument description in the docstring for `test_missing_google_args`: `y`
+sections.py:333:9: D417 Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
+sections.py:345:9: D417 Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
+sections.py:358:9: D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `y`, `z`
+sections.py:370:9: D417 Missing argument descriptions in the docstring for `test_missing_docstring`: `a`, `b`
+sections.py:398:5: D417 Missing argument description in the docstring for `test_missing_numpy_args`: `y`
+sections.py:434:9: D417 Missing argument descriptions in the docstring for `test_missing_args`: `test`, `y`, `z`
+sections.py:449:9: D417 Missing argument descriptions in the docstring for `test_missing_args_class_method`: `test`, `y`, `z`
+sections.py:468:9: D417 Missing argument descriptions in the docstring for `test_missing_args_static_method`: `a`, `z`
+sections.py:498:9: D417 Missing argument description in the docstring for `test_incorrect_indent`: `y`

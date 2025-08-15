@@ -369,3 +369,25 @@ UP049 Generic class uses private type parameters
 104 |         v1 = cast(_T, ...)
     |
 help: Rename type parameter to remove leading underscores
+
+## Concise Output
+UP049_1.py:2:11: UP049 [*] Generic class uses private type parameters
+UP049_1.py:7:11: UP049 [*] Generic class uses private type parameters
+UP049_1.py:12:11: UP049 [*] Generic class uses private type parameters
+UP049_1.py:17:12: UP049 [*] Generic class uses private type parameters
+UP049_1.py:22:11: UP049 [*] Generic class uses private type parameters
+UP049_1.py:31:18: UP049 [*] Generic class uses private type parameters
+UP049_1.py:31:22: UP049 [*] Generic class uses private type parameters
+UP049_1.py:31:31: UP049 [*] Generic class uses private type parameters
+UP049_1.py:31:50: UP049 [*] Generic class uses private type parameters
+UP049_1.py:31:56: UP049 [*] Generic class uses private type parameters
+UP049_1.py:39:9: UP049 Generic class uses private type parameters
+UP049_1.py:47:25: UP049 Generic class uses private type parameters
+UP049_1.py:64:9: UP049 Generic class uses private type parameters
+UP049_1.py:67:12: UP049 Generic class uses private type parameters
+UP049_1.py:68:9: UP049 Generic class uses private type parameters
+UP049_1.py:71:9: UP049 Generic class uses private type parameters
+UP049_1.py:82:9: UP049 Generic class uses private type parameters
+UP049_1.py:88:11: UP049 Generic function uses private type parameters
+UP049_1.py:94:9: UP049 Generic class uses private type parameters
+UP049_1.py:102:9: UP049 Generic class uses private type parameters

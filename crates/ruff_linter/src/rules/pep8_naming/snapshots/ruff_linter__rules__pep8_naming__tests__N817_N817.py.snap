@@ -24,3 +24,8 @@ N817 CamelCase `ElementTree` imported as acronym `ET`
 10 | from ..xml.eltree import ElementTree as ET
    |                          ^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
+N817.py:2:17: N817 CamelCase `CamelCase` imported as acronym `CC`
+N817.py:10:26: N817 CamelCase `ElementTree` imported as acronym `ET`

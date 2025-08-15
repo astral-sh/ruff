@@ -22,3 +22,7 @@ FIX004 Line contains HACK, consider resolving the issue
 7 | # FIXME: fixme
 8 | # fixme: fixme
   |
+
+## Concise Output
+T00.py:5:3: FIX004 Line contains HACK, consider resolving the issue
+T00.py:6:3: FIX004 Line contains HACK, consider resolving the issue

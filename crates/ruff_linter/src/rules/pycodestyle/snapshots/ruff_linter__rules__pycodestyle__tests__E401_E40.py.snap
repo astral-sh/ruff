@@ -185,3 +185,14 @@ help: Split imports
 79 79 | 
 80    |-    if True: import re as regex, string
    80 |+    if True: import re as regex; import string
+
+## Concise Output
+E40.py:2:1: E401 [*] Multiple imports on one line
+E40.py:65:1: E401 [*] Multiple imports on one line
+E40.py:66:1: E401 [*] Multiple imports on one line
+E40.py:68:8: E401 [*] Multiple imports on one line
+E40.py:72:5: E401 [*] Multiple imports on one line
+E40.py:75:9: E401 [*] Multiple imports on one line
+E40.py:77:16: E401 [*] Multiple imports on one line
+E40.py:78:9: E401 [*] Multiple imports on one line
+E40.py:80:14: E401 [*] Multiple imports on one line

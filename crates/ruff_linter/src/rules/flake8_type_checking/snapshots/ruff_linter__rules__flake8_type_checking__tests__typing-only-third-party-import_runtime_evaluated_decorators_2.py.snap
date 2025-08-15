@@ -23,3 +23,6 @@ help: Move into type-checking block
 11 14 | 
 12 15 | 
 13 16 | @attrs.define(auto_attribs=True)
+
+## Concise Output
+runtime_evaluated_decorators_2.py:10:8: TC002 [*] Move third-party import `numpy` into a type-checking block

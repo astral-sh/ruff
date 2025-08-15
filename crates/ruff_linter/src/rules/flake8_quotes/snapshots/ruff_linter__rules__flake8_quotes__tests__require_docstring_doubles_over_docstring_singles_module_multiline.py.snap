@@ -22,3 +22,6 @@ help: Replace single quotes docstring with double quotes
 4 4 | '''
 5 5 | this is not a docstring
 6 6 | '''
+
+## Concise Output
+docstring_singles_module_multiline.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred

@@ -56,3 +56,8 @@ help: Remove `start` argument
 18 18 | # regression test for https://github.com/astral-sh/ruff/pull/18805
 19    |-range((0), 42)
    19 |+range(42)
+
+## Concise Output
+PIE808.py:2:7: PIE808 [*] Unnecessary `start` argument in `range`
+PIE808.py:5:16: PIE808 [*] Unnecessary `start` argument in `range`
+PIE808.py:19:8: PIE808 [*] Unnecessary `start` argument in `range`

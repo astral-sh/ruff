@@ -9,3 +9,6 @@ SIM107 Don't use `return` in `try`-`except` and `finally`
 9 |         return "3"
   |         ^^^^^^^^^^
   |
+
+## Concise Output
+SIM107.py:9:9: SIM107 Don't use `return` in `try`-`except` and `finally`

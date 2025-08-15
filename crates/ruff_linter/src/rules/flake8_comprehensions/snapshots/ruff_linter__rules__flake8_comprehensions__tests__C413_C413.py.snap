@@ -347,3 +347,21 @@ help: Remove unnecessary `list()` call
 28    |-list(sorted
    28 |+(sorted
 29 29 | ("xy"))
+
+## Concise Output
+C413.py:3:1: C413 [*] Unnecessary `list()` call around `sorted()`
+C413.py:4:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:5:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:6:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:7:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:8:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:9:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:10:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:11:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:14:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:15:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:18:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:19:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:24:1: C413 [*] Unnecessary `reversed()` call around `sorted()`
+C413.py:26:1: C413 [*] Unnecessary `list()` call around `sorted()`
+C413.py:28:1: C413 [*] Unnecessary `list()` call around `sorted()`

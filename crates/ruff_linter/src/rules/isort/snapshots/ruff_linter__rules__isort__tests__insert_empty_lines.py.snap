@@ -82,3 +82,9 @@ help: Organize imports
 54 55 | # Comment goes here.
 55 56 | def f():
 56 57 |     pass
+
+## Concise Output
+insert_empty_lines.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:4:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:14:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:52:1: I001 [*] Import block is un-sorted or un-formatted

@@ -98,3 +98,10 @@ help: Replace `(zip)(flag_stars.keys(), flag_stars.values())` with ` flag_stars.
 35 35 | flag_stars = {}
 36    |-for country, stars in(zip)(flag_stars.keys(), flag_stars.values()):...
    36 |+for country, stars in flag_stars.items():...
+
+## Concise Output
+SIM911.py:2:17: SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values())`
+SIM911.py:5:17: SIM911 [*] Use `d.items()` instead of `zip(d.keys(), d.values(), strict=True)`
+SIM911.py:20:13: SIM911 [*] Use `d2.items()` instead of `zip(d2.keys(), d2.values())`
+SIM911.py:30:27: SIM911 [*] Use `dict.items()` instead of `zip(dict.keys(), dict.values())`
+SIM911.py:36:22: SIM911 [*] Use ` flag_stars.items()` instead of `(zip)(flag_stars.keys(), flag_stars.values())`

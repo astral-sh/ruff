@@ -29,3 +29,8 @@ PT013 Incorrect import of `pytest`; use `import pytest` instead
 13 | from pytest import fixture as other_name
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+PT013.py:11:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
+PT013.py:12:1: PT013 Incorrect import of `pytest`; use `import pytest` instead
+PT013.py:13:1: PT013 Incorrect import of `pytest`; use `import pytest` instead

@@ -16,3 +16,7 @@ S410 `lxml` is vulnerable to XML attacks
 2 | from lxml import etree  # S410
   |      ^^^^
   |
+
+## Concise Output
+S410.py:1:8: S410 `lxml` is vulnerable to XML attacks
+S410.py:2:6: S410 `lxml` is vulnerable to XML attacks

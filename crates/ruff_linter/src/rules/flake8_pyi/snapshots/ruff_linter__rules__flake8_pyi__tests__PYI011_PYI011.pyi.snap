@@ -471,3 +471,23 @@ help: Replace default value with `...`
 160     |-    + "",
     159 |+    x: str = ...,
 161 160 | ) -> None: ...
+
+## Concise Output
+PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:38:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:46:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:63:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:71:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:78:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:85:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:90:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:94:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:98:17: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:102:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:106:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:110:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:138:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:141:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:147:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:150:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed arguments

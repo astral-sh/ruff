@@ -9,3 +9,6 @@ PD007 `.ix` is deprecated; use more explicit `.loc` or `.iloc`
 4 | y = x.ix[[0, 2], "A"]
   |     ^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+<filename>:4:5: PD007 `.ix` is deprecated; use more explicit `.loc` or `.iloc`

@@ -21,3 +21,7 @@ RUF009 Do not perform function call `default_function` in dataclass defaults
    |                                                  ^^^^^^^^^^^^^^^^^^
 12 |     another_class_var: ClassVar[list[int]] = default_function()
    |
+
+## Concise Output
+RUF009_deferred.py:10:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009_deferred.py:11:50: RUF009 Do not perform function call `default_function` in dataclass defaults

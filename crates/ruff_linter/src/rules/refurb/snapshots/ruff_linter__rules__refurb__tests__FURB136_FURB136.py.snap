@@ -199,3 +199,14 @@ help: Replace with `max(y, x)`
 24    |-    > y
 25    |-) else y  # FURB136
    22 |+max(y, x)  # FURB136
+
+## Concise Output
+FURB136.py:4:1: FURB136 [*] Replace `x if x > y else y` with `max(y, x)`
+FURB136.py:6:1: FURB136 [*] Replace `x if x >= y else y` with `max(x, y)`
+FURB136.py:8:1: FURB136 [*] Replace `x if x < y else y` with `min(y, x)`
+FURB136.py:10:1: FURB136 [*] Replace `x if x <= y else y` with `min(x, y)`
+FURB136.py:12:1: FURB136 [*] Replace `y if x > y else x` with `min(x, y)`
+FURB136.py:14:1: FURB136 [*] Replace `y if x >= y else x` with `min(y, x)`
+FURB136.py:16:1: FURB136 [*] Replace `y if x < y else x` with `max(x, y)`
+FURB136.py:18:1: FURB136 [*] Replace `y if x <= y else x` with `max(y, x)`
+FURB136.py:22:1: FURB136 [*] Replace `if` expression with `max(y, x)`

@@ -38,3 +38,9 @@ PTH211 `os.symlink` should be replaced by `Path.symlink_to`
    | ^^^^^^^^^^
 11 | Path("tmp/python").symlink_to("usr/bin/python", target_is_directory=True)  # Ok
    |
+
+## Concise Output
+PTH211.py:5:1: PTH211 `os.symlink` should be replaced by `Path.symlink_to`
+PTH211.py:6:1: PTH211 `os.symlink` should be replaced by `Path.symlink_to`
+PTH211.py:9:1: PTH211 `os.symlink` should be replaced by `Path.symlink_to`
+PTH211.py:10:1: PTH211 `os.symlink` should be replaced by `Path.symlink_to`

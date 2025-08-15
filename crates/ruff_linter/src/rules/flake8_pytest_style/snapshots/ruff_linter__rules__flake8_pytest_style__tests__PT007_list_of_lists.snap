@@ -229,3 +229,15 @@ help: Use `list` of `list` for parameter values
 82 82 | @pytest.mark.parametrize("d", [3,])
 83 83 | @pytest.mark.parametrize(
 84 84 |     "d",
+
+## Concise Output
+PT007.py:4:35: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:11:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:12:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:13:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:22:5: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:39:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:40:9: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:38: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:39: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:47: PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `list`

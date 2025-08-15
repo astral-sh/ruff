@@ -76,3 +76,9 @@ help: Replace with single space
 12 12 |                ef,  +h,
 13    |-               c,   -d]
    13 |+               c, -d]
+
+## Concise Output
+E24.py:2:8: E241 [*] Multiple spaces after comma
+E24.py:11:18: E241 [*] Multiple spaces after comma
+E24.py:12:19: E241 [*] Multiple spaces after comma
+E24.py:13:18: E241 [*] Multiple spaces after comma

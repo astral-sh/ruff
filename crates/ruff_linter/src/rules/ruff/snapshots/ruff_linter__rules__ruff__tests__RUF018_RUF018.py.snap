@@ -20,3 +20,7 @@ RUF018 Avoid assignment expressions in `assert` statements
   |            ^^^^^^^^^^^^
 4 | print(x, y)
   |
+
+## Concise Output
+RUF018.py:2:9: RUF018 Avoid assignment expressions in `assert` statements
+RUF018.py:3:12: RUF018 Avoid assignment expressions in `assert` statements

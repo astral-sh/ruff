@@ -22,3 +22,6 @@ help: Organize imports
   3 |+from module import BASIC, CONSTANT, Apple, CLASS, Class, function
   4 |+from sklearn.svm import CONST, Klass, SVC, func
   5 |+from torch.nn import A_CONSTANT, AClass, SELU
+
+## Concise Output
+order_by_type_with_custom_classes.py:1:1: I001 [*] Import block is un-sorted or un-formatted

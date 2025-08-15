@@ -42,3 +42,7 @@ help: Remove the `else` clause
 14 12 | 
 15 13 | 
 16 14 | while of_course():
+
+## Concise Output
+RUF047_while.py:6:1: RUF047 [*] Empty `else` clause
+RUF047_while.py:12:1: RUF047 [*] Empty `else` clause

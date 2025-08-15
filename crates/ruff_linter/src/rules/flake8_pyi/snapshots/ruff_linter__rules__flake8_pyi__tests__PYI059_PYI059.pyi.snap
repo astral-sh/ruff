@@ -115,3 +115,10 @@ PYI059 `Generic[]` should always be the last base class
    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Move `Generic[]` to the end
+
+## Concise Output
+PYI059.pyi:8:17: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:12:16: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:22:10: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:25:10: PYI059 [*] `Generic[]` should always be the last base class
+PYI059.pyi:40:8: PYI059 `Generic[]` should always be the last base class

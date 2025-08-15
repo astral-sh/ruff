@@ -61,3 +61,8 @@ help: Rewrite with `@functools.cache
 16 16 | @other_decorator
 17 17 | def fixme():
 18 18 |     pass
+
+## Concise Output
+UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`

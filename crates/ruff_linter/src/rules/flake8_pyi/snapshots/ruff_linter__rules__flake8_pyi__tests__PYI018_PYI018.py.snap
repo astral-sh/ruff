@@ -103,3 +103,10 @@ help: Remove unused private TypeVarTuple `_Ts2`
 11 10 | 
 12 11 | # OK
 13 12 | _UsedTypeVar = TypeVar("_UsedTypeVar")
+
+## Concise Output
+PYI018.py:6:1: PYI018 [*] Private TypeVar `_T` is never used
+PYI018.py:7:1: PYI018 [*] Private TypeVarTuple `_Ts` is never used
+PYI018.py:8:1: PYI018 [*] Private ParamSpec `_P` is never used
+PYI018.py:9:1: PYI018 [*] Private ParamSpec `_P2` is never used
+PYI018.py:10:1: PYI018 [*] Private TypeVarTuple `_Ts2` is never used

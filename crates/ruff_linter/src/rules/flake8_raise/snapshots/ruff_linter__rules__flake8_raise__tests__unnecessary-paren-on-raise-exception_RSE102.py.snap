@@ -333,3 +333,20 @@ help: Remove unnecessary parentheses
 111     |-    # comment
 112     |-)
     110 |+raise TypeError
+
+## Concise Output
+RSE102.py:5:21: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:13:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:16:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:20:5: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:24:5: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:27:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:32:19: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:37:16: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:74:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:76:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:79:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:81:17: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:107:27: RSE102 [*] Unnecessary parentheses on raised exception
+RSE102.py:110:16: RSE102 [*] Unnecessary parentheses on raised exception

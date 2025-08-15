@@ -19,3 +19,6 @@ help: Move out of type-checking block
 4   |-    from datetime import datetime
   5 |+    pass
 5 6 | x = datetime
+
+## Concise Output
+TC004_1.py:4:26: TC004 [*] Move import `datetime.datetime` out of type-checking block. Import is used for more than type hinting.

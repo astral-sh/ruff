@@ -114,3 +114,11 @@ help: Replace with `Path.stat(...).st_mtime`
 12 12 | getmtime(b"filename")
 13    |-getmtime(Path("filename"))
    13 |+Path("filename").stat().st_mtime
+
+## Concise Output
+PTH204.py:6:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+PTH204.py:7:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+PTH204.py:8:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+PTH204.py:11:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+PTH204.py:12:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+PTH204.py:13:1: PTH204 [*] `os.path.getmtime` should be replaced by `Path.stat().st_mtime`

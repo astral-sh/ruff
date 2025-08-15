@@ -19,3 +19,6 @@ help: Remove unused import: `re.RegexFlag`
 5 4 | from typing import Annotated
 6 5 | 
 7 6 | p: Annotated["Path", int] = 1
+
+## Concise Output
+F401_23.py:4:16: F401 [*] `re.RegexFlag` imported but unused

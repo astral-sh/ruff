@@ -304,3 +304,18 @@ help: Remove `list()` cast
 102     |-):
     96  |+for i in items:
 103 97  |     print(i)
+
+## Concise Output
+PERF101.py:7:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:10:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:13:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:16:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:19:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:22:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:25:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:34:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:57:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:69:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:86:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:91:9: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+PERF101.py:96:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it

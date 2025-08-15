@@ -11,3 +11,6 @@ help: Insert required import: `from __future__ import annotations as _annotation
 3 3 | # b
   4 |+from __future__ import annotations as _annotations
 4 5 | import os
+
+## Concise Output
+multiline_docstring.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`

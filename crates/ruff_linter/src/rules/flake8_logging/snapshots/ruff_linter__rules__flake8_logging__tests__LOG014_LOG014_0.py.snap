@@ -159,3 +159,13 @@ help: Remove `exc_info=`
 31 31 | 
 32 32 | 
 33 33 | ### No errors
+
+## Concise Output
+LOG014_0.py:12:18: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:13:17: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:16:18: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:17:17: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:21:22: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:22:21: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:29:26: LOG014 [*] `exc_info=` outside exception handlers
+LOG014_0.py:30:25: LOG014 [*] `exc_info=` outside exception handlers

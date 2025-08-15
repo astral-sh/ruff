@@ -9,3 +9,6 @@ invalid-syntax: mapping pattern checks duplicate key `'key'`
   |                     ^^^^^
 4 |         pass
   |
+
+## Concise Output
+<filename>:3:21: invalid-syntax: mapping pattern checks duplicate key `'key'`

@@ -349,3 +349,21 @@ help: Use removesuffix instead of assignment conditional upon endswith.
 206     |-        a = a[: -len("foo")]
     205 |+    a = a.removesuffix("foo")
 207 206 |     print(a)
+
+## Concise Output
+FURB188.py:7:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:14:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:21:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:25:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:29:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:33:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:146:9: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:149:12: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:154:12: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.
+FURB188.py:158:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:160:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:162:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:183:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:190:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:193:5: FURB188 [*] Prefer `str.removeprefix()` over conditionally replacing with slice.
+FURB188.py:205:5: FURB188 [*] Prefer `str.removesuffix()` over conditionally replacing with slice.

@@ -56,3 +56,7 @@ help: Move into type-checking block
 9  12 | 
 10 13 | 
 11 14 | class A(BaseModel):
+
+## Concise Output
+runtime_evaluated_base_classes_2.py:3:21: TC002 [*] Move third-party import `geopandas` into a type-checking block
+runtime_evaluated_base_classes_2.py:5:8: TC002 [*] Move third-party import `pyproj` into a type-checking block

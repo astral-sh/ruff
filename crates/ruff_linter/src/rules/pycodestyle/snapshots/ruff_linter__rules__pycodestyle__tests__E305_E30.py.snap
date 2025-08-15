@@ -119,3 +119,11 @@ help: Add missing blank line(s)
 972 973 | # ====== Cool constants ========
 973 974 | BANANA = 100
 974 975 | APPLE = 200
+
+## Concise Output
+E30.py:798:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+E30.py:809:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+E30.py:821:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+E30.py:833:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+E30.py:846:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)
+E30.py:973:1: E305 [*] Expected 2 blank lines after class or function definition, found (1)

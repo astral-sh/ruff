@@ -50,3 +50,10 @@ S202 Uses of `tarfile.extractall()`
    |     ^^^^^^^^^^^^^^^^^^
 39 |     tar.close()
    |
+
+## Concise Output
+S202.py:8:5: S202 Uses of `tarfile.extractall()`
+S202.py:14:5: S202 Uses of `tarfile.extractall()`
+S202.py:20:5: S202 Uses of `tarfile.extractall()`
+S202.py:26:5: S202 Uses of `tarfile.extractall()`
+S202.py:38:5: S202 Uses of `tarfile.extractall()`

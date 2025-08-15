@@ -36,3 +36,9 @@ PLW0244 Slot `b` redefined from base class `AnotherBase`
 23 |     __slots__ = ["a","b","e","f"]
    |                      ^^^
    |
+
+## Concise Output
+redefined_slots_in_subclass.py:6:18: PLW0244 Slot `a` redefined from base class `Base`
+redefined_slots_in_subclass.py:17:23: PLW0244 Slot `a` redefined from base class `Grandparent`
+redefined_slots_in_subclass.py:23:18: PLW0244 Slot `a` redefined from base class `AnotherBase`
+redefined_slots_in_subclass.py:23:22: PLW0244 Slot `b` redefined from base class `AnotherBase`

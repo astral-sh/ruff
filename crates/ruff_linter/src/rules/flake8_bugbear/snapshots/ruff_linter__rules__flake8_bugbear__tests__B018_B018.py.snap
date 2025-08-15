@@ -281,3 +281,32 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 65 |     "foo" + "bar"  # BinOp (raise)
    |     ^^^^^^^^^^^^^
    |
+
+## Concise Output
+B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:12:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:13:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:14:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:15:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:16:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:17:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:18:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:19:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:20:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:24:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:27:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:39:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:40:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:41:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:42:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:43:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:44:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:45:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:46:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:47:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:48:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:52:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:55:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:63:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:64:5: B018 Found useless attribute access. Either assign it to a variable or remove it.
+B018.py:65:5: B018 Found useless expression. Either assign it to a variable or remove it.

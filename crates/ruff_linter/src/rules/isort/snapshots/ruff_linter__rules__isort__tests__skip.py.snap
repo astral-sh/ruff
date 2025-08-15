@@ -62,3 +62,8 @@ help: Organize imports
 34    |-    import sys; import os
    34 |+    import os
    35 |+    import sys
+
+## Concise Output
+skip.py:20:5: I001 [*] Import block is un-sorted or un-formatted
+skip.py:27:5: I001 [*] Import block is un-sorted or un-formatted
+skip.py:34:5: I001 [*] Import block is un-sorted or un-formatted

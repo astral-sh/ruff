@@ -153,3 +153,19 @@ E701 Multiple statements on one line (colon)
 60 | #:
 61 | class Foo:
    |
+
+## Concise Output
+E70.py:2:5: E701 Multiple statements on one line (colon)
+E70.py:4:40: E701 Multiple statements on one line (colon)
+E70.py:25:8: E701 Multiple statements on one line (colon)
+E70.py:27:8: E701 Multiple statements on one line (colon)
+E70.py:29:10: E701 Multiple statements on one line (colon)
+E70.py:31:4: E701 Multiple statements on one line (colon)
+E70.py:32:18: E701 Multiple statements on one line (colon)
+E70.py:33:8: E701 Multiple statements on one line (colon)
+E70.py:35:8: E701 Multiple statements on one line (colon)
+E70.py:37:9: E701 Multiple statements on one line (colon)
+E70.py:39:15: E701 Multiple statements on one line (colon)
+E70.py:54:8: E701 Multiple statements on one line (colon)
+E70.py:56:8: E701 Multiple statements on one line (colon)
+E70.py:59:12: E701 Multiple statements on one line (colon)

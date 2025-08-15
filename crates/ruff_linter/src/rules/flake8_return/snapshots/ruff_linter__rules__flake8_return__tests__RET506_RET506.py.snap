@@ -169,3 +169,12 @@ help: Remove unnecessary `else`
 85 84 | 
 86 85 | 
 87 86 | ###
+
+## Concise Output
+RET506.py:8:5: RET506 [*] Unnecessary `elif` after `raise` statement
+RET506.py:23:5: RET506 [*] Unnecessary `elif` after `raise` statement
+RET506.py:34:5: RET506 [*] Unnecessary `else` after `raise` statement
+RET506.py:45:9: RET506 [*] Unnecessary `else` after `raise` statement
+RET506.py:60:5: RET506 [*] Unnecessary `else` after `raise` statement
+RET506.py:70:9: RET506 [*] Unnecessary `else` after `raise` statement
+RET506.py:80:5: RET506 [*] Unnecessary `else` after `raise` statement

@@ -17,3 +17,6 @@ help: Assign to variable; remove `inplace` arg
 3 3 | x = pd.DataFrame()
 4   |-x.drop(["a"], axis=1, inplace=True)
   4 |+x = x.drop(["a"], axis=1)
+
+## Concise Output
+<filename>:4:23: PD002 [*] `inplace=True` should be avoided; it has inconsistent behavior

@@ -9,3 +9,6 @@ PD011 Use `.to_numpy()` instead of `.values`
 4 | result = x.values
   |          ^^^^^^^^
   |
+
+## Concise Output
+<filename>:4:10: PD011 Use `.to_numpy()` instead of `.values`

@@ -34,3 +34,9 @@ PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.u
    |                        ^^^^
 40 |     pass
    |
+
+## Concise Output
+PT019.py:9:14: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019.py:13:17: PT019 Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019.py:31:24: PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead
+PT019.py:39:24: PT019 Fixture `_bar` without value is injected as parameter, use `@pytest.mark.usefixtures` instead

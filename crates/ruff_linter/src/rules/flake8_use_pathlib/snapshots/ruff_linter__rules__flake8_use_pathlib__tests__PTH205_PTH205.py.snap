@@ -64,3 +64,11 @@ PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
    | ^^^^^^^^
    |
 help: Replace with `Path.stat(...).st_ctime`
+
+## Concise Output
+PTH205.py:6:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+PTH205.py:7:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+PTH205.py:8:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+PTH205.py:10:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+PTH205.py:11:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`
+PTH205.py:12:1: PTH205 `os.path.getctime` should be replaced by `Path.stat().st_ctime`

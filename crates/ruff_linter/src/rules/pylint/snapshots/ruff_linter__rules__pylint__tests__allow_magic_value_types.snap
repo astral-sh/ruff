@@ -50,3 +50,10 @@ PLR2004 Magic value used in comparison, consider replacing `b"something"` with a
    |                  ^^^^^^^^^^^^
 93 |     pass
    |
+
+## Concise Output
+magic_value_comparison.py:56:12: PLR2004 Magic value used in comparison, consider replacing `-2.0` with a constant variable
+magic_value_comparison.py:59:12: PLR2004 Magic value used in comparison, consider replacing `+2.0` with a constant variable
+magic_value_comparison.py:74:22: PLR2004 Magic value used in comparison, consider replacing `"Hunter2"` with a constant variable
+magic_value_comparison.py:80:21: PLR2004 Magic value used in comparison, consider replacing `3.141592653589793238` with a constant variable
+magic_value_comparison.py:92:18: PLR2004 Magic value used in comparison, consider replacing `b"something"` with a constant variable

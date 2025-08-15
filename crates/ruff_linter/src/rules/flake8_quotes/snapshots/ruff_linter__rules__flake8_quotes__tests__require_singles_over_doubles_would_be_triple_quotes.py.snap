@@ -23,3 +23,7 @@ help: Replace double quotes with single quotes
 1 1 | s = ""'Start with empty string' ' and lint docstring safely'
 2   |-s = "Do not"' start with empty string' ' and lint docstring safely'
   2 |+s = 'Do not'' start with empty string' ' and lint docstring safely'
+
+## Concise Output
+doubles_would_be_triple_quotes.py:1:5: Q000 Double quotes found but single quotes preferred
+doubles_would_be_triple_quotes.py:2:5: Q000 [*] Double quotes found but single quotes preferred

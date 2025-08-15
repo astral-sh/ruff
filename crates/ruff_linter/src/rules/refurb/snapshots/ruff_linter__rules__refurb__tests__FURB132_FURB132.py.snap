@@ -84,3 +84,9 @@ help: Replace with `s.discard(f"{var}:{var}")`
 34 33 | 
 35 34 | 
 36 35 | def identity(x):
+
+## Concise Output
+FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
+FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
+FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
+FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check and `remove`

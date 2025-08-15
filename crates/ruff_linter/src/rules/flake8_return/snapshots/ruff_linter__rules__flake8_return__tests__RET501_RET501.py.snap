@@ -63,3 +63,8 @@ help: Remove explicit `return None`
 60    |-            None # comment
 61    |-        )
    59 |+        return
+
+## Concise Output
+RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:59:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value

@@ -65,3 +65,12 @@ W505 Doc line too long (85 > 50)
 31 |     It's over the limit on this line, which isn't the first line in the docstring."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+W505.py:2:51: W505 Doc line too long (57 > 50)
+W505.py:6:51: W505 Doc line too long (56 > 50)
+W505.py:10:51: W505 Doc line too long (56 > 50)
+W505.py:13:51: W505 Doc line too long (94 > 50)
+W505.py:18:51: W505 Doc line too long (61 > 50)
+W505.py:24:51: W505 Doc line too long (82 > 50)
+W505.py:31:51: W505 Doc line too long (85 > 50)

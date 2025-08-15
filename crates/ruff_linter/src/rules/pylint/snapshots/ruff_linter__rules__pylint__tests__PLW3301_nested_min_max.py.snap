@@ -372,3 +372,22 @@ help: Flatten nested `max` calls
 52 49 | 
 53 50 | # OK
 54 51 | max_word_len = max(
+
+## Concise Output
+nested_min_max.py:2:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:3:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:3:8: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:4:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:7:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:8:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:8:8: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:9:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:15:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:18:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:24:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:25:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:26:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:27:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:41:1: PLW3301 [*] Nested `max` calls can be flattened
+nested_min_max.py:44:1: PLW3301 [*] Nested `min` calls can be flattened
+nested_min_max.py:48:16: PLW3301 [*] Nested `max` calls can be flattened

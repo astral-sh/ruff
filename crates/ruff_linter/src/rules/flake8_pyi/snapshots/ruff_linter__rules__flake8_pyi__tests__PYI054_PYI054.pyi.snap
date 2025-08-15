@@ -165,3 +165,13 @@ help: Replace with `...`
 19 19 | field16: complex = -1e1234567j
 20    |-field17: complex = 1e123456789j  # Error: PYI054
    20 |+field17: complex = ...  # Error: PYI054
+
+## Concise Output
+PYI054.pyi:2:16: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:4:17: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:8:16: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:10:17: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:13:18: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:15:19: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:18:20: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted
+PYI054.pyi:20:20: PYI054 [*] Numeric literals with a string representation longer than ten characters are not permitted

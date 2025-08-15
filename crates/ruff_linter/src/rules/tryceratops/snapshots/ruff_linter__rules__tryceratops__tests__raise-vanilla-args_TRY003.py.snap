@@ -38,3 +38,9 @@ TRY003 Avoid specifying long messages outside the exception class
 44 |         raise BadArgCantBeEven("The argument `a` should not be odd.")
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+TRY003.py:8:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:34:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:39:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:44:15: TRY003 Avoid specifying long messages outside the exception class

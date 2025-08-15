@@ -212,3 +212,13 @@ help: Replace with `or` operator
 48    |-    else None
    46 |+    else None)
 49 47 | )
+
+## Concise Output
+FURB110.py:1:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:3:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:6:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:10:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:13:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:23:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:34:5: FURB110 [*] Replace ternary `if` expression with `or` operator
+FURB110.py:44:5: FURB110 [*] Replace ternary `if` expression with `or` operator

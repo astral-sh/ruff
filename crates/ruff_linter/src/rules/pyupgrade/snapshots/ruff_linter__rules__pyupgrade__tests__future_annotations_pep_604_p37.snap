@@ -19,3 +19,6 @@ help: Convert to `X | None`
    40 |+x: int | None = None
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
+
+## Concise Output
+future_annotations.py:40:4: UP045 [*] Use `X | None` for type annotations

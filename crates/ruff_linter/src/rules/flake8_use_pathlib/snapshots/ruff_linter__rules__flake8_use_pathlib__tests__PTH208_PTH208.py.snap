@@ -64,3 +64,12 @@ PTH208 Use `pathlib.Path.iterdir()` instead.
    |              ^^^^^^^^^^
 23 |     ...
    |
+
+## Concise Output
+PTH208.py:3:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:4:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:7:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:10:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:16:1: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:19:4: PTH208 Use `pathlib.Path.iterdir()` instead.
+PTH208.py:22:14: PTH208 Use `pathlib.Path.iterdir()` instead.

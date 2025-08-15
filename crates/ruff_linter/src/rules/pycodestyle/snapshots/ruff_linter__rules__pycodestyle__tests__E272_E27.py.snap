@@ -66,3 +66,8 @@ help: Replace with single space
 26 26 | #: E273
 27 27 | a and	b
 28 28 | #: E274
+
+## Concise Output
+E27.py:21:2: E272 [*] Multiple spaces before keyword
+E27.py:23:2: E272 [*] Multiple spaces before keyword
+E27.py:25:5: E272 [*] Multiple spaces before keyword

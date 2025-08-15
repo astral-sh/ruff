@@ -23,3 +23,6 @@ help: Replace double multiline quotes with single quotes
 6 6 | double quote string
 7   |-"""
   7 |+'''
+
+## Concise Output
+doubles_all.py:5:30: Q001 [*] Double quote multiline found but single quotes preferred

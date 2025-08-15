@@ -41,3 +41,9 @@ PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and 
    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^
 10 | c: foo.ByteString
    |
+
+## Concise Output
+PYI057.pyi:4:20: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+PYI057.pyi:5:29: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated
+PYI057.pyi:8:4: PYI057 Do not use `typing.ByteString`, which has unclear semantics and is deprecated
+PYI057.pyi:9:4: PYI057 Do not use `collections.abc.ByteString`, which has unclear semantics and is deprecated

@@ -83,3 +83,13 @@ ASYNC220 Async functions should not create subprocesses with blocking methods
 89 |
 90 |     # ASYNC222
    |
+
+## Concise Output
+ASYNC22x.py:31:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:73:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:74:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:75:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:76:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:86:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:87:5: ASYNC220 Async functions should not create subprocesses with blocking methods
+ASYNC22x.py:88:5: ASYNC220 Async functions should not create subprocesses with blocking methods

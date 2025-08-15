@@ -218,3 +218,15 @@ help: Replace with `"123".bit_count()`
 16 16 | 
 17 17 | count = x.bit_count()  # OK
 18 18 | count = (10).bit_count()  # OK
+
+## Concise Output
+FURB161.py:6:9: FURB161 [*] Use of `bin(x).count('1')`
+FURB161.py:7:9: FURB161 [*] Use of `bin(10).count('1')`
+FURB161.py:8:9: FURB161 [*] Use of `bin(0b1010).count('1')`
+FURB161.py:9:9: FURB161 [*] Use of `bin(0xA).count('1')`
+FURB161.py:10:9: FURB161 [*] Use of `bin(0o12).count('1')`
+FURB161.py:11:9: FURB161 [*] Use of `bin(0x10 + 0x1000).count('1')`
+FURB161.py:12:9: FURB161 [*] Use of `bin(ten()).count('1')`
+FURB161.py:13:9: FURB161 [*] Use of `bin(10).count('1')`
+FURB161.py:14:9: FURB161 [*] Use of `bin("10" "15").count('1')`
+FURB161.py:15:9: FURB161 [*] Use of `bin("123").count('1')`

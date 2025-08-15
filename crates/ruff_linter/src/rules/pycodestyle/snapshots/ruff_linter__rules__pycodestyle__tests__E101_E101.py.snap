@@ -31,3 +31,8 @@ E101 Indentation contains mixed spaces and tabs
 19 |        print("xyz");
    | ^^^^^^^
    |
+
+## Concise Output
+E101.py:11:1: E101 Indentation contains mixed spaces and tabs
+E101.py:15:1: E101 Indentation contains mixed spaces and tabs
+E101.py:19:1: E101 Indentation contains mixed spaces and tabs

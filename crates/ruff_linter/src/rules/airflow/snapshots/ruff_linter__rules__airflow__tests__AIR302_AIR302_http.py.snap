@@ -64,3 +64,8 @@ help: Install `apache-airflow-providers-http>=1.0.0` and use `HttpSensor` from `
 6 6 | 
 7 7 | HttpHook()
 8 8 | SimpleHttpOperator()
+
+## Concise Output
+AIR302_http.py:7:1: AIR302 [*] `airflow.hooks.http_hook.HttpHook` is moved into `http` provider in Airflow 3.0;
+AIR302_http.py:8:1: AIR302 [*] `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
+AIR302_http.py:9:1: AIR302 [*] `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provider in Airflow 3.0;

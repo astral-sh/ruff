@@ -226,3 +226,26 @@ S324 Probable use of insecure hash functions in `hashlib`: `Md5`
 52 |
 53 | # OK
    |
+
+## Concise Output
+S324.py:7:13: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:8:13: S324 Probable use of insecure hash functions in `hashlib`: `md4`
+S324.py:9:18: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:10:13: S324 Probable use of insecure hash functions in `hashlib`: `MD4`
+S324.py:11:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:12:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:13:13: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:14:18: S324 Probable use of insecure hash functions in `hashlib`: `SHA`
+S324.py:15:1: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:16:1: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:17:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:18:1: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:20:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:22:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
+S324.py:23:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
+S324.py:24:26: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:25:21: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:27:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_CRYPT`
+S324.py:28:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_MD5`
+S324.py:29:14: S324 Probable use of insecure hash functions in `crypt`: `crypt.METHOD_BLOWFISH`
+S324.py:51:13: S324 Probable use of insecure hash functions in `hashlib`: `Md5`

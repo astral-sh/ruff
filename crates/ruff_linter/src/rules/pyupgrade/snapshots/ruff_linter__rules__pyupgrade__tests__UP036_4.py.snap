@@ -177,3 +177,13 @@ help: Remove outdated version block
 44    |-    elif foo:
    42 |+    if foo:
 45 43 |         cmd = [sys.executable, "-m", "test", "-j0"]
+
+## Concise Output
+UP036_4.py:4:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:11:10: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:17:10: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:24:10: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:27:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:32:10: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:37:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:42:8: UP036 [*] Version block is outdated for minimum Python version

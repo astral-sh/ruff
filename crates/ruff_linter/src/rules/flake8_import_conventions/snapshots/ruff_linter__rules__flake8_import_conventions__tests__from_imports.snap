@@ -95,3 +95,13 @@ ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
 12 | # No ICN001 violations
    |
 help: Alias `xml.dom.minidom.parseString` to `pstr`
+
+## Concise Output
+from_imports.py:3:8: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:4:27: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:5:32: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:6:21: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:7:44: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:8:29: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:9:36: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:10:57: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`

@@ -197,3 +197,14 @@ help: Remove parentheses
    93 |+@(fixture)
 94 94 | def outer_paren_imported_fixture_no_params():
 95 95 |     return 42
+
+## Concise Output
+PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:81:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:88:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:93:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`

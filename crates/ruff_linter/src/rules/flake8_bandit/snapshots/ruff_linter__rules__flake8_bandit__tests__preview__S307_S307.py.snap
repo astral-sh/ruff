@@ -36,3 +36,9 @@ S307 Use of possibly insecure function; consider using `ast.literal_eval`
 17 | foo = eval
    |       ^^^^
    |
+
+## Concise Output
+S307.py:3:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+S307.py:4:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+S307.py:16:5: S307 Use of possibly insecure function; consider using `ast.literal_eval`
+S307.py:17:7: S307 Use of possibly insecure function; consider using `ast.literal_eval`

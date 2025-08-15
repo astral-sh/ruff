@@ -118,3 +118,15 @@ PYI063 Use PEP 570 syntax for positional-only parameters
 58 | class GoodMetaclass(type):
    |
 help: Add `/` to function signature
+
+## Concise Output
+PYI063.pyi:6:9: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:7:14: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:8:15: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:24:14: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:25:22: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:26:25: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:28:25: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:30:23: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:52:23: PYI063 Use PEP 570 syntax for positional-only parameters
+PYI063.pyi:56:26: PYI063 Use PEP 570 syntax for positional-only parameters

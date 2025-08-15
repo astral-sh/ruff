@@ -84,3 +84,9 @@ help: Replace with builtin `TimeoutError`
 35 35 |     pass
 36 36 | 
 37 37 | # First should change, second should not
+
+## Concise Output
+UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`

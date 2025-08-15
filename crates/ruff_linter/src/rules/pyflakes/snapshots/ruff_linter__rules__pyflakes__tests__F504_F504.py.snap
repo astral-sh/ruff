@@ -125,3 +125,11 @@ help: Remove extra named arguments: greeting
 19 19 | # https://github.com/astral-sh/ruff/issues/18806
 20    |-"Hello, %(name)s" % {"greeting": print(1), "name": "World"}
    20 |+"Hello, %(name)s" % {"name": "World"}
+
+## Concise Output
+F504.py:3:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:8:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:9:1: F504 [*] `%`-format string has unused named argument(s): b
+F504.py:11:1: F504 [*] `%`-format string has unused named argument(s): ab
+F504.py:14:1: F504 [*] `%`-format string has unused named argument(s): test1, test2
+F504.py:20:1: F504 [*] `%`-format string has unused named argument(s): greeting

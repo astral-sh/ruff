@@ -178,3 +178,12 @@ help: Replace with `a_dict.get(key, "default-1")`
 153 153 | 
 154 154 | # OK (default contains effect)
 155 155 | var = a_dict[key] if key in a_dict else val1 + val2
+
+## Concise Output
+SIM401.py:8:1: SIM401 [*] Use `var = a_dict.get(key, "default1")` instead of an `if` block
+SIM401.py:14:1: SIM401 [*] Use `var = a_dict.get(key, "default2")` instead of an `if` block
+SIM401.py:26:1: SIM401 [*] Use `var = a_dict.get(keys[idx], "default")` instead of an `if` block
+SIM401.py:40:1: SIM401 [*] Use `vars[idx] = a_dict.get(key, "defaultß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789ß9💣2ℝ6789")` instead of an `if` block
+SIM401.py:49:5: SIM401 [*] Use `vars[idx] = a_dict.get(key, "default")` instead of an `if` block
+SIM401.py:149:7: SIM401 [*] Use `a_dict.get(key, "default3")` instead of an `if` block
+SIM401.py:152:7: SIM401 [*] Use `a_dict.get(key, "default-1")` instead of an `if` block

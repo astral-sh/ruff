@@ -45,3 +45,10 @@ F821 Undefined name `Model`
 24 | _ = abc.ItemsView["Model"]
    |                    ^^^^^
    |
+
+## Concise Output
+F821_4.py:4:11: F821 Undefined name `Model`
+F821_4.py:9:12: F821 Undefined name `Model`
+F821_4.py:14:16: F821 Undefined name `Model`
+F821_4.py:19:32: F821 Undefined name `Model`
+F821_4.py:24:20: F821 Undefined name `Model`

@@ -173,3 +173,14 @@ help: Remove unnecessary `...`
 45 45 | 
 46 46 | 
 47 47 | class EmptyClass:
+
+## Concise Output
+PYI013.py:3:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:7:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:12:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:13:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:21:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:26:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:30:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:36:5: PYI013 [*] Non-empty class body must not contain `...`
+PYI013.py:44:5: PYI013 [*] Non-empty class body must not contain `...`

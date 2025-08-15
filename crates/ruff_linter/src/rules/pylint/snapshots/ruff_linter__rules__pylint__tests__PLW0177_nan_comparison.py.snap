@@ -139,3 +139,20 @@ PLW0177 Comparing against a NaN value; use `math.isnan` instead
 99 | assert x == float(" \n+nan   \t")
    |             ^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+nan_comparison.py:11:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:15:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:19:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:23:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:27:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:31:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:35:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+nan_comparison.py:39:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+nan_comparison.py:43:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+nan_comparison.py:47:9: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+nan_comparison.py:53:9: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:59:10: PLW0177 Comparing against a NaN value; use `np.isnan` instead
+nan_comparison.py:60:10: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:98:13: PLW0177 Comparing against a NaN value; use `math.isnan` instead
+nan_comparison.py:99:13: PLW0177 Comparing against a NaN value; use `math.isnan` instead

@@ -460,3 +460,28 @@ help: Remove unused `noqa` directive
 130 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131     |-x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     131 |+x = eval(command)  # noqa: PGH001, S307
+
+## Concise Output
+RUF100_0.py:9:12: RUF100 [*] Unused blanket `noqa` directive
+RUF100_0.py:13:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:16:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
+RUF100_0.py:19:12: RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
+RUF100_0.py:22:12: RUF100 [*] Unused `noqa` directive (unused: `F841`)
+RUF100_0.py:29:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:32:5: F841 [*] Local variable `d` is assigned to but never used
+RUF100_0.py:32:12: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:58:6: RUF100 [*] Unused `noqa` directive (unused: `F841`)
+RUF100_0.py:66:6: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_0.py:74:6: RUF100 [*] Unused blanket `noqa` directive
+RUF100_0.py:88:8: F401 [*] `shelve` imported but unused
+RUF100_0.py:93:89: E501 Line too long (89 > 88)
+RUF100_0.py:93:92: RUF100 [*] Unused `noqa` directive (unused: `F401`)
+RUF100_0.py:107:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
+RUF100_0.py:108:5: F841 [*] Local variable `e` is assigned to but never used
+RUF100_0.py:108:12: RUF100 [*] Unused `noqa` directive (unknown: `E50`)
+RUF100_0.py:118:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
+RUF100_0.py:120:19: RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
+RUF100_0.py:122:12: RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
+RUF100_0.py:129:20: RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
+RUF100_0.py:130:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
+RUF100_0.py:131:20: RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)

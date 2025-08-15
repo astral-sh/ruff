@@ -383,3 +383,23 @@ help: Replace with `trio.sleep_forever()`
 137 137 |     await sleep(18446744073709551616)
 138     |-    await trio.sleep(99999999999999999999)
     138 |+    await trio.sleep_forever()
+
+## Concise Output
+ASYNC116.py:11:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:14:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:18:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:19:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:48:5: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:50:14: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:57:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:64:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:67:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:71:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:72:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:101:5: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:103:15: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:110:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:119:11: ASYNC116 [*] `anyio.sleep()` with >24 hour interval should usually be `anyio.sleep_forever()`
+ASYNC116.py:129:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:137:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`
+ASYNC116.py:138:11: ASYNC116 [*] `trio.sleep()` with >24 hour interval should usually be `trio.sleep_forever()`

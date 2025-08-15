@@ -417,3 +417,44 @@ B909 Mutation to loop iterable `some_list` during iteration
 168 |
 169 | # should not error (list)
     |
+
+## Concise Output
+B909.py:12:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:13:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:14:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:15:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:16:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:17:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:18:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:19:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:20:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:21:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:25:9: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:47:5: B909 Mutation to loop iterable `mydicts` during iteration
+B909.py:48:5: B909 Mutation to loop iterable `mydicts` during iteration
+B909.py:49:5: B909 Mutation to loop iterable `mydicts` during iteration
+B909.py:62:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:63:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:64:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:65:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:66:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:67:5: B909 Mutation to loop iterable `myset` during iteration
+B909.py:84:5: B909 Mutation to loop iterable `a.some_list` during iteration
+B909.py:85:5: B909 Mutation to loop iterable `a.some_list` during iteration
+B909.py:93:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:94:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:95:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:96:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:97:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:102:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:103:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:104:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:105:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:125:5: B909 Mutation to loop iterable `foo` during iteration
+B909.py:136:9: B909 Mutation to loop iterable `foo` during iteration
+B909.py:140:8: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:150:8: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:157:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:158:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:159:5: B909 Mutation to loop iterable `some_list` during iteration
+B909.py:167:5: B909 Mutation to loop iterable `some_list` during iteration

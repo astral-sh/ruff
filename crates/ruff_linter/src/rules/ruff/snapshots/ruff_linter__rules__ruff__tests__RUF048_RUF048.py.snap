@@ -27,3 +27,8 @@ RUF048 `__version__` may contain non-integral-like elements
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 9 |     print(part)
   |
+
+## Concise Output
+RUF048.py:4:7: RUF048 `__version__` may contain non-integral-like elements
+RUF048.py:5:6: RUF048 `__version__` may contain non-integral-like elements
+RUF048.py:8:13: RUF048 `__version__` may contain non-integral-like elements

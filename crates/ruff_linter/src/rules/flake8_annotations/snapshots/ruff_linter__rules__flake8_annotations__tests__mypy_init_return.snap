@@ -81,3 +81,9 @@ help: Add return type annotation: `None`
 47    |-    def __init__(self, *arg):
    47 |+    def __init__(self, *arg) -> None:
 48 48 |         ...
+
+## Concise Output
+mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:40:5: ANN202 [*] Missing return type annotation for private function `__init__`
+mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`

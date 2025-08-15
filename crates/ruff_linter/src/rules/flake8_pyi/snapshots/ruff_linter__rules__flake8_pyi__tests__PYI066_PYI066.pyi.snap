@@ -55,3 +55,10 @@ PYI066 Put branches for newer Python versions first when branching on `sys.versi
 21 |     ...
 22 | else:
    |
+
+## Concise Output
+PYI066.pyi:3:4: PYI066 Put branches for newer Python versions first when branching on `sys.version_info` comparisons
+PYI066.pyi:8:4: PYI066 Put branches for newer Python versions first when branching on `sys.version_info` comparisons
+PYI066.pyi:10:6: PYI066 Put branches for newer Python versions first when branching on `sys.version_info` comparisons
+PYI066.pyi:12:6: PYI066 Put branches for newer Python versions first when branching on `sys.version_info` comparisons
+PYI066.pyi:20:6: PYI066 Put branches for newer Python versions first when branching on `sys.version_info` comparisons

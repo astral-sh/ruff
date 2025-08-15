@@ -363,3 +363,18 @@ help: Convert to inequality test
 118     |-    ] and \
     113 |+    if foo != bar and \
 119 114 |         0 < 1: ...
+
+## Concise Output
+FURB171_0.py:3:4: FURB171 [*] Membership test against single-item container
+FURB171_0.py:6:4: FURB171 [*] Membership test against single-item container
+FURB171_0.py:9:4: FURB171 [*] Membership test against single-item container
+FURB171_0.py:12:4: FURB171 [*] Membership test against single-item container
+FURB171_0.py:15:4: FURB171 [*] Membership test against single-item container
+FURB171_0.py:18:8: FURB171 [*] Membership test against single-item container
+FURB171_0.py:52:5: FURB171 [*] Membership test against single-item container
+FURB171_0.py:57:5: FURB171 [*] Membership test against single-item container
+FURB171_0.py:77:28: FURB171 [*] Membership test against single-item container
+FURB171_0.py:87:28: FURB171 [*] Membership test against single-item container
+FURB171_0.py:98:24: FURB171 [*] Membership test against single-item container
+FURB171_0.py:105:8: FURB171 [*] Membership test against single-item container
+FURB171_0.py:113:8: FURB171 [*] Membership test against single-item container

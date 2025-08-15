@@ -136,3 +136,11 @@ help: Parenthesize tuple
 28 28 | d[()] # empty tuples should be ignored
 29 29 | 
 30 30 | d[:,] # slices in the subscript lead to syntax error if parens are added
+
+## Concise Output
+RUF031_prefer_parens.py:8:5: RUF031 [*] Use parentheses for tuples in subscripts
+RUF031_prefer_parens.py:16:3: RUF031 [*] Use parentheses for tuples in subscripts
+RUF031_prefer_parens.py:17:3: RUF031 [*] Use parentheses for tuples in subscripts
+RUF031_prefer_parens.py:18:3: RUF031 [*] Use parentheses for tuples in subscripts
+RUF031_prefer_parens.py:21:3: RUF031 [*] Use parentheses for tuples in subscripts
+RUF031_prefer_parens.py:26:3: RUF031 [*] Use parentheses for tuples in subscripts

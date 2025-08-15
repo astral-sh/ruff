@@ -73,3 +73,12 @@ B026 Star-arg unpacking after a keyword argument is strongly discouraged
 21 | foo(*["bar"], bam="bam", *["baz"])
    |                          ^^^^^^^^
    |
+
+## Concise Output
+B026.py:16:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:17:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:18:27: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:19:38: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:20:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:20:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+B026.py:21:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged

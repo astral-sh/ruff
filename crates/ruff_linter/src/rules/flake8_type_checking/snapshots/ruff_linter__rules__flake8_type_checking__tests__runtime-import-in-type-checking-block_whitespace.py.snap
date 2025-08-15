@@ -21,3 +21,6 @@ help: Move out of type-checking block
 5   |-if TYPE_CHECKING: import builtins
   5 |+if TYPE_CHECKING: pass
 6 6 | builtins.print("!")
+
+## Concise Output
+whitespace.py:5:26: TC004 [*] Move import `builtins` out of type-checking block. Import is used for more than type hinting.

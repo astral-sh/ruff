@@ -83,3 +83,9 @@ help: Replace `exit` with `sys.exit()`
 22 23 |     codes = [1]
 23    |-    exit(*codes)
    24 |+    sys.exit(*codes)
+
+## Concise Output
+sys_exit_alias_16.py:3:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+sys_exit_alias_16.py:10:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+sys_exit_alias_16.py:17:5: PLR1722 Use `sys.exit()` instead of `exit`
+sys_exit_alias_16.py:23:5: PLR1722 [*] Use `sys.exit()` instead of `exit`

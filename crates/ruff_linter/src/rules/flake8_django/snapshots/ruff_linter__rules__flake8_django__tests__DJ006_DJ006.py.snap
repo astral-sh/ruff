@@ -9,3 +9,6 @@ DJ006 Do not use `exclude` with `ModelForm`, use `fields` instead
 6 |         exclude = ["bar"]
   |         ^^^^^^^
   |
+
+## Concise Output
+DJ006.py:6:9: DJ006 Do not use `exclude` with `ModelForm`, use `fields` instead

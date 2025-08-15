@@ -18,3 +18,6 @@ help: Install `apache-airflow-providers-presto>=1.0.0` and use `PrestoHook` from
   3 |+from airflow.providers.presto.hooks.presto import PrestoHook
 4 4 | 
 5 5 | PrestoHook()
+
+## Concise Output
+AIR302_presto.py:5:1: AIR302 [*] `airflow.hooks.presto_hook.PrestoHook` is moved into `presto` provider in Airflow 3.0;

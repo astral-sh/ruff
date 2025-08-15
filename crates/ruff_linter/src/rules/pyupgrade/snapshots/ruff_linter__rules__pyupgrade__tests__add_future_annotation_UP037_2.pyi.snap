@@ -240,3 +240,15 @@ help: Remove quotes
 50    |-[int]''' = [42]
    49 |+a: (list
    50 |+[int]) = [42]
+
+## Concise Output
+UP037_2.pyi:3:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:6:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:11:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:17:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:22:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:28:10: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:32:4: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:36:10: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:41:14: UP037 [*] Remove quotes from type annotation
+UP037_2.pyi:49:4: UP037 [*] Remove quotes from type annotation

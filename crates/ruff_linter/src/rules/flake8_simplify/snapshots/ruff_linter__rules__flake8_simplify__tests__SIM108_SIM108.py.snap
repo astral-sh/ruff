@@ -397,3 +397,22 @@ help: Replace `if`-`else`-block with `var = "str" if cond else f'{first}-{second
 209     |-else:
 210     |-    var = f'{first}-{second}'
     207 |+var = "str" if cond else f'{first}-{second}'
+
+## Concise Output
+SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
+SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = "cccccccccccccccccccccccccccccccccß" if a else "ddddddddddddddddddddddddddddddddd💣"` instead of `if`-`else`-block
+SIM108.py:105:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
+SIM108.py:112:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:117:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:141:1: SIM108 [*] Use binary operator `z = cond or other_cond` instead of `if`-`else`-block
+SIM108.py:148:1: SIM108 [*] Use binary operator `z = cond and other_cond` instead of `if`-`else`-block
+SIM108.py:155:1: SIM108 [*] Use binary operator `z = not cond and other_cond` instead of `if`-`else`-block
+SIM108.py:167:1: SIM108 [*] Use ternary operator `z = 1 if True else other` instead of `if`-`else`-block
+SIM108.py:172:1: SIM108 [*] Use ternary operator `z = 1 if False else other` instead of `if`-`else`-block
+SIM108.py:177:1: SIM108 [*] Use ternary operator `z = True if 1 else other` instead of `if`-`else`-block
+SIM108.py:185:1: SIM108 [*] Use ternary operator `z = foo() if foo() else other` instead of `if`-`else`-block
+SIM108.py:193:1: SIM108 [*] Use ternary operator `z = not foo() if foo() else other` instead of `if`-`else`-block
+SIM108.py:202:1: SIM108 [*] Use ternary operator `var = "str" if cond else f"{first}-{second}"` instead of `if`-`else`-block
+SIM108.py:207:1: SIM108 [*] Use ternary operator `var = "str" if cond else f'{first}-{second}'` instead of `if`-`else`-block

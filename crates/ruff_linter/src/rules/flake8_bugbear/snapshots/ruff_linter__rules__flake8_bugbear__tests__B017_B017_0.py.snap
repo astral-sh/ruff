@@ -77,3 +77,13 @@ B017 Do not assert blind exception: `BaseException`
    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 72 |                 raise ValueError("Should be flagged")
    |
+
+## Concise Output
+B017_0.py:23:14: B017 Do not assert blind exception: `Exception`
+B017_0.py:27:14: B017 Do not assert blind exception: `BaseException`
+B017_0.py:45:10: B017 Do not assert blind exception: `Exception`
+B017_0.py:48:10: B017 Do not assert blind exception: `Exception`
+B017_0.py:57:36: B017 Do not assert blind exception: `Exception`
+B017_0.py:62:10: B017 Do not assert blind exception: `Exception`
+B017_0.py:68:18: B017 Do not assert blind exception: `Exception`
+B017_0.py:71:18: B017 Do not assert blind exception: `BaseException`

@@ -169,3 +169,13 @@ help: Replace `np.float` with builtin type
 24 25 | 
 25    |-float(1)
    26 |+builtins.float(1)
+
+## Concise Output
+NPY001.py:6:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type
+NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:12:80: NPY001 [*] Type alias `np.complex` is deprecated, replace with builtin type
+NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:25:1: NPY001 [*] Type alias `np.float` is deprecated, replace with builtin type

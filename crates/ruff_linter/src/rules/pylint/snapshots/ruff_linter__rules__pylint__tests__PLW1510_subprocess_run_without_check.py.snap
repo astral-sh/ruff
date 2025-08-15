@@ -87,3 +87,9 @@ help: Add explicit `check=False`
 11 11 | 
 12 12 | # Non-errors.
 13 13 | subprocess.run("ls", check=True)
+
+## Concise Output
+subprocess_run_without_check.py:4:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:5:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explicit `check` argument
+subprocess_run_without_check.py:10:1: PLW1510 [*] `subprocess.run` without explicit `check` argument

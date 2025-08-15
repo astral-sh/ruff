@@ -27,3 +27,6 @@ help: Organize imports
   6 |+    MutableMapping,
   7 |+    MutableSequence,
   8 |+)
+
+## Concise Output
+combine_import_from.py:1:1: I001 [*] Import block is un-sorted or un-formatted

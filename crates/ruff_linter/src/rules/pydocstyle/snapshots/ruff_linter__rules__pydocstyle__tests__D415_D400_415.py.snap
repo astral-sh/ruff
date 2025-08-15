@@ -38,3 +38,8 @@ help: Add closing punctuation
 19    |-    """Here's a line ending with a whitespace  """
    19 |+    """Here's a line ending with a whitespace.  """
 20 20 |     ...
+
+## Concise Output
+D400_415.py:11:5: D415 First line should end with a period, question mark, or exclamation point
+D400_415.py:15:5: D415 First line should end with a period, question mark, or exclamation point
+D400_415.py:19:5: D415 [*] First line should end with a period, question mark, or exclamation point

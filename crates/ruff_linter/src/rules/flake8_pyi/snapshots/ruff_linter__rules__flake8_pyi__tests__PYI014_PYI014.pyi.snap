@@ -324,3 +324,18 @@ help: Replace default value with `...`
 79 79 | ) -> None: ...
 80 80 | def f23(
 81 81 |     x=True,  # OK
+
+## Concise Output
+PYI014.pyi:3:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:29:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:35:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:50:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:56:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:59:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:61:11: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:63:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:66:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:69:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:72:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:75:7: PYI014 [*] Only simple default values allowed for arguments
+PYI014.pyi:78:7: PYI014 [*] Only simple default values allowed for arguments

@@ -36,3 +36,9 @@ ARG001 Unused function argument: `x`
    |            ^
 14 |     print("Hello, world!")
    |
+
+## Concise Output
+ARG.py:9:7: ARG001 Unused function argument: `self`
+ARG.py:9:13: ARG001 Unused function argument: `x`
+ARG.py:13:7: ARG001 Unused function argument: `cls`
+ARG.py:13:12: ARG001 Unused function argument: `x`

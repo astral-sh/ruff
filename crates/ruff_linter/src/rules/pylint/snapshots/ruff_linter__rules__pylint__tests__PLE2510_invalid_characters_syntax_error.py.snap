@@ -117,3 +117,16 @@ invalid-syntax: Expected a statement
 13 | b = '␈' f'␈' '␈
    |                ^
    |
+
+## Concise Output
+invalid_characters_syntax_error.py:5:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+invalid_characters_syntax_error.py:7:5: invalid-syntax: missing closing quote in string literal
+invalid_characters_syntax_error.py:7:7: invalid-syntax: Expected a statement
+invalid_characters_syntax_error.py:8:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+invalid_characters_syntax_error.py:10:7: invalid-syntax: f-string: unterminated string
+invalid_characters_syntax_error.py:10:8: invalid-syntax: Expected FStringEnd, found newline
+invalid_characters_syntax_error.py:11:7: PLE2510 Invalid unescaped character backspace, use "\b" instead
+invalid_characters_syntax_error.py:13:6: PLE2510 Invalid unescaped character backspace, use "\b" instead
+invalid_characters_syntax_error.py:13:11: PLE2510 Invalid unescaped character backspace, use "\b" instead
+invalid_characters_syntax_error.py:13:14: invalid-syntax: missing closing quote in string literal
+invalid_characters_syntax_error.py:13:16: invalid-syntax: Expected a statement

@@ -167,3 +167,13 @@ help: Use existing variable
 52    |-            mapped_arrays[mapped_label] = [value_arrays[label][i] for i in range(len(array))]  # PLR1733
    52 |+            mapped_arrays[mapped_label] = [array[i] for i in range(len(array))]  # PLR1733
 53 53 |     return mapped_arrays
+
+## Concise Output
+unnecessary_dict_index_lookup.py:4:6: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:5:6: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:6:18: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:9:15: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:50:51: PLR1733 [*] Unnecessary lookup of dictionary value by key
+unnecessary_dict_index_lookup.py:52:44: PLR1733 [*] Unnecessary lookup of dictionary value by key

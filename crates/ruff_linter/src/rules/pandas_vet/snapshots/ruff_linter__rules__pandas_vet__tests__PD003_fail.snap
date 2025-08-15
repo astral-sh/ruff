@@ -8,3 +8,6 @@ PD003 `.isna` is preferred to `.isnull`; functionality is equivalent
 3 | nulls = pd.isnull(val)
   |         ^^^^^^^^^
   |
+
+## Concise Output
+<filename>:3:9: PD003 `.isna` is preferred to `.isnull`; functionality is equivalent

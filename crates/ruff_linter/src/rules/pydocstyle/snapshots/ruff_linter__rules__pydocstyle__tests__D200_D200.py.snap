@@ -41,3 +41,8 @@ D200 One-line docstring should fit on one line
    | |_______^
    |
 help: Reformat to one line
+
+## Concise Output
+D200.py:2:5: D200 One-line docstring should fit on one line
+D200.py:7:5: D200 [*] One-line docstring should fit on one line
+D200.py:12:5: D200 One-line docstring should fit on one line

@@ -19,3 +19,6 @@ help: Add missing blank line(s)
   4 |+
 4 5 | def fn2():
 5 6 |     pass
+
+## Concise Output
+E302_first_line_function.py:4:1: E302 [*] Expected 2 blank lines, found 1

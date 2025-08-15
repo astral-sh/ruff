@@ -56,3 +56,8 @@ help: Remove exception name
 73 73 |             def foo():
 74    |-                raise e
    74 |+                raise
+
+## Concise Output
+TRY201.py:20:15: TRY201 [*] Use `raise` without specifying exception name
+TRY201.py:63:19: TRY201 [*] Use `raise` without specifying exception name
+TRY201.py:74:23: TRY201 [*] Use `raise` without specifying exception name

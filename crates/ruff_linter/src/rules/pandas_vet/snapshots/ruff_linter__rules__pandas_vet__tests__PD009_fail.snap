@@ -9,3 +9,6 @@ PD009 Use `.iloc` instead of `.iat`. If speed is important, use NumPy.
 4 | index = x.iat[:, 1:3]
   |         ^^^^^^^^^^^^^
   |
+
+## Concise Output
+<filename>:4:9: PD009 Use `.iloc` instead of `.iat`. If speed is important, use NumPy.

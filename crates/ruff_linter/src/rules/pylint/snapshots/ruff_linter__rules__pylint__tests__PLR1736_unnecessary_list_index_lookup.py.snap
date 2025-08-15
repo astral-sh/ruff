@@ -249,3 +249,17 @@ help: Use the loop variable directly
 84 84 |     for index, column_name in enumerate(column_names):
 85    |-        _ = data[column_names[index]]  # PLR1736
    85 |+        _ = data[column_name]  # PLR1736
+
+## Concise Output
+unnecessary_list_index_lookup.py:7:6: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:8:6: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:9:14: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:12:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:13:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:14:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:17:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:18:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:19:16: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:74:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:78:15: PLR1736 [*] List index lookup in `enumerate()` loop
+unnecessary_list_index_lookup.py:85:18: PLR1736 [*] List index lookup in `enumerate()` loop

@@ -62,3 +62,11 @@ TD003 Missing issue link for this TODO
 43 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
    |
+
+## Concise Output
+TD003.py:15:3: TD003 Missing issue link for this TODO
+TD003.py:18:3: TD003 Missing issue link for this TODO
+TD003.py:31:3: TD003 Missing issue link for this TODO
+TD003.py:35:9: TD003 Missing issue link for this TODO
+TD003.py:41:3: TD003 Missing issue link for this TODO
+TD003.py:43:3: TD003 Missing issue link for this TODO

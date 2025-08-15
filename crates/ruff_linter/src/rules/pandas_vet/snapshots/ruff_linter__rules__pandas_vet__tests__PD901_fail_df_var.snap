@@ -8,3 +8,6 @@ PD901 Avoid using the generic variable name `df` for DataFrames
 3 | df = pd.DataFrame()
   | ^^
   |
+
+## Concise Output
+<filename>:3:1: PD901 Avoid using the generic variable name `df` for DataFrames

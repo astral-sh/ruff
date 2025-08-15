@@ -196,3 +196,19 @@ B007 Loop control variable `line_` not used within loop body
    |     ^^^^^
 99 |     fp.readline()
    |
+
+## Concise Output
+B007.py:6:5: B007 Loop control variable `i` not used within loop body
+B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
+B007.py:30:5: B007 Loop control variable `i` not used within loop body
+B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
+B007.py:34:10: B007 Loop control variable `bar` may not be used within loop body
+B007.py:38:10: B007 Loop control variable `bar` may not be used within loop body
+B007.py:42:10: B007 Loop control variable `bar` may not be used within loop body
+B007.py:46:10: B007 Loop control variable `bar` may not be used within loop body
+B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
+B007.py:59:14: B007 Loop control variable `bar` not used within loop body
+B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
+B007.py:77:14: B007 Loop control variable `bar` not used within loop body
+B007.py:88:14: B007 Loop control variable `bar` not used within loop body
+B007.py:98:5: B007 Loop control variable `line_` not used within loop body

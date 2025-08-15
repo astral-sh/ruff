@@ -47,3 +47,10 @@ D102 Missing docstring in public method
     |         ^^^^^^^^^^^^^
 660 |         pass
     |
+
+## Concise Output
+D.py:23:9: D102 Missing docstring in public method
+D.py:56:9: D102 Missing docstring in public method
+D.py:68:9: D102 Missing docstring in public method
+D.py:650:9: D102 Missing docstring in public method
+D.py:659:9: D102 Missing docstring in public method

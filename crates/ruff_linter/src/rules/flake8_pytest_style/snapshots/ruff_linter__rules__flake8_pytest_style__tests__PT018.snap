@@ -430,3 +430,26 @@ help: Break down assertion into multiple parts
 70 72 | 
 71 73 |     assert (not self.find_graph_output(node.output[0]) or
 72 74 |             self.find_graph_input(node.input[0]))
+
+## Concise Output
+PT018.py:14:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:15:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:16:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:17:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:18:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:19:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:20:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:21:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:24:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:37:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:38:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:40:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:44:1: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:45:1: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:49:5: PT018 Assertion should be broken down into multiple parts
+PT018.py:51:12: PT018 Assertion should be broken down into multiple parts
+PT018.py:54:9: PT018 Assertion should be broken down into multiple parts
+PT018.py:59:5: PT018 [*] Assertion should be broken down into multiple parts
+PT018.py:65:5: PT018 [*] Assertion should be broken down into multiple parts

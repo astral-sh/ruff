@@ -39,4 +39,8 @@ help: Remove over-indentation from "Returns" underline
     173 |+    ------
 174 174 |     """
 175 175 | 
-176 176 |
+176 176 | 
+
+## Concise Output
+sections.py:159:9: D215 [*] Section underline is over-indented ("Returns")
+sections.py:173:9: D215 [*] Section underline is over-indented ("Returns")

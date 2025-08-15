@@ -504,3 +504,23 @@ help: Combine `if` branches
 157 155 |     print(1)
 158 156 | else:
 159 157 |     print(2)
+
+## Concise Output
+SIM114.py:2:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:7:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:12:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:19:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:28:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:29:5: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:36:5: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:43:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:67:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:69:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:71:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:118:5: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:122:5: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:132:5: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:138:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:144:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:148:1: SIM114 [*] Combine `if` branches using logical `or` operator
+SIM114.py:154:1: SIM114 [*] Combine `if` branches using logical `or` operator

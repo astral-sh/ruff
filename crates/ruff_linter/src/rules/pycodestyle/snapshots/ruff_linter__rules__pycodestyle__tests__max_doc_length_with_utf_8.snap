@@ -65,3 +65,12 @@ W505 Doc line too long (85 > 50)
 31 |     It's over theß9💣2ℝ on this line, which isn't the first line in the ß9💣2ℝing."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+W505_utf_8.py:2:50: W505 Doc line too long (57 > 50)
+W505_utf_8.py:6:49: W505 Doc line too long (56 > 50)
+W505_utf_8.py:10:51: W505 Doc line too long (56 > 50)
+W505_utf_8.py:13:51: W505 Doc line too long (94 > 50)
+W505_utf_8.py:18:50: W505 Doc line too long (61 > 50)
+W505_utf_8.py:24:50: W505 Doc line too long (82 > 50)
+W505_utf_8.py:31:50: W505 Doc line too long (85 > 50)

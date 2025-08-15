@@ -696,3 +696,38 @@ help: Use a raw string literal
 136 136 | # Debug text (should trigger)
 137     |-t = t"{'\InHere'=}"
     137 |+t = t"{r'\InHere'=}"
+
+## Concise Output
+W605_1.py:4:11: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:8:1: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:13:7: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:20:6: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:25:40: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:43:13: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:44:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:45:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:46:14: W605 [*] Invalid escape sequence: `\}`
+W605_1.py:47:14: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:48:15: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:57:9: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:58:11: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:59:12: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:65:31: W605 [*] Invalid escape sequence: `\I`
+W605_1.py:68:9: W605 [*] Invalid escape sequence: `\I`
+W605_1.py:73:11: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:77:1: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:82:7: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:89:6: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:94:40: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:109:1: W605 [*] Invalid escape sequence: `\w`
+W605_1.py:112:13: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:113:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:114:11: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:115:14: W605 [*] Invalid escape sequence: `\}`
+W605_1.py:116:14: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:117:15: W605 [*] Invalid escape sequence: `\{`
+W605_1.py:126:9: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:127:11: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:128:12: W605 [*] Invalid escape sequence: `\d`
+W605_1.py:134:31: W605 [*] Invalid escape sequence: `\I`
+W605_1.py:137:9: W605 [*] Invalid escape sequence: `\I`

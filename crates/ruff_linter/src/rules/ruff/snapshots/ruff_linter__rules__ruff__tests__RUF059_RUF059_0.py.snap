@@ -219,3 +219,16 @@ RUF059 Unpacked variable `x` is never used
 102 |     print(_x)
     |
 help: Prefix it with an underscore or any other dummy variable pattern
+
+## Concise Output
+RUF059_0.py:24:6: RUF059 [*] Unpacked variable `c` is never used
+RUF059_0.py:24:9: RUF059 [*] Unpacked variable `d` is never used
+RUF059_0.py:26:6: RUF059 [*] Unpacked variable `x` is never used
+RUF059_0.py:26:9: RUF059 [*] Unpacked variable `y` is never used
+RUF059_0.py:66:24: RUF059 [*] Unpacked variable `connection` is never used
+RUF059_0.py:74:24: RUF059 [*] Unpacked variable `connection` is never used
+RUF059_0.py:79:49: RUF059 [*] Unpacked variable `this` is never used
+RUF059_0.py:79:55: RUF059 [*] Unpacked variable `that` is never used
+RUF059_0.py:86:23: RUF059 [*] Unpacked variable `this` is never used
+RUF059_0.py:86:29: RUF059 [*] Unpacked variable `that` is never used
+RUF059_0.py:101:5: RUF059 Unpacked variable `x` is never used

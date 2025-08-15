@@ -368,3 +368,22 @@ help: Remove duplicates
 32 32 | Literal[Literal[Literal[1], Literal[1]]]  # once
 33    |-Literal[Literal[1], Literal[Literal[Literal[1]]]]  # once
    33 |+Literal[1]  # once
+
+## Concise Output
+PYI062.py:5:25: PYI062 [*] Duplicate literal member `True`
+PYI062.py:5:31: PYI062 [*] Duplicate literal member `False`
+PYI062.py:7:45: PYI062 [*] Duplicate literal member `1`
+PYI062.py:9:33: PYI062 [*] Duplicate literal member `{1, 3, 5}`
+PYI062.py:11:20: PYI062 [*] Duplicate literal member `1`
+PYI062.py:12:23: PYI062 [*] Duplicate literal member `1`
+PYI062.py:12:26: PYI062 [*] Duplicate literal member `2`
+PYI062.py:13:20: PYI062 [*] Duplicate literal member `1`
+PYI062.py:13:32: PYI062 [*] Duplicate literal member `1`
+PYI062.py:14:32: PYI062 [*] Duplicate literal member `2`
+PYI062.py:15:37: PYI062 [*] Duplicate literal member `1`
+PYI062.py:16:30: PYI062 [*] Duplicate literal member `1`
+PYI062.py:16:33: PYI062 [*] Duplicate literal member `1`
+PYI062.py:20:9: PYI062 [*] Duplicate literal member `1`
+PYI062.py:25:46: PYI062 [*] Duplicate literal member `True`
+PYI062.py:32:37: PYI062 [*] Duplicate literal member `1`
+PYI062.py:33:45: PYI062 [*] Duplicate literal member `1`

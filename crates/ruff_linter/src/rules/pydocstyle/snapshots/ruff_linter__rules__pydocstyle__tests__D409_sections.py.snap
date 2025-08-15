@@ -62,3 +62,8 @@ help: Adjust underline length to match "Other Parameters"
 590 590 |     other_parameters:
 591 591 |         A dictionary of string attributes
 592 592 |     parameters:
+
+## Concise Output
+sections.py:111:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:225:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:589:5: D409 [*] Section underline should match the length of its name ("Other Parameters")

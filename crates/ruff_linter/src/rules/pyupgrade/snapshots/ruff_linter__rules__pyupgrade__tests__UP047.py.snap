@@ -121,4 +121,12 @@ help: Use type parameters
    43 |+def any_str_param[AnyStr: (bytes, str)](s: AnyStr) -> AnyStr:
 44 44 |     return s
 45 45 | 
-46 46 |
+46 46 | 
+
+## Concise Output
+UP047.py:12:5: UP047 [*] Generic function `f` should use type parameters
+UP047.py:16:5: UP047 [*] Generic function `g` should use type parameters
+UP047.py:20:5: UP047 [*] Generic function `h` should use type parameters
+UP047.py:29:5: UP047 [*] Generic function `i` should use type parameters
+UP047.py:39:5: UP047 [*] Generic function `broken_fix` should use type parameters
+UP047.py:43:5: UP047 [*] Generic function `any_str_param` should use type parameters

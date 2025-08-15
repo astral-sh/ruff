@@ -184,3 +184,21 @@ LOG015 `exception()` call on root logger
    | ^^^^^^^^^^^^^^^^^^
    |
 help: Use own logger instead
+
+## Concise Output
+LOG015.py:4:1: LOG015 `debug()` call on root logger
+LOG015.py:5:1: LOG015 `info()` call on root logger
+LOG015.py:6:1: LOG015 `warn()` call on root logger
+LOG015.py:7:1: LOG015 `warning()` call on root logger
+LOG015.py:8:1: LOG015 `error()` call on root logger
+LOG015.py:9:1: LOG015 `critical()` call on root logger
+LOG015.py:10:1: LOG015 `log()` call on root logger
+LOG015.py:11:1: LOG015 `exception()` call on root logger
+LOG015.py:26:1: LOG015 `debug()` call on root logger
+LOG015.py:27:1: LOG015 `info()` call on root logger
+LOG015.py:28:1: LOG015 `warn()` call on root logger
+LOG015.py:29:1: LOG015 `warning()` call on root logger
+LOG015.py:30:1: LOG015 `error()` call on root logger
+LOG015.py:31:1: LOG015 `critical()` call on root logger
+LOG015.py:32:1: LOG015 `log()` call on root logger
+LOG015.py:33:1: LOG015 `exception()` call on root logger

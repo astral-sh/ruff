@@ -42,3 +42,9 @@ PLC2403 Module name `łos` contains a non-ASCII character
 11 | from os.path import los  # OK
    |
 help: Use an ASCII-only alias
+
+## Concise Output
+non_ascii_module_import.py:1:29: PLC2403 Module alias `łos` contains a non-ASCII character
+non_ascii_module_import.py:4:24: PLC2403 Module alias `łos` contains a non-ASCII character
+non_ascii_module_import.py:7:8: PLC2403 Module name `os.path.łos` contains a non-ASCII character
+non_ascii_module_import.py:10:21: PLC2403 Module name `łos` contains a non-ASCII character

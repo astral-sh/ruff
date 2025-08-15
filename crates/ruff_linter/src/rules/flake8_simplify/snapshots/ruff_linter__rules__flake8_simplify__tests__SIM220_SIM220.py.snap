@@ -58,3 +58,8 @@ help: Replace with `False`
 8 8 |     pass
 9 9 | 
 10 10 | if a:
+
+## Concise Output
+SIM220.py:1:4: SIM220 [*] Use `False` instead of `a and not a`
+SIM220.py:4:5: SIM220 [*] Use `False` instead of `a and not a`
+SIM220.py:7:5: SIM220 [*] Use `False` instead of `a and not a`

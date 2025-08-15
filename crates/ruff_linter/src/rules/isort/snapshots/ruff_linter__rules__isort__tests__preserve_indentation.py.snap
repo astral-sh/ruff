@@ -40,3 +40,7 @@ help: Organize imports
   5 |+    import os
 5 6 |     import sys
 6   |-    import os
+
+## Concise Output
+preserve_indentation.py:2:5: I001 [*] Import block is un-sorted or un-formatted
+preserve_indentation.py:5:5: I001 [*] Import block is un-sorted or un-formatted

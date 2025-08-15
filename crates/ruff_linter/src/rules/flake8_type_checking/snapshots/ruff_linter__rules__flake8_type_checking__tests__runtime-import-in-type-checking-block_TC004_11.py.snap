@@ -21,3 +21,6 @@ help: Move out of type-checking block
   5 |+    pass
 5 6 | 
 6 7 | __all__ = ("List",)
+
+## Concise Output
+TC004_11.py:4:24: TC004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.

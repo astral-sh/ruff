@@ -420,3 +420,45 @@ W191 Indentation contains tabs
     | ^^^^
 162 | }    <- this tab is fine"""
     |
+
+## Concise Output
+W19.py:1:1: W191 Indentation contains tabs
+W19.py:1:1: invalid-syntax: Unexpected indentation
+W19.py:5:1: invalid-syntax: Expected a statement
+W19.py:6:1: W191 Indentation contains tabs
+W19.py:12:1: W191 Indentation contains tabs
+W19.py:19:1: W191 Indentation contains tabs
+W19.py:24:1: W191 Indentation contains tabs
+W19.py:29:1: W191 Indentation contains tabs
+W19.py:35:1: W191 Indentation contains tabs
+W19.py:41:1: W191 Indentation contains tabs
+W19.py:47:1: W191 Indentation contains tabs
+W19.py:48:1: W191 Indentation contains tabs
+W19.py:57:1: W191 Indentation contains tabs
+W19.py:61:1: W191 Indentation contains tabs
+W19.py:64:1: W191 Indentation contains tabs
+W19.py:65:1: W191 Indentation contains tabs
+W19.py:66:1: W191 Indentation contains tabs
+W19.py:67:1: W191 Indentation contains tabs
+W19.py:68:1: W191 Indentation contains tabs
+W19.py:69:1: W191 Indentation contains tabs
+W19.py:76:1: W191 Indentation contains tabs
+W19.py:81:1: W191 Indentation contains tabs
+W19.py:86:1: W191 Indentation contains tabs
+W19.py:91:1: W191 Indentation contains tabs
+W19.py:94:1: W191 Indentation contains tabs
+W19.py:95:1: W191 Indentation contains tabs
+W19.py:101:1: W191 Indentation contains tabs
+W19.py:102:1: W191 Indentation contains tabs
+W19.py:128:1: W191 Indentation contains tabs
+W19.py:134:1: W191 Indentation contains tabs
+W19.py:135:1: W191 Indentation contains tabs
+W19.py:136:1: W191 Indentation contains tabs
+W19.py:139:1: W191 Indentation contains tabs
+W19.py:140:1: W191 Indentation contains tabs
+W19.py:141:1: W191 Indentation contains tabs
+W19.py:142:1: W191 Indentation contains tabs
+W19.py:143:1: W191 Indentation contains tabs
+W19.py:146:1: W191 Indentation contains tabs
+W19.py:157:1: W191 Indentation contains tabs
+W19.py:161:1: W191 Indentation contains tabs

@@ -294,3 +294,18 @@ help: Convert `X` to class syntax
 49 48 | 
 50 49 | # Private names should not be reported (OK)
 51 50 | WithPrivate = TypedDict("WithPrivate", {"__x": int})
+
+## Concise Output
+UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:46:1: UP013 [*] Convert `X` from `TypedDict` functional to class syntax

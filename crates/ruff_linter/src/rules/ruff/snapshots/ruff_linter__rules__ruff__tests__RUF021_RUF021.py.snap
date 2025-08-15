@@ -267,3 +267,17 @@ help: Parenthesize the `and` subexpression
 53 53 |     # another comment
 54 54 |     or some_eighth_reasonably_long_condition
 55 55 | ):
+
+## Concise Output
+RUF021.py:12:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:13:10: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:16:5: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:19:14: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:26:11: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:30:7: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:30:18: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:35:44: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:38:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:40:4: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:46:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear
+RUF021.py:48:8: RUF021 [*] Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear

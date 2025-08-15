@@ -19,3 +19,6 @@ help: Insert spaces
 3 3 | #: E262:1:12
 4 4 | x = x + 1  #Increment x
 5 5 | #: E262:1:12
+
+## Concise Output
+E26.py:2:5: E261 [*] Insert at least two spaces before an inline comment

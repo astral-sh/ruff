@@ -23,3 +23,6 @@ help: Move out of type-checking block
   7 |+    pass
 7 8 | 
 8 9 | AnyCallable: TypeAlias = Callable[..., Any]
+
+## Concise Output
+TC004_12.py:6:33: TC004 [*] Move import `collections.abc.Callable` out of type-checking block. Import is used for more than type hinting.

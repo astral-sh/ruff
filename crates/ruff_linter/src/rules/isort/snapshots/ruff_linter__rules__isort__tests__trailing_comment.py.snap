@@ -144,3 +144,10 @@ help: Organize imports
 53    |-    # e
 54    |-) # f
    50 |+from mylib import MyClient  # b  # c  # d  # e  # f
+
+## Concise Output
+trailing_comment.py:8:1: I001 [*] Import block is un-sorted or un-formatted
+trailing_comment.py:17:1: I001 [*] Import block is un-sorted or un-formatted
+trailing_comment.py:35:1: I001 [*] Import block is un-sorted or un-formatted
+trailing_comment.py:42:1: I001 [*] Import block is un-sorted or un-formatted
+trailing_comment.py:50:1: I001 [*] Import block is un-sorted or un-formatted

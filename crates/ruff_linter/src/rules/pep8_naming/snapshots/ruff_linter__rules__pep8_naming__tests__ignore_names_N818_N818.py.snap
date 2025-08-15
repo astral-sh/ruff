@@ -20,3 +20,7 @@ N818 Exception name `StillBad` should be named with an Error suffix
    |       ^^^^^^^^
 11 |     pass
    |
+
+## Concise Output
+N818.py:4:7: N818 Exception name `StillBad` should be named with an Error suffix
+N818.py:10:7: N818 Exception name `StillBad` should be named with an Error suffix

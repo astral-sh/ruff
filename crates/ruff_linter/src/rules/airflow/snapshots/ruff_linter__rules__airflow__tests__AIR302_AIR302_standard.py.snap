@@ -509,3 +509,26 @@ help: Install `apache-airflow-providers-standard>=0.0.3` and use `ExternalDagLin
 77 78 | 
 78    |-ExternalTaskSensorLink()
    79 |+ExternalDagLink()
+
+## Concise Output
+AIR302_standard.py:20:1: AIR302 [*] `airflow.operators.bash_operator.BashOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:22:1: AIR302 [*] `airflow.operators.dagrun_operator.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:23:1: AIR302 [*] `airflow.operators.dagrun_operator.TriggerDagRunOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:25:1: AIR302 [*] `airflow.operators.latest_only_operator.LatestOnlyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:27:1: AIR302 [*] `airflow.operators.python_operator.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:28:1: AIR302 [*] `airflow.operators.python_operator.PythonOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:29:1: AIR302 [*] `airflow.operators.python_operator.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:30:1: AIR302 [*] `airflow.operators.python_operator.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:32:1: AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskMarker` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:33:1: AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensor` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:38:1: AIR302 [*] `airflow.hooks.subprocess.SubprocessResult` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:42:1: AIR302 [*] `airflow.hooks.subprocess.working_directory` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:46:1: AIR302 [*] `airflow.operators.datetime.target_times_as_dates` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:50:1: AIR302 [*] `airflow.operators.trigger_dagrun.TriggerDagRunLink` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:54:1: AIR302 [*] `airflow.sensors.external_task.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:58:1: AIR302 [*] `airflow.sensors.time_delta.WaitSensor` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:62:1: AIR302 [*] `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:66:1: AIR302 [*] `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:70:1: AIR302 [*] `airflow.operators.dummy_operator.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:74:1: AIR302 [*] `airflow.operators.dummy_operator.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302_standard.py:78:1: AIR302 [*] `airflow.sensors.external_task_sensor.ExternalTaskSensorLink` is moved into `standard` provider in Airflow 3.0;

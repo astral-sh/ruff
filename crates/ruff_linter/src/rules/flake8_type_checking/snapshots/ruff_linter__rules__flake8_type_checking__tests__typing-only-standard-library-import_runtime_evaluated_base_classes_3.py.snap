@@ -28,3 +28,6 @@ help: Move into type-checking block
 9  12 | 
 10 13 | 
 11 14 | class A(pydantic.BaseModel):
+
+## Concise Output
+runtime_evaluated_base_classes_3.py:5:18: TC003 [*] Move standard library import `uuid.UUID` into a type-checking block

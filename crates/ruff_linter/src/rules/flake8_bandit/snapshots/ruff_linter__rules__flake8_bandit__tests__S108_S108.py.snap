@@ -69,3 +69,12 @@ S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
    |                        ^^^^^^^^
 26 |     f.write("def")
    |
+
+## Concise Output
+S108.py:5:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:8:13: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:11:11: S108 Probable insecure usage of temporary file or directory: "/var/tmp/123"
+S108.py:14:11: S108 Probable insecure usage of temporary file or directory: "/dev/shm/unit/test"
+S108.py:22:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:25:11: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"
+S108.py:25:24: S108 Probable insecure usage of temporary file or directory: "/tmp/abc"

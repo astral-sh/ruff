@@ -100,3 +100,10 @@ help: Replace with `a`
 20    |-if 1 + (not (not a)):  # SIM208
    20 |+if 1 + (bool(a)):  # SIM208
 21 21 |     pass
+
+## Concise Output
+SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
+SIM208.py:16:5: SIM208 [*] Use `b` instead of `not (not b)`
+SIM208.py:18:3: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:20:9: SIM208 [*] Use `a` instead of `not (not a)`

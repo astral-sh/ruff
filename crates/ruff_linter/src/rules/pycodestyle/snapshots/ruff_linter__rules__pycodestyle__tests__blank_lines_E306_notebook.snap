@@ -21,3 +21,6 @@ help: Add missing blank line
 60 61 |     def b():
 61 62 |         pass
 62 63 | # end
+
+## Concise Output
+E30.ipynb:60:5: E306 [*] Expected 1 blank line before a nested definition, found 0

@@ -16,3 +16,6 @@ help: Remove trailing newline
 12 12 |     foo()
 13 13 |     bar()
 14    |-
+
+## Concise Output
+W391_0.py:14:1: W391 [*] Extra newline at end of file

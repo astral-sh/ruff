@@ -10,3 +10,6 @@ F503 `%`-format string expected sequence but got mapping
    | ^^^^^^^^^^^^^^^^^^^^
 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
    |
+
+## Concise Output
+F50x.py:10:1: F503 `%`-format string expected sequence but got mapping

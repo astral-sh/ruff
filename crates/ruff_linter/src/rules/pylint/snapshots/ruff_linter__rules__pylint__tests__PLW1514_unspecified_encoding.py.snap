@@ -496,3 +496,28 @@ help: Add explicit `encoding` argument
 105     |-    with file.open() as f:
     105 |+    with file.open(encoding="utf-8") as f:
 106 106 |         contents = f.read()
+
+## Concise Output
+unspecified_encoding.py:8:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:9:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
+unspecified_encoding.py:10:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
+unspecified_encoding.py:11:1: PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
+unspecified_encoding.py:12:1: PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
+unspecified_encoding.py:13:1: PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
+unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:47:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:48:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:51:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:55:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:56:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:59:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:64:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:65:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:77:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:78:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:79:8: PLW1514 [*] `pathlib.Path(...).read_text` without explicit `encoding` argument
+unspecified_encoding.py:80:1: PLW1514 [*] `pathlib.Path(...).write_text` without explicit `encoding` argument
+unspecified_encoding.py:96:1: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:105:10: PLW1514 [*] `pathlib.Path(...).open` in text mode without explicit `encoding` argument

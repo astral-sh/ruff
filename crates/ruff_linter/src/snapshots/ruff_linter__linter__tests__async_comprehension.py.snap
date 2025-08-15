@@ -32,3 +32,8 @@ PLE1142 `await` should be used within an async function
 11 | |         pass
    | |____________^
    |
+
+## Concise Output
+resources/test/fixtures/syntax_errors/async_comprehension.py:5:8: PLE1142 `await` should be used within an async function
+resources/test/fixtures/syntax_errors/async_comprehension.py:7:5: PLE1142 `await` should be used within an async function
+resources/test/fixtures/syntax_errors/async_comprehension.py:10:5: PLE1142 `await` should be used within an async function

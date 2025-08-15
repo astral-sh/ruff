@@ -82,3 +82,9 @@ help: Replace with `b_src.split(rb"abc")`
 18 18 | 
 19 19 | # Patterns containing metacharacters should NOT be replaced
 20 20 | re.sub(rb"ab[c]", b"", b_src)
+
+## Concise Output
+RUF055_3.py:6:1: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_3.py:9:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_3.py:13:4: RUF055 [*] Plain string pattern passed to `re` function
+RUF055_3.py:17:1: RUF055 [*] Plain string pattern passed to `re` function

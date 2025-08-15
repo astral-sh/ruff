@@ -156,3 +156,18 @@ TID252 Prefer absolute imports over relative imports from parent modules
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Replace relative imports from parent modules with absolute imports
+
+## Concise Output
+TID252.py:9:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:10:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:11:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:12:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:17:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:21:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:22:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:23:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:24:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:25:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:26:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:27:1: TID252 Prefer absolute imports over relative imports from parent modules
+TID252.py:28:1: TID252 Prefer absolute imports over relative imports from parent modules

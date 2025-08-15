@@ -75,3 +75,9 @@ help: Remove extraneous blank line(s)
 43 42 | def outer():
 44 43 |      def inner():
 45 44 |          pass
+
+## Concise Output
+E30.pyi:17:1: E303 [*] Too many blank lines (2)
+E30.pyi:22:1: E303 [*] Too many blank lines (2)
+E30.pyi:35:5: E303 [*] Too many blank lines (2)
+E30.pyi:43:1: E303 [*] Too many blank lines (2)

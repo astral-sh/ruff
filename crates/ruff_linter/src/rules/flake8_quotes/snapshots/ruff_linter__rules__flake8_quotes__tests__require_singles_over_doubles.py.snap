@@ -53,3 +53,8 @@ help: Replace double quotes with single quotes
 3   |-this_should_be_linted = f"double quote string"
   3 |+this_should_be_linted = f'double quote string'
 4 4 | this_should_be_linted = f"double {'quote'} string"
+
+## Concise Output
+doubles.py:1:25: Q000 [*] Double quotes found but single quotes preferred
+doubles.py:2:25: Q000 [*] Double quotes found but single quotes preferred
+doubles.py:3:25: Q000 [*] Double quotes found but single quotes preferred

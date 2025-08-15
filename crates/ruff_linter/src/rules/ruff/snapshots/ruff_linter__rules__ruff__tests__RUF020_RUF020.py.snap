@@ -211,3 +211,18 @@ RUF020 `Never | T` is equivalent to `T`
    |            ^^^^^
    |
 help: Remove `Never`
+
+## Concise Output
+RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
+RUF020.py:4:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+RUF020.py:5:1: RUF020 [*] `Never | T` is equivalent to `T`
+RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
+RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
+RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+RUF020.py:12:11: RUF020 `Never | T` is equivalent to `T`
+RUF020.py:13:12: RUF020 `Never | T` is equivalent to `T`
+RUF020.py:14:12: RUF020 `Never | T` is equivalent to `T`
+RUF020.py:16:10: RUF020 `Never | T` is equivalent to `T`
+RUF020.py:17:4: RUF020 `Never | T` is equivalent to `T`
+RUF020.py:17:12: RUF020 `Never | T` is equivalent to `T`

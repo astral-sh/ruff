@@ -60,3 +60,8 @@ help: Move out of type-checking block
 5 6 | 
 6 7 | 
 7 8 | def example(a: List[int], /, b: Sequence[int], *, c: Set[int]):
+
+## Concise Output
+TC004_5.py:4:24: TC004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.
+TC004_5.py:4:30: TC004 [*] Move import `typing.Sequence` out of type-checking block. Import is used for more than type hinting.
+TC004_5.py:4:40: TC004 [*] Move import `typing.Set` out of type-checking block. Import is used for more than type hinting.

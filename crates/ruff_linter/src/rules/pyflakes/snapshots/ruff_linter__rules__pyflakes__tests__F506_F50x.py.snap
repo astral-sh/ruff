@@ -32,3 +32,8 @@ F506 `%`-format string has mixed positional and named placeholders
 12 |
 13 | # ok: single %s with mapping
    |
+
+## Concise Output
+F50x.py:2:1: F506 `%`-format string has mixed positional and named placeholders
+F50x.py:3:1: F506 `%`-format string has mixed positional and named placeholders
+F50x.py:11:1: F506 `%`-format string has mixed positional and named placeholders

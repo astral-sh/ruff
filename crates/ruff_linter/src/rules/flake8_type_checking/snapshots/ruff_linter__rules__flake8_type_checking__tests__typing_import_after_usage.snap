@@ -12,3 +12,6 @@ TC002 Move third-party import `pandas` into a type-checking block
 6 | def f(x: pd.DataFrame):
   |
 help: Move into type-checking block
+
+## Concise Output
+<filename>:4:18: TC002 Move third-party import `pandas` into a type-checking block

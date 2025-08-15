@@ -59,4 +59,9 @@ help: Add blank line before "Raises"
     227 |+
 227 228 |     Raises:
 228 229 |     My attention.
-229 230 |
+229 230 | 
+
+## Concise Output
+sections.py:80:5: D411 [*] Missing blank line before section ("Yields")
+sections.py:134:5: D411 [*] Missing blank line before section ("Returns")
+sections.py:227:5: D411 [*] Missing blank line before section ("Raises")

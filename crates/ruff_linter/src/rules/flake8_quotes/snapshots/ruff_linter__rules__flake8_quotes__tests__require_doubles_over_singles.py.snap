@@ -56,3 +56,8 @@ help: Replace single quotes with double quotes
 4 4 | this_should_be_linted = f'double {"quote"} string'
 5 5 | 
 6 6 | # https://github.com/astral-sh/ruff/issues/10546
+
+## Concise Output
+singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:3:25: Q000 [*] Single quotes found but double quotes preferred

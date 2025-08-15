@@ -224,3 +224,24 @@ PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) s
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 169 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
     |
+
+## Concise Output
+PYI036.py:54:31: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+PYI036.py:55:24: PYI036 If there are no star-args, `__aexit__` should have at least 3 non-keyword-only args (excluding `self`)
+PYI036.py:58:38: PYI036 All arguments after the first four in `__exit__` must have a default value
+PYI036.py:59:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.py:62:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.py:63:73: PYI036 The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+PYI036.py:63:94: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.py:66:111: PYI036 The third argument in `__exit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.py:67:101: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.py:70:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.py:70:58: PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+PYI036.py:71:74: PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
+PYI036.py:74:38: PYI036 All arguments after the first four in `__exit__` must have a default value
+PYI036.py:75:48: PYI036 All keyword-only arguments in `__aexit__` must have a default value
+PYI036.py:82:29: PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+PYI036.py:83:95: PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+PYI036.py:161:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+PYI036.py:166:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`
+PYI036.py:168:17: PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) should either be `None, None, None` or `type[BaseException], BaseException, types.TracebackType`

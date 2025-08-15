@@ -51,3 +51,10 @@ N811 Constant `C` imported as non-constant `c`
 6 |
 7 | # These are all OK:
   |
+
+## Concise Output
+N811.py:1:8: N811 Constant `CONST` imported as non-constant `const`
+N811.py:2:17: N811 Constant `CONSTANT` imported as non-constant `constant`
+N811.py:3:17: N811 Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
+N811.py:4:8: N811 Constant `CON` imported as non-constant `c`
+N811.py:5:17: N811 Constant `C` imported as non-constant `c`

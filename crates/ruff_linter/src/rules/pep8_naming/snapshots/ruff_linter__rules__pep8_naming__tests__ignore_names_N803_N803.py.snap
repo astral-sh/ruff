@@ -20,3 +20,7 @@ N803 Argument name `stillBad` should be lowercase
    |                            ^^^^^^^^
 12 |         return _, a, stillBad
    |
+
+## Concise Output
+N803.py:4:16: N803 Argument name `stillBad` should be lowercase
+N803.py:11:28: N803 Argument name `stillBad` should be lowercase

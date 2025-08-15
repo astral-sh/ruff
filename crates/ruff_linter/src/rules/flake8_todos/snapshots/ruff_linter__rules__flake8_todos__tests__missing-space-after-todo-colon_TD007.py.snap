@@ -54,3 +54,10 @@ TD007 Missing space after colon in TODO
    |         ^^^^
 10 | # TODO this colon doesn't terminate the tag, so don't check it. https://www.google.com
    |
+
+## Concise Output
+TD007.py:5:3: TD007 Missing space after colon in TODO
+TD007.py:6:3: TD007 Missing space after colon in TODO
+TD007.py:7:3: TD007 Missing space after colon in TODO
+TD007.py:8:3: TD007 Missing space after colon in TODO
+TD007.py:9:9: TD007 Missing space after colon in TODO

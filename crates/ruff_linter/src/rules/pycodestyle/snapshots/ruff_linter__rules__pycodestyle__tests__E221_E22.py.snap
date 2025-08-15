@@ -195,4 +195,15 @@ help: Replace with single space
     184 |+if a ==  1:
 185 185 |     print(a)
 186 186 | 
-187 187 |
+187 187 | 
+
+## Concise Output
+E22.py:3:6: E221 [*] Multiple spaces before operator
+E22.py:5:2: E221 [*] Multiple spaces before operator
+E22.py:6:2: E221 [*] Multiple spaces before operator
+E22.py:9:5: E221 [*] Multiple spaces before operator
+E22.py:10:5: E221 [*] Multiple spaces before operator
+E22.py:13:9: E221 [*] Multiple spaces before operator
+E22.py:15:9: E221 [*] Multiple spaces before operator
+E22.py:19:14: E221 [*] Multiple spaces before operator
+E22.py:184:5: E221 [*] Multiple spaces before operator

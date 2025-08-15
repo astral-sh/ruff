@@ -76,3 +76,13 @@ S104 Possible binding to all interfaces
 25 |
 26 | # t-strings - all ok
    |
+
+## Concise Output
+S104.py:9:1: S104 Possible binding to all interfaces
+S104.py:10:1: S104 Possible binding to all interfaces
+S104.py:11:3: S104 Possible binding to all interfaces
+S104.py:15:6: S104 Possible binding to all interfaces
+S104.py:19:9: S104 Possible binding to all interfaces
+S104.py:24:1: S104 Possible binding to all interfaces
+S104.py:24:13: S104 Possible binding to all interfaces
+S104.py:24:26: S104 Possible binding to all interfaces

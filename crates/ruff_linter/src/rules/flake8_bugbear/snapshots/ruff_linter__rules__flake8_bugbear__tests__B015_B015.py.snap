@@ -46,3 +46,10 @@ B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `a
 29 |     1 == 1
    |     ^^^^^^
    |
+
+## Concise Output
+B015.py:3:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.py:7:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.py:17:5: B015 Pointless comparison at end of function scope. Did you mean to return the expression result?
+B015.py:21:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
+B015.py:29:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.

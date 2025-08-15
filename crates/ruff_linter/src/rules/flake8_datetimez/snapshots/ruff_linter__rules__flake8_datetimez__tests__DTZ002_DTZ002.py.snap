@@ -22,3 +22,7 @@ DTZ002 `datetime.datetime.today()` used
 11 | # uses `astimezone` method
    |
 help: Use `datetime.datetime.now(tz=...)` instead
+
+## Concise Output
+DTZ002.py:4:1: DTZ002 `datetime.datetime.today()` used
+DTZ002.py:9:1: DTZ002 `datetime.datetime.today()` used

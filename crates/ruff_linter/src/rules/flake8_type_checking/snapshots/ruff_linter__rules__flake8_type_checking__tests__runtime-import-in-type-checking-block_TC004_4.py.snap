@@ -20,3 +20,6 @@ help: Move out of type-checking block
 5 6 | 
 6 7 | 
 7 8 | def example(*args: Any, **kwargs: Any):
+
+## Concise Output
+TC004_4.py:4:24: TC004 [*] Move import `typing.Any` out of type-checking block. Import is used for more than type hinting.

@@ -248,3 +248,29 @@ ASYNC221 Async functions should not run processes with blocking methods
 84 |
 85 |     # other weird cases: ASYNC220
    |
+
+## Concise Output
+ASYNC22x.py:8:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:12:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:29:9: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:32:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:38:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:39:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:40:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:41:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:42:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:43:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:46:9: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:54:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:55:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:61:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:62:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:63:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:64:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:65:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:66:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:67:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:68:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:81:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:82:5: ASYNC221 Async functions should not run processes with blocking methods
+ASYNC22x.py:83:5: ASYNC221 Async functions should not run processes with blocking methods

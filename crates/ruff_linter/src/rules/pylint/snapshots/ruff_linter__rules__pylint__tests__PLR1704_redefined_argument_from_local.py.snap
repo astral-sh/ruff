@@ -124,3 +124,18 @@ PLR1704 Redefining argument with the local name `b`
    |             ^
 94 |             print(b)
    |
+
+## Concise Output
+redefined_argument_from_local.py:41:9: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:46:9: PLR1704 Redefining argument with the local name `i`
+redefined_argument_from_local.py:53:25: PLR1704 Redefining argument with the local name `e`
+redefined_argument_from_local.py:58:24: PLR1704 Redefining argument with the local name `f`
+redefined_argument_from_local.py:63:24: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:63:27: PLR1704 Redefining argument with the local name `b`
+redefined_argument_from_local.py:68:24: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:68:27: PLR1704 Redefining argument with the local name `b`
+redefined_argument_from_local.py:73:51: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:79:13: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:85:13: PLR1704 Redefining argument with the local name `b`
+redefined_argument_from_local.py:91:13: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:93:13: PLR1704 Redefining argument with the local name `b`

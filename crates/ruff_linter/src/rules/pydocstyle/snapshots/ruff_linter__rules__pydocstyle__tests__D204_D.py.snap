@@ -102,4 +102,11 @@ help: Insert 1 blank line after class docstring
     659 |+
 659 660 |     def sort_services(self):
 660 661 |         pass
-661 662 |
+661 662 | 
+
+## Concise Output
+D.py:181:5: D204 [*] 1 blank line required after class docstring
+D.py:192:5: D204 [*] 1 blank line required after class docstring
+D.py:649:5: D204 [*] 1 blank line required after class docstring
+D.py:654:5: D204 [*] 1 blank line required after class docstring
+D.py:658:5: D204 [*] 1 blank line required after class docstring

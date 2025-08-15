@@ -8,3 +8,6 @@ ASYNC251 Async functions should not call `time.sleep`
 6 |     time.sleep(1)  # ASYNC251
   |     ^^^^^^^^^^
   |
+
+## Concise Output
+ASYNC251.py:6:5: ASYNC251 Async functions should not call `time.sleep`

@@ -28,3 +28,7 @@ help: Convert to triple double quotes
 11 11 | 
 12 12 | 
 13 13 | # OK
+
+## Concise Output
+D300.py:6:5: D300 Use triple double quotes `"""`
+D300.py:10:5: D300 [*] Use triple double quotes `"""`

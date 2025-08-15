@@ -115,3 +115,11 @@ help: Remove duplicate field definition for `name`
 50 50 |     name: str = "Foo"
 51 51 |     name: str = name + " Bar"
 52    |-    name: str = "Bar"  # PIE794
+
+## Concise Output
+PIE794.py:4:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:13:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:23:5: PIE794 [*] Class field `bar` is defined multiple times
+PIE794.py:40:5: PIE794 [*] Class field `bar` is defined multiple times
+PIE794.py:46:5: PIE794 [*] Class field `name` is defined multiple times
+PIE794.py:52:5: PIE794 [*] Class field `name` is defined multiple times

@@ -40,3 +40,9 @@ YTT201 `sys.version_info[0] != 3` referenced (python4), use `<`
 10 | PY2 = version_info[0] != 3
    |       ^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+YTT201.py:7:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+YTT201.py:8:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+YTT201.py:9:7: YTT201 `sys.version_info[0] != 3` referenced (python4), use `<`
+YTT201.py:10:7: YTT201 `sys.version_info[0] != 3` referenced (python4), use `<`

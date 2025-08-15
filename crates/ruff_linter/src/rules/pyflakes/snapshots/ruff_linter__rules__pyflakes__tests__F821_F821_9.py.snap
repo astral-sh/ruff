@@ -9,3 +9,6 @@ F821 Undefined name `captured`
 22 |             return captured  # F821
    |                    ^^^^^^^^
    |
+
+## Concise Output
+F821_9.py:22:20: F821 Undefined name `captured`

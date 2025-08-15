@@ -43,3 +43,7 @@ help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `jaydebeapi` from `
 7 7 | 
 8 8 | JdbcHook()
 9 9 | jaydebeapi()
+
+## Concise Output
+AIR302_jdbc.py:8:1: AIR302 [*] `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in Airflow 3.0;
+AIR302_jdbc.py:9:1: AIR302 [*] `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in Airflow 3.0;

@@ -1051,3 +1051,51 @@ help: Remove outdated version block
 256     |-if sys.version_info[0] > 2:
 257     |-    print("py3")
     256 |+print("py3")
+
+## Concise Output
+UP036_0.py:3:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:8:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:16:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:20:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:25:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:29:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:37:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:45:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:53:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:56:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:62:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:67:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:73:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:86:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:97:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:104:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:116:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:122:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:125:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:130:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:140:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:150:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:163:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:166:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:168:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:172:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:176:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:179:8: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:191:24: UP036 Version specifier is invalid
+UP036_0.py:194:23: UP036 Version specifier is invalid
+UP036_0.py:197:24: UP036 Version specifier is invalid
+UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:207:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:219:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:229:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:232:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:235:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:238:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:241:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:244:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:247:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:250:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:253:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:256:4: UP036 [*] Version block is outdated for minimum Python version

@@ -25,3 +25,6 @@ help: Move into type-checking block
 8 8 |     from types import TracebackType
 9 9 | 
 10 10 | def foo(tb: TracebackType) -> pathlib.Path: ...
+
+## Concise Output
+<filename>:4:8: TC003 [*] Move standard library import `pathlib` into a type-checking block

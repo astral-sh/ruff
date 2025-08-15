@@ -28,3 +28,8 @@ N814 Camelcase `StillBad` imported as constant `STILL_BAD`
 8 | from mod import StillBad as STILL_BAD
   |                 ^^^^^^^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+N814.py:2:8: N814 Camelcase `StillBad` imported as constant `STILLBAD`
+N814.py:5:17: N814 Camelcase `StillBad` imported as constant `STILLBAD`
+N814.py:8:17: N814 Camelcase `StillBad` imported as constant `STILL_BAD`

@@ -184,3 +184,14 @@ help: Remove duplicate base
    75 |+class Bar(Foo  # 2
 77 76 | ):
 78 77 |     pass
+
+## Concise Output
+duplicate_bases.py:13:13: PLE0241 [*] Duplicate base `A` for class `F1`
+duplicate_bases.py:17:13: PLE0241 [*] Duplicate base `A` for class `F2`
+duplicate_bases.py:23:5: PLE0241 [*] Duplicate base `A` for class `F3`
+duplicate_bases.py:30:5: PLE0241 [*] Duplicate base `A` for class `F4`
+duplicate_bases.py:36:13: PLE0241 [*] Duplicate base `A` for class `G1`
+duplicate_bases.py:40:13: PLE0241 [*] Duplicate base `A` for class `G2`
+duplicate_bases.py:46:5: PLE0241 [*] Duplicate base `A` for class `G3`
+duplicate_bases.py:54:5: PLE0241 [*] Duplicate base `A` for class `G4`
+duplicate_bases.py:76:5: PLE0241 [*] Duplicate base `Foo` for class `Bar`

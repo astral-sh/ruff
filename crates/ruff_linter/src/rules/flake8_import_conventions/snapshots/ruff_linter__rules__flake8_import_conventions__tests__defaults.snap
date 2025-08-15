@@ -290,3 +290,19 @@ help: Alias `networkx` to `nx`
 23 23 | 
 24 24 | 
 25 25 | def conventional_aliases():
+
+## Concise Output
+defaults.py:6:12: ICN001 [*] `altair` should be imported as `alt`
+defaults.py:7:12: ICN001 `matplotlib.pyplot` should be imported as `plt`
+defaults.py:8:12: ICN001 [*] `numpy` should be imported as `np`
+defaults.py:9:12: ICN001 [*] `pandas` should be imported as `pd`
+defaults.py:10:12: ICN001 [*] `seaborn` should be imported as `sns`
+defaults.py:11:12: ICN001 [*] `tkinter` should be imported as `tk`
+defaults.py:12:12: ICN001 [*] `networkx` should be imported as `nx`
+defaults.py:16:22: ICN001 [*] `altair` should be imported as `alt`
+defaults.py:17:33: ICN001 [*] `matplotlib.pyplot` should be imported as `plt`
+defaults.py:18:21: ICN001 [*] `numpy` should be imported as `np`
+defaults.py:19:22: ICN001 [*] `pandas` should be imported as `pd`
+defaults.py:20:23: ICN001 [*] `seaborn` should be imported as `sns`
+defaults.py:21:23: ICN001 [*] `tkinter` should be imported as `tk`
+defaults.py:22:24: ICN001 [*] `networkx` should be imported as `nx`

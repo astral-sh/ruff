@@ -274,3 +274,19 @@ help: Remove unnecessary kwargs
 41    |-    }
    36 |+    x=1.0, y=2.0
 42 37 | )
+
+## Concise Output
+PIE804.py:1:5: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:3:5: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:5:20: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:7:20: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:9:20: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:11:5: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:22:5: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:25:5: PIE804 Unnecessary `dict` kwargs
+PIE804.py:25:17: PIE804 Unnecessary `dict` kwargs
+PIE804.py:26:10: PIE804 Unnecessary `dict` kwargs
+PIE804.py:26:22: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:30:16: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:31:16: PIE804 [*] Unnecessary `dict` kwargs
+PIE804.py:36:5: PIE804 [*] Unnecessary `dict` kwargs

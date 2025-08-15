@@ -9,3 +9,6 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
 2 |
 3 | # Don't trigger for t-strings
   |
+
+## Concise Output
+INT001.py:1:3: INT001 f-string is resolved before function call; consider `_("string %s") % arg`

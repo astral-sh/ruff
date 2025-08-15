@@ -40,4 +40,8 @@ help: Remove unused import: `typing.Union`
 58    |-    from typing import Union
 59 58 | 
 60 59 |     from typing_extensions import TypeAliasType
-61 60 |
+61 60 | 
+
+## Concise Output
+F401_34.py:45:24: F401 [*] `typing.Union` imported but unused
+F401_34.py:58:24: F401 [*] `typing.Union` imported but unused

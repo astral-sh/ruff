@@ -146,3 +146,17 @@ TRY203 Remove exception handler; error is immediately re-raised
 70 |
 71 |   def fine():
    |
+
+## Concise Output
+TRY203.py:12:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:18:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:25:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:32:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:38:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:44:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:50:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:52:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:58:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:60:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:66:5: TRY203 Remove exception handler; error is immediately re-raised
+TRY203.py:68:5: TRY203 Remove exception handler; error is immediately re-raised

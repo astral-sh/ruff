@@ -19,3 +19,7 @@ F841 Local variable `x` is assigned to but never used
    |     ^
    |
 help: Remove assignment to unused variable `x`
+
+## Concise Output
+<filename>:10:5: F821 Undefined name `x`
+<filename>:10:5: F841 Local variable `x` is assigned to but never used

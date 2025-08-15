@@ -66,3 +66,8 @@ help: Convert to `T | None`
 29    |-def f(arg: typing.Literal[1, "foo", True] = None):  # RUF013
    30 |+def f(arg: typing.Literal[1, "foo", True] | None = None):  # RUF013
 30 31 |     pass
+
+## Concise Output
+RUF013_3.py:4:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_3.py:22:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
+RUF013_3.py:29:12: RUF013 [*] PEP 484 prohibits implicit `Optional`

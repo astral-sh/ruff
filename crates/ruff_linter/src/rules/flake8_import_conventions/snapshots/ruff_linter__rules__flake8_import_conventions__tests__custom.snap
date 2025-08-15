@@ -354,3 +354,35 @@ ICN001 `numpy.typing` should be imported as `npt`
 52 | import numpy.typing as npt  # conventional
    |
 help: Alias `numpy.typing` to `npt`
+
+## Concise Output
+custom.py:3:8: ICN001 `altair` should be imported as `alt`
+custom.py:4:8: ICN001 `dask.array` should be imported as `da`
+custom.py:5:8: ICN001 `dask.dataframe` should be imported as `dd`
+custom.py:6:8: ICN001 `matplotlib.pyplot` should be imported as `plt`
+custom.py:7:8: ICN001 `numpy` should be imported as `np`
+custom.py:8:8: ICN001 `pandas` should be imported as `pd`
+custom.py:9:8: ICN001 `seaborn` should be imported as `sns`
+custom.py:10:8: ICN001 `tensorflow` should be imported as `tf`
+custom.py:11:8: ICN001 `holoviews` should be imported as `hv`
+custom.py:12:8: ICN001 `panel` should be imported as `pn`
+custom.py:13:8: ICN001 `plotly.express` should be imported as `px`
+custom.py:14:8: ICN001 `matplotlib` should be imported as `mpl`
+custom.py:15:8: ICN001 `polars` should be imported as `pl`
+custom.py:16:8: ICN001 `pyarrow` should be imported as `pa`
+custom.py:18:18: ICN001 `altair` should be imported as `alt`
+custom.py:19:29: ICN001 `matplotlib.pyplot` should be imported as `plt`
+custom.py:20:22: ICN001 `dask.array` should be imported as `da`
+custom.py:21:26: ICN001 `dask.dataframe` should be imported as `dd`
+custom.py:22:17: ICN001 `numpy` should be imported as `np`
+custom.py:23:18: ICN001 `pandas` should be imported as `pd`
+custom.py:24:19: ICN001 `seaborn` should be imported as `sns`
+custom.py:25:22: ICN001 `tensorflow` should be imported as `tf`
+custom.py:26:21: ICN001 `holoviews` should be imported as `hv`
+custom.py:27:17: ICN001 `panel` should be imported as `pn`
+custom.py:28:26: ICN001 `plotly.express` should be imported as `px`
+custom.py:29:22: ICN001 `matplotlib` should be imported as `mpl`
+custom.py:30:18: ICN001 `polars` should be imported as `pl`
+custom.py:31:19: ICN001 `pyarrow` should be imported as `pa`
+custom.py:50:8: ICN001 `numpy.typing` should be imported as `npt`
+custom.py:51:24: ICN001 `numpy.typing` should be imported as `npt`

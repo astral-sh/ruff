@@ -65,3 +65,8 @@ help: Replace with `@singledispatchmethod`
 24 24 |     @staticmethod
 25 25 |     def do(position):
 26 26 |         pass
+
+## Concise Output
+singledispatch_method.py:10:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods
+singledispatch_method.py:15:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods
+singledispatch_method.py:23:5: PLE1519 [*] `@singledispatch` decorator should not be used on methods

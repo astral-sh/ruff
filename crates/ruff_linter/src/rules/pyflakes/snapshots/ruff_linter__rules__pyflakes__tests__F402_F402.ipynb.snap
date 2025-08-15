@@ -21,3 +21,7 @@ F402 Import `path` from cell 1, line 2 shadowed by loop variable
   |     ^^^^
 6 |     pass
   |
+
+## Concise Output
+F402.ipynb:3:5: F402 Import `os` from cell 1, line 1 shadowed by loop variable
+F402.ipynb:5:5: F402 Import `path` from cell 1, line 2 shadowed by loop variable

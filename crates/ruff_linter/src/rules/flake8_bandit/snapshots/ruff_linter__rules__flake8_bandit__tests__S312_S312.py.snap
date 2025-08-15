@@ -19,3 +19,7 @@ S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
 15 |
 16 | def _() -> Telnet: ...
    |
+
+## Concise Output
+S312.py:3:1: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.
+S312.py:14:24: S312 Telnet is considered insecure. Use SSH or some other encrypted protocol.

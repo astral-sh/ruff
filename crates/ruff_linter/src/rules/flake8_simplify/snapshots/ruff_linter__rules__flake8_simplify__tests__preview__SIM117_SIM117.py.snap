@@ -351,3 +351,19 @@ help: Combine `with` statements
 165     |-        pass
     163 |+async with asyncio.timeout(1), A(), B():
     164 |+    pass
+
+## Concise Output
+SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:47:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:95:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:100:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:106:5: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements

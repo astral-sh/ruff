@@ -85,3 +85,13 @@ TID253 `torch` is banned at the module level
 19 |
 20 | # unlike TID251, inline imports are *not* banned
    |
+
+## Concise Output
+TID253.py:2:8: TID253 `torch` is banned at the module level
+TID253.py:4:1: TID253 `torch` is banned at the module level
+TID253.py:6:1: TID253 `tensorflow` is banned at the module level
+TID253.py:8:8: TID253 `torch` is banned at the module level
+TID253.py:11:15: TID253 `tensorflow` is banned at the module level
+TID253.py:14:8: TID253 `torch` is banned at the module level
+TID253.py:16:1: TID253 `tensorflow` is banned at the module level
+TID253.py:18:1: TID253 `torch` is banned at the module level

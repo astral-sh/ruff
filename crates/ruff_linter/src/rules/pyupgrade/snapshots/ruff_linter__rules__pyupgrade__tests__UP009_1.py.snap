@@ -17,3 +17,6 @@ help: Remove unnecessary coding comment
 2   |-# -*- coding: utf-8 -*-
 3 2 | 
 4 3 | print('Hello world')
+
+## Concise Output
+UP009_1.py:2:1: UP009 [*] UTF-8 encoding declaration is unnecessary

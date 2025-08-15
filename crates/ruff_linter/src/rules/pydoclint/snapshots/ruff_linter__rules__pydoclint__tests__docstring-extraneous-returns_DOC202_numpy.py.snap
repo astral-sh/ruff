@@ -46,3 +46,7 @@ DOC202 Docstring should not have a returns section because the function doesn't 
 49 |           print('test')
    |
 help: Remove the "Returns" section
+
+## Concise Output
+DOC202_numpy.py:16:5: DOC202 Docstring should not have a returns section because the function doesn't return anything
+DOC202_numpy.py:36:9: DOC202 Docstring should not have a returns section because the function doesn't return anything

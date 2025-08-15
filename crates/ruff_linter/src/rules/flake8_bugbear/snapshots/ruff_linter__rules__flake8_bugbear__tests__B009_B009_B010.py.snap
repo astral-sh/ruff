@@ -396,3 +396,23 @@ help: Replace `getattr` with attribute access
 70 70 | 
 71 71 | # Regression test for: https://github.com/astral-sh/ruff/issues/18353
 72 72 | setattr(foo, "__debug__", 0)
+
+## Concise Output
+B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:20:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:21:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:22:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:23:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:27:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:28:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:29:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:30:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:31:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:32:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:33:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:34:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+B009_B010.py:69:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.

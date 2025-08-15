@@ -10,3 +10,6 @@ PLR0913 Too many arguments in function definition (6 > 5)
    |     ^
 10 |     pass
    |
+
+## Concise Output
+too_many_arguments_params.py:9:5: PLR0913 Too many arguments in function definition (6 > 5)

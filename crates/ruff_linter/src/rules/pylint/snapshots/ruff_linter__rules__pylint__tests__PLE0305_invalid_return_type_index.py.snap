@@ -44,3 +44,10 @@ PLE0305 `__index__` does not return an integer
    |         ^^^^^^^^^
 28 |         print("ruff")  # [invalid-index-return]
    |
+
+## Concise Output
+invalid_return_type_index.py:8:16: PLE0305 `__index__` does not return an integer
+invalid_return_type_index.py:13:16: PLE0305 `__index__` does not return an integer
+invalid_return_type_index.py:18:16: PLE0305 `__index__` does not return an integer
+invalid_return_type_index.py:23:16: PLE0305 `__index__` does not return an integer
+invalid_return_type_index.py:27:9: PLE0305 `__index__` does not return an integer

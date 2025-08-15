@@ -1451,3 +1451,68 @@ help: Convert to f-string
 270 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 271     |-x: "'{} + {}'.format(x, y)"
     271 |+x: "f'{x} + {y}'"
+
+## Concise Output
+UP032_0.py:5:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:7:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:9:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:11:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:13:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:15:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:17:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:19:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:21:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:23:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:25:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:27:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:29:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:31:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:33:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:35:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:37:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:39:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:41:7: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:43:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:45:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:47:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:49:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:51:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:53:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:55:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:57:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:59:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:61:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:65:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:69:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:73:85: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:79:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:81:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:86:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:94:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:104:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:111:11: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:115:10: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:118:7: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:122:12: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:126:12: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:129:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:160:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:164:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:174:84: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:202:1: UP032 Use f-string instead of `format` call
+UP032_0.py:209:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:231:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:236:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:240:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:245:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:248:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:251:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:254:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:261:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:264:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:267:1: UP032 [*] Use f-string instead of `format` call
+UP032_0.py:271:5: UP032 [*] Use f-string instead of `format` call

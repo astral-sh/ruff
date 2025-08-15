@@ -87,3 +87,9 @@ help: Convert to `datetime.UTC` alias
 27 27 | 
 28    |-    print(dt.timezone.utc)
    28 |+    print(dt.UTC)
+
+## Concise Output
+UP017.py:10:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:16:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:22:11: UP017 [*] Use `datetime.UTC` alias
+UP017.py:28:11: UP017 [*] Use `datetime.UTC` alias

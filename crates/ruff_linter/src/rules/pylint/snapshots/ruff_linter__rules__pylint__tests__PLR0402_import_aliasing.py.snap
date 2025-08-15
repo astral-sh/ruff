@@ -56,3 +56,8 @@ PLR0402 Use `from foo.bar import foobar` in lieu of alias
 14 | import os as OS
    |
 help: Replace with `from foo.bar import foobar`
+
+## Concise Output
+import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
+import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
+import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of alias

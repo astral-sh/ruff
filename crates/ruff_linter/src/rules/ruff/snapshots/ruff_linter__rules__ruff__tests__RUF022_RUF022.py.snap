@@ -1109,3 +1109,40 @@ help: Apply an isort-style sorting to `__all__`
 263 263 |     # strange multiline comment comment 2a
 264 264 |     # strange multiline comment 2b
 265 265 |     ,
+
+## Concise Output
+RUF022.py:5:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:6:12: RUF022 [*] `__all__` is not sorted
+RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:11:17: RUF022 [*] `__all__` is not sorted
+RUF022.py:14:18: RUF022 [*] `__all__` is not sorted
+RUF022.py:17:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:19:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:21:22: RUF022 [*] `__all__` is not sorted
+RUF022.py:23:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:24:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:25:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:26:19: RUF022 [*] `__all__` is not sorted
+RUF022.py:32:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:40:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:54:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:101:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:110:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:125:28: RUF022 [*] `__all__` is not sorted
+RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:145:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:155:5: RUF022 [*] `__all__` is not sorted
+RUF022.py:164:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:174:5: RUF022 [*] `__all__` is not sorted
+RUF022.py:183:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:188:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:192:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:204:11: RUF022 `__all__` is not sorted
+RUF022.py:211:11: RUF022 `__all__` is not sorted
+RUF022.py:219:11: RUF022 `__all__` is not sorted
+RUF022.py:225:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:229:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:233:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:243:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:253:11: RUF022 [*] `__all__` is not sorted

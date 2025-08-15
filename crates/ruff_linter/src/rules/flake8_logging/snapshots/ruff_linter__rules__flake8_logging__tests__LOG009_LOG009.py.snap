@@ -40,3 +40,7 @@ help: Replace `logging.WARN` with `logging.WARNING`
 11    |-    WARN  # LOG009
    11 |+    WARNING  # LOG009
 12 12 |     WARNING  # OK
+
+## Concise Output
+LOG009.py:4:5: LOG009 [*] Use of undocumented `logging.WARN` constant
+LOG009.py:11:5: LOG009 [*] Use of undocumented `logging.WARN` constant

@@ -27,3 +27,8 @@ PLW0406 Module `import_self.module` imports itself
 3 | from . import module
   |               ^^^^^^
   |
+
+## Concise Output
+module.py:1:8: PLW0406 Module `import_self.module` imports itself
+module.py:2:25: PLW0406 Module `import_self.module` imports itself
+module.py:3:15: PLW0406 Module `import_self.module` imports itself

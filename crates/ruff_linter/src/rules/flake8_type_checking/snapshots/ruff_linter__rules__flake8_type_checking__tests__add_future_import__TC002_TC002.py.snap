@@ -257,4 +257,15 @@ help: Move into type-checking block
 172     |-    from module import Member
 173 176 | 
 174 177 |     x: Member = 1
-175 178 |
+175 178 | 
+
+## Concise Output
+TC002.py:5:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:11:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:17:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:23:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:29:24: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:35:37: TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+TC002.py:41:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:47:22: TC002 [*] Move third-party import `pandas` into a type-checking block
+TC002.py:172:24: TC002 [*] Move third-party import `module.Member` into a type-checking block

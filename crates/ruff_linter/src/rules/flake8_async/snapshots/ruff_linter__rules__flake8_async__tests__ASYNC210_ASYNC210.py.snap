@@ -252,3 +252,30 @@ ASYNC210 Async functions should not call blocking HTTP methods
 54 |
 55 |     r = {}
    |
+
+## Concise Output
+ASYNC210.py:8:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:12:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:16:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:20:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:24:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:28:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:29:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:31:11: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:32:11: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:32:24: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:34:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:35:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:36:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:37:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:38:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:39:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:42:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:43:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:44:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:45:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:46:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:47:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:50:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:51:5: ASYNC210 Async functions should not call blocking HTTP methods
+ASYNC210.py:53:5: ASYNC210 Async functions should not call blocking HTTP methods

@@ -58,3 +58,8 @@ help: Replace with `True`
 8 8 |     pass
 9 9 | 
 10 10 | if a:
+
+## Concise Output
+SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
+SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
+SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`

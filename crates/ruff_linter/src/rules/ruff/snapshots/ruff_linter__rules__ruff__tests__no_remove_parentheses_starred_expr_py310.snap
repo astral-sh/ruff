@@ -177,3 +177,13 @@ help: Remove parentheses
 29 29 | d[()] # empty tuples should be ignored
 30 30 | d[:,] # slices in the subscript lead to syntax error if parens are added
 31 31 | d[1,2,:]
+
+## Concise Output
+RUF031.py:2:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:3:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:11:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:12:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:13:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:20:3: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:24:5: RUF031 [*] Avoid parentheses for tuples in subscripts
+RUF031.py:28:3: RUF031 [*] Avoid parentheses for tuples in subscripts

@@ -239,4 +239,17 @@ help: Replace with string literal
    96 |+val = decimal.Decimal("-10.0")  # Should error
 97 97 | 
 98 98 | val = decimal.Decimal("-10.0")
-99 99 |
+99 99 | 
+
+## Concise Output
+RUF032.py:6:17: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:12:17: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:18:17: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:33:15: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:39:15: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:45:15: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:56:15: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:58:15: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:88:23: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:92:23: RUF032 [*] `Decimal()` called with float literal argument
+RUF032.py:96:23: RUF032 [*] `Decimal()` called with float literal argument

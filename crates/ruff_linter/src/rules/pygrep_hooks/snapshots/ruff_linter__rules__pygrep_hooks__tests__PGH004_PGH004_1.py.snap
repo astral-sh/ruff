@@ -7,3 +7,6 @@ PGH004 Use specific rule codes when using `noqa`
 1 | #noqa
   | ^^^^^
   |
+
+## Concise Output
+PGH004_1.py:1:1: PGH004 Use specific rule codes when using `noqa`

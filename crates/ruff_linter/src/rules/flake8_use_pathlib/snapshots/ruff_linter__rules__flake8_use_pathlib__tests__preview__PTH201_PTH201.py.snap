@@ -440,3 +440,25 @@ help: Remove the current directory argument
 77 77 | _ = PureWindowsPath(".")
 78    |-_ = PackagePath(".")
    78 |+_ = PackagePath()
+
+## Concise Output
+PTH201.py:6:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:7:9: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:8:14: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:9:10: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:11:6: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:14:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:18:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:22:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:26:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:31:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:36:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:40:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:44:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:48:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:55:5: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:74:15: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:75:19: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:76:17: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:77:21: PTH201 [*] Do not pass the current directory explicitly to `Path`
+PTH201.py:78:17: PTH201 [*] Do not pass the current directory explicitly to `Path`

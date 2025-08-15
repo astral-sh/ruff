@@ -40,3 +40,9 @@ TRY002 Create your own exception
 41 |         raise BaseException
    |               ^^^^^^^^^^^^^
    |
+
+## Concise Output
+TRY002.py:13:15: TRY002 Create your own exception
+TRY002.py:17:15: TRY002 Create your own exception
+TRY002.py:37:15: TRY002 Create your own exception
+TRY002.py:41:15: TRY002 Create your own exception

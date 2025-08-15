@@ -516,3 +516,29 @@ help: Use a single compare expression
 147 147 | 
 148     |-a < (b) and (((b)) < c)
     148 |+(a < (b) < c)
+
+## Concise Output
+boolean_chained_comparison.py:8:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:14:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:20:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:26:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:36:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:42:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:48:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:54:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:65:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:65:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:73:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:73:14: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:73:24: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:123:2: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:124:1: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:125:3: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:126:2: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:127:4: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:129:2: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:129:11: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:132:1: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:135:1: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:141:5: PLR1716 [*] Contains chained boolean comparison that can be simplified
+boolean_chained_comparison.py:148:1: PLR1716 [*] Contains chained boolean comparison that can be simplified

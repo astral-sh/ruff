@@ -167,3 +167,13 @@ help: Remove implied `scope` argument
 70 66 |     name2=name, name3="my_fixture", **kwargs
 71 67 | )
 72 68 | def error_multiple_args():
+
+## Concise Output
+PT003.py:14:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:19:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:24:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:29:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:37:31: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:43:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:52:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`

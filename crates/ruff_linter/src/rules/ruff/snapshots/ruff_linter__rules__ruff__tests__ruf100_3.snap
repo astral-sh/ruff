@@ -516,3 +516,30 @@ help: Remove unused `noqa` directive
 30 30 | print(a)  # comment with unicode µ    # noqa: E501
 31    |-print(a)  # comment with unicode µ    # noqa: E501, F821
    31 |+print(a)  # comment with unicode µ    # noqa: F821
+
+## Concise Output
+RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:26:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:27:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:28:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:30:7: F821 Undefined name `a`
+RUF100_3.py:30:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:31:39: RUF100 [*] Unused `noqa` directive (unused: `E501`)

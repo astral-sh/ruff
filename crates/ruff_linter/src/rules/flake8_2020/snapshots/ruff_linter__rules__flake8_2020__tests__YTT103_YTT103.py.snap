@@ -51,3 +51,10 @@ YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
 8 | sys.version >= "3.5"
   | ^^^^^^^^^^^
   |
+
+## Concise Output
+YTT103.py:4:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+YTT103.py:5:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+YTT103.py:6:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+YTT103.py:7:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+YTT103.py:8:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`

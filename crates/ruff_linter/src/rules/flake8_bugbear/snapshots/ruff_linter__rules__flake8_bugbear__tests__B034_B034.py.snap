@@ -108,3 +108,15 @@ B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid conf
 15 |
 16 | # OK
    |
+
+## Concise Output
+B034.py:5:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:6:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:7:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:8:1: B034 `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:9:1: B034 `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:10:1: B034 `re.subn` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:11:1: B034 `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:12:1: B034 `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:13:1: B034 `re.split` should pass `maxsplit` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions
+B034.py:14:1: B034 `re.sub` should pass `count` and `flags` as keyword arguments to avoid confusion due to unintuitive argument positions

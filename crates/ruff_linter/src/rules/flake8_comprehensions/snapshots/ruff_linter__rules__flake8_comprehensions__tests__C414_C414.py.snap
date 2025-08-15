@@ -537,3 +537,29 @@ help: Remove the inner `list()` call
    45 |+    x_xxxx_xxxxxxxxxxx_xxxxx.xxxx(),  # xxxxxxxxxxx xxxxx xxxx xxx xx Nxxx
 46 46 |     key=lambda xxxxx: xxxxx or "",
 47 47 | )
+
+## Concise Output
+C414.py:2:1: C414 [*] Unnecessary `list()` call within `list()`
+C414.py:3:1: C414 [*] Unnecessary `tuple()` call within `list()`
+C414.py:4:1: C414 [*] Unnecessary `list()` call within `tuple()`
+C414.py:5:1: C414 [*] Unnecessary `tuple()` call within `tuple()`
+C414.py:6:1: C414 [*] Unnecessary `set()` call within `set()`
+C414.py:7:1: C414 [*] Unnecessary `list()` call within `set()`
+C414.py:8:1: C414 [*] Unnecessary `tuple()` call within `set()`
+C414.py:9:1: C414 [*] Unnecessary `sorted()` call within `set()`
+C414.py:10:1: C414 [*] Unnecessary `sorted()` call within `set()`
+C414.py:11:1: C414 [*] Unnecessary `reversed()` call within `set()`
+C414.py:12:1: C414 [*] Unnecessary `list()` call within `sorted()`
+C414.py:13:1: C414 [*] Unnecessary `tuple()` call within `sorted()`
+C414.py:14:1: C414 [*] Unnecessary `sorted()` call within `sorted()`
+C414.py:15:1: C414 [*] Unnecessary `sorted()` call within `sorted()`
+C414.py:16:1: C414 [*] Unnecessary `sorted()` call within `sorted()`
+C414.py:17:1: C414 [*] Unnecessary `reversed()` call within `sorted()`
+C414.py:18:1: C414 [*] Unnecessary `list()` call within `sorted()`
+C414.py:19:1: C414 [*] Unnecessary `list()` call within `tuple()`
+C414.py:25:1: C414 [*] Unnecessary `set()` call within `set()`
+C414.py:26:1: C414 [*] Unnecessary `list()` call within `set()`
+C414.py:27:1: C414 [*] Unnecessary `tuple()` call within `set()`
+C414.py:28:1: C414 [*] Unnecessary `reversed()` call within `sorted()`
+C414.py:37:27: C414 [*] Unnecessary `list()` call within `sorted()`
+C414.py:44:27: C414 [*] Unnecessary `list()` call within `sorted()`

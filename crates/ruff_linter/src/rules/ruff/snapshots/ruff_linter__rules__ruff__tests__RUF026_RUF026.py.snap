@@ -276,4 +276,20 @@ help: Replace with `defaultdict(default_factory=tuple)`
    76 |+        tuple, member=1,
 78 77 |     )  # RUF026
 79 78 | 
-80 79 |
+80 79 | 
+
+## Concise Output
+RUF026.py:11:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:15:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:19:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:23:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:27:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:34:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:38:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:44:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:52:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:56:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:60:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:64:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:68:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`
+RUF026.py:75:5: RUF026 [*] `default_factory` is a positional-only argument to `defaultdict`

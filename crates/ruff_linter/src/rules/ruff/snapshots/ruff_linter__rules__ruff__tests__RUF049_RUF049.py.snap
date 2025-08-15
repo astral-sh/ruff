@@ -71,3 +71,12 @@ RUF049 An enum class should not be decorated with `@dataclass`
 41 |   class E(Enum): ...
    |
 help: Remove either `@dataclass` or `Enum`
+
+## Concise Output
+RUF049.py:10:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:14:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:18:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:22:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:26:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:32:1: RUF049 An enum class should not be decorated with `@dataclass`
+RUF049.py:38:1: RUF049 An enum class should not be decorated with `@dataclass`

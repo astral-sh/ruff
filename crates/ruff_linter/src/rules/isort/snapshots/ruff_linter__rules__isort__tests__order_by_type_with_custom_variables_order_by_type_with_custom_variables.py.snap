@@ -16,3 +16,6 @@ help: Organize imports
   1 |+from subprocess import CONSTANT, Klass, exe, utils, var_ABC, Variable
   2 |+
   3 |+from sklearn.svm import CONST, Class, abc, MyVar, VAR
+
+## Concise Output
+order_by_type_with_custom_variables.py:1:1: I001 [*] Import block is un-sorted or un-formatted

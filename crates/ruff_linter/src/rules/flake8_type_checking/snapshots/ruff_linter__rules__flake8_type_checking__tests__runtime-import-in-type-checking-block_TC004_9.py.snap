@@ -43,4 +43,8 @@ help: Move out of type-checking block
   5 |+    from typing import Dict
 5 6 | 
 6 7 | x: Tuple
-7 8 |
+7 8 | 
+
+## Concise Output
+TC004_9.py:4:24: TC004 [*] Move import `typing.Tuple` out of type-checking block. Import is used for more than type hinting.
+TC004_9.py:4:31: TC004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.

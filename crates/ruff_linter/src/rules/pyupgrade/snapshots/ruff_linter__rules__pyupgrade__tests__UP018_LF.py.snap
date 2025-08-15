@@ -41,3 +41,7 @@ help: Replace with integer literal
 6   |-int(+
   6 |+(+
 7 7 |     1)
+
+## Concise Output
+UP018_LF.py:3:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
+UP018_LF.py:6:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)

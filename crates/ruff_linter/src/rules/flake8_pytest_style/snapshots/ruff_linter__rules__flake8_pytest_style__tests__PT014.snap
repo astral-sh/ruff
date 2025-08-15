@@ -193,3 +193,15 @@ help: Remove duplicate test case
    56 |+@pytest.mark.parametrize('data, spec', [(1.0, 1.0)])
 57 57 | def test_numbers(data, spec):
 58 58 |     ...
+
+## Concise Output
+PT014.py:4:35: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:14:35: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:14:41: PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
+PT014.py:14:44: PT014 [*] Duplicate of test case at index 2 in `pytest.mark.parametrize`
+PT014.py:24:9: PT014 Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:32:39: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:32:48: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:42:10: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:44:11: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`
+PT014.py:56:53: PT014 [*] Duplicate of test case at index 0 in `pytest.mark.parametrize`

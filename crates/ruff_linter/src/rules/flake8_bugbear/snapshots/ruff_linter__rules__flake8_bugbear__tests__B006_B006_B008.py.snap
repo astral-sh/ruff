@@ -483,3 +483,30 @@ help: Replace with `None`; initialize within function
 313     |-def single_line_func_wrong(value: dict[str, str] = {}):
     313 |+def single_line_func_wrong(value: dict[str, str] = None):
 314 314 |     """Docstring without newline"""
+
+## Concise Output
+B006_B008.py:63:25: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:67:30: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:73:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:77:31: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:82:36: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:85:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:89:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:93:32: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:97:26: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:102:46: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:106:46: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:110:45: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:114:33: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:239:20: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:276:27: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:277:35: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:278:62: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:279:80: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:284:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:288:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:293:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:297:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:302:52: B006 [*] Do not use mutable data structures for argument defaults
+B006_B008.py:308:52: B006 Do not use mutable data structures for argument defaults
+B006_B008.py:313:52: B006 [*] Do not use mutable data structures for argument defaults

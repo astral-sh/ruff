@@ -82,3 +82,13 @@ PYI006 Use `<` or `>=` for `sys.version_info` comparisons
 20 | elif python_version == (3, 11): ...  # Error: PYI006 Use only `<` and `>=` for version info comparisons
    |      ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+PYI006.pyi:8:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:10:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:12:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:14:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:16:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:17:6: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:19:4: PYI006 Use `<` or `>=` for `sys.version_info` comparisons
+PYI006.pyi:20:6: PYI006 Use `<` or `>=` for `sys.version_info` comparisons

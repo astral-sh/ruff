@@ -30,3 +30,8 @@ PYI035 `__slots__` in a stub file must have a value, as it has the same semantic
  9 |
 10 | class Bar:
    |
+
+## Concise Output
+PYI035.pyi:1:1: PYI035 `__all__` in a stub file must have a value, as it has the same semantics as `__all__` at runtime
+PYI035.pyi:7:5: PYI035 `__match_args__` in a stub file must have a value, as it has the same semantics as `__match_args__` at runtime
+PYI035.pyi:8:5: PYI035 `__slots__` in a stub file must have a value, as it has the same semantics as `__slots__` at runtime

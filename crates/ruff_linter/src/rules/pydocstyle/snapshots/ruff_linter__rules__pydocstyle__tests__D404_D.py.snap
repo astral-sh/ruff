@@ -36,3 +36,9 @@ D404 First word of the docstring should not be "This"
 641 | def same_line(): """This is a docstring on the same line"""
     |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
+
+## Concise Output
+D.py:631:5: D404 First word of the docstring should not be "This"
+D.py:636:5: D404 First word of the docstring should not be "This"
+D.py:639:17: D404 First word of the docstring should not be "This"
+D.py:641:18: D404 First word of the docstring should not be "This"

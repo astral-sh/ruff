@@ -37,3 +37,9 @@ F704 `await` statement outside of a function
 12 |
 13 | def _():
    |
+
+## Concise Output
+F704.py:6:5: F704 `yield` statement outside of a function
+F704.py:9:1: F704 `yield` statement outside of a function
+F704.py:10:1: F704 `yield from` statement outside of a function
+F704.py:11:1: F704 `await` statement outside of a function

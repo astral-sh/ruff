@@ -73,3 +73,9 @@ D210 No whitespaces allowed surrounding docstring text
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Trim surrounding whitespace
+
+## Concise Output
+D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
+D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
+D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
+D.py:581:5: D210 No whitespaces allowed surrounding docstring text

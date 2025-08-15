@@ -87,3 +87,9 @@ help: Set `stacklevel=2`
 33 33 | 
 34 34 | _my_prefixes = ("this","that")
 35 35 | warnings.warn("test", skip_file_prefixes = _my_prefixes)
+
+## Concise Output
+B028.py:8:1: B028 [*] No explicit `stacklevel` keyword argument found
+B028.py:9:1: B028 [*] No explicit `stacklevel` keyword argument found
+B028.py:22:1: B028 [*] No explicit `stacklevel` keyword argument found
+B028.py:32:1: B028 [*] No explicit `stacklevel` keyword argument found

@@ -363,3 +363,37 @@ PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
    | ^^^^^^^^^^^^^^^
    |
 help: Replace with `Path(...).stat().st_size`
+
+## Concise Output
+PTH202.py:10:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:11:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:12:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:13:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:15:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:16:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:17:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:19:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:20:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:21:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:22:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:24:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:25:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:26:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:27:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:29:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:30:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:31:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:32:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:34:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:35:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:36:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:39:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:43:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:50:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:56:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:61:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:64:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:69:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:71:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:78:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`
+PTH202.py:82:1: PTH202 `os.path.getsize` should be replaced by `Path.stat().st_size`

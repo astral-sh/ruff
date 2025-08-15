@@ -981,3 +981,42 @@ help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `PodGene
     112 |+from airflow.providers.cncf.kubernetes.pod_generator import PodGenerator
 112 113 | 
 113 114 | PodGeneratorDeprecated()
+
+## Concise Output
+AIR302_kubernetes.py:22:1: AIR302 [*] `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:23:1: AIR302 [*] `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:25:1: AIR302 [*] `airflow.kubernetes.k8s_model.K8SModel` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:26:1: AIR302 [*] `airflow.kubernetes.k8s_model.append_to_pod` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:28:1: AIR302 [*] `airflow.kubernetes.kube_client._disable_verify_ssl` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:29:1: AIR302 [*] `airflow.kubernetes.kube_client._enable_tcp_keepalive` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:30:1: AIR302 [*] `airflow.kubernetes.kube_client.get_kube_client` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:32:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.add_pod_suffix` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:33:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:34:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.create_pod_id` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:49:1: AIR302 [*] `airflow.kubernetes.pod_generator.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:50:1: AIR302 [*] `airflow.kubernetes.pod_generator.PodGenerator` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:51:1: AIR302 [*] `airflow.kubernetes.pod_generator.add_pod_suffix` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:52:1: AIR302 [*] `airflow.kubernetes.pod_generator.datetime_to_label_safe_datestring` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:53:1: AIR302 [*] `airflow.kubernetes.pod_generator.extend_object_field` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:54:1: AIR302 [*] `airflow.kubernetes.pod_generator.label_safe_datestring_to_datetime` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:55:1: AIR302 [*] `airflow.kubernetes.pod_generator.make_safe_label_value` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:56:1: AIR302 [*] `airflow.kubernetes.pod_generator.merge_objects` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:57:1: AIR302 [*] `airflow.kubernetes.pod_generator.rand_str` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:69:1: AIR302 [*] `airflow.kubernetes.pod_generator_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:70:1: AIR302 [*] `airflow.kubernetes.pod_generator_deprecated.PodGenerator` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:71:1: AIR302 [*] `airflow.kubernetes.pod_generator_deprecated.make_safe_label_value` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:73:1: AIR302 [*] `airflow.kubernetes.pod_launcher.PodLauncher` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:74:1: AIR302 [*] `airflow.kubernetes.pod_launcher.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:90:1: AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:91:1: AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.PodLauncher` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:92:1: AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:93:1: AIR302 [*] `airflow.kubernetes.pod_launcher_deprecated.get_kube_client` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:95:1: AIR302 [*] `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoEnv` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:96:1: AIR302 [*] `airflow.kubernetes.secret.K8SModel` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:97:1: AIR302 [*] `airflow.kubernetes.secret.Secret` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:98:1: AIR302 [*] `airflow.kubernetes.volume.Volume` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:99:1: AIR302 [*] `airflow.kubernetes.volume_mount.VolumeMount` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:107:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.annotations_to_key` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:108:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.get_logs_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:109:1: AIR302 [*] `airflow.kubernetes.kubernetes_helper_functions.rand_str` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR302_kubernetes.py:113:1: AIR302 [*] `airflow.kubernetes.pod_generator.PodGeneratorDeprecated` is moved into `cncf-kubernetes` provider in Airflow 3.0;

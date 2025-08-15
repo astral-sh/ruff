@@ -30,3 +30,8 @@ D419 Docstring is empty
 80 |         ''
    |         ^^
    |
+
+## Concise Output
+D.py:20:9: D419 Docstring is empty
+D.py:74:5: D419 Docstring is empty
+D.py:80:9: D419 Docstring is empty

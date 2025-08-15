@@ -9,3 +9,6 @@ S704 Unsafe use of `markupsafe.Markup` detected
 9 | Markup(cleaned)  # S704
   | ^^^^^^^^^^^^^^^
   |
+
+## Concise Output
+S704_whitelisted_markup_calls.py:9:1: S704 Unsafe use of `markupsafe.Markup` detected

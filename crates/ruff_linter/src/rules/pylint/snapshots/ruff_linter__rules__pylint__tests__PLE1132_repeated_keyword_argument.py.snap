@@ -84,3 +84,13 @@ PLE1132 Repeated keyword argument: `c`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |                              ^^^
    |
+
+## Concise Output
+repeated_keyword_argument.py:16:21: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:17:21: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:17:30: PLE1132 Repeated keyword argument: `a`
+repeated_keyword_argument.py:18:27: PLE1132 Repeated keyword argument: `b`
+repeated_keyword_argument.py:18:36: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:18:45: PLE1132 Repeated keyword argument: `a`
+repeated_keyword_argument.py:19:34: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:20:30: PLE1132 Repeated keyword argument: `c`

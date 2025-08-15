@@ -30,4 +30,7 @@ help: Move into type-checking block
 20    |-    from . import TYP001
 21 24 | 
 22 25 |     x: TYP001
-23 26 |
+23 26 | 
+
+## Concise Output
+TC001.py:20:19: TC001 [*] Move application import `.TYP001` into a type-checking block

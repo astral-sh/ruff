@@ -811,3 +811,38 @@ help: Use `secrets_masker` from `airflow.sdk.execution_time` instead.
 112 112 | 
 113 113 | #  airflow.utils.log
 114 114 | secrets_masker
+
+## Concise Output
+AIR301_names_fix.py:17:1: AIR301 [*] `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
+AIR301_names_fix.py:19:1: AIR301 [*] `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
+AIR301_names_fix.py:21:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+AIR301_names_fix.py:22:1: AIR301 [*] `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
+AIR301_names_fix.py:23:1: AIR301 [*] `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
+AIR301_names_fix.py:25:1: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+AIR301_names_fix.py:27:1: AIR301 [*] `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+AIR301_names_fix.py:28:1: AIR301 [*] `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
+AIR301_names_fix.py:30:1: AIR301 [*] `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+AIR301_names_fix.py:32:1: AIR301 [*] `airflow.security.permissions.RESOURCE_DATASET` is removed in Airflow 3.0
+AIR301_names_fix.py:40:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
+AIR301_names_fix.py:41:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Airflow 3.0
+AIR301_names_fix.py:47:1: AIR301 [*] `airflow.operators.python.get_current_context` is removed in Airflow 3.0
+AIR301_names_fix.py:52:1: AIR301 [*] `airflow.providers.mysql.datasets.mysql.sanitize_uri` is removed in Airflow 3.0
+AIR301_names_fix.py:57:1: AIR301 [*] `airflow.providers.postgres.datasets.postgres.sanitize_uri` is removed in Airflow 3.0
+AIR301_names_fix.py:62:1: AIR301 [*] `airflow.providers.trino.datasets.trino.sanitize_uri` is removed in Airflow 3.0
+AIR301_names_fix.py:67:1: AIR301 [*] `airflow.notifications.basenotifier.BaseNotifier` is removed in Airflow 3.0
+AIR301_names_fix.py:72:1: AIR301 [*] `airflow.auth.managers.base_auth_manager.BaseAuthManager` is removed in Airflow 3.0
+AIR301_names_fix.py:87:1: AIR301 [*] `airflow.configuration.get` is removed in Airflow 3.0
+AIR301_names_fix.py:87:6: AIR301 [*] `airflow.configuration.getboolean` is removed in Airflow 3.0
+AIR301_names_fix.py:87:18: AIR301 [*] `airflow.configuration.getfloat` is removed in Airflow 3.0
+AIR301_names_fix.py:87:28: AIR301 [*] `airflow.configuration.getint` is removed in Airflow 3.0
+AIR301_names_fix.py:87:36: AIR301 [*] `airflow.configuration.has_option` is removed in Airflow 3.0
+AIR301_names_fix.py:87:48: AIR301 [*] `airflow.configuration.remove_option` is removed in Airflow 3.0
+AIR301_names_fix.py:87:63: AIR301 [*] `airflow.configuration.as_dict` is removed in Airflow 3.0
+AIR301_names_fix.py:87:72: AIR301 [*] `airflow.configuration.set` is removed in Airflow 3.0
+AIR301_names_fix.py:91:1: AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
+AIR301_names_fix.py:96:1: AIR301 [*] `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
+AIR301_names_fix.py:97:1: AIR301 [*] `airflow.hooks.base_hook.BaseHook` is removed in Airflow 3.0
+AIR301_names_fix.py:103:1: AIR301 [*] `airflow.utils.helpers.chain` is removed in Airflow 3.0
+AIR301_names_fix.py:104:1: AIR301 [*] `airflow.utils.helpers.cross_downstream` is removed in Airflow 3.0
+AIR301_names_fix.py:109:1: AIR301 [*] `airflow.utils.file.TemporaryDirectory` is removed in Airflow 3.0
+AIR301_names_fix.py:114:1: AIR301 [*] `airflow.utils.log.secrets_masker` is removed in Airflow 3.0

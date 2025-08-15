@@ -528,3 +528,32 @@ help: Combine string literals
 94 94 | 
 95 95 | 
 96 96 | # Mixed literal + non-literal scenarios
+
+## Concise Output
+ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:48:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:50:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:72:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:72:9: ISC001 Implicitly concatenated string literals on one line
+ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:84:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:85:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:86:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:87:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:88:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC.py:93:5: ISC001 [*] Implicitly concatenated string literals on one line

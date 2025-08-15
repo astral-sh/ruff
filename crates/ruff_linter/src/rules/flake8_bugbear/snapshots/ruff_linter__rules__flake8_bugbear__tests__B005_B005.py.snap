@@ -88,3 +88,13 @@ B005 Using `.strip()` with multi-character strings is misleading
 25 |
 26 | from somewhere import other_type, strip
    |
+
+## Concise Output
+B005.py:4:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:7:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:10:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:13:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:16:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:19:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:22:1: B005 Using `.strip()` with multi-character strings is misleading
+B005.py:24:1: B005 Using `.strip()` with multi-character strings is misleading

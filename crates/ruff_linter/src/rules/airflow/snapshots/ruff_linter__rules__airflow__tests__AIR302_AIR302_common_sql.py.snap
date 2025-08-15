@@ -667,4 +667,37 @@ help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `SqlSensor` f
     115 |+from airflow.providers.common.sql.sensors.sql import SqlSensor
 116 116 | 
 117 117 | SqlSensor()
-118 118 |
+118 118 | 
+
+## Concise Output
+AIR302_common_sql.py:8:1: AIR302 [*] `airflow.hooks.dbapi.ConnectorProtocol` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:9:1: AIR302 [*] `airflow.hooks.dbapi.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:14:1: AIR302 [*] `airflow.hooks.dbapi_hook.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:15:1: AIR302 [*] `airflow.operators.check_operator.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:21:1: AIR302 [*] `airflow.operators.sql.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:22:1: AIR302 [*] `airflow.operators.check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:27:1: AIR302 [*] `airflow.operators.druid_check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:32:1: AIR302 [*] `airflow.operators.presto_check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:42:1: AIR302 [*] `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:43:1: AIR302 [*] `airflow.operators.presto_check_operator.PrestoCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:44:1: AIR302 [*] `airflow.operators.check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:45:1: AIR302 [*] `airflow.operators.check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:54:1: AIR302 [*] `airflow.operators.presto_check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:55:1: AIR302 [*] `airflow.operators.sql.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:56:1: AIR302 [*] `airflow.operators.presto_check_operator.PrestoIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:64:1: AIR302 [*] `airflow.operators.check_operator.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:65:1: AIR302 [*] `airflow.operators.check_operator.ThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:70:1: AIR302 [*] `airflow.operators.sql.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:78:1: AIR302 [*] `airflow.operators.check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:79:1: AIR302 [*] `airflow.operators.check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:88:1: AIR302 [*] `airflow.operators.sql.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:89:1: AIR302 [*] `airflow.operators.presto_check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:90:1: AIR302 [*] `airflow.operators.presto_check_operator.PrestoValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:102:1: AIR302 [*] `airflow.operators.sql.BaseSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:103:1: AIR302 [*] `airflow.operators.sql.BranchSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:104:1: AIR302 [*] `airflow.operators.sql.SQLTableCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:105:1: AIR302 [*] `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:106:1: AIR302 [*] `airflow.operators.sql._convert_to_float_if_possible` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:107:1: AIR302 [*] `airflow.operators.sql.parse_boolean` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:112:1: AIR302 [*] `airflow.sensors.sql.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;
+AIR302_common_sql.py:117:1: AIR302 [*] `airflow.sensors.sql_sensor.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;

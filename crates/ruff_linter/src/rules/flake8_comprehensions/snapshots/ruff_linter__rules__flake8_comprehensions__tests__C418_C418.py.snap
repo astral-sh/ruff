@@ -83,3 +83,9 @@ help: Remove outer `dict()` call
 7 5 | 
 8 6 | dict({}, a=1)
 9 7 | dict({x: 1 for x in range(1)}, a=1)
+
+## Concise Output
+C418.py:1:1: C418 [*] Unnecessary dict literal passed to `dict()` (remove the outer call to `dict()`)
+C418.py:2:1: C418 [*] Unnecessary dict literal passed to `dict()` (remove the outer call to `dict()`)
+C418.py:3:1: C418 [*] Unnecessary dict comprehension passed to `dict()` (remove the outer call to `dict()`)
+C418.py:4:1: C418 [*] Unnecessary dict comprehension passed to `dict()` (remove the outer call to `dict()`)

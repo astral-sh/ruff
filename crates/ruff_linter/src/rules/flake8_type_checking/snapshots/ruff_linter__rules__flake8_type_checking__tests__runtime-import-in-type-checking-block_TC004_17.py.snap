@@ -22,3 +22,6 @@ help: Move out of type-checking block
 7 8 | 
 8 9 | 
 9 10 | def example() -> DataFrame:
+
+## Concise Output
+TC004_17.py:6:24: TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is used for more than type hinting.

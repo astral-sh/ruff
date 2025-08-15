@@ -42,3 +42,10 @@ TC010 Invalid string member in `X | Y`-style union type
 16 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^
    |
+
+## Concise Output
+TC010_2.py:4:4: TC010 Invalid string member in `X | Y`-style union type
+TC010_2.py:5:5: TC010 Invalid string member in `X | Y`-style union type
+TC010_2.py:5:20: TC010 Invalid string member in `X | Y`-style union type
+TC010_2.py:12:20: TC010 Invalid string member in `X | Y`-style union type
+TC010_2.py:16:30: TC010 Invalid string member in `X | Y`-style union type

@@ -59,3 +59,7 @@ help: Move into type-checking block
 92 95 |     import pkgfoo.bar as B
 93 96 | 
 94 97 |     def test(value: pkg.A):
+
+## Concise Output
+strict.py:54:25: TC002 [*] Move third-party import `pkg.bar.A` into a type-checking block
+strict.py:91:12: TC002 [*] Move third-party import `pkg` into a type-checking block

@@ -413,3 +413,24 @@ help: Remove `print`
 107 107 | # - single StringLiteral
 108     |-assert True, builtins.print("This print should be removed.")
     108 |+assert True, "This print should be removed."
+
+## Concise Output
+RUF030.py:6:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:11:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:16:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:21:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:26:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:31:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:36:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:41:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:46:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:51:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:56:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:61:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:66:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:71:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:76:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:83:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:88:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:93:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional
+RUF030.py:108:14: RUF030 [*] `print()` call in `assert` statement is likely unintentional

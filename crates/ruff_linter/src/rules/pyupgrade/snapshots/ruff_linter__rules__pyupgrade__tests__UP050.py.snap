@@ -246,3 +246,16 @@ help: Remove `metaclass=type`
 83    |-class A(metaclass=builtins.type):
    83 |+class A:
 84 84 |     ...
+
+## Concise Output
+UP050.py:5:9: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:10:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:16:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:24:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:30:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:38:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:44:12: UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+UP050.py:50:5: UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+UP050.py:58:5: UP050 [*] Class `B` uses `metaclass=type`, which is redundant
+UP050.py:69:5: UP050 [*] Class `A` uses `metaclass=type`, which is redundant
+UP050.py:83:9: UP050 [*] Class `A` uses `metaclass=type`, which is redundant

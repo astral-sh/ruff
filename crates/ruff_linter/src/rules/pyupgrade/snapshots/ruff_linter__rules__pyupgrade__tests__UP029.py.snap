@@ -78,3 +78,9 @@ help: Remove unnecessary builtin import
 6 5 | import io
 7 6 | import six
 8 7 | import six.moves
+
+## Concise Output
+UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
+UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
+UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
+UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`

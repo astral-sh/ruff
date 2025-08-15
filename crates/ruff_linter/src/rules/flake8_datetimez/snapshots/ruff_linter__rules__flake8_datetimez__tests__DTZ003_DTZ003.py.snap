@@ -22,3 +22,7 @@ DTZ003 `datetime.datetime.utcnow()` used
 11 | # uses `astimezone` method
    |
 help: Use `datetime.datetime.now(tz=...)` instead
+
+## Concise Output
+DTZ003.py:4:1: DTZ003 `datetime.datetime.utcnow()` used
+DTZ003.py:9:1: DTZ003 `datetime.datetime.utcnow()` used

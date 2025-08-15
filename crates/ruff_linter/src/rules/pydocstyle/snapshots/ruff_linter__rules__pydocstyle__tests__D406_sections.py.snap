@@ -65,3 +65,8 @@ help: Add newline after "Parameters"
 602 602 |     ----------
 603 603 |     parameters:
 604 604 |         A list of string parameters
+
+## Concise Output
+sections.py:32:5: D406 [*] Section name should end with a newline ("Returns")
+sections.py:227:5: D406 [*] Section name should end with a newline ("Raises")
+sections.py:601:5: D406 [*] Section name should end with a newline ("Parameters")

@@ -15,3 +15,6 @@ help: Replace with `.error()`
 3 3 | 
 4   |-logger.exception("")
   4 |+logger.error("")
+
+## Concise Output
+LOG004_1.py:4:1: LOG004 [*] `.exception()` call outside exception handlers

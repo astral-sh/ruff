@@ -19,3 +19,6 @@ help: Replace with `contextlib.suppress(ImportError)`
   3 |+with contextlib.suppress(ImportError):
 3 4 |    from __builtin__ import bytes, str, open, super, range, zip, round, int, pow, object, input
 4   |-except ImportError:    pass
+
+## Concise Output
+SIM105_4.py:2:1: SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pass`

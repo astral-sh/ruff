@@ -134,4 +134,12 @@ help: Convert `X` to class syntax
 38    |-])
    36 |+class X(NamedTuple):
    37 |+    some_config: int
-39 38 |
+39 38 | 
+
+## Concise Output
+UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:14:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:17:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:20:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:36:1: UP014 [*] Convert `X` from `NamedTuple` functional to class syntax

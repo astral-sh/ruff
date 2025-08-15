@@ -153,3 +153,12 @@ help: Replace with comprehension
 17 17 | 
 18 18 | # Okay.
 19 19 | dict.fromkeys(pierogi_fillings)
+
+## Concise Output
+RUF024.py:9:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:10:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:11:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:12:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:13:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:14:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`
+RUF024.py:16:1: RUF024 [*] Do not pass mutable objects as values to `dict.fromkeys`

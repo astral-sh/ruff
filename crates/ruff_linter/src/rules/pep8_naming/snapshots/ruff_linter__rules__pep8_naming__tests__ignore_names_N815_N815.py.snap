@@ -60,3 +60,11 @@ N815 Variable `still_Bad` in class scope should not be mixedCase
 19 |     still_Bad: set
    |     ^^^^^^^^^
    |
+
+## Concise Output
+N815.py:3:5: N815 Variable `stillBad` in class scope should not be mixedCase
+N815.py:6:5: N815 Variable `_stillBad` in class scope should not be mixedCase
+N815.py:9:5: N815 Variable `still_Bad` in class scope should not be mixedCase
+N815.py:13:5: N815 Variable `stillBad` in class scope should not be mixedCase
+N815.py:16:5: N815 Variable `_stillBad` in class scope should not be mixedCase
+N815.py:19:5: N815 Variable `still_Bad` in class scope should not be mixedCase

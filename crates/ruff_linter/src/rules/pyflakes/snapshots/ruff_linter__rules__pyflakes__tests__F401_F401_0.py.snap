@@ -297,3 +297,20 @@ help: Remove unused import: `datameta_client_lib.model_helpers.noqa`
 120 120 | 
 121     |-from datameta_client_lib.model_helpers import (
 122     |-noqa )
+
+## Concise Output
+F401_0.py:2:8: F401 [*] `functools` imported but unused
+F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
+F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
+F401_0.py:32:12: F401 [*] `shelve` imported but unused
+F401_0.py:33:12: F401 [*] `importlib` imported but unused
+F401_0.py:37:12: F401 [*] `pathlib` imported but unused
+F401_0.py:52:16: F401 [*] `pickle` imported but unused
+F401_0.py:93:16: F401 [*] `x` imported but unused
+F401_0.py:94:16: F401 [*] `y` imported but unused
+F401_0.py:99:8: F401 [*] `foo.bar.baz` imported but unused
+F401_0.py:105:12: F401 [*] `a1` imported but unused
+F401_0.py:107:12: F401 [*] `a2` imported but unused
+F401_0.py:112:16: F401 [*] `b1` imported but unused
+F401_0.py:114:16: F401 [*] `b2` imported but unused
+F401_0.py:122:1: F401 [*] `datameta_client_lib.model_helpers.noqa` imported but unused

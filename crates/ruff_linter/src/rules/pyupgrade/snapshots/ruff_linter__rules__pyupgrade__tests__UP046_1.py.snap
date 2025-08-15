@@ -9,3 +9,6 @@ UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters
 12 |     var: AnyStr
    |
 help: Use type parameters
+
+## Concise Output
+UP046_1.py:11:14: UP046 Generic class `BadStr` uses `Generic` subclass instead of type parameters

@@ -73,3 +73,12 @@ F521 `.format` call has invalid format string: Empty attribute in format string
 10 |
 11 | # The following are all "good" uses of .format
    |
+
+## Concise Output
+F521.py:1:1: F521 `.format` call has invalid format string: Single '{' encountered in format string
+F521.py:2:1: F521 `.format` call has invalid format string: Single '}' encountered in format string
+F521.py:3:1: F521 `.format` call has invalid format string: Expected '}' before end of string
+F521.py:5:1: F521 `.format` call has invalid format string: Max format placeholder recursion exceeded
+F521.py:7:1: F521 `.format` call has invalid format string: Empty attribute in format string
+F521.py:8:1: F521 `.format` call has invalid format string: Empty attribute in format string
+F521.py:9:1: F521 `.format` call has invalid format string: Empty attribute in format string

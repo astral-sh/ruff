@@ -12,3 +12,6 @@ PERF203 `try`-`except` within a loop incurs performance overhead
 7 |
 8 |   # OK
   |
+
+## Concise Output
+PERF203.py:5:5: PERF203 `try`-`except` within a loop incurs performance overhead

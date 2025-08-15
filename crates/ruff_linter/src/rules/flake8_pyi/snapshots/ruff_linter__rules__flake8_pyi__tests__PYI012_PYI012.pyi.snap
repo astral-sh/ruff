@@ -122,3 +122,11 @@ help: Remove unnecessary `pass`
 29 28 | 
 30 29 |     def __init__():
 31 30 |         pass
+
+## Concise Output
+PYI012.pyi:5:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:8:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:16:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:20:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:23:5: PYI012 [*] Class body must not contain `pass`
+PYI012.pyi:28:5: PYI012 [*] Class body must not contain `pass`

@@ -19,3 +19,7 @@ D107 Missing docstring in `__init__`
     |         ^^^^^^^^
 535 |         pass
     |
+
+## Concise Output
+D.py:60:9: D107 Missing docstring in `__init__`
+D.py:534:9: D107 Missing docstring in `__init__`

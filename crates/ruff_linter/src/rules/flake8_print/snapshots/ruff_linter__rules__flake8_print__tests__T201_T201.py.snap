@@ -82,3 +82,9 @@ help: Remove `print`
 8 7 | 
 9 8 | with tempfile.NamedTemporaryFile() as fp:
 10 9 |     print("Hello, world!", file=fp)  # OK
+
+## Concise Output
+T201.py:4:1: T201 [*] `print` found
+T201.py:5:1: T201 [*] `print` found
+T201.py:6:1: T201 [*] `print` found
+T201.py:7:1: T201 [*] `print` found

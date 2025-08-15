@@ -18,3 +18,7 @@ ASYNC109 Async function definition with a `timeout` parameter
 10 |     ...
    |
 help: Use `asyncio.timeout` instead
+
+## Concise Output
+ASYNC109_1.py:5:16: ASYNC109 Async function definition with a `timeout` parameter
+ASYNC109_1.py:9:16: ASYNC109 Async function definition with a `timeout` parameter

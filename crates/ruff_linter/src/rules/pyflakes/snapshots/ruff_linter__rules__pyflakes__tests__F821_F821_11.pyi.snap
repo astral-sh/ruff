@@ -8,3 +8,6 @@ F821 Undefined name `os`
    |                            ^^
 16 |     pass
    |
+
+## Concise Output
+F821_11.pyi:15:28: F821 Undefined name `os`

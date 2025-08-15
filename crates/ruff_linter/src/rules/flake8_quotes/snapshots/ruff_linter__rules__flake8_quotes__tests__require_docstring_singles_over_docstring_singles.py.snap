@@ -157,3 +157,11 @@ help: Replace single multiline quotes with double quotes
 39    |-            '''
    39 |+            """
 40 40 |             pass
+
+## Concise Output
+docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred

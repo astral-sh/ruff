@@ -78,3 +78,9 @@ help: Replace with `a in (b, c)`
 15 15 |     d
 16 16 | 
 17 17 | # OK
+
+## Concise Output
+SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons

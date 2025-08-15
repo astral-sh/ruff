@@ -26,3 +26,8 @@ PGH004 Use specific rule codes when using `ruff: noqa`
   | ^^^^^^^^^^^^^^
 7 | import math as m
   |
+
+## Concise Output
+PGH004_2.py:1:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_2.py:2:1: PGH004 Use specific rule codes when using `ruff: noqa`
+PGH004_2.py:6:1: PGH004 Use specific rule codes when using `ruff: noqa`

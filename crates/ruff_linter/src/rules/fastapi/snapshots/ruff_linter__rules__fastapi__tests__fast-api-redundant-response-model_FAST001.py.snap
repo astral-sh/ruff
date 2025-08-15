@@ -202,4 +202,16 @@ help: Remove argument
     118 |+    @app_arg.get("/")
 119 119 |     async def get_root() -> str:
 120 120 |         return "Hello World!"
-121 121 |
+121 121 | 
+
+## Concise Output
+FAST001.py:17:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:22:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:27:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:32:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:37:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:42:21: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:47:21: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:48:22: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:53:24: FAST001 [*] FastAPI route with redundant `response_model` argument
+FAST001.py:118:23: FAST001 [*] FastAPI route with redundant `response_model` argument

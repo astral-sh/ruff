@@ -18,3 +18,7 @@ PLE0604 Invalid object in `__all__`, must contain only strings
 7 | __all__ = list([None, "Fruit", "Worm"])  # [invalid-all-object]
   | ^^^^^^^
   |
+
+## Concise Output
+invalid_all_object.py:1:1: PLE0604 Invalid object in `__all__`, must contain only strings
+invalid_all_object.py:7:1: PLE0604 Invalid object in `__all__`, must contain only strings

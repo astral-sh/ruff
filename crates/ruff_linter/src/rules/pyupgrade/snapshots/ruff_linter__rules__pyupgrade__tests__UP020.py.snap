@@ -41,3 +41,7 @@ help: Replace with builtin `open`
 8     |-with open("f.txt") as f:
    9  |+with builtins.open("f.txt") as f:
 9  10 |     print(f.read())
+
+## Concise Output
+UP020.py:3:6: UP020 [*] Use builtin `open`
+UP020.py:8:6: UP020 [*] Use builtin `open`

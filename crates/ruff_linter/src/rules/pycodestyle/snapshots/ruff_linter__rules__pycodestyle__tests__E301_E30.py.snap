@@ -104,3 +104,10 @@ help: Add missing blank line
 526 527 |     def bar(self, x: int | str) -> int | str:
 527 528 |         return x
 528 529 | # end
+
+## Concise Output
+E30.py:478:5: E301 [*] Expected 1 blank line, found 0
+E30.py:489:5: E301 [*] Expected 1 blank line, found 0
+E30.py:499:5: E301 [*] Expected 1 blank line, found 0
+E30.py:511:5: E301 [*] Expected 1 blank line, found 0
+E30.py:526:5: E301 [*] Expected 1 blank line, found 0

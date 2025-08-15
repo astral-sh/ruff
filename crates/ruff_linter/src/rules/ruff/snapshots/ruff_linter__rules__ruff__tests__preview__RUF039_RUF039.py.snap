@@ -494,3 +494,33 @@ RUF039 First argument to `re.compile()` is not raw string
    | |__^
    |
 help: Replace with raw string
+
+## Concise Output
+RUF039.py:5:12: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039.py:6:12: RUF039 [*] First argument to `re.findall()` is not raw string
+RUF039.py:7:13: RUF039 First argument to `re.finditer()` is not raw string
+RUF039.py:8:14: RUF039 [*] First argument to `re.fullmatch()` is not raw string
+RUF039.py:9:10: RUF039 [*] First argument to `re.match()` is not raw string
+RUF039.py:10:11: RUF039 [*] First argument to `re.search()` is not raw string
+RUF039.py:11:10: RUF039 [*] First argument to `re.split()` is not raw string
+RUF039.py:12:8: RUF039 First argument to `re.sub()` is not raw string
+RUF039.py:13:9: RUF039 [*] First argument to `re.subn()` is not raw bytes literal
+RUF039.py:15:15: RUF039 [*] First argument to `regex.compile()` is not raw string
+RUF039.py:16:15: RUF039 [*] First argument to `regex.findall()` is not raw string
+RUF039.py:17:16: RUF039 First argument to `regex.finditer()` is not raw string
+RUF039.py:18:17: RUF039 [*] First argument to `regex.fullmatch()` is not raw string
+RUF039.py:19:13: RUF039 [*] First argument to `regex.match()` is not raw string
+RUF039.py:20:14: RUF039 [*] First argument to `regex.search()` is not raw string
+RUF039.py:21:13: RUF039 [*] First argument to `regex.split()` is not raw string
+RUF039.py:22:11: RUF039 First argument to `regex.sub()` is not raw string
+RUF039.py:23:12: RUF039 [*] First argument to `regex.subn()` is not raw bytes literal
+RUF039.py:25:16: RUF039 [*] First argument to `regex.template()` is not raw string
+RUF039.py:59:12: RUF039 [*] First argument to `re.compile()` is not raw string
+RUF039.py:60:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:61:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:62:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:63:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:64:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:65:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:66:12: RUF039 First argument to `re.compile()` is not raw string
+RUF039.py:67:12: RUF039 First argument to `re.compile()` is not raw string

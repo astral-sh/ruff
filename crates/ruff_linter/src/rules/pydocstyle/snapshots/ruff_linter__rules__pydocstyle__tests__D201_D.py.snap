@@ -98,3 +98,10 @@ D201 No blank lines allowed before function docstring (found 1)
 731 |     ...
     |
 help: Remove blank line(s) before function docstring
+
+## Concise Output
+D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:729:5: D201 No blank lines allowed before function docstring (found 1)

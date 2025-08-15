@@ -59,4 +59,9 @@ help: Add parentheses
    59 |+@aliased()
 60 60 | def aliased_no_parentheses():
 61 61 |     return 42
-62 62 |
+62 62 | 
+
+## Concise Output
+PT001.py:9:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:34:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:59:1: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`

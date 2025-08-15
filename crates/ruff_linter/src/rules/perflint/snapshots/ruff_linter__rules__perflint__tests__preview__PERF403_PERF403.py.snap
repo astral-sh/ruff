@@ -394,3 +394,22 @@ help: Replace for loop with dict comprehension
 173 171 | 
 174 172 | 
 175 173 | # https://github.com/astral-sh/ruff/issues/19005
+
+## Concise Output
+PERF403.py:5:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:13:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:33:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:63:13: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:78:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:85:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:94:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:106:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:115:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:122:9: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:129:9: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:137:9: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:145:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:153:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:162:13: PERF403 [*] Use a dictionary comprehension instead of a for-loop
+PERF403.py:166:13: PERF403 [*] Use `dict.update` instead of a for-loop
+PERF403.py:172:9: PERF403 [*] Use a dictionary comprehension instead of a for-loop

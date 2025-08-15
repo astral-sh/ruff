@@ -108,3 +108,15 @@ PTH206 Replace `.split(os.sep)` with `Path.parts`
 18 |
 19 | # OK
    |
+
+## Concise Output
+PTH206.py:8:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:9:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:10:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:11:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:12:12: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:13:13: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:14:13: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:15:47: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:16:11: PTH206 Replace `.split(os.sep)` with `Path.parts`
+PTH206.py:17:30: PTH206 Replace `.split(os.sep)` with `Path.parts`

@@ -102,3 +102,10 @@ D202 No blank lines allowed after function docstring (found 1)
 731 |     ...
     |
 help: Remove blank line(s) after function docstring
+
+## Concise Output
+D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D.py:151:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
+D.py:729:5: D202 No blank lines allowed after function docstring (found 1)

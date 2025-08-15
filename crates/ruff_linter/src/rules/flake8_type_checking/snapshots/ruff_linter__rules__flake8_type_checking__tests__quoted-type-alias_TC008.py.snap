@@ -632,3 +632,33 @@ help: Remove quotes
 71 71 | r: TypeAlias = """int | None"""
 72    |-type R = """int | None"""
    72 |+type R = int | None
+
+## Concise Output
+TC008.py:15:16: TC008 [*] Remove quotes from type alias
+TC008.py:17:16: TC008 [*] Remove quotes from type alias
+TC008.py:20:16: TC008 [*] Remove quotes from type alias
+TC008.py:22:16: TC008 [*] Remove quotes from type alias
+TC008.py:23:20: TC008 [*] Remove quotes from type alias
+TC008.py:26:16: TC008 [*] Remove quotes from type alias
+TC008.py:27:17: TC008 [*] Remove quotes from type alias
+TC008.py:29:17: TC008 [*] Remove quotes from type alias
+TC008.py:32:10: TC008 [*] Remove quotes from type alias
+TC008.py:33:10: TC008 [*] Remove quotes from type alias
+TC008.py:34:10: TC008 [*] Remove quotes from type alias
+TC008.py:35:10: TC008 [*] Remove quotes from type alias
+TC008.py:36:14: TC008 [*] Remove quotes from type alias
+TC008.py:37:10: TC008 [*] Remove quotes from type alias
+TC008.py:38:10: TC008 [*] Remove quotes from type alias
+TC008.py:39:10: TC008 [*] Remove quotes from type alias
+TC008.py:40:11: TC008 [*] Remove quotes from type alias
+TC008.py:42:11: TC008 [*] Remove quotes from type alias
+TC008.py:48:14: TC008 [*] Remove quotes from type alias
+TC008.py:52:18: TC008 [*] Remove quotes from type alias
+TC008.py:55:16: TC008 [*] Remove quotes from type alias
+TC008.py:57:10: TC008 [*] Remove quotes from type alias
+TC008.py:61:17: TC008 [*] Remove quotes from type alias
+TC008.py:63:11: TC008 [*] Remove quotes from type alias
+TC008.py:66:16: TC008 [*] Remove quotes from type alias
+TC008.py:68:10: TC008 [*] Remove quotes from type alias
+TC008.py:71:16: TC008 [*] Remove quotes from type alias
+TC008.py:72:10: TC008 [*] Remove quotes from type alias

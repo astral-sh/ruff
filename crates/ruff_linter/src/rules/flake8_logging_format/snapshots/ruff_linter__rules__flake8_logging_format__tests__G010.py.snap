@@ -86,3 +86,9 @@ help: Convert to `warning`
 14 13 | warning("foo")
    14 |+warning("foo")
 15 15 | exception("foo")
+
+## Concise Output
+G010.py:6:9: G010 [*] Logging statement uses `warn` instead of `warning`
+G010.py:8:8: G010 [*] Logging statement uses `warn` instead of `warning`
+G010.py:10:11: G010 [*] Logging statement uses `warn` instead of `warning`
+G010.py:13:1: G010 [*] Logging statement uses `warn` instead of `warning`

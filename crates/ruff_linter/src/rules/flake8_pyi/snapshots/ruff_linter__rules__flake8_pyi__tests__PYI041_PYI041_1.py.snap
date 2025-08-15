@@ -378,3 +378,24 @@ help: Remove redundant type
 111     |-    def f3(self, arg: None | float | None | int | None = None) -> None:  # PYI041 - with fix
     111 |+    def f3(self, arg: None | float | None | None = None) -> None:  # PYI041 - with fix
 112 112 |         pass
+
+## Concise Output
+PYI041_1.py:23:14: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:27:30: PYI041 [*] Use `complex` instead of `float | complex`
+PYI041_1.py:31:28: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:35:26: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:39:24: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:43:26: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:47:26: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:51:26: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:55:26: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:60:10: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:68:9: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:80:24: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:83:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:86:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:89:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:92:25: PYI041 [*] Use `complex` instead of `int | float | complex`
+PYI041_1.py:99:23: PYI041 Use `float` instead of `int | float`
+PYI041_1.py:104:27: PYI041 [*] Use `float` instead of `int | float`
+PYI041_1.py:111:23: PYI041 [*] Use `float` instead of `int | float`

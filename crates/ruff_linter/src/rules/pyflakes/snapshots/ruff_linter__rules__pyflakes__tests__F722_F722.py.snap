@@ -73,3 +73,11 @@ F722 Syntax error in forward annotation: unexpected EOF while parsing
 44 | | """
    | |___^
    |
+
+## Concise Output
+F722.py:9:12: F722 Syntax error in forward annotation: Expected an expression
+F722.py:13:4: F722 Syntax error in forward annotation: Got unexpected token ☃
+F722.py:30:11: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
+F722.py:35:11: F722 Syntax error in forward annotation: Unexpected token at the end of an expression
+F722.py:39:11: F722 Syntax error in forward annotation: unexpected EOF while parsing
+F722.py:42:11: F722 Syntax error in forward annotation: unexpected EOF while parsing

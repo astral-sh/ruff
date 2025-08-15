@@ -73,3 +73,12 @@ D414 Section has no content ("Returns")
     |         ^^^^^^^
 564 |     """
     |
+
+## Concise Output
+sections.py:56:5: D414 Section has no content ("Returns")
+sections.py:67:5: D414 Section has no content ("Returns")
+sections.py:78:5: D414 Section has no content ("Returns")
+sections.py:80:5: D414 Section has no content ("Yields")
+sections.py:172:5: D414 Section has no content ("Returns")
+sections.py:266:5: D414 Section has no content ("Returns")
+sections.py:563:9: D414 Section has no content ("Returns")

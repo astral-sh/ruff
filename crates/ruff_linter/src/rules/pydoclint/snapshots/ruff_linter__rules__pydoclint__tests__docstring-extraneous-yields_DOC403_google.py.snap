@@ -38,3 +38,7 @@ DOC403 Docstring has a "Yields" section but the function doesn't yield anything
 39 |           print('test')
    |
 help: Remove the "Yields" section
+
+## Concise Output
+DOC403_google.py:14:5: DOC403 Docstring has a "Yields" section but the function doesn't yield anything
+DOC403_google.py:30:9: DOC403 Docstring has a "Yields" section but the function doesn't yield anything

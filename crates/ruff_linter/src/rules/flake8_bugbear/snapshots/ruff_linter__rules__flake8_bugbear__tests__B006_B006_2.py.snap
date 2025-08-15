@@ -20,4 +20,7 @@ help: Replace with `None`; initialize within function
 4   |-def foobar(foor, bar={}):    
   4 |+def foobar(foor, bar=None):    
 5 5 |     """
-6 6 |     """
+6 6 |     """                    
+
+## Concise Output
+B006_2.py:4:22: B006 [*] Do not use mutable data structures for argument defaults

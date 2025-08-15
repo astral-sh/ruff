@@ -97,3 +97,9 @@ help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `HiveToDrui
 11 11 | 
 12 12 | DruidDbApiHook()
 13 13 | DruidHook()
+
+## Concise Output
+AIR302_druid.py:12:1: AIR302 [*] `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:13:1: AIR302 [*] `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:15:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
+AIR302_druid.py:16:1: AIR302 [*] `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;

@@ -47,3 +47,8 @@ help: Add unused import `bees` to __all__
 41 41 | 
 42    |-__all__ = ["argparse", "exported"]
    42 |+__all__ = ["argparse", "exported", "bees"]
+
+## Concise Output
+__init__.py:19:8: F401 [*] `sys` imported but unused
+__init__.py:36:15: F401 [*] `.unused` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+__init__.py:39:26: F401 [*] `.renamed` imported but unused; consider removing, adding to `__all__`, or using a redundant alias

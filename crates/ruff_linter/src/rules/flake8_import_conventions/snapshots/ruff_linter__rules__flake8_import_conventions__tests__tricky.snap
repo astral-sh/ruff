@@ -23,3 +23,6 @@ help: Alias `pandas` to `pd`
   7 |+        import pandas as pd
 8 8 |     except ImportError:
 9 9 |         return False
+
+## Concise Output
+tricky.py:7:16: ICN001 [*] `pandas` should be imported as `pd`

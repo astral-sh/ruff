@@ -90,3 +90,14 @@ F821 Undefined name `baz`
    |        ^^^
 44 | eggs = "baz"  # always okay
    |
+
+## Concise Output
+F821_26.py:9:33: F821 Undefined name `CStr`
+F821_26.py:11:25: F821 Undefined name `C`
+F821_26.py:16:12: F821 Undefined name `C`
+F821_26.py:18:35: F821 Undefined name `C`
+F821_26.py:23:10: F821 Undefined name `B`
+F821_26.py:25:20: F821 Undefined name `B`
+F821_26.py:33:17: F821 Undefined name `Tree`
+F821_26.py:39:11: F821 Undefined name `foo`
+F821_26.py:43:8: F821 Undefined name `baz`

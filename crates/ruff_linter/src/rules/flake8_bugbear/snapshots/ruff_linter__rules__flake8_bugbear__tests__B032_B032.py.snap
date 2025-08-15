@@ -82,3 +82,13 @@ B032 Possible unintentional type annotation (using `:`). Did you mean to assign 
 20 |
 21 | # Do not flag below
    |
+
+## Concise Output
+B032.py:9:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:10:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:12:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:13:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:16:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:17:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:18:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:19:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?

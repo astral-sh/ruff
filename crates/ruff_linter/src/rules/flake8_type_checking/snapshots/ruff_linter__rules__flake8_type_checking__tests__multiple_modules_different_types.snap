@@ -50,3 +50,7 @@ help: Move into type-checking block
 7  10 | 
 8  11 | def f(x: os, y: pandas):
 9  12 |     pass
+
+## Concise Output
+<filename>:6:8: TC003 [*] Move standard library import `os` into a type-checking block
+<filename>:6:12: TC002 [*] Move third-party import `pandas` into a type-checking block

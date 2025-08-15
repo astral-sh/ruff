@@ -250,3 +250,16 @@ help: Remove `.replace()` call
 53 53 | 
 54 54 | 
 55 55 | ### No errors
+
+## Concise Output
+FURB162.py:8:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:9:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:11:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:12:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:14:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:16:24: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:20:5: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:26:5: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:36:5: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:42:5: FURB162 [*] Unnecessary timezone replacement with zero offset
+FURB162.py:52:24: FURB162 [*] Unnecessary timezone replacement with zero offset

@@ -147,3 +147,12 @@ help: Replace with builtin `TimeoutError`
 43 43 |     pass
 44 44 | 
 45 45 | # These should not change
+
+## Concise Output
+UP041.py:5:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:10:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:17:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:22:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:27:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:34:8: UP041 [*] Replace aliased errors with `TimeoutError`
+UP041.py:42:8: UP041 [*] Replace aliased errors with `TimeoutError`

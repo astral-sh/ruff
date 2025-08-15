@@ -1378,3 +1378,73 @@ UP031 Use format specifiers instead of percent format
     | ^^^^^^^^^
     |
 help: Replace with format specifiers
+
+## Concise Output
+UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:6:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:8:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:10:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:15: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:14:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:16:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:18:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:20:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:22:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:24:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:26:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:28:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:30:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:33:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:38:3: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:43:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:45:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:52:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:54:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:56:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:58:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:62:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:68:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:72:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:74:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:76:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:79:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:80:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:81:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:82:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:86:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:89:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:94:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:100:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:105:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:111:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:116:8: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:123:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:125:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:127:1: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:131:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:134:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:135:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:136:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:137:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:138:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:140:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:141:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:145:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:147:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:149:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:151:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:153:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:155:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:157:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:159:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:161:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:163:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:165:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:167:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:169:1: UP031 Use format specifiers instead of percent format
+UP031_0.py:171:1: UP031 Use format specifiers instead of percent format

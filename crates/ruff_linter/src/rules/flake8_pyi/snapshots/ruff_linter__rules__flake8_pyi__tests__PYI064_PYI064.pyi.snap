@@ -95,3 +95,10 @@ PYI064 `Final[Literal[123]]` can be replaced with a bare `Final`
 13 | n1: Final[Literal[True, False]] # No issue here
    |
 help: Replace with `Final`
+
+## Concise Output
+PYI064.pyi:3:1: PYI064 [*] `Final[Literal[True]]` can be replaced with a bare `Final`
+PYI064.pyi:4:1: PYI064 [*] `Final[Literal[None]]` can be replaced with a bare `Final`
+PYI064.pyi:5:1: PYI064 [*] `Final[Literal[...]]` can be replaced with a bare `Final`
+PYI064.pyi:8:1: PYI064 [*] `Final[Literal[123]]` can be replaced with a bare `Final`
+PYI064.pyi:11:1: PYI064 `Final[Literal[123]]` can be replaced with a bare `Final`

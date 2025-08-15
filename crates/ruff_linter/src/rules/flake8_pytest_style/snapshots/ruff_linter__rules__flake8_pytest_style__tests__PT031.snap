@@ -135,3 +135,16 @@ PT031 `pytest.warns()` block should contain a single simple statement
 97 | |             assert foo
    | |______________________^
    |
+
+## Concise Output
+PT031.py:42:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:48:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:52:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:56:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:60:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:64:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:71:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:83:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:87:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:91:5: PT031 `pytest.warns()` block should contain a single simple statement
+PT031.py:95:5: PT031 `pytest.warns()` block should contain a single simple statement

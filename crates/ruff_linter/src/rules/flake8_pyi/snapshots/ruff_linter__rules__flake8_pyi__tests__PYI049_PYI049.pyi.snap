@@ -36,3 +36,9 @@ PYI049 Private TypedDict `_UnusedTypeDict4` is never used
    |           ^^^^^^^^^^^^^^^^
 44 |         pass
    |
+
+## Concise Output
+PYI049.pyi:6:7: PYI049 Private TypedDict `_UnusedTypedDict` is never used
+PYI049.pyi:10:7: PYI049 Private TypedDict `_UnusedTypedDict2` is never used
+PYI049.pyi:34:1: PYI049 Private TypedDict `_UnusedTypedDict3` is never used
+PYI049.pyi:43:11: PYI049 Private TypedDict `_UnusedTypeDict4` is never used

@@ -304,3 +304,18 @@ help: Remove outdated version block
 75    |-    elif sys.version_info > (3,):
    75 |+    else:
 76 76 |         print(3)
+
+## Concise Output
+UP036_1.py:3:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:8:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:13:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:18:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:23:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:28:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:35:4: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:42:6: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:49:6: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:56:6: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:62:10: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:67:6: UP036 [*] Version block is outdated for minimum Python version
+UP036_1.py:75:10: UP036 [*] Version block is outdated for minimum Python version

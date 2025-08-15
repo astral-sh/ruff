@@ -26,3 +26,7 @@ help: Remove assignment to unused variable `I`
 23 23 |     # logged to user
 24    |-    I = 1  # noqa: E741.F841
    24 |+    pass  # noqa: E741.F841
+
+## Concise Output
+noqa.py:24:5: E741 Ambiguous variable name: `I`
+noqa.py:24:5: F841 [*] Local variable `I` is assigned to but never used

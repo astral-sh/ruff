@@ -39,3 +39,6 @@ help: Organize imports
    11 |+import foo
    12 |+import StringIO
    13 |+from module import BASIC, CONSTANT, Apple, Class, function
+
+## Concise Output
+order_by_type.py:1:1: I001 [*] Import block is un-sorted or un-formatted

@@ -22,3 +22,6 @@ help: Replace with single space
 7 7 | #: Okay
 8 8 | b = (1, 20)  # space before 20
 9 9 | #: E241 E241 E241
+
+## Concise Output
+E24.py:6:8: E242 [*] Tab after comma

@@ -66,3 +66,11 @@ TRY301 Abstract `raise` to an inner function
 40 |         except* Exception:
 41 |             logger.exception("something failed")
    |
+
+## Concise Output
+TRY301.py:14:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:16:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:21:17: TRY301 Abstract `raise` to an inner function
+TRY301.py:32:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:34:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:39:17: TRY301 Abstract `raise` to an inner function

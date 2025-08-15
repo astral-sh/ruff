@@ -45,3 +45,10 @@ PLE0303 `__len__` does not return a non-negative integer
 26 |         return -42  # [invalid-length-return]
    |                ^^^
    |
+
+## Concise Output
+invalid_return_type_length.py:6:16: PLE0303 `__len__` does not return a non-negative integer
+invalid_return_type_length.py:11:16: PLE0303 `__len__` does not return a non-negative integer
+invalid_return_type_length.py:16:16: PLE0303 `__len__` does not return a non-negative integer
+invalid_return_type_length.py:20:9: PLE0303 `__len__` does not return a non-negative integer
+invalid_return_type_length.py:26:16: PLE0303 `__len__` does not return a non-negative integer

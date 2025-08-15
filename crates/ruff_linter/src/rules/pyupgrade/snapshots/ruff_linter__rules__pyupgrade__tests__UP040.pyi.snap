@@ -93,3 +93,9 @@ help: Use the `type` keyword
 17 17 |     # comment1
 18 18 |     int  # comment2
 19 19 |     # comment3
+
+## Concise Output
+UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.pyi:11:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+UP040.pyi:16:1: UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keyword

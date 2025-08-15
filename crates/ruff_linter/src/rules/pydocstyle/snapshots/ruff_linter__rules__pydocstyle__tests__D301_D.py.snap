@@ -20,3 +20,6 @@ help: Add `r` prefix
 334 334 | 
 335 335 | 
 336 336 | @expect('D301: Use r""" if any backslashes in a docstring')
+
+## Concise Output
+D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring

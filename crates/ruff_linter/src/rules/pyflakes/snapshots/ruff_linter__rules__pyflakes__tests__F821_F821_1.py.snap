@@ -32,3 +32,9 @@ F821 Undefined name `Model`
 30 | x = Match["Model"]
    |            ^^^^^
    |
+
+## Concise Output
+F821_1.py:11:11: F821 Undefined name `Model`
+F821_1.py:18:18: F821 Undefined name `Model`
+F821_1.py:24:14: F821 Undefined name `Model`
+F821_1.py:30:12: F821 Undefined name `Model`

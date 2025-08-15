@@ -823,3 +823,45 @@ help: Replace TypeVar `S` with `Self`
 206 206 | 
 207 207 | 
 208 208 | class GoodClassWiStringTypeHints:
+
+## Concise Output
+PYI019_0.py:7:16: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:10:28: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:14:25: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:18:33: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:39:14: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:42:30: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:54:11: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:61:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:63:26: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:65:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:67:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:69:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:71:16: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:74:27: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:77:29: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:79:30: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:81:32: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:83:53: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:85:55: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:87:27: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:89:43: PYI019 [*] Use `Self` instead of custom TypeVar `_S695`
+PYI019_0.py:94:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:114:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:118:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:120:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:135:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:137:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:140:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:141:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:144:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:149:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:154:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:159:10: PYI019 Use `Self` instead of custom TypeVar `_T`
+PYI019_0.py:164:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:173:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`
+PYI019_0.py:189:52: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:192:49: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:196:50: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:200:50: PYI019 [*] Use `Self` instead of custom TypeVar `_S`
+PYI019_0.py:205:10: PYI019 [*] Use `Self` instead of custom TypeVar `S`

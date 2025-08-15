@@ -379,4 +379,25 @@ help: Remove commented-out code
 78    |-# ]
 79 78 | 
 80 79 | # Script tag block followed by normal block (Ok)
-81 80 |
+81 80 | 
+
+## Concise Output
+ERA001.py:1:1: ERA001 Found commented-out code
+ERA001.py:2:1: ERA001 Found commented-out code
+ERA001.py:3:1: ERA001 Found commented-out code
+ERA001.py:5:1: ERA001 Found commented-out code
+ERA001.py:13:5: ERA001 Found commented-out code
+ERA001.py:21:5: ERA001 Found commented-out code
+ERA001.py:26:5: ERA001 Found commented-out code
+ERA001.py:27:5: ERA001 Found commented-out code
+ERA001.py:32:1: ERA001 Found commented-out code
+ERA001.py:33:1: ERA001 Found commented-out code
+ERA001.py:34:1: ERA001 Found commented-out code
+ERA001.py:35:1: ERA001 Found commented-out code
+ERA001.py:36:1: ERA001 Found commented-out code
+ERA001.py:37:1: ERA001 Found commented-out code
+ERA001.py:38:1: ERA001 Found commented-out code
+ERA001.py:44:1: ERA001 Found commented-out code
+ERA001.py:47:1: ERA001 Found commented-out code
+ERA001.py:75:1: ERA001 Found commented-out code
+ERA001.py:78:1: ERA001 Found commented-out code

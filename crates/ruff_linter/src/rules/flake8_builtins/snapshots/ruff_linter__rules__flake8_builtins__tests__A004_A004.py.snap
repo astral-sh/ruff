@@ -77,3 +77,13 @@ A004 Import `ExceptionGroup` is shadowing a Python builtin
 11 |     from exceptiongroup import BaseExceptionGroup, ExceptionGroup
    |                                                    ^^^^^^^^^^^^^^
    |
+
+## Concise Output
+A004.py:1:16: A004 Import `sum` is shadowing a Python builtin
+A004.py:2:8: A004 Import `float` is shadowing a Python builtin
+A004.py:3:27: A004 Import `int` is shadowing a Python builtin
+A004.py:4:18: A004 Import `input` is shadowing a Python builtin
+A004.py:4:25: A004 Import `exec` is shadowing a Python builtin
+A004.py:5:30: A004 Import `dir` is shadowing a Python builtin
+A004.py:11:32: A004 Import `BaseExceptionGroup` is shadowing a Python builtin
+A004.py:11:52: A004 Import `ExceptionGroup` is shadowing a Python builtin

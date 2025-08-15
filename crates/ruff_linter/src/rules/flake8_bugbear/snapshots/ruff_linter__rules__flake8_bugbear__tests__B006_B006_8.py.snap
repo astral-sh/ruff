@@ -95,3 +95,10 @@ help: Replace with `None`; initialize within function
 19    |-def quux(a: list = []):
    19 |+def quux(a: list = None):
 20 20 |     raise NotImplemented
+
+## Concise Output
+B006_8.py:1:19: B006 [*] Do not use mutable data structures for argument defaults
+B006_8.py:5:19: B006 [*] Do not use mutable data structures for argument defaults
+B006_8.py:10:19: B006 [*] Do not use mutable data structures for argument defaults
+B006_8.py:15:19: B006 [*] Do not use mutable data structures for argument defaults
+B006_8.py:19:20: B006 [*] Do not use mutable data structures for argument defaults

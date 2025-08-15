@@ -259,3 +259,18 @@ help: Add quotes
 98 98 |     cast(typ=int, val=3.0)  # TC006
 99    |-    cast(val=3.0, typ=int)  # TC006
    99 |+    cast(val=3.0, typ="int")  # TC006
+
+## Concise Output
+TC006.py:4:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:10:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:16:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:40:14: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:46:17: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:52:12: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:59:9: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:68:17: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:75:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:82:10: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:89:9: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:98:14: TC006 [*] Add quotes to type expression in `typing.cast()`
+TC006.py:99:23: TC006 [*] Add quotes to type expression in `typing.cast()`

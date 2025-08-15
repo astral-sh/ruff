@@ -297,3 +297,22 @@ help: Replace with `collections.defaultdict`
 65    |-def f(x: typing.DefaultDict[str, str]) -> None:
    66 |+def f(x: defaultdict[str, str]) -> None:
 66 67 |     ...
+
+## Concise Output
+UP006_0.py:4:10: UP006 [*] Use `list` instead of `typing.List` for type annotation
+UP006_0.py:11:10: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:18:10: UP006 [*] Use `list` instead of `t.List` for type annotation
+UP006_0.py:25:10: UP006 [*] Use `list` instead of `IList` for type annotation
+UP006_0.py:29:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:33:12: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:37:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:41:13: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:45:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:49:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:49:17: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:53:11: UP006 [*] Use `list` instead of `List` for type annotation
+UP006_0.py:53:16: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:57:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:57:10: UP006 Use `list` instead of `List` for type annotation
+UP006_0.py:61:10: UP006 [*] Use `collections.deque` instead of `typing.Deque` for type annotation
+UP006_0.py:65:10: UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type annotation

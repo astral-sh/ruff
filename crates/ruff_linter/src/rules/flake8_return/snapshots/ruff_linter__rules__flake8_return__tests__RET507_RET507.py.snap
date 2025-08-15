@@ -166,3 +166,12 @@ help: Remove unnecessary `else`
 90 89 | 
 91 90 | 
 92 91 | def bar1(x, y, z):
+
+## Concise Output
+RET507.py:8:9: RET507 [*] Unnecessary `elif` after `continue` statement
+RET507.py:22:9: RET507 [*] Unnecessary `elif` after `continue` statement
+RET507.py:36:9: RET507 [*] Unnecessary `else` after `continue` statement
+RET507.py:47:13: RET507 [*] Unnecessary `else` after `continue` statement
+RET507.py:63:9: RET507 [*] Unnecessary `else` after `continue` statement
+RET507.py:74:13: RET507 [*] Unnecessary `else` after `continue` statement
+RET507.py:85:9: RET507 [*] Unnecessary `else` after `continue` statement

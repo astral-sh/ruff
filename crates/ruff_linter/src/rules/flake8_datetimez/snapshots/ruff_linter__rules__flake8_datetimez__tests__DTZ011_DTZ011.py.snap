@@ -20,3 +20,7 @@ DTZ011 `datetime.date.today()` used
   | ^^^^^^^^^^^^
   |
 help: Use `datetime.datetime.now(tz=...).date()` instead
+
+## Concise Output
+DTZ011.py:4:1: DTZ011 `datetime.date.today()` used
+DTZ011.py:9:1: DTZ011 `datetime.date.today()` used

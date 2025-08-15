@@ -12,3 +12,6 @@ help: Convert to triple double quotes
 ℹ Safe fix
 1   |-﻿''' SAM macro definitions '''
   1 |+﻿""" SAM macro definitions """
+
+## Concise Output
+bom.py:1:1: D300 [*] Use triple double quotes `"""`

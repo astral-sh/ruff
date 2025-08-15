@@ -172,3 +172,21 @@ E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstanc
     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 145 |     pass
     |
+
+## Concise Output
+E721.py:2:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:5:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:8:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:21:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:21:36: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:23:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:25:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:27:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:29:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:31:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:37:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:39:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:41:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:59:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:140:1: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+E721.py:144:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks

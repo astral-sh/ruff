@@ -42,3 +42,10 @@ PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
    |                     ^^^^^^^^^^
 36 |     ...
    |
+
+## Concise Output
+PYI050.py:13:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.py:18:10: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.py:23:44: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.py:27:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+PYI050.py:35:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations

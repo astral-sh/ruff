@@ -505,3 +505,28 @@ help: Replace with `next(iter(zip(x, y)))`
 72 72 |     zip = list  # Overwrite the builtin zip
 73    |-    list(zip(x, y))[0]
    73 |+    next(iter(zip(x, y)))
+
+## Concise Output
+RUF015.py:4:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:5:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:6:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:7:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:29:1: RUF015 [*] Prefer `next(i + 1 for i in x)` over single element slice
+RUF015.py:30:1: RUF015 [*] Prefer `next(i for i in x if i > 5)` over single element slice
+RUF015.py:31:1: RUF015 [*] Prefer `next((i, i + 1) for i in x)` over single element slice
+RUF015.py:35:1: RUF015 [*] Prefer `next(i + j for i in x for j in y)` over single element slice
+RUF015.py:38:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
+RUF015.py:39:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:40:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
+RUF015.py:41:1: RUF015 [*] Prefer `next(iter(range(10)))` over single element slice
+RUF015.py:42:1: RUF015 [*] Prefer `next(iter(x["y"]))` over single element slice
+RUF015.py:43:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:44:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:45:1: RUF015 [*] Prefer `next(iter(x.y))` over single element slice
+RUF015.py:50:26: RUF015 [*] Prefer `next(...)` over single element slice
+RUF015.py:57:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:58:1: RUF015 [*] Prefer `next(zip(x, y))` over single element slice
+RUF015.py:61:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:62:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:63:1: RUF015 [*] Prefer `next(iter(x))` over single element slice
+RUF015.py:73:5: RUF015 [*] Prefer `next(iter(zip(x, y)))` over single element slice

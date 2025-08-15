@@ -151,3 +151,19 @@ PYI052 Need type annotation for `WIZ`
 114 |     WIZ = 4
     |           ^
     |
+
+## Concise Output
+PYI052.pyi:14:10: PYI052 Need type annotation for `field5`
+PYI052.pyi:15:10: PYI052 Need type annotation for `field6`
+PYI052.pyi:16:10: PYI052 Need type annotation for `field7`
+PYI052.pyi:17:11: PYI052 Need type annotation for `field71`
+PYI052.pyi:19:10: PYI052 Need type annotation for `field8`
+PYI052.pyi:20:11: PYI052 Need type annotation for `field81`
+PYI052.pyi:22:11: PYI052 Need type annotation for `field83`
+PYI052.pyi:23:11: PYI052 Need type annotation for `field84`
+PYI052.pyi:24:11: PYI052 Need type annotation for `field85`
+PYI052.pyi:33:11: PYI052 Need type annotation for `field19`
+PYI052.pyi:35:11: PYI052 Need type annotation for `field20`
+PYI052.pyi:37:11: PYI052 Need type annotation for `field21`
+PYI052.pyi:39:12: PYI052 Need type annotation for `field212`
+PYI052.pyi:114:11: PYI052 Need type annotation for `WIZ`

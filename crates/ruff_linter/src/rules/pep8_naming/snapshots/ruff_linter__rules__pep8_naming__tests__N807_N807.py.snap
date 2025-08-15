@@ -17,3 +17,7 @@ N807 Function name should not start and end with `__`
    |         ^^^^^^^
 15 |         pass
    |
+
+## Concise Output
+N807.py:1:5: N807 Function name should not start and end with `__`
+N807.py:14:9: N807 Function name should not start and end with `__`

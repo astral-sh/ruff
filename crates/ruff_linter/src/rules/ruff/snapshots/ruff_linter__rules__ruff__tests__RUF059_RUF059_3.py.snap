@@ -40,3 +40,7 @@ help: Prefix it with an underscore or any other dummy variable pattern
 14 14 | 
 15 15 | 
 16 16 | def baz():
+
+## Concise Output
+RUF059_3.py:13:5: RUF059 [*] Unpacked variable `b` is never used
+RUF059_3.py:13:8: RUF059 [*] Unpacked variable `c` is never used

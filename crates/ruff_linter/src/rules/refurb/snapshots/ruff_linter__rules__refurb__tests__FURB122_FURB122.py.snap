@@ -450,3 +450,25 @@ help: Replace with `f.writelines`
 215     |-        for line in ((1,) if True else (2,)):
 216     |-            f.write(f"{line}")
     215 |+        f.writelines(f"{line}" for line in ((1,) if True else (2,)))
+
+## Concise Output
+FURB122.py:10:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:17:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:23:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:29:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:35:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:43:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:50:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:57:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:63:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:69:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:75:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:82:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:88:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:93:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:183:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:189:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:196:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:202:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:209:9: FURB122 [*] Use of `f.write` in a for loop
+FURB122.py:215:9: FURB122 [*] Use of `f.write` in a for loop

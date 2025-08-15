@@ -435,3 +435,28 @@ RUF064 Non-octal mode
 61 | os.chmod("foo", 0)  # Ok
    |
 help: Replace with octal literal
+
+## Concise Output
+RUF064.py:6:17: RUF064 [*] Non-octal mode
+RUF064.py:8:17: RUF064 Non-octal mode
+RUF064.py:9:17: RUF064 Non-octal mode
+RUF064.py:10:17: RUF064 Non-octal mode
+RUF064.py:12:10: RUF064 [*] Non-octal mode
+RUF064.py:15:14: RUF064 [*] Non-octal mode
+RUF064.py:18:18: RUF064 [*] Non-octal mode
+RUF064.py:21:17: RUF064 [*] Non-octal mode
+RUF064.py:24:20: RUF064 [*] Non-octal mode
+RUF064.py:27:18: RUF064 [*] Non-octal mode
+RUF064.py:30:17: RUF064 [*] Non-octal mode
+RUF064.py:33:28: RUF064 [*] Non-octal mode
+RUF064.py:36:19: RUF064 [*] Non-octal mode
+RUF064.py:40:12: RUF064 [*] Non-octal mode
+RUF064.py:43:21: RUF064 [*] Non-octal mode
+RUF064.py:46:25: RUF064 [*] Non-octal mode
+RUF064.py:49:26: RUF064 [*] Non-octal mode
+RUF064.py:52:14: RUF064 [*] Non-octal mode
+RUF064.py:53:14: RUF064 [*] Non-octal mode
+RUF064.py:56:17: RUF064 [*] Non-octal mode
+RUF064.py:57:17: RUF064 [*] Non-octal mode
+RUF064.py:59:17: RUF064 Non-octal mode
+RUF064.py:60:17: RUF064 Non-octal mode

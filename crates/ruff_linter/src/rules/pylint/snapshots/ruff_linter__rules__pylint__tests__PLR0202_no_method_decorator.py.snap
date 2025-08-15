@@ -50,3 +50,7 @@ help: Add @classmethod decorator
 26 27 | 
 27 28 |     def static_method():
 28 29 |         pass
+
+## Concise Output
+no_method_decorator.py:9:5: PLR0202 [*] Class method defined without decorator
+no_method_decorator.py:22:5: PLR0202 [*] Class method defined without decorator

@@ -33,3 +33,8 @@ B018 Found useless expression. Either assign it to a variable or remove it.
 14 | # Comments, newlines and whitespace
 15 | x  # comment
    |
+
+## Concise Output
+B018.ipynb:5:1: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.ipynb:9:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.ipynb:13:1: B018 Found useless expression. Either assign it to a variable or remove it.

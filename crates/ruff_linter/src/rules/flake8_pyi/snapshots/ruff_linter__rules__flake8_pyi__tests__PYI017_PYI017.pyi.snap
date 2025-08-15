@@ -44,3 +44,9 @@ PYI017 Stubs should not contain assignments to attributes or multiple targets
 11 |
 12 | i: TypeAlias = int | str  # OK
    |
+
+## Concise Output
+PYI017.pyi:4:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
+PYI017.pyi:6:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
+PYI017.pyi:8:1: PYI017 Stubs should not contain assignments to attributes or multiple targets
+PYI017.pyi:10:1: PYI017 Stubs should not contain assignments to attributes or multiple targets

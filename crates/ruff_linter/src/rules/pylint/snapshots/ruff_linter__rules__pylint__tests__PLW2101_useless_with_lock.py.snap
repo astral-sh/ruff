@@ -108,3 +108,16 @@ PLW2101 Threading lock directly created in `with` statement has no effect
    |      ^^^^^^^^^^^^^^^^^^
 36 |     ...
    |
+
+## Concise Output
+useless_with_lock.py:5:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:8:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:11:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:14:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:17:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:20:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:23:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:26:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:29:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:32:6: PLW2101 Threading lock directly created in `with` statement has no effect
+useless_with_lock.py:35:6: PLW2101 Threading lock directly created in `with` statement has no effect

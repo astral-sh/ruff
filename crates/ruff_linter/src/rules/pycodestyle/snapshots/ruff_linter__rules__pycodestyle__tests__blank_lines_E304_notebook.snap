@@ -21,3 +21,6 @@ help: Remove extraneous blank line(s)
 45 44 | def function():
 46 45 |     pass
 47 46 | # end
+
+## Concise Output
+E30.ipynb:45:1: E304 [*] Blank lines found after function decorator (1)

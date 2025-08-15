@@ -20,3 +20,7 @@ PLR0917 Too many positional arguments (7/4)
    |     ^
 10 |     pass
    |
+
+## Concise Output
+too_many_positional_params.py:3:5: PLR0917 Too many positional arguments (7/4)
+too_many_positional_params.py:9:5: PLR0917 Too many positional arguments (7/4)

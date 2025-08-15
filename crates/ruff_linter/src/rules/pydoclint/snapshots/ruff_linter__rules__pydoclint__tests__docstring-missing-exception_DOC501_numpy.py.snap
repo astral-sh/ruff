@@ -144,3 +144,11 @@ DOC501 Raised exception `ValueError` missing from docstring
 147 |           raise TypeError  # DOC501
     |
 help: Add `ValueError` to the docstring
+
+## Concise Output
+DOC501_numpy.py:35:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_numpy.py:58:5: DOC501 Raised exception `ValueError` missing from docstring
+DOC501_numpy.py:58:5: DOC501 Raised exception `FasterThanLightError` missing from docstring
+DOC501_numpy.py:83:5: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_numpy.py:139:5: DOC501 Raised exception `TypeError` missing from docstring
+DOC501_numpy.py:139:5: DOC501 Raised exception `ValueError` missing from docstring

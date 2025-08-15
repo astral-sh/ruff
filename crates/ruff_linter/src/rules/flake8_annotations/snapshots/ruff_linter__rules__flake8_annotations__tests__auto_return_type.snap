@@ -812,3 +812,49 @@ help: Add return type annotation: `str | int`
 300 300 |     match x:
 301 301 |         case [1, 2, 3]:
 302 302 |             return 1
+
+## Concise Output
+auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:5:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:9:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:16:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:20:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
+auto_return_type.py:41:5: ANN201 Missing return type annotation for public function `func`
+auto_return_type.py:45:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:52:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:68:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:73:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:77:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:90:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:96:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:104:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:112:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:119:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:128:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:137:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:146:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:158:9: ANN201 Missing return type annotation for public function `method`
+auto_return_type.py:162:9: ANN201 Missing return type annotation for public function `method`
+auto_return_type.py:166:9: ANN201 Missing return type annotation for public function `method`
+auto_return_type.py:171:9: ANN205 Missing return type annotation for staticmethod `method`
+auto_return_type.py:176:9: ANN206 Missing return type annotation for classmethod `method`
+auto_return_type.py:180:9: ANN201 [*] Missing return type annotation for public function `method`
+auto_return_type.py:187:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:194:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:210:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:234:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:240:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:248:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:255:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:262:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:269:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:276:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:283:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:290:5: ANN201 [*] Missing return type annotation for public function `func`
+auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public function `func`

@@ -63,3 +63,8 @@ help: Replace `yield` with `return`
 42 42 |     resource = acquire_resource()
 43    |-    yield resource
    43 |+    return resource
+
+## Concise Output
+PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`

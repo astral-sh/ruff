@@ -40,3 +40,9 @@ PYI042 Type alias `foo_bar` should be CamelCase
    |      ^^^^^^^
 28 | type FooBar = int | str
    |
+
+## Concise Output
+PYI042.py:10:1: PYI042 Type alias `just_literals_pipe_union` should be CamelCase
+PYI042.py:19:1: PYI042 Type alias `snake_case_alias1` should be CamelCase
+PYI042.py:20:1: PYI042 Type alias `_snake_case_alias2` should be CamelCase
+PYI042.py:27:6: PYI042 Type alias `foo_bar` should be CamelCase

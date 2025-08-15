@@ -41,4 +41,8 @@ help: Add blank line after "Returns"
     227 |+
 227 228 |     Raises:
 228 229 |     My attention.
-229 230 |
+229 230 | 
+
+## Concise Output
+sections.py:78:5: D410 [*] Missing blank line after section ("Returns")
+sections.py:224:5: D410 [*] Missing blank line after section ("Returns")

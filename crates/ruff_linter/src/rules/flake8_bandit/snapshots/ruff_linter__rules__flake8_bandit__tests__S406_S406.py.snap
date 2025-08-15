@@ -27,3 +27,8 @@ S406 `xml.sax` methods are vulnerable to XML attacks
 3 | import xml.sax  # S406
   |        ^^^^^^^
   |
+
+## Concise Output
+S406.py:1:6: S406 `xml.sax` methods are vulnerable to XML attacks
+S406.py:2:8: S406 `xml.sax` methods are vulnerable to XML attacks
+S406.py:3:8: S406 `xml.sax` methods are vulnerable to XML attacks

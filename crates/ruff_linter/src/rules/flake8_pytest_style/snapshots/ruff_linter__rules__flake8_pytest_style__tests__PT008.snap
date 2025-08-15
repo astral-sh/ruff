@@ -124,3 +124,17 @@ PT008 Use `return_value=` instead of patching with `lambda`
 48 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
+
+## Concise Output
+PT008.py:35:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:36:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:37:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:38:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:40:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:41:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:42:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:43:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:45:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:46:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:47:1: PT008 Use `return_value=` instead of patching with `lambda`
+PT008.py:48:1: PT008 Use `return_value=` instead of patching with `lambda`

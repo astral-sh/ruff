@@ -210,3 +210,14 @@ help: Remove unnecessary comprehension
 51 51 | 
 52 52 | # should be linted in preview...
 53 53 | min({x.id for x in bar})
+
+## Concise Output
+C419.py:1:5: C419 [*] Unnecessary list comprehension
+C419.py:2:5: C419 [*] Unnecessary list comprehension
+C419.py:4:5: C419 [*] Unnecessary list comprehension
+C419.py:7:5: C419 [*] Unnecessary list comprehension
+C419.py:9:5: C419 [*] Unnecessary set comprehension
+C419.py:28:5: C419 [*] Unnecessary list comprehension
+C419.py:39:5: C419 [*] Unnecessary list comprehension
+C419.py:49:5: C419 [*] Unnecessary set comprehension
+C419.py:50:5: C419 [*] Unnecessary set comprehension

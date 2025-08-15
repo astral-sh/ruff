@@ -21,3 +21,6 @@ help: Remove assignment to unused variable `x`
 8 8 |         pass
 9 9 | 
 10 10 |     # No error here, though it should arguably be an F821 error. `x` will
+
+## Concise Output
+<filename>:7:25: F841 [*] Local variable `x` is assigned to but never used

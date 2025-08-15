@@ -40,3 +40,6 @@ help: Organize imports
 12 20 |     from line_with_93 import (
 13 21 |         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 14 22 |     )
+
+## Concise Output
+fit_line_length.py:7:5: I001 [*] Import block is un-sorted or un-formatted

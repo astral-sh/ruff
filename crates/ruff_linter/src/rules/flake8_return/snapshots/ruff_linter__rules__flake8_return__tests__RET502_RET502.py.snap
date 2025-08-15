@@ -19,4 +19,7 @@ help: Add explicit `None` return value
   3 |+        return None  # error
 4 4 |     return 1
 5 5 | 
-6 6 |
+6 6 | 
+
+## Concise Output
+RET502.py:3:9: RET502 [*] Do not implicitly `return None` in function able to return non-`None` value

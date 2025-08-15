@@ -244,3 +244,29 @@ B023 Function definition does not bind loop variable `i`
 174 |             return [lambda: i for i in range(3)]  # error
     |                             ^
     |
+
+## Concise Output
+B023.py:12:30: B023 Function definition does not bind loop variable `x`
+B023.py:13:30: B023 Function definition does not bind loop variable `y`
+B023.py:16:16: B023 Function definition does not bind loop variable `x`
+B023.py:28:19: B023 Function definition does not bind loop variable `x`
+B023.py:29:19: B023 Function definition does not bind loop variable `x`
+B023.py:30:19: B023 Function definition does not bind loop variable `x`
+B023.py:31:22: B023 Function definition does not bind loop variable `x`
+B023.py:40:34: B023 Function definition does not bind loop variable `x`
+B023.py:42:14: B023 Function definition does not bind loop variable `x`
+B023.py:50:30: B023 Function definition does not bind loop variable `a`
+B023.py:51:30: B023 Function definition does not bind loop variable `a_`
+B023.py:52:30: B023 Function definition does not bind loop variable `b`
+B023.py:53:30: B023 Function definition does not bind loop variable `c`
+B023.py:61:17: B023 Function definition does not bind loop variable `j`
+B023.py:61:21: B023 Function definition does not bind loop variable `k`
+B023.py:68:10: B023 Function definition does not bind loop variable `l`
+B023.py:82:16: B023 Function definition does not bind loop variable `i`
+B023.py:117:24: B023 Function definition does not bind loop variable `x`
+B023.py:118:27: B023 Function definition does not bind loop variable `x`
+B023.py:119:37: B023 Function definition does not bind loop variable `x`
+B023.py:120:38: B023 Function definition does not bind loop variable `x`
+B023.py:121:37: B023 Function definition does not bind loop variable `x`
+B023.py:171:29: B023 Function definition does not bind loop variable `name`
+B023.py:174:29: B023 Function definition does not bind loop variable `i`

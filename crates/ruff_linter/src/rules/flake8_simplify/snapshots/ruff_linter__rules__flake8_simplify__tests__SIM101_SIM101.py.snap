@@ -192,3 +192,15 @@ help: Merge `isinstance` calls for `a`
 53    |-if(isinstance(a, int)) or (isinstance(a, float)):
    53 |+if isinstance(a, (int, float)):
 54 54 |     pass
+
+## Concise Output
+SIM101.py:1:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:4:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:7:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:19:4: SIM101 [*] Multiple `isinstance` calls for expression, merge into a single call
+SIM101.py:22:4: SIM101 Multiple `isinstance` calls for expression, merge into a single call
+SIM101.py:38:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+SIM101.py:53:3: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
