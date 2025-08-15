@@ -204,11 +204,11 @@ impl PartialEq<Name> for &String {
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for Name {
     fn schema_name() -> Cow<'static, str> {
-        String::schema_name()
+        "Name".into()
     }
 
-    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        String::json_schema(generator)
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({ "type": "String" })
     }
 
     fn _schemars_private_non_optional_json_schema(

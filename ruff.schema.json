@@ -2448,10 +2448,10 @@
       "additionalProperties": false
     },
     "Name": {
-      "type": "string"
+      "type": "String"
     },
     "NameImports": {
-      "type": "string"
+      "type": "String"
     },
     "OutputFormat": {
       "type": "string",
