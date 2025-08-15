@@ -115,12 +115,13 @@ fn stdin_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> -:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -139,12 +140,13 @@ fn stdin_filename() {
     success: false
     exit_code: 1
     ----- stdout -----
-    F401.py:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> F401.py:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -174,19 +176,21 @@ import bar   # unused import
     success: false
     exit_code: 1
     ----- stdout -----
-    bar.py:2:8: F401 [*] `bar` imported but unused
+    F401 [*] `bar` imported but unused
+     --> bar.py:2:8
       |
     2 | import bar   # unused import
-      |        ^^^ F401
+      |        ^^^
       |
-      = help: Remove unused import: `bar`
+    help: Remove unused import: `bar`
 
-    foo.py:2:8: F401 [*] `foo` imported but unused
+    F401 [*] `foo` imported but unused
+     --> foo.py:2:8
       |
     2 | import foo   # unused import
-      |        ^^^ F401
+      |        ^^^
       |
-      = help: Remove unused import: `foo`
+    help: Remove unused import: `foo`
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -208,12 +212,13 @@ fn check_warn_stdin_filename_with_files() {
     success: false
     exit_code: 1
     ----- stdout -----
-    F401.py:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> F401.py:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -234,12 +239,13 @@ fn stdin_source_type_py() {
     success: false
     exit_code: 1
     ----- stdout -----
-    TCH.py:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> TCH.py:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -484,10 +490,11 @@ fn stdin_fix_jupyter() {
      "nbformat_minor": 5
     }
     ----- stderr -----
-    Jupyter.ipynb:cell 3:1:7: F821 Undefined name `x`
+    F821 Undefined name `x`
+     --> Jupyter.ipynb:cell 3:1:7
       |
     1 | print(x)
-      |       ^ F821
+      |       ^
       |
 
     Found 3 errors (2 fixed, 1 remaining).
@@ -582,19 +589,21 @@ fn stdin_override_parser_ipynb() {
     success: false
     exit_code: 1
     ----- stdout -----
-    Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> Jupyter.py:cell 1:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
-    Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
+    F401 [*] `sys` imported but unused
+     --> Jupyter.py:cell 3:1:8
       |
     1 | import sys
-      |        ^^^ F401
+      |        ^^^
       |
-      = help: Remove unused import: `sys`
+    help: Remove unused import: `sys`
 
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
@@ -618,12 +627,13 @@ fn stdin_override_parser_py() {
     success: false
     exit_code: 1
     ----- stdout -----
-    F401.ipynb:1:8: F401 [*] `os` imported but unused
+    F401 [*] `os` imported but unused
+     --> F401.ipynb:1:8
       |
     1 | import os
-      |        ^^ F401
+      |        ^^
       |
-      = help: Remove unused import: `os`
+    help: Remove unused import: `os`
 
     Found 1 error.
     [*] 1 fixable with the `--fix` option.
@@ -646,12 +656,13 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
          print(sys.version)
 
     ----- stderr -----
-    -:3:4: F634 If test is a tuple, which is always `True`
+    F634 If test is a tuple, which is always `True`
+     --> -:3:4
       |
     1 | import sys
     2 |
     3 | if (1, 2):
-      |    ^^^^^^ F634
+      |    ^^^^^^
     4 |      print(sys.version)
       |
 
@@ -811,7 +822,8 @@ fn stdin_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: invalid-syntax: Expected one or more symbol names after import
+    invalid-syntax: Expected one or more symbol names after import
+     --> -:1:16
       |
     1 | from foo import
       |                ^
@@ -831,14 +843,16 @@ fn stdin_multiple_parse_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:16: invalid-syntax: Expected one or more symbol names after import
+    invalid-syntax: Expected one or more symbol names after import
+     --> -:1:16
       |
     1 | from foo import
       |                ^
     2 | bar =
       |
 
-    -:2:6: invalid-syntax: Expected an expression
+    invalid-syntax: Expected an expression
+     --> -:2:6
       |
     1 | from foo import
     2 | bar =
@@ -860,7 +874,8 @@ fn parse_error_not_included() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:6: invalid-syntax: Expected an expression
+    invalid-syntax: Expected an expression
+     --> -:1:6
       |
     1 | foo =
       |      ^
@@ -880,10 +895,11 @@ fn full_output_preview() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    E741 Ambiguous variable name: `l`
+     --> -:1:1
       |
     1 | l = 1
-      | ^ E741
+      | ^
       |
 
     Found 1 error.
@@ -908,10 +924,11 @@ preview = true
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    E741 Ambiguous variable name: `l`
+     --> -:1:1
       |
     1 | l = 1
-      | ^ E741
+      | ^
       |
 
     Found 1 error.
@@ -929,10 +946,11 @@ fn full_output_format() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: E741 Ambiguous variable name: `l`
+    E741 Ambiguous variable name: `l`
+     --> -:1:1
       |
     1 | l = 1
-      | ^ E741
+      | ^
       |
 
     Found 1 error.
@@ -1419,7 +1437,9 @@ fn redirect_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> -:1:1
+
     Found 1 error.
 
     ----- stderr -----
@@ -1451,7 +1471,9 @@ fn redirect_prefix() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> -:1:1
+
     Found 1 error.
 
     ----- stderr -----
@@ -1468,7 +1490,9 @@ fn deprecated_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF920 Hey this is a deprecated test rule.
+    RUF920 Hey this is a deprecated test rule.
+    --> -:1:1
+
     Found 1 error.
 
     ----- stderr -----
@@ -1485,8 +1509,12 @@ fn deprecated_multiple_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
+    RUF920 Hey this is a deprecated test rule.
+    --> -:1:1
+
+    RUF921 Hey this is another deprecated test rule.
+    --> -:1:1
+
     Found 2 errors.
 
     ----- stderr -----
@@ -1504,8 +1532,12 @@ fn deprecated_indirect() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
+    RUF920 Hey this is a deprecated test rule.
+    --> -:1:1
+
+    RUF921 Hey this is another deprecated test rule.
+    --> -:1:1
+
     Found 2 errors.
 
     ----- stderr -----
@@ -1651,22 +1683,23 @@ fn check_input_from_argfile() -> Result<()> {
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
     ]}, {
         assert_cmd_snapshot!(cmd
-            .pass_stdin(""), @r###"
+            .pass_stdin(""), @r"
         success: false
         exit_code: 1
         ----- stdout -----
-        /path/to/a.py:1:8: F401 [*] `os` imported but unused
+        F401 [*] `os` imported but unused
+         --> /path/to/a.py:1:8
           |
         1 | import os
-          |        ^^ F401
+          |        ^^
           |
-          = help: Remove unused import: `os`
+        help: Remove unused import: `os`
 
         Found 1 error.
         [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
-        "###);
+        ");
     });
 
     Ok(())
@@ -1682,8 +1715,12 @@ fn check_hints_hidden_unsafe_fixes() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1700,7 +1737,9 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -1718,8 +1757,12 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     [*] 1 fixable with the --fix option.
 
@@ -1738,7 +1781,9 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 1 error.
 
     ----- stderr -----
@@ -1755,8 +1800,12 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     [*] 2 fixable with the --fix option.
 
@@ -1777,7 +1826,9 @@ fn fix_applies_safe_fixes_by_default() {
     # fix from stable-test-rule-safe-fix
 
     ----- stderr -----
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors (1 fixed, 1 remaining).
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     ");
@@ -1814,7 +1865,9 @@ fn fix_does_not_apply_display_only_fixes() {
     ----- stdout -----
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> -:1:1
+
     Found 1 error.
     ");
 }
@@ -1832,7 +1885,9 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     ----- stdout -----
     def add_to_list(item, some_list=[]): ...
     ----- stderr -----
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> -:1:1
+
     Found 1 error.
     ");
 }
@@ -1849,7 +1904,9 @@ fn fix_only_unsafe_fixes_available() {
     ----- stdout -----
 
     ----- stderr -----
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
     ");
@@ -1985,8 +2042,12 @@ extend-unsafe-fixes = ["RUF901"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF901 Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
 
@@ -2017,8 +2078,12 @@ extend-safe-fixes = ["RUF902"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     [*] 2 fixable with the `--fix` option.
 
@@ -2051,8 +2116,12 @@ extend-safe-fixes = ["RUF902"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 Hey this is a stable test rule with an unsafe fix.
+    RUF901 [*] Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
     Found 2 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -2087,13 +2156,27 @@ extend-safe-fixes = ["RUF9"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:1: RUF900 Hey this is a stable test rule.
-    -:1:1: RUF901 Hey this is a stable test rule with a safe fix.
-    -:1:1: RUF902 [*] Hey this is a stable test rule with an unsafe fix.
-    -:1:1: RUF903 Hey this is a stable test rule with a display only fix.
-    -:1:1: RUF920 Hey this is a deprecated test rule.
-    -:1:1: RUF921 Hey this is another deprecated test rule.
-    -:1:1: RUF950 Hey this is a test rule that was redirected from another.
+    RUF900 Hey this is a stable test rule.
+    --> -:1:1
+
+    RUF901 Hey this is a stable test rule with a safe fix.
+    --> -:1:1
+
+    RUF902 [*] Hey this is a stable test rule with an unsafe fix.
+    --> -:1:1
+
+    RUF903 Hey this is a stable test rule with a display only fix.
+    --> -:1:1
+
+    RUF920 Hey this is a deprecated test rule.
+    --> -:1:1
+
+    RUF921 Hey this is another deprecated test rule.
+    --> -:1:1
+
+    RUF950 Hey this is a test rule that was redirected from another.
+    --> -:1:1
+
     Found 7 errors.
     [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
 
@@ -2154,10 +2237,11 @@ def log(x, base) -> float:
     success: false
     exit_code: 1
     ----- stdout -----
-    -:2:5: D417 Missing argument description in the docstring for `log`: `base`
+    D417 Missing argument description in the docstring for `log`: `base`
+     --> -:2:5
       |
     2 | def log(x, base) -> float:
-      |     ^^^ D417
+      |     ^^^
     3 |     """Calculate natural log of a value
       |
 
@@ -2190,14 +2274,15 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:3:1: RUF017 Avoid quadratic list summation
+    RUF017 Avoid quadratic list summation
+     --> -:3:1
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
-      | ^^^^^^^^^^^^^^^ RUF017
+      | ^^^^^^^^^^^^^^^
       |
-      = help: Replace with `functools.reduce`
+    help: Replace with `functools.reduce`
 
     Found 1 error.
     No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
@@ -2230,14 +2315,15 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    -:3:1: RUF017 Avoid quadratic list summation
+    RUF017 Avoid quadratic list summation
+     --> -:3:1
       |
     1 | x = [1, 2, 3]
     2 | y = [4, 5, 6]
     3 | sum([x, y], [])
-      | ^^^^^^^^^^^^^^^ RUF017
+      | ^^^^^^^^^^^^^^^
       |
-      = help: Replace with `functools.reduce`
+    help: Replace with `functools.reduce`
 
     Found 1 error.
 
@@ -2259,10 +2345,11 @@ fn pyproject_toml_stdin_syntax_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml:1:9: RUF200 Failed to parse pyproject.toml: unclosed table, expected `]`
+    RUF200 Failed to parse pyproject.toml: unclosed table, expected `]`
+     --> pyproject.toml:1:9
       |
     1 | [project
-      |         ^ RUF200
+      |         ^
       |
 
     Found 1 error.
@@ -2284,11 +2371,12 @@ fn pyproject_toml_stdin_schema_error() {
     success: false
     exit_code: 1
     ----- stdout -----
-    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+    RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+     --> pyproject.toml:2:8
       |
     1 | [project]
     2 | name = 1
-      |        ^ RUF200
+      |        ^
       |
 
     Found 1 error.
@@ -2376,11 +2464,12 @@ fn pyproject_toml_stdin_schema_error_fix() {
     [project]
     name = 1
     ----- stderr -----
-    pyproject.toml:2:8: RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+    RUF200 Failed to parse pyproject.toml: invalid type: integer `1`, expected a string
+     --> pyproject.toml:2:8
       |
     1 | [project]
     2 | name = 1
-      |        ^ RUF200
+      |        ^
       |
 
     Found 1 error.

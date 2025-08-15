@@ -199,9 +199,9 @@ fn split_default(
             //   - "".split(maxsplit=0) -> []
             //   - " ".split(maxsplit=0) -> []
             let processed_str = if direction == Direction::Left {
-                string_val.trim_start()
+                string_val.trim_start_matches(py_unicode_is_whitespace)
             } else {
-                string_val.trim_end()
+                string_val.trim_end_matches(py_unicode_is_whitespace)
             };
             let list_items: &[_] = if processed_str.is_empty() {
                 &[]
@@ -214,7 +214,10 @@ fn split_default(
             ))
         }
         Ordering::Less => {
-            let list_items: Vec<&str> = string_val.split_whitespace().collect();
+            let list_items: Vec<&str> = string_val
+                .split(py_unicode_is_whitespace)
+                .filter(|s| !s.is_empty())
+                .collect();
             Some(construct_replacement(
                 &list_items,
                 str_value.first_literal_flags(),
@@ -291,4 +294,35 @@ fn get_maxsplit_value(arg: Option<&Expr>) -> Option<i32> {
 enum Direction {
     Left,
     Right,
+}
+
+/// Like [`char::is_whitespace`] but with Python's notion of whitespace.
+///
+/// <https://github.com/astral-sh/ruff/issues/19845>
+/// <https://github.com/python/cpython/blob/v3.14.0rc1/Objects/unicodetype_db.h#L6673-L6711>
+#[rustfmt::skip]
+#[inline]
+const fn py_unicode_is_whitespace(ch: char) -> bool {
+    matches!(
+        ch,
+        | '\u{0009}'
+        | '\u{000A}'
+        | '\u{000B}'
+        | '\u{000C}'
+        | '\u{000D}'
+        | '\u{001C}'
+        | '\u{001D}'
+        | '\u{001E}'
+        | '\u{001F}'
+        | '\u{0020}'
+        | '\u{0085}'
+        | '\u{00A0}'
+        | '\u{1680}'
+        | '\u{2000}'..='\u{200A}'
+        | '\u{2028}'
+        | '\u{2029}'
+        | '\u{202F}'
+        | '\u{205F}'
+        | '\u{3000}'
+    )
 }

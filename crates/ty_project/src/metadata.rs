@@ -4,9 +4,9 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
+use ty_combine::Combine;
 use ty_python_semantic::ProgramSettings;
 
-use crate::combine::Combine;
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
@@ -19,7 +19,7 @@ pub mod pyproject;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 #[cfg_attr(test, derive(serde::Serialize))]
 pub struct ProjectMetadata {
     pub(super) name: Name,

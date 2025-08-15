@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
-FURB145.py:4:5: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+ --> FURB145.py:4:5
   |
 3 | # Errors.
 4 | a = l[:]
-  |     ^^^^ FURB145
+  |     ^^^^
 5 | b, c = 1, l[:]
 6 | d, e = l[:], 1
   |
-  = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 1 1 | l = [1, 2, 3, 4, 5]
@@ -21,16 +22,17 @@ FURB145.py:4:5: FURB145 [*] Prefer `copy` method over slicing
 6 6 | d, e = l[:], 1
 7 7 | m = l[::]
 
-FURB145.py:5:11: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+ --> FURB145.py:5:11
   |
 3 | # Errors.
 4 | a = l[:]
 5 | b, c = 1, l[:]
-  |           ^^^^ FURB145
+  |           ^^^^
 6 | d, e = l[:], 1
 7 | m = l[::]
   |
-  = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 2 2 | 
@@ -42,16 +44,17 @@ FURB145.py:5:11: FURB145 [*] Prefer `copy` method over slicing
 7 7 | m = l[::]
 8 8 | l[:]
 
-FURB145.py:6:8: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+ --> FURB145.py:6:8
   |
 4 | a = l[:]
 5 | b, c = 1, l[:]
 6 | d, e = l[:], 1
-  |        ^^^^ FURB145
+  |        ^^^^
 7 | m = l[::]
 8 | l[:]
   |
-  = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 3 3 | # Errors.
@@ -63,16 +66,17 @@ FURB145.py:6:8: FURB145 [*] Prefer `copy` method over slicing
 8 8 | l[:]
 9 9 | print(l[:])
 
-FURB145.py:7:5: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+ --> FURB145.py:7:5
   |
 5 | b, c = 1, l[:]
 6 | d, e = l[:], 1
 7 | m = l[::]
-  |     ^^^^^ FURB145
+  |     ^^^^^
 8 | l[:]
 9 | print(l[:])
   |
-  = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 4 4 | a = l[:]
@@ -84,15 +88,16 @@ FURB145.py:7:5: FURB145 [*] Prefer `copy` method over slicing
 9 9 | print(l[:])
 10 10 | 
 
-FURB145.py:8:1: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+ --> FURB145.py:8:1
   |
 6 | d, e = l[:], 1
 7 | m = l[::]
 8 | l[:]
-  | ^^^^ FURB145
+  | ^^^^
 9 | print(l[:])
   |
-  = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 5 5 | b, c = 1, l[:]
@@ -104,16 +109,17 @@ FURB145.py:8:1: FURB145 [*] Prefer `copy` method over slicing
 10 10 | 
 11 11 | # False negatives.
 
-FURB145.py:9:7: FURB145 [*] Prefer `copy` method over slicing
+FURB145 [*] Prefer `copy` method over slicing
+  --> FURB145.py:9:7
    |
  7 | m = l[::]
  8 | l[:]
  9 | print(l[:])
-   |       ^^^^ FURB145
+   |       ^^^^
 10 |
 11 | # False negatives.
    |
-   = help: Replace with `copy()`
+help: Replace with `copy()`
 
 ℹ Safe fix
 6  6  | d, e = l[:], 1

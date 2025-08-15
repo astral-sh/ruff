@@ -20,7 +20,7 @@ from _collections_abc import dict_keys, dict_values
 from _typeshed import Incomplete, ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, Sequence
 from types import TracebackType
-from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeVar, overload
+from typing import Any, ClassVar, Generic, Literal, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 from xml.dom.minicompat import EmptyNodeList, NodeList
 from xml.dom.xmlbuilder import DocumentLS, DOMImplementationLS
@@ -57,9 +57,11 @@ _ImportableNodeVar = TypeVar(
     | Notation,
 )
 
+@type_check_only
 class _DOMErrorHandler(Protocol):
     def handleError(self, error: Exception) -> bool: ...
 
+@type_check_only
 class _UserDataHandler(Protocol):
     def handle(self, operation: int, key: str, data: Any, src: Node, dst: Node) -> None: ...
 

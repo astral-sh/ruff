@@ -1,7 +1,8 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC_syntax_error.py:2:5: invalid-syntax: missing closing quote in string literal
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error.py:2:5
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -10,28 +11,30 @@ ISC_syntax_error.py:2:5: invalid-syntax: missing closing quote in string literal
 4 | "a" """b
   |
 
-ISC_syntax_error.py:2:7: invalid-syntax: Expected a statement
+invalid-syntax: Expected a statement
+ --> ISC_syntax_error.py:2:7
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
   |       ^
 3 | "a" "b" "c
 4 | "a" """b
-5 | c""" "d
   |
 
-ISC_syntax_error.py:3:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error.py:3:1
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
 3 | "a" "b" "c
-  | ^^^^^^^ ISC001
+  | ^^^^^^^
 4 | "a" """b
 5 | c""" "d
   |
-  = help: Combine string literals
+help: Combine string literals
 
-ISC_syntax_error.py:3:9: invalid-syntax: missing closing quote in string literal
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error.py:3:9
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -41,7 +44,8 @@ ISC_syntax_error.py:3:9: invalid-syntax: missing closing quote in string literal
 5 | c""" "d
   |
 
-ISC_syntax_error.py:3:11: invalid-syntax: Expected a statement
+invalid-syntax: Expected a statement
+ --> ISC_syntax_error.py:3:11
   |
 1 | # The lexer doesn't emit a string token if it's unterminated
 2 | "a" "b
@@ -51,19 +55,21 @@ ISC_syntax_error.py:3:11: invalid-syntax: Expected a statement
 5 | c""" "d
   |
 
-ISC_syntax_error.py:4:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+ --> ISC_syntax_error.py:4:1
   |
 2 |   "a" "b
 3 |   "a" "b" "c
 4 | / "a" """b
 5 | | c""" "d
-  | |____^ ISC001
+  | |____^
 6 |
 7 |   # For f-strings, the `FStringRanges` won't contain the range for
   |
-  = help: Combine string literals
+help: Combine string literals
 
-ISC_syntax_error.py:5:6: invalid-syntax: missing closing quote in string literal
+invalid-syntax: missing closing quote in string literal
+ --> ISC_syntax_error.py:5:6
   |
 3 | "a" "b" "c
 4 | "a" """b
@@ -73,7 +79,8 @@ ISC_syntax_error.py:5:6: invalid-syntax: missing closing quote in string literal
 7 | # For f-strings, the `FStringRanges` won't contain the range for
   |
 
-ISC_syntax_error.py:5:8: invalid-syntax: Expected a statement
+invalid-syntax: Expected a statement
+ --> ISC_syntax_error.py:5:8
   |
 3 | "a" "b" "c
 4 | "a" """b
@@ -81,10 +88,10 @@ ISC_syntax_error.py:5:8: invalid-syntax: Expected a statement
   |        ^
 6 |
 7 | # For f-strings, the `FStringRanges` won't contain the range for
-8 | # unterminated f-strings.
   |
 
-ISC_syntax_error.py:9:8: invalid-syntax: f-string: unterminated string
+invalid-syntax: f-string: unterminated string
+  --> ISC_syntax_error.py:9:8
    |
  7 | # For f-strings, the `FStringRanges` won't contain the range for
  8 | # unterminated f-strings.
@@ -94,7 +101,8 @@ ISC_syntax_error.py:9:8: invalid-syntax: f-string: unterminated string
 11 | f"a" f"""b
    |
 
-ISC_syntax_error.py:9:9: invalid-syntax: Expected FStringEnd, found newline
+invalid-syntax: Expected FStringEnd, found newline
+  --> ISC_syntax_error.py:9:9
    |
  7 | # For f-strings, the `FStringRanges` won't contain the range for
  8 | # unterminated f-strings.
@@ -102,21 +110,22 @@ ISC_syntax_error.py:9:9: invalid-syntax: Expected FStringEnd, found newline
    |         ^
 10 | f"a" f"b" f"c
 11 | f"a" f"""b
-12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:10:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC_syntax_error.py:10:1
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
 10 | f"a" f"b" f"c
-   | ^^^^^^^^^ ISC001
+   | ^^^^^^^^^
 11 | f"a" f"""b
 12 | c""" f"d {e
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC_syntax_error.py:10:13: invalid-syntax: f-string: unterminated string
+invalid-syntax: f-string: unterminated string
+  --> ISC_syntax_error.py:10:13
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
@@ -126,7 +135,8 @@ ISC_syntax_error.py:10:13: invalid-syntax: f-string: unterminated string
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:10:14: invalid-syntax: Expected FStringEnd, found newline
+invalid-syntax: Expected FStringEnd, found newline
+  --> ISC_syntax_error.py:10:14
    |
  8 | # unterminated f-strings.
  9 | f"a" f"b
@@ -136,19 +146,21 @@ ISC_syntax_error.py:10:14: invalid-syntax: Expected FStringEnd, found newline
 12 | c""" f"d {e
    |
 
-ISC_syntax_error.py:11:1: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC_syntax_error.py:11:1
    |
  9 |   f"a" f"b
 10 |   f"a" f"b" f"c
 11 | / f"a" f"""b
 12 | | c""" f"d {e
-   | |____^ ISC001
+   | |____^
 13 |
 14 |   (
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC_syntax_error.py:16:5: invalid-syntax: missing closing quote in string literal
+invalid-syntax: missing closing quote in string literal
+  --> ISC_syntax_error.py:16:5
    |
 14 | (
 15 |     "a"
@@ -158,7 +170,8 @@ ISC_syntax_error.py:16:5: invalid-syntax: missing closing quote in string litera
 18 |     "d"
    |
 
-ISC_syntax_error.py:26:9: invalid-syntax: f-string: unterminated triple-quoted string
+invalid-syntax: f-string: unterminated triple-quoted string
+  --> ISC_syntax_error.py:26:9
    |
 24 |   (
 25 |       """abc"""
@@ -170,14 +183,16 @@ ISC_syntax_error.py:26:9: invalid-syntax: f-string: unterminated triple-quoted s
    | |__^
    |
 
-ISC_syntax_error.py:30:1: invalid-syntax: unexpected EOF while parsing
+invalid-syntax: unexpected EOF while parsing
+  --> ISC_syntax_error.py:30:1
    |
 28 |     "i" "j"
 29 | )
    |  ^
    |
 
-ISC_syntax_error.py:30:1: invalid-syntax: f-string: unterminated string
+invalid-syntax: f-string: unterminated string
+  --> ISC_syntax_error.py:30:1
    |
 28 |     "i" "j"
 29 | )

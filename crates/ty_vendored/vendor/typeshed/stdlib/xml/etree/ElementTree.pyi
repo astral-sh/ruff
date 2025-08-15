@@ -663,6 +663,7 @@ class C14NWriterTarget:
 # The target type is tricky, because the implementation doesn't
 # require any particular attribute to be present. This documents the attributes
 # that can be present, but uncommenting any of them would require them.
+@type_check_only
 class _Target(Protocol):
     # start: Callable[str, dict[str, str], Any] | None
     # end: Callable[[str], Any] | None

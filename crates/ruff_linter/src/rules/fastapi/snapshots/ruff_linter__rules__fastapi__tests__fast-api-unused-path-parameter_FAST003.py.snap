@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
 ---
-FAST003.py:9:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:9:19
    |
  8 | # Errors
  9 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^
 10 | async def read_thing(query: str):
 11 |     return {"query": query}
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 7  7  | 
@@ -21,14 +22,15 @@ FAST003.py:9:19: FAST003 [*] Parameter `thing_id` appears in route path, but not
 12 12 | 
 13 13 | 
 
-FAST003.py:14:23: FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `isbn` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:14:23
    |
 14 | @app.get("/books/isbn-{isbn}")
-   |                       ^^^^^^ FAST003
+   |                       ^^^^^^
 15 | async def read_thing():
 16 |     ...
    |
-   = help: Add `isbn` to function signature
+help: Add `isbn` to function signature
 
 ℹ Unsafe fix
 12 12 | 
@@ -40,14 +42,15 @@ FAST003.py:14:23: FAST003 [*] Parameter `isbn` appears in route path, but not in
 17 17 | 
 18 18 | 
 
-FAST003.py:19:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:19:19
    |
 19 | @app.get("/things/{thing_id:path}")
-   |                   ^^^^^^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^^^^^^
 20 | async def read_thing(query: str):
 21 |     return {"query": query}
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 17 17 | 
@@ -59,14 +62,15 @@ FAST003.py:19:19: FAST003 [*] Parameter `thing_id` appears in route path, but no
 22 22 | 
 23 23 | 
 
-FAST003.py:24:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:24:19
    |
 24 | @app.get("/things/{thing_id : path}")
-   |                   ^^^^^^^^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^^^^^^^^
 25 | async def read_thing(query: str):
 26 |     return {"query": query}
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 22 22 | 
@@ -78,14 +82,15 @@ FAST003.py:24:19: FAST003 [*] Parameter `thing_id` appears in route path, but no
 27 27 | 
 28 28 | 
 
-FAST003.py:29:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:29:27
    |
 29 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 30 | async def read_thing(author: str):
 31 |     return {"author": author}
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 27 27 | 
@@ -97,14 +102,15 @@ FAST003.py:29:27: FAST003 [*] Parameter `title` appears in route path, but not i
 32 32 | 
 33 33 | 
 
-FAST003.py:34:18: FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `author_name` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:34:18
    |
 34 | @app.get("/books/{author_name}/{title}")
-   |                  ^^^^^^^^^^^^^ FAST003
+   |                  ^^^^^^^^^^^^^
 35 | async def read_thing():
 36 |     ...
    |
-   = help: Add `author_name` to function signature
+help: Add `author_name` to function signature
 
 ℹ Unsafe fix
 32 32 | 
@@ -116,14 +122,15 @@ FAST003.py:34:18: FAST003 [*] Parameter `author_name` appears in route path, but
 37 37 | 
 38 38 | 
 
-FAST003.py:34:32: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:34:32
    |
 34 | @app.get("/books/{author_name}/{title}")
-   |                                ^^^^^^^ FAST003
+   |                                ^^^^^^^
 35 | async def read_thing():
 36 |     ...
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 32 32 | 
@@ -135,30 +142,33 @@ FAST003.py:34:32: FAST003 [*] Parameter `title` appears in route path, but not i
 37 37 | 
 38 38 | 
 
-FAST003.py:39:18: FAST003 Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003 Parameter `author` appears in route path, but only as a positional-only argument in `read_thing` signature
+  --> FAST003.py:39:18
    |
 39 | @app.get("/books/{author}/{title}")
-   |                  ^^^^^^^^ FAST003
+   |                  ^^^^^^^^
 40 | async def read_thing(author: str, title: str, /):
 41 |     return {"author": author, "title": title}
    |
 
-FAST003.py:39:27: FAST003 Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
+FAST003 Parameter `title` appears in route path, but only as a positional-only argument in `read_thing` signature
+  --> FAST003.py:39:27
    |
 39 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 40 | async def read_thing(author: str, title: str, /):
 41 |     return {"author": author, "title": title}
    |
 
-FAST003.py:44:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:44:27
    |
 44 | @app.get("/books/{author}/{title}/{page}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 45 | async def read_thing(
 46 |     author: str,
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 44 44 | @app.get("/books/{author}/{title}/{page}")
@@ -170,14 +180,15 @@ FAST003.py:44:27: FAST003 [*] Parameter `title` appears in route path, but not i
 49 49 | 
 50 50 | 
 
-FAST003.py:44:35: FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `page` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:44:35
    |
 44 | @app.get("/books/{author}/{title}/{page}")
-   |                                   ^^^^^^ FAST003
+   |                                   ^^^^^^
 45 | async def read_thing(
 46 |     author: str,
    |
-   = help: Add `page` to function signature
+help: Add `page` to function signature
 
 ℹ Unsafe fix
 44 44 | @app.get("/books/{author}/{title}/{page}")
@@ -189,14 +200,15 @@ FAST003.py:44:35: FAST003 [*] Parameter `page` appears in route path, but not in
 49 49 | 
 50 50 | 
 
-FAST003.py:51:18: FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `author` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:51:18
    |
 51 | @app.get("/books/{author}/{title}")
-   |                  ^^^^^^^^ FAST003
+   |                  ^^^^^^^^
 52 | async def read_thing():
 53 |     ...
    |
-   = help: Add `author` to function signature
+help: Add `author` to function signature
 
 ℹ Unsafe fix
 49 49 | 
@@ -208,14 +220,15 @@ FAST003.py:51:18: FAST003 [*] Parameter `author` appears in route path, but not 
 54 54 | 
 55 55 | 
 
-FAST003.py:51:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:51:27
    |
 51 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 52 | async def read_thing():
 53 |     ...
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 49 49 | 
@@ -227,14 +240,15 @@ FAST003.py:51:27: FAST003 [*] Parameter `title` appears in route path, but not i
 54 54 | 
 55 55 | 
 
-FAST003.py:56:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:56:27
    |
 56 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 57 | async def read_thing(*, author: str):
 58 |     ...
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 54 54 | 
@@ -246,14 +260,15 @@ FAST003.py:56:27: FAST003 [*] Parameter `title` appears in route path, but not i
 59 59 | 
 60 60 | 
 
-FAST003.py:61:27: FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `title` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:61:27
    |
 61 | @app.get("/books/{author}/{title}")
-   |                           ^^^^^^^ FAST003
+   |                           ^^^^^^^
 62 | async def read_thing(hello, /, *, author: str):
 63 |     ...
    |
-   = help: Add `title` to function signature
+help: Add `title` to function signature
 
 ℹ Unsafe fix
 59 59 | 
@@ -265,14 +280,15 @@ FAST003.py:61:27: FAST003 [*] Parameter `title` appears in route path, but not i
 64 64 | 
 65 65 | 
 
-FAST003.py:66:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:66:19
    |
 66 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^
 67 | async def read_thing(
 68 |         query: str,
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 65 65 | 
@@ -284,14 +300,15 @@ FAST003.py:66:19: FAST003 [*] Parameter `thing_id` appears in route path, but no
 70 70 |     return {"query": query}
 71 71 | 
 
-FAST003.py:73:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:73:19
    |
 73 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^
 74 | async def read_thing(
 75 |         query: str = "default",
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 72 72 | 
@@ -303,14 +320,15 @@ FAST003.py:73:19: FAST003 [*] Parameter `thing_id` appears in route path, but no
 77 77 |     return {"query": query}
 78 78 | 
 
-FAST003.py:80:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:80:19
    |
 80 | @app.get("/things/{thing_id}")
-   |                   ^^^^^^^^^^ FAST003
+   |                   ^^^^^^^^^^
 81 | async def read_thing(
 82 |         *, query: str = "default",
    |
-   = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 79 79 | 
@@ -322,14 +340,15 @@ FAST003.py:80:19: FAST003 [*] Parameter `thing_id` appears in route path, but no
 84 84 |     return {"query": query}
 85 85 | 
 
-FAST003.py:87:18: FAST003 [*] Parameter `name` appears in route path, but not in `read_thing` signature
+FAST003 [*] Parameter `name` appears in route path, but not in `read_thing` signature
+  --> FAST003.py:87:18
    |
 87 | @app.get("/books/{name}/{title}")
-   |                  ^^^^^^ FAST003
+   |                  ^^^^^^
 88 | async def read_thing(*, author: Annotated[str, Path(alias="author_name")], title: str):
 89 |     return {"author": author, "title": title}
    |
-   = help: Add `name` to function signature
+help: Add `name` to function signature
 
 ℹ Unsafe fix
 85 85 | 
@@ -341,15 +360,16 @@ FAST003.py:87:18: FAST003 [*] Parameter `name` appears in route path, but not in
 90 90 | 
 91 91 | 
 
-FAST003.py:158:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `single` signature
+   --> FAST003.py:158:19
     |
 157 | ### Errors
 158 | @app.get("/things/{thing_id}")
-    |                   ^^^^^^^^^^ FAST003
+    |                   ^^^^^^^^^^
 159 | async def single(other: Annotated[str, Depends(something_else)]): ...
 160 | @app.get("/things/{thing_id}")
     |
-    = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 156 156 | 
@@ -361,15 +381,16 @@ FAST003.py:158:19: FAST003 [*] Parameter `thing_id` appears in route path, but n
 161 161 | async def default(other: str = Depends(something_else)): ...
 162 162 | 
 
-FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `default` signature
+   --> FAST003.py:160:19
     |
 158 | @app.get("/things/{thing_id}")
 159 | async def single(other: Annotated[str, Depends(something_else)]): ...
 160 | @app.get("/things/{thing_id}")
-    |                   ^^^^^^^^^^ FAST003
+    |                   ^^^^^^^^^^
 161 | async def default(other: str = Depends(something_else)): ...
     |
-    = help: Add `thing_id` to function signature
+help: Add `thing_id` to function signature
 
 ℹ Unsafe fix
 158 158 | @app.get("/things/{thing_id}")
@@ -381,15 +402,16 @@ FAST003.py:160:19: FAST003 [*] Parameter `thing_id` appears in route path, but n
 163 163 | 
 164 164 | ### No errors
 
-FAST003.py:197:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
+FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_full` signature
+   --> FAST003.py:197:12
     |
 196 | # Errors
 197 | @app.get("/{id}")
-    |            ^^^^ FAST003
+    |            ^^^^
 198 | async def get_id_pydantic_full(
 199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
     |
-    = help: Add `id` to function signature
+help: Add `id` to function signature
 
 ℹ Unsafe fix
 196 196 | # Errors
@@ -401,16 +423,17 @@ FAST003.py:197:12: FAST003 [*] Parameter `id` appears in route path, but not in 
 201 201 | @app.get("/{id}")
 202 202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 
-FAST003.py:201:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
+FAST003 [*] Parameter `id` appears in route path, but not in `get_id_pydantic_short` signature
+   --> FAST003.py:201:12
     |
 199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
 200 | ): ...
 201 | @app.get("/{id}")
-    |            ^^^^ FAST003
+    |            ^^^^
 202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 203 | @app.get("/{id}")
     |
-    = help: Add `id` to function signature
+help: Add `id` to function signature
 
 ℹ Unsafe fix
 199 199 |     params: Annotated[PydanticParams, Depends(PydanticParams)],
@@ -422,15 +445,16 @@ FAST003.py:201:12: FAST003 [*] Parameter `id` appears in route path, but not in 
 204 204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
 205 205 | 
 
-FAST003.py:203:12: FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature
+FAST003 [*] Parameter `id` appears in route path, but not in `get_id_init_not_annotated` signature
+   --> FAST003.py:203:12
     |
 201 | @app.get("/{id}")
 202 | async def get_id_pydantic_short(params: Annotated[PydanticParams, Depends()]): ...
 203 | @app.get("/{id}")
-    |            ^^^^ FAST003
+    |            ^^^^
 204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
     |
-    = help: Add `id` to function signature
+help: Add `id` to function signature
 
 ℹ Unsafe fix
 201 201 | @app.get("/{id}")

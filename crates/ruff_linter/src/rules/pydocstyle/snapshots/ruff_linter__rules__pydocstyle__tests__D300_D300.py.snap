@@ -1,22 +1,23 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
-snapshot_kind: text
 ---
-D300.py:6:5: D300 Use triple double quotes `"""`
+D300 Use triple double quotes `"""`
+ --> D300.py:6:5
   |
 5 | def ends_in_quote():
 6 |     'Sum\\mary."'
-  |     ^^^^^^^^^^^^^ D300
+  |     ^^^^^^^^^^^^^
   |
-  = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
-D300.py:10:5: D300 [*] Use triple double quotes `"""`
+D300 [*] Use triple double quotes `"""`
+  --> D300.py:10:5
    |
  9 | def contains_quote():
 10 |     'Sum"\\mary.'
-   |     ^^^^^^^^^^^^^ D300
+   |     ^^^^^^^^^^^^^
    |
-   = help: Convert to triple double quotes
+help: Convert to triple double quotes
 
 ℹ Safe fix
 7  7  | 

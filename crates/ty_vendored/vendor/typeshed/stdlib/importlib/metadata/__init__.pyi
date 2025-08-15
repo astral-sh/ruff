@@ -11,7 +11,7 @@ from os import PathLike
 from pathlib import Path
 from re import Pattern
 from typing import Any, ClassVar, Generic, NamedTuple, TypeVar, overload
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, deprecated
 
 _T = TypeVar("_T")
 _KT = TypeVar("_KT")
@@ -153,8 +153,8 @@ class EntryPoint(_EntryPointBase):
             """
 
     def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
     if sys.version_info >= (3, 11):
+        def __eq__(self, other: object) -> bool: ...
         def __lt__(self, other: object) -> bool: ...
     if sys.version_info < (3, 12):
         def __iter__(self) -> Iterator[Any]:  # result of iter((str, Self)), really
@@ -311,6 +311,7 @@ if sys.version_info >= (3, 10) and sys.version_info < (3, 12):
         def keys(self) -> dict_keys[_KT, _VT]: ...
         def values(self) -> dict_values[_KT, _VT]: ...
 
+    @deprecated("Deprecated since Python 3.10; removed in Python 3.12. Use `select` instead.")
     class SelectableGroups(Deprecated[str, EntryPoints], dict[str, EntryPoints]):  # use as dict is deprecated since 3.10
         """
         A backward- and forward-compatible result from

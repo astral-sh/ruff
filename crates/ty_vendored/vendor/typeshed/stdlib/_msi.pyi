@@ -1,10 +1,12 @@
 """Documentation"""
 
 import sys
+from typing import type_check_only
 
 if sys.platform == "win32":
     class MSIError(Exception): ...
     # Actual typename View, not exposed by the implementation
+    @type_check_only
     class _View:
         def Execute(self, params: _Record | None = ...) -> None: ...
         def GetColumnInfo(self, kind: int) -> _Record: ...
@@ -16,6 +18,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename SummaryInformation, not exposed by the implementation
+    @type_check_only
     class _SummaryInformation:
         def GetProperty(self, field: int) -> int | bytes | None: ...
         def GetPropertyCount(self) -> int: ...
@@ -26,6 +29,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename Database, not exposed by the implementation
+    @type_check_only
     class _Database:
         def OpenView(self, sql: str) -> _View: ...
         def Commit(self) -> None: ...
@@ -36,6 +40,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename Record, not exposed by the implementation
+    @type_check_only
     class _Record:
         def GetFieldCount(self) -> int: ...
         def GetInteger(self, field: int) -> int: ...

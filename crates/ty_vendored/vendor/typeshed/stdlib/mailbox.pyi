@@ -8,7 +8,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from email._policybase import _MessageT
 from types import GenericAlias, TracebackType
-from typing import IO, Any, AnyStr, Generic, Literal, Protocol, TypeVar, overload
+from typing import IO, Any, AnyStr, Generic, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -33,13 +33,16 @@ __all__ = [
 
 _T = TypeVar("_T")
 
+@type_check_only
 class _SupportsReadAndReadline(SupportsRead[bytes], SupportsNoArgReadline[bytes], Protocol): ...
 
 _MessageData: TypeAlias = email.message.Message | bytes | str | io.StringIO | _SupportsReadAndReadline
 
+@type_check_only
 class _HasIteritems(Protocol):
     def iteritems(self) -> Iterator[tuple[str, _MessageData]]: ...
 
+@type_check_only
 class _HasItems(Protocol):
     def items(self) -> Iterator[tuple[str, _MessageData]]: ...
 

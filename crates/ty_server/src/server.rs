@@ -2,16 +2,11 @@
 
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
-use crate::session::{AllOptions, ClientOptions, DiagnosticMode, Session};
+use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
+use crate::session::{InitializationOptions, Session};
+use anyhow::Context;
 use lsp_server::Connection;
-use lsp_types::{
-    ClientCapabilities, DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
-    HoverProviderCapability, InitializeParams, InlayHintOptions, InlayHintServerCapabilities,
-    MessageType, SelectionRangeProviderCapability, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url, WorkDoneProgressOptions,
-};
+use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
 use std::panic::{PanicHookInfo, RefUnwindSafe};
@@ -47,23 +42,45 @@ impl Server {
         in_test: bool,
     ) -> crate::Result<Self> {
         let (id, init_value) = connection.initialize_start()?;
-        let init_params: InitializeParams = serde_json::from_value(init_value)?;
 
-        let AllOptions {
-            global: global_options,
-            workspace: mut workspace_options,
-        } = AllOptions::from_value(
-            init_params
-                .initialization_options
-                .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
+        let InitializeParams {
+            initialization_options,
+            capabilities: client_capabilities,
+            workspace_folders,
+            ..
+        } = serde_json::from_value(init_value)
+            .context("Failed to deserialize initialization parameters")?;
+
+        let (initialization_options, deserialization_error) =
+            InitializationOptions::from_value(initialization_options);
+
+        if !in_test {
+            crate::logging::init_logging(
+                initialization_options.log_level.unwrap_or_default(),
+                initialization_options.log_file.as_deref(),
+            );
+        }
+
+        if let Some(error) = deserialization_error {
+            tracing::error!("Failed to deserialize initialization options: {error}");
+        }
+
+        tracing::debug!("Initialization options: {initialization_options:?}");
+
+        let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities = server_capabilities(
+            position_encoding,
+            resolved_client_capabilities,
+            &initialization_options
+                .options
+                .global
+                .clone()
+                .into_settings(),
         );
 
-        let client_capabilities = init_params.capabilities;
-        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities =
-            Self::server_capabilities(position_encoding, global_options.diagnostic_mode());
-
         let version = ruff_db::program_version().unwrap_or("Unknown");
+        tracing::debug!("Version: {version}");
 
         connection.initialize_finish(
             id,
@@ -81,37 +98,41 @@ impl Server {
         let (main_loop_sender, main_loop_receiver) = crossbeam::channel::bounded(32);
         let client = Client::new(main_loop_sender.clone(), connection.sender.clone());
 
-        if !in_test {
-            crate::logging::init_logging(
-                global_options.tracing.log_level.unwrap_or_default(),
-                global_options.tracing.log_file.as_deref(),
-            );
+        let unknown_options = &initialization_options.options.unknown;
+        if !unknown_options.is_empty() {
+            // HACK: Old versions of the ty VS Code extension used a custom schema for settings
+            // which was changed in version 2025.35.0. This is to ensure that users don't receive
+            // unnecessary warnings when using an older version of the extension. This should be
+            // removed after a few releases.
+            if !unknown_options.contains_key("settings")
+                || !unknown_options.contains_key("globalSettings")
+            {
+                tracing::warn!(
+                    "Received unknown options during initialization: {}",
+                    serde_json::to_string_pretty(&unknown_options)
+                        .unwrap_or_else(|_| format!("{unknown_options:?}"))
+                );
+
+                client.show_warning_message(format_args!(
+                    "Received unknown options during initialization: '{}'. \
+                    Refer to the logs for more details",
+                    unknown_options
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>()
+                        .join("', '")
+                ));
+            }
         }
 
-        tracing::debug!("Version: {version}");
-
-        let mut workspace_for_url = |url: Url| {
-            let Some(workspace_settings) = workspace_options.as_mut() else {
-                return (url, ClientOptions::default());
-            };
-            let settings = workspace_settings.remove(&url).unwrap_or_else(|| {
-                tracing::warn!(
-                    "No workspace options found for {}, using default options",
-                    url
-                );
-                ClientOptions::default()
-            });
-            (url, settings)
-        };
-
-        let workspaces = init_params
-            .workspace_folders
+        // Get workspace URLs without settings - settings will come from workspace/configuration
+        let workspace_urls = workspace_folders
             .filter(|folders| !folders.is_empty())
             .map(|folders| {
                 folders
                     .into_iter()
-                    .map(|folder| workspace_for_url(folder.uri))
-                    .collect()
+                    .map(|folder| folder.uri)
+                    .collect::<Vec<_>>()
             })
             .or_else(|| {
                 let current_dir = native_system
@@ -125,7 +146,7 @@ impl Server {
                     current_dir.display()
                 );
                 let uri = Url::from_file_path(current_dir).ok()?;
-                Some(vec![workspace_for_url(uri)])
+                Some(vec![uri])
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -134,19 +155,19 @@ impl Server {
                 )
             })?;
 
-        let workspaces = if workspaces.len() > 1 {
-            let first_workspace = workspaces.into_iter().next().unwrap();
+        let workspace_urls = if workspace_urls.len() > 1 {
+            let first_workspace = workspace_urls.into_iter().next().unwrap();
             tracing::warn!(
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0
+                &first_workspace
             );
             client.show_warning_message(format_args!(
                 "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace.0,
+                &first_workspace,
             ));
             vec![first_workspace]
         } else {
-            workspaces
+            workspace_urls
         };
 
         Ok(Self {
@@ -155,10 +176,10 @@ impl Server {
             main_loop_receiver,
             main_loop_sender,
             session: Session::new(
-                &client_capabilities,
+                resolved_client_capabilities,
                 position_encoding,
-                global_options,
-                workspaces,
+                workspace_urls,
+                initialization_options,
                 native_system,
                 in_test,
             )?,
@@ -188,70 +209,6 @@ impl Server {
                     .max() // this selects the highest priority position encoding
             })
             .unwrap_or_default()
-    }
-
-    fn server_capabilities(
-        position_encoding: PositionEncoding,
-        diagnostic_mode: DiagnosticMode,
-    ) -> ServerCapabilities {
-        ServerCapabilities {
-            position_encoding: Some(position_encoding.into()),
-            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
-                identifier: Some(crate::DIAGNOSTIC_NAME.into()),
-                inter_file_dependencies: true,
-                // TODO: Dynamically register for workspace diagnostics.
-                workspace_diagnostics: diagnostic_mode.is_workspace(),
-                work_done_progress_options: WorkDoneProgressOptions {
-                    work_done_progress: Some(diagnostic_mode.is_workspace()),
-                },
-            })),
-            text_document_sync: Some(TextDocumentSyncCapability::Options(
-                TextDocumentSyncOptions {
-                    open_close: Some(true),
-                    change: Some(TextDocumentSyncKind::INCREMENTAL),
-                    ..Default::default()
-                },
-            )),
-            type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
-            definition_provider: Some(lsp_types::OneOf::Left(true)),
-            declaration_provider: Some(DeclarationCapability::Simple(true)),
-            references_provider: Some(lsp_types::OneOf::Left(true)),
-            document_highlight_provider: Some(lsp_types::OneOf::Left(true)),
-            hover_provider: Some(HoverProviderCapability::Simple(true)),
-            signature_help_provider: Some(SignatureHelpOptions {
-                trigger_characters: Some(vec!["(".to_string(), ",".to_string()]),
-                retrigger_characters: Some(vec![")".to_string()]),
-                work_done_progress_options: lsp_types::WorkDoneProgressOptions::default(),
-            }),
-            inlay_hint_provider: Some(lsp_types::OneOf::Right(
-                InlayHintServerCapabilities::Options(InlayHintOptions::default()),
-            )),
-            semantic_tokens_provider: Some(
-                SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
-                    work_done_progress_options: WorkDoneProgressOptions::default(),
-                    legend: SemanticTokensLegend {
-                        token_types: ty_ide::SemanticTokenType::all()
-                            .iter()
-                            .map(|token_type| token_type.as_lsp_concept().into())
-                            .collect(),
-                        token_modifiers: ty_ide::SemanticTokenModifier::all_names()
-                            .iter()
-                            .map(|&s| s.into())
-                            .collect(),
-                    },
-                    range: Some(true),
-                    full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
-                }),
-            ),
-            completion_provider: Some(lsp_types::CompletionOptions {
-                trigger_characters: Some(vec!['.'.to_string()]),
-                ..Default::default()
-            }),
-            selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-            document_symbol_provider: Some(lsp_types::OneOf::Left(true)),
-            workspace_symbol_provider: Some(lsp_types::OneOf::Left(true)),
-            ..Default::default()
-        }
     }
 }
 

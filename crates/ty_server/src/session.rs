@@ -4,25 +4,34 @@ use anyhow::{Context, anyhow};
 use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{Exit, Notification};
-use lsp_types::request::{Request, Shutdown, WorkspaceDiagnosticRequest};
-use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
+use lsp_types::request::{
+    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
+    WorkspaceDiagnosticRequest,
+};
+use lsp_types::{
+    DiagnosticRegistrationOptions, DiagnosticServerCapabilities, Registration, RegistrationParams,
+    TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
+};
 use options::GlobalOptions;
 use ruff_db::Db;
 use ruff_db::files::File;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
+use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
-pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
-pub(crate) use self::options::AllOptions;
+pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
-pub(crate) use self::settings::ClientSettings;
+pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
+use crate::capabilities::{
+    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
+};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -31,7 +40,6 @@ use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
 use index::Index;
 
-mod capabilities;
 pub(crate) mod client;
 pub(crate) mod index;
 mod options;
@@ -65,6 +73,12 @@ pub(crate) struct Session {
     /// That's what we use the default project for.
     default_project: DefaultProject,
 
+    /// Initialization options that were provided by the client during server initialization.
+    initialization_options: InitializationOptions,
+
+    /// Resolved global settings that are shared across all workspaces.
+    global_settings: Arc<GlobalSettings>,
+
     /// The global position encoding, negotiated during LSP initialization.
     position_encoding: PositionEncoding,
 
@@ -77,6 +91,7 @@ pub(crate) struct Session {
     /// Has the client requested the server to shutdown.
     shutdown_requested: bool,
 
+    /// Whether the server has dynamically registered the diagnostic capability with the client.
     /// Is the connected client a `TestServer` instance.
     in_test: bool,
 
@@ -91,6 +106,10 @@ pub(crate) struct Session {
     /// We'll re-run the request after every change to `Session` (see `revision`)
     /// to see if there are now changes and, if so, respond to the client.
     suspended_workspace_diagnostics_request: Option<SuspendedWorkspaceDiagnosticRequest>,
+
+    /// Registrations is a set of LSP methods that have been dynamically registered with the
+    /// client.
+    registrations: HashSet<String>,
 }
 
 /// LSP State for a Project
@@ -121,18 +140,20 @@ pub(crate) struct ProjectState {
 
 impl Session {
     pub(crate) fn new(
-        client_capabilities: &ClientCapabilities,
+        resolved_client_capabilities: ResolvedClientCapabilities,
         position_encoding: PositionEncoding,
-        global_options: GlobalOptions,
-        workspace_folders: Vec<(Url, ClientOptions)>,
+        workspace_urls: Vec<Url>,
+        initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
         in_test: bool,
     ) -> crate::Result<Self> {
-        let index = Arc::new(Index::new(global_options.into_settings()));
+        let index = Arc::new(Index::new());
 
         let mut workspaces = Workspaces::default();
-        for (url, workspace_options) in workspace_folders {
-            workspaces.register(url, workspace_options.into_settings())?;
+        // Register workspaces with default settings - they'll be initialized with real settings
+        // when workspace/configuration response is received
+        for url in workspace_urls {
+            workspaces.register(url)?;
         }
 
         Ok(Self {
@@ -142,21 +163,29 @@ impl Session {
             deferred_messages: VecDeque::new(),
             index: Some(index),
             default_project: DefaultProject::new(),
+            initialization_options,
+            global_settings: Arc::new(GlobalSettings::default()),
             projects: BTreeMap::new(),
-            resolved_client_capabilities: ResolvedClientCapabilities::new(client_capabilities),
+            resolved_client_capabilities,
             request_queue: RequestQueue::new(),
             shutdown_requested: false,
             in_test,
             suspended_workspace_diagnostics_request: None,
             revision: 0,
+            registrations: HashSet::new(),
         })
     }
 
     pub(crate) fn request_queue(&self) -> &RequestQueue {
         &self.request_queue
     }
+
     pub(crate) fn request_queue_mut(&mut self) -> &mut RequestQueue {
         &mut self.request_queue
+    }
+
+    pub(crate) fn initialization_options(&self) -> &InitializationOptions {
+        &self.initialization_options
     }
 
     pub(crate) fn is_shutdown_requested(&self) -> bool {
@@ -414,11 +443,55 @@ impl Session {
         client: &Client,
     ) {
         assert!(!self.workspaces.all_initialized());
+
+        // These are the options combined from all the global options received by the server for
+        // each workspace via the workspace configuration request.
+        let mut combined_global_options: Option<GlobalOptions> = None;
+
         for (url, options) in workspace_settings {
             tracing::debug!("Initializing workspace `{url}`");
 
-            let settings = options.into_settings();
-            let Some((root, workspace)) = self.workspaces.initialize(&url, settings) else {
+            // Combine the global options specified during initialization with the
+            // workspace-specific options to create the final workspace options.
+            let ClientOptions {
+                global, workspace, ..
+            } = self
+                .initialization_options
+                .options
+                .clone()
+                .combine(options.clone());
+
+            let unknown_options = &options.unknown;
+            if !unknown_options.is_empty() {
+                // HACK: This is to ensure that users with an older version of the ty VS Code
+                // extension don't get warnings about unknown options when they are using a newer
+                // version of the language server. This should be removed after a few releases.
+                if !unknown_options.contains_key("importStrategy")
+                    && !unknown_options.contains_key("interpreter")
+                {
+                    tracing::warn!(
+                        "Received unknown options for workspace `{url}`: {}",
+                        serde_json::to_string_pretty(unknown_options)
+                            .unwrap_or_else(|_| format!("{unknown_options:?}"))
+                    );
+
+                    client.show_warning_message(format!(
+                        "Received unknown options for workspace `{url}`: '{}'. \
+                        Refer to the logs for more details.",
+                        unknown_options
+                            .keys()
+                            .map(String::as_str)
+                            .collect::<Vec<_>>()
+                            .join("', '")
+                    ));
+                }
+            }
+
+            combined_global_options.combine_with(Some(global));
+
+            let workspace_settings = workspace.into_settings();
+            let Some((root, workspace)) = self.workspaces.initialize(&url, workspace_settings)
+            else {
                 continue;
             };
 
@@ -445,17 +518,16 @@ impl Session {
                 });
 
             let (root, db) = match project {
-                Ok(mut db) => {
-                    db.set_check_mode(workspace.settings.diagnostic_mode().into_check_mode());
-                    (root, db)
-                }
+                Ok(db) => (root, db),
                 Err(err) => {
                     tracing::error!(
-                        "Failed to create project for `{root}`: {err:#}. Falling back to default settings"
+                        "Failed to create project for `{root}`: {err:#}. \
+                        Falling back to default settings"
                     );
 
                     client.show_error_message(format!(
-                        "Failed to load project rooted at {root}. Please refer to the logs for more details.",
+                        "Failed to load project rooted at {root}. \
+                        Please refer to the logs for more details.",
                     ));
 
                     let db_with_default_settings =
@@ -488,6 +560,18 @@ impl Session {
             publish_settings_diagnostics(self, client, root);
         }
 
+        if let Some(global_options) = combined_global_options.take() {
+            let global_settings = global_options.into_settings();
+            if global_settings.diagnostic_mode().is_workspace() {
+                for project in self.projects.values_mut() {
+                    project.db.set_check_mode(CheckMode::AllFiles);
+                }
+            }
+            self.global_settings = Arc::new(global_settings);
+        }
+
+        self.register_capabilities(client);
+
         assert!(
             self.workspaces.all_initialized(),
             "All workspaces should be initialized after calling `initialize_workspaces`"
@@ -502,17 +586,153 @@ impl Session {
         }
     }
 
+    /// Registers the dynamic capabilities with the client as per the resolved global settings.
+    ///
+    /// ## Diagnostic capability
+    ///
+    /// This capability is used to enable / disable workspace diagnostics as per the
+    /// `ty.diagnosticMode` global setting.
+    ///
+    /// ## Rename capability
+    ///
+    /// This capability is used to enable / disable rename functionality as per the
+    /// `ty.experimental.rename` global setting.
+    fn register_capabilities(&mut self, client: &Client) {
+        static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
+        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
+
+        let mut registrations = vec![];
+        let mut unregistrations = vec![];
+
+        if self
+            .resolved_client_capabilities
+            .supports_diagnostic_dynamic_registration()
+        {
+            if self
+                .registrations
+                .contains(DocumentDiagnosticRequest::METHOD)
+            {
+                unregistrations.push(Unregistration {
+                    id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                    method: DocumentDiagnosticRequest::METHOD.into(),
+                });
+            }
+
+            let diagnostic_mode = self.global_settings.diagnostic_mode;
+
+            tracing::debug!(
+                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+            );
+            registrations.push(Registration {
+                id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                method: DocumentDiagnosticRequest::METHOD.into(),
+                register_options: Some(
+                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
+                        DiagnosticRegistrationOptions {
+                            diagnostic_options: server_diagnostic_options(
+                                diagnostic_mode.is_workspace(),
+                            ),
+                            ..Default::default()
+                        },
+                    ))
+                    .unwrap(),
+                ),
+            });
+        }
+
+        if self
+            .resolved_client_capabilities
+            .supports_rename_dynamic_registration()
+        {
+            let is_rename_enabled = self.global_settings.is_rename_enabled();
+
+            if !is_rename_enabled {
+                tracing::debug!("Rename capability is disabled in the resolved global settings");
+                if self.registrations.contains(Rename::METHOD) {
+                    unregistrations.push(Unregistration {
+                        id: RENAME_REGISTRATION_ID.into(),
+                        method: Rename::METHOD.into(),
+                    });
+                }
+            }
+
+            if is_rename_enabled {
+                registrations.push(Registration {
+                    id: RENAME_REGISTRATION_ID.into(),
+                    method: Rename::METHOD.into(),
+                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
+                });
+            }
+        }
+
+        // First, unregister any existing capabilities and then register or re-register them.
+        self.unregister_dynamic_capability(client, unregistrations);
+        self.register_dynamic_capability(client, registrations);
+    }
+
+    /// Registers a list of dynamic capabilities with the client.
+    fn register_dynamic_capability(&mut self, client: &Client, registrations: Vec<Registration>) {
+        if registrations.is_empty() {
+            return;
+        }
+
+        for registration in &registrations {
+            self.registrations.insert(registration.method.clone());
+        }
+
+        client.send_request::<RegisterCapability>(
+            self,
+            RegistrationParams { registrations },
+            |_: &Client, ()| {
+                tracing::debug!("Registered dynamic capabilities");
+            },
+        );
+    }
+
+    /// Unregisters a list of dynamic capabilities with the client.
+    fn unregister_dynamic_capability(
+        &mut self,
+        client: &Client,
+        unregistrations: Vec<Unregistration>,
+    ) {
+        if unregistrations.is_empty() {
+            return;
+        }
+
+        for unregistration in &unregistrations {
+            if !self.registrations.remove(&unregistration.method) {
+                tracing::debug!(
+                    "Unregistration for `{}` was requested, but it was not registered",
+                    unregistration.method
+                );
+            }
+        }
+
+        client.send_request::<UnregisterCapability>(
+            self,
+            UnregistrationParams {
+                unregisterations: unregistrations,
+            },
+            |_: &Client, ()| {
+                tracing::debug!("Unregistered dynamic capabilities");
+            },
+        );
+    }
+
     /// Creates a document snapshot with the URL referencing the document to snapshot.
     pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
-        let index = self.index();
+        let key = self
+            .key_from_url(url)
+            .map_err(DocumentQueryError::InvalidUrl);
         DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
-            client_settings: index.global_settings(),
+            workspace_settings: key
+                .as_ref()
+                .ok()
+                .and_then(|key| self.workspaces.settings_for_path(key.path().as_system()?))
+                .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: self
-                .key_from_url(url)
-                .map_err(DocumentQueryError::InvalidUrl)
-                .and_then(|key| index.make_document_ref(key)),
+            document_query_result: key.and_then(|key| self.index().make_document_ref(key)),
         }
     }
 
@@ -526,6 +746,7 @@ impl Session {
                 .cloned()
                 .collect(),
             index: self.index.clone().unwrap(),
+            global_settings: self.global_settings.clone(),
             position_encoding: self.position_encoding,
             in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
@@ -582,6 +803,7 @@ impl Session {
     /// Calling this multiple times for the same document is a logic error.
     pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
         self.index_mut().close_document(key)?;
+        self.bump_revision();
         Ok(())
     }
 
@@ -601,7 +823,7 @@ impl Session {
     /// This method drops all references to the index and returns a guard that will restore the
     /// references when dropped. This guard holds the only reference to the index and allows
     /// modifying it.
-    fn index_mut(&mut self) -> MutIndexGuard {
+    fn index_mut(&mut self) -> MutIndexGuard<'_> {
         let index = self.index.take().unwrap();
 
         for db in self.projects_mut() {
@@ -626,8 +848,8 @@ impl Session {
         self.resolved_client_capabilities
     }
 
-    pub(crate) fn global_settings(&self) -> Arc<ClientSettings> {
-        self.index().global_settings()
+    pub(crate) fn global_settings(&self) -> &GlobalSettings {
+        &self.global_settings
     }
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
@@ -678,7 +900,7 @@ impl Drop for MutIndexGuard<'_> {
 #[derive(Debug)]
 pub(crate) struct DocumentSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
-    client_settings: Arc<ClientSettings>,
+    workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document_query_result: Result<DocumentQuery, DocumentQueryError>,
 }
@@ -694,9 +916,9 @@ impl DocumentSnapshot {
         self.position_encoding
     }
 
-    /// Returns the client settings for this document.
-    pub(crate) fn client_settings(&self) -> &ClientSettings {
-        &self.client_settings
+    /// Returns the client settings for the workspace that this document belongs to.
+    pub(crate) fn workspace_settings(&self) -> &WorkspaceSettings {
+        &self.workspace_settings
     }
 
     /// Returns the result of the document query for this snapshot.
@@ -726,6 +948,7 @@ impl DocumentSnapshot {
 /// An immutable snapshot of the current state of [`Session`].
 pub(crate) struct SessionSnapshot {
     index: Arc<Index>,
+    global_settings: Arc<GlobalSettings>,
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
     in_test: bool,
@@ -750,6 +973,10 @@ impl SessionSnapshot {
 
     pub(crate) fn index(&self) -> &Index {
         &self.index
+    }
+
+    pub(crate) fn global_settings(&self) -> &GlobalSettings {
+        &self.global_settings
     }
 
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
@@ -783,7 +1010,9 @@ impl Workspaces {
     /// the workspace are announced to the server during the `initialize` request, but the
     /// resolved settings are only available after the client has responded to the `workspace/configuration`
     /// request.
-    pub(crate) fn register(&mut self, url: Url, settings: ClientSettings) -> anyhow::Result<()> {
+    ///
+    /// [`initialize`]: Workspaces::initialize
+    pub(crate) fn register(&mut self, url: Url) -> anyhow::Result<()> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -792,8 +1021,13 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
 
-        self.workspaces
-            .insert(system_path, Workspace { url, settings });
+        self.workspaces.insert(
+            system_path,
+            Workspace {
+                url,
+                settings: Arc::new(WorkspaceSettings::default()),
+            },
+        );
 
         self.uninitialized += 1;
 
@@ -808,7 +1042,7 @@ impl Workspaces {
     pub(crate) fn initialize(
         &mut self,
         url: &Url,
-        settings: ClientSettings,
+        settings: WorkspaceSettings,
     ) -> Option<(SystemPathBuf, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
 
@@ -816,7 +1050,7 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path).ok()?;
 
         if let Some(workspace) = self.workspaces.get_mut(&system_path) {
-            workspace.settings = settings;
+            workspace.settings = Arc::new(settings);
             self.uninitialized -= 1;
             Some((system_path, workspace))
         } else {
@@ -824,6 +1058,8 @@ impl Workspaces {
         }
     }
 
+    /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
+    /// registered for the path.
     pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
@@ -831,10 +1067,22 @@ impl Workspaces {
             .map(|(_, db)| db)
     }
 
+    /// Returns the client settings for the workspace at the given path, [`None`] if there's no
+    /// workspace registered for the path.
+    pub(crate) fn settings_for_path(
+        &self,
+        path: impl AsRef<SystemPath>,
+    ) -> Option<Arc<WorkspaceSettings>> {
+        self.for_path(path).map(Workspace::settings_arc)
+    }
+
     pub(crate) fn urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.workspaces.values().map(Workspace::url)
     }
 
+    /// Returns `true` if all workspaces have been [initialized].
+    ///
+    /// [initialized]: Workspaces::initialize
     pub(crate) fn all_initialized(&self) -> bool {
         self.uninitialized == 0
     }
@@ -853,7 +1101,7 @@ impl<'a> IntoIterator for &'a Workspaces {
 pub(crate) struct Workspace {
     /// The workspace root URL as sent by the client during initialization.
     url: Url,
-    settings: ClientSettings,
+    settings: Arc<WorkspaceSettings>,
 }
 
 impl Workspace {
@@ -861,8 +1109,12 @@ impl Workspace {
         &self.url
     }
 
-    pub(crate) fn settings(&self) -> &ClientSettings {
+    pub(crate) fn settings(&self) -> &WorkspaceSettings {
         &self.settings
+    }
+
+    pub(crate) fn settings_arc(&self) -> Arc<WorkspaceSettings> {
+        self.settings.clone()
     }
 }
 
@@ -899,11 +1151,8 @@ impl DefaultProject {
             )
             .unwrap();
 
-            let mut db = ProjectDatabase::new(metadata, system).unwrap();
-            db.set_check_mode(index.global_settings().diagnostic_mode().into_check_mode());
-
             ProjectState {
-                db,
+                db: ProjectDatabase::new(metadata, system).unwrap(),
                 untracked_files_with_pushed_diagnostics: Vec::new(),
             }
         })

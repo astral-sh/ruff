@@ -5,7 +5,7 @@ from ctypes import _SimpleCData, c_char
 from multiprocessing.context import BaseContext
 from multiprocessing.synchronize import _LockLike
 from types import TracebackType
-from typing import Any, Generic, Literal, Protocol, TypeVar, overload
+from typing import Any, Generic, Literal, Protocol, TypeVar, overload, type_check_only
 
 __all__ = ["RawValue", "RawArray", "Value", "Array", "copy", "synchronized"]
 
@@ -97,7 +97,7 @@ def synchronized(
 ) -> SynchronizedArray[_T]: ...
 @overload
 def synchronized(obj: _CT, lock: _LockLike | None = None, ctx: Any | None = None) -> SynchronizedBase[_CT]: ...
-
+@type_check_only
 class _AcquireFunc(Protocol):
     def __call__(self, block: bool = ..., timeout: float | None = ..., /) -> bool: ...
 

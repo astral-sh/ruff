@@ -4,7 +4,7 @@ from _typeshed import Unused
 from collections.abc import Callable, Iterable, Iterator
 from logging import Logger
 from types import GenericAlias, TracebackType
-from typing import Any, Final, Generic, NamedTuple, Protocol, TypeVar
+from typing import Any, Final, Generic, NamedTuple, Protocol, TypeVar, type_check_only
 from typing_extensions import ParamSpec, Self
 
 FIRST_COMPLETED: Final = "FIRST_COMPLETED"
@@ -249,6 +249,7 @@ class Executor:
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> bool | None: ...
 
+@type_check_only
 class _AsCompletedFuture(Protocol[_T_co]):
     # as_completed only mutates non-generic aspects of passed Futures and does not do any nominal
     # checks. Therefore, we can use a Protocol here to allow as_completed to act covariantly.

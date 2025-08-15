@@ -20,7 +20,7 @@ use crate::{IOErrorDiagnostic, Project};
 /// so no query can be depending on the contents of the indexed files before that. All subsequent mutations to
 /// the indexed files must go through `IndexedMut`, which uses the Salsa setter `project.set_file_set` to
 /// ensure that Salsa always knows when the set of indexed files have changed.
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 pub struct IndexedFiles {
     state: std::sync::Mutex<State>,
 }
@@ -38,7 +38,7 @@ impl IndexedFiles {
         }
     }
 
-    pub(super) fn get(&self) -> Index {
+    pub(super) fn get(&self) -> Index<'_> {
         let state = self.state.lock().unwrap();
 
         match &*state {
@@ -57,7 +57,7 @@ impl IndexedFiles {
     /// Returns a mutable view on the index that allows cheap in-place mutations.
     ///
     /// The changes are automatically written back to the database once the view is dropped.
-    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut> {
+    pub(super) fn indexed_mut(db: &mut dyn Db, project: Project) -> Option<IndexedMut<'_>> {
         // Calling `trigger_cancellation` cancels all pending salsa queries. This ensures that there are no pending
         // reads to the file set (this `db` is the only alive db).
         db.trigger_cancellation();
@@ -102,7 +102,7 @@ impl Default for IndexedFiles {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 enum State {
     /// The files of a package haven't been indexed yet.
     Lazy,
@@ -150,7 +150,7 @@ pub struct Indexed<'db> {
     _lifetime: PhantomData<&'db ()>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, get_size2::GetSize)]
 struct IndexedInner {
     files: FxHashSet<File>,
     diagnostics: Vec<IOErrorDiagnostic>,

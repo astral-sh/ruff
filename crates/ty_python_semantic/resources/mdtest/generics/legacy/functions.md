@@ -365,3 +365,93 @@ def g(x: T) -> T | None:
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
+
+## Opaque decorators don't affect typevar binding
+
+Inside the body of a generic function, we should be able to see that the typevars bound by that
+function are in fact bound by that function. This requires being able to see the enclosing
+function's _undecorated_ type and signature, especially in the case where a gradually typed
+decorator "hides" the function type from outside callers.
+
+```py
+from typing import cast, Any, Callable, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+T = TypeVar("T")
+
+def opaque_decorator(f: Any) -> Any:
+    return f
+
+def transparent_decorator(f: F) -> F:
+    return f
+
+@opaque_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+
+@transparent_decorator
+def decorated(t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Solving TypeVars with upper bounds in unions
+
+```py
+from typing import Generic, TypeVar
+
+class A: ...
+
+T = TypeVar("T", bound=A)
+
+class B(Generic[T]):
+    x: T
+
+def f(c: T | None):
+    return None
+
+def g(b: B[T]):
+    return f(b.x)  # Fine
+```
+
+## Constrained TypeVar in a union
+
+This is a regression test for an issue that surfaced in the primer report of an early version of
+<https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
+the fact that it only appears in the function's type annotations as part of a union:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", str, bytes)
+
+def NamedTemporaryFile(suffix: T | None, prefix: T | None) -> None:
+    return None
+
+def f(x: str):
+    NamedTemporaryFile(prefix=x, suffix=".tar.gz")  # Fine
+```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import TypeVar, overload
+
+T = TypeVar("T")
+
+def outer(t: T) -> None:
+    def inner(t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer(t: T) -> None: ...
+def overloaded_outer(t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+```

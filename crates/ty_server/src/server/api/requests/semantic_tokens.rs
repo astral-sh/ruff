@@ -16,7 +16,7 @@ impl RequestHandler for SemanticTokensRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
-    fn document_url(params: &SemanticTokensParams) -> Cow<Url> {
+    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Url> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -26,7 +26,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         _client: &Client,
         _params: SemanticTokensParams,
     ) -> crate::server::Result<Option<SemanticTokensResult>> {
-        if snapshot.client_settings().is_language_services_disabled() {
+        if snapshot
+            .workspace_settings()
+            .is_language_services_disabled()
+        {
             return Ok(None);
         }
 
