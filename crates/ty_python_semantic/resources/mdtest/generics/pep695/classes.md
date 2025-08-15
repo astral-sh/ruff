@@ -617,5 +617,34 @@ class C[T](C): ...
 class D[T](D[int]): ...
 ```
 
+## Tuple as a PEP-695 generic class
+
+Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in
+typeshed:
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class tuple[T]: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

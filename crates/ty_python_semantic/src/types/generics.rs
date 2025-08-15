@@ -148,6 +148,12 @@ impl<'db> GenericContext<'db> {
             .collect();
 
         match known_class {
+            // As of 15/08/2025, this branch is never taken, since `tuple` in typeshed
+            // does not have any PEP-695 type parameters. However, it will presumably
+            // at some point have its stub definition rewritten to use PEP-695 type parameters,
+            // and a custom typeshed could also reasonably define `tuple` in `builtins.pyi`
+            // with PEP-695 type parameters. (We have a regression test for this in
+            // `generics/pep695/classes.md`.)
             Some(KnownClass::Tuple) => {
                 assert_eq!(
                     variables.len(),
