@@ -1499,10 +1499,21 @@ data and a list containing the descriptors.
 """
 
 if sys.platform == "win32":
-    def fromshare(info: bytes) -> socket: ...
+    def fromshare(info: bytes) -> socket:
+        """fromshare(info) -> socket object
+
+Create a socket object from the bytes object returned by
+socket.share(pid).
+"""
 
 if sys.platform == "win32":
-    def socketpair(family: int = ..., type: int = ..., proto: int = 0) -> tuple[socket, socket]: ...
+    def socketpair(family: int = ..., type: int = ..., proto: int = 0) -> tuple[socket, socket]:
+        """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
+Create a pair of socket objects from the sockets returned by the platform
+socketpair() function.
+The arguments are the same as for socket() except the default family is AF_UNIX
+if defined on the platform; otherwise, the default is AF_INET.
+"""
 
 else:
     def socketpair(

@@ -511,11 +511,23 @@ the built-in open() function does.
     if sys.platform == "win32":
         if sys.version_info >= (3, 13):
             # raises UnsupportedOperation:
-            def owner(self: Never, *, follow_symlinks: bool = True) -> str: ...  # type: ignore[misc]
-            def group(self: Never, *, follow_symlinks: bool = True) -> str: ...  # type: ignore[misc]
+            def owner(self: Never, *, follow_symlinks: bool = True) -> str:  # type: ignore[misc]
+                """
+Return the login name of the file owner.
+"""
+            def group(self: Never, *, follow_symlinks: bool = True) -> str:  # type: ignore[misc]
+                """
+Return the group name of the file gid.
+"""
         else:
-            def owner(self: Never) -> str: ...  # type: ignore[misc]
-            def group(self: Never) -> str: ...  # type: ignore[misc]
+            def owner(self: Never) -> str:  # type: ignore[misc]
+                """
+        Return the login name of the file owner.
+        """
+            def group(self: Never) -> str:  # type: ignore[misc]
+                """
+        Return the group name of the file gid.
+        """
     else:
         if sys.version_info >= (3, 13):
             def owner(self, *, follow_symlinks: bool = True) -> str:
@@ -539,7 +551,10 @@ Return the group name of the file gid.
     # This method does "exist" on Windows on <3.12, but always raises NotImplementedError
     # On py312+, it works properly on Windows, as with all other platforms
     if sys.platform == "win32" and sys.version_info < (3, 12):
-        def is_mount(self: Never) -> bool: ...  # type: ignore[misc]
+        def is_mount(self: Never) -> bool:  # type: ignore[misc]
+            """
+        Check if this path is a POSIX mount point
+        """
     else:
         def is_mount(self) -> bool:
             """
