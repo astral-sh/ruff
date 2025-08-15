@@ -3,10 +3,15 @@
 ## `type(x) is C`
 
 ```py
+from typing import final
+
 class A: ...
 class B: ...
 
-def _(x: A | B):
+@final
+class C: ...
+
+def _(x: A | B, y: A | C):
     if type(x) is A:
         reveal_type(x)  # revealed: A
     else:
@@ -14,20 +19,55 @@ def _(x: A | B):
         # of `x` could be a subclass of `A`, so we need
         # to infer the full union type:
         reveal_type(x)  # revealed: A | B
+
+    if type(y) is C:
+        reveal_type(y)  # revealed: C
+    else:
+        # here, however, inferring `A` is fine,
+        # because `C` is `@final`: no subclass of `A`
+        # and `C` could exist
+        reveal_type(y)  # revealed: A
+
+    if type(y) is A:
+        reveal_type(y)  # revealed: A
+    else:
+        # but here, `type(y)` could be a subclass of `A`,
+        # in which case the `type(y) is A` call would evaluate
+        # to `False` even if `y` was an instance of `A`,
+        # so narrowing cannot occur
+        reveal_type(y)  # revealed: A | C
 ```
 
 ## `type(x) is not C`
 
 ```py
+from typing import final
+
 class A: ...
 class B: ...
 
-def _(x: A | B):
+@final
+class C: ...
+
+def _(x: A | B, y: A | C):
     if type(x) is not A:
         # Same reasoning as above: no narrowing should occur here.
         reveal_type(x)  # revealed: A | B
     else:
         reveal_type(x)  # revealed: A
+
+    if type(y) is not C:
+        # same reasoning as above: narrowing *can* occur here because `C` is `@final`
+        reveal_type(y)  # revealed: A
+    else:
+        reveal_type(y)  # revealed: C
+
+    if type(y) is not A:
+        # same reasoning as above: narrowing *cannot* occur here
+        # because `A` is not `@final`
+        reveal_type(y)  # revealed: A | C
+    else:
+        reveal_type(y)  # revealed: A
 ```
 
 ## `type(x) == C`, `type(x) != C`
