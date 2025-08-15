@@ -197,8 +197,7 @@ impl CodeGeneratorKind {
                 Some(CodeGeneratorKind::DataclassLike)
             } else if class
                 .explicit_bases(db)
-                .iter()
-                .any(|base| matches!(base, Type::SpecialForm(SpecialFormType::NamedTuple)))
+                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
             {
                 Some(CodeGeneratorKind::NamedTuple)
             } else if class.is_typed_dict(db) {
