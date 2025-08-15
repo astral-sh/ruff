@@ -756,12 +756,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
                     };
 
                     let target = match &**args {
