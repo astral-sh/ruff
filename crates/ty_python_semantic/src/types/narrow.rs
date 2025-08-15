@@ -772,13 +772,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_valid_constraint = if is_positive {
+                    let is_positive = if is_positive {
                         op == &ast::CmpOp::Is
                     } else {
                         op == &ast::CmpOp::IsNot
                     };
 
-                    if !is_valid_constraint {
+                    // `else`-branch narrowing for `if type(x) is Y` can only be done
+                    // if `Y` is a final class
+                    if !rhs_class.is_final(self.db) && !is_positive {
                         continue;
                     }
 
@@ -791,7 +793,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         let place = self.expect_place(&target);
                         constraints.insert(
                             place,
-                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                .negate_if(self.db, !is_positive),
                         );
                     }
                 }
