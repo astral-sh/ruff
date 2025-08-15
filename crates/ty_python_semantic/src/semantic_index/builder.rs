@@ -400,28 +400,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Any lazy snapshots of places that have been reassigned are no longer valid, so delete them.
-    fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+    /// Any lazy snapshots of the place that have been reassigned are no longer valid, so delete them.
+    /// If there is no reassignment, the state of the symbol just before the closure definition is recorded as a lazy snapshot.
+    /// We have not yet tracked where the closure is actually referenced, but we can assume that the closure becomes referenceable after the closure is defined.
+    /// ```py
+    /// def outer() -> None:
+    ///     x = None
+    ///
+    ///     def inner2() -> None:
+    ///         # `inner` can be referenced before its definition,
+    ///         # but `inner2` must still be called after the definition of `inner` for this call to be valid.
+    ///         inner()
+    ///
+    ///         # In this scope, `x` may refer to `x = None` or `x = 1`.
+    ///         reveal_type(x)  # revealed: None | Literal[1]
+    ///
+    ///     # Reassignment of `x` after the definition of `inner2`.
+    ///     # Sweep lazy snapshots of `x` for `inner2`.
+    ///     x = 1
+    ///
+    ///     def inner() -> None:
+    ///         # In this scope, `x = None` appears as being shadowed by `x = 1`.
+    ///         reveal_type(x)  # revealed: Literal[1]
+    ///
+    ///     # No reassignment of `x` after the definition of `inner`, so we can safely record a lazy snapshot for `inner`.
+    ///     inner()
+    ///     inner2()
+    /// ```
+    fn sweep_lazy_snapshots(&mut self, bound_place: ScopedPlaceId) {
+        let current_scope = self.current_scope();
+        let current_place_table = &self.place_tables[current_scope];
+        let Some(bound_symbol) = bound_place.as_symbol() else {
+            return;
+        };
         // Retain only snapshots that are either eager
-        //     || (enclosing_scope != popped_scope && popped_scope is not a visible ancestor of enclosing_scope)
+        //     || (enclosing_scope != current_scope && current_scope is not a visible ancestor of enclosing_scope)
         //     || enclosing_place is not a symbol or not reassigned
         // <=> remove those that are lazy
-        //     && (enclosing_scope == popped_scope || popped_scope is a visible ancestor of enclosing_scope)
+        //     && (enclosing_scope == current_scope || current_scope is a visible ancestor of enclosing_scope)
         //     && enclosing_place is a symbol and reassigned
         self.enclosing_snapshots.retain(|key, _| {
-            let popped_place_table = &self.place_tables[popped_scope_id];
             key.nested_laziness.is_eager()
-                || (key.enclosing_scope != popped_scope_id
+                || (key.enclosing_scope != current_scope
                     && VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
-                        .all(|(ancestor, _)| ancestor != popped_scope_id))
-                || !key.enclosing_place.as_symbol().is_some_and(|symbol_id| {
-                    let name = &self.place_tables[key.enclosing_scope]
-                        .symbol(symbol_id)
-                        .name();
-                    popped_place_table.symbol_id(name).is_some_and(|symbol_id| {
-                        popped_place_table.symbol(symbol_id).is_reassigned()
+                        .all(|(ancestor, _)| ancestor != current_scope))
+                || !key
+                    .enclosing_place
+                    .as_symbol()
+                    .is_some_and(|enclosing_symbol| {
+                        let name = &self.place_tables[key.enclosing_scope]
+                            .symbol(enclosing_symbol)
+                            .name();
+                        current_place_table
+                            .symbol_id(name)
+                            .is_some_and(|symbol_id| {
+                                symbol_id == bound_symbol
+                                    && current_place_table.symbol(symbol_id).is_reassigned()
+                            })
                     })
-                })
         });
     }
 
@@ -463,8 +499,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .scope_stack
             .pop()
             .expect("Root scope should be present");
-
-        self.sweep_lazy_snapshots(popped_scope_id);
 
         let children_end = self.scopes.next_index();
 
@@ -545,6 +579,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     #[track_caller]
     fn mark_place_bound(&mut self, id: ScopedPlaceId) {
         self.current_place_table_mut().mark_bound(id);
+        self.sweep_lazy_snapshots(id);
     }
 
     #[track_caller]
