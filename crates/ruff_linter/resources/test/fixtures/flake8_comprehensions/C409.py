@@ -42,3 +42,6 @@ tuple(
         x for x in [1,2,3]
     }
 )
+
+t9 = tuple([1],)
+t10 = tuple([1, 2],)
