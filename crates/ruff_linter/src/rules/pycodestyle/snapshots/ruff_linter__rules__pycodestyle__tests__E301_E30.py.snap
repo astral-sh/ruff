@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
-snapshot_kind: text
 ---
 E30.py:478:5: E301 [*] Expected 1 blank line, found 0
     |
@@ -100,3 +99,43 @@ E30.py:526:5: E301 [*] Expected 1 blank line, found 0
 526 527 |     def bar(self, x: int | str) -> int | str:
 527 528 |         return x
 528 529 | # end
+
+E30.py:983:9: E301 [*] Expected 1 blank line, found 0
+    |
+981 |     async def recv(self, *, length=65536):
+982 |         loop = asyncio.get_event_loop()
+983 |         def callback():
+    |         ^^^ E301
+984 |             loop.remove_reader(self._fd)
+985 |         loop.add_reader(self._fd, callback)
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+980 980 | class foo:
+981 981 |     async def recv(self, *, length=65536):
+982 982 |         loop = asyncio.get_event_loop()
+    983 |+
+983 984 |         def callback():
+984 985 |             loop.remove_reader(self._fd)
+985 986 |         loop.add_reader(self._fd, callback)
+
+E30.py:993:9: E301 [*] Expected 1 blank line, found 0
+    |
+991 |     if True:
+992 |         print("conditional")
+993 |         def test():
+    |         ^^^ E301
+994 |             pass
+995 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+990 990 | class Foo:
+991 991 |     if True:
+992 992 |         print("conditional")
+    993 |+
+993 994 |         def test():
+994 995 |             pass
+995 996 | # end

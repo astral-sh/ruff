@@ -836,15 +836,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             // Allow groups of one-liners.
             && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
             && !state.follows.follows_def_with_dummy_body()
-            // Only apply to functions that are "immediately within" a class (not nested within other functions/blocks).
-            // This change aligns with flake8's behavior and avoids false positives for functions nested within
-            // conditional blocks, loops, or other control structures within classes. E301 is primarily concerned
-            // with the spacing between direct class methods, not deeply nested implementation details.
-            && if let Status::Inside(class_indent) = state.class_status {
-                line.indent_length == class_indent + self.context.settings().tab_size.as_usize()
-            } else {
-                false
-            }
+            // Apply to functions within classes: both immediately within and nested within conditional blocks.
+            // This aligns with pycodestyle's behavior where E301 triggers for functions in classes regardless
+            // of whether they're immediately within the class or nested in control structures.
+            && matches!(state.class_status, Status::Inside(_))
             // The class/parent method's docstring can directly precede the def.
             // Allow following a decorator (if there is an error it will be triggered on the first decorator).
             && !matches!(state.follows, Follows::Docstring | Follows::Decorator)
@@ -860,6 +855,32 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     self.stylist.line_ending().to_string(),
                     self.locator.line_start(state.last_non_comment_line_end),
+                )));
+            }
+        } else if line.preceding_blank_lines == 0
+            // Apply to nested definitions: only within function bodies, not within classes
+            // (E301 handles functions within classes, including those nested in conditional blocks)
+            && matches!(state.fn_status, Status::Inside(_))
+            && line.kind.is_class_function_or_decorator()
+            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+            && !matches!(state.follows, Follows::Decorator)
+            // The class's docstring can directly precede the first function.
+            && !matches!(state.follows, Follows::Docstring)
+            // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
+            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
+            // Allow groups of one-liners.
+            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
+            && !state.follows.follows_def_with_dummy_body()
+            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
+            && !self.source_type.is_stub()
+        {
+            // E306
+            if let Some(mut diagnostic) =
+                self.report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range)
+            {
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    self.stylist.line_ending().to_string(),
+                    self.locator.line_start(line.first_token_range.start()),
                 )));
             }
         }
@@ -1048,41 +1069,6 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                         self.locator.line_start(state.last_non_comment_line_end),
                     )));
                 }
-            }
-        }
-
-        if line.preceding_blank_lines == 0
-            // Apply to nested definitions: either within a function body, or deeper-than-immediate inside a class
-            && (
-                matches!(state.fn_status, Status::Inside(_))
-                || if let Status::Inside(class_indent) = state.class_status {
-                    line.indent_length
-                        > class_indent + self.context.settings().tab_size.as_usize()
-                } else {
-                    false
-                }
-            )
-            && line.kind.is_class_function_or_decorator()
-            // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-            && !matches!(state.follows, Follows::Decorator)
-            // The class's docstring can directly precede the first function.
-            && !matches!(state.follows, Follows::Docstring)
-            // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
-            && prev_indent_length.is_some_and(|prev_indent_length| prev_indent_length >= line.indent_length)
-            // Allow groups of one-liners.
-            && !(state.follows.is_any_def() && line.last_token != TokenKind::Colon)
-            && !state.follows.follows_def_with_dummy_body()
-            // Blank lines in stub files are only used for grouping. Don't enforce blank lines.
-            && !self.source_type.is_stub()
-        {
-            // E306
-            if let Some(mut diagnostic) =
-                self.report_diagnostic(BlankLinesBeforeNestedDefinition, line.first_token_range)
-            {
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    self.stylist.line_ending().to_string(),
-                    self.locator.line_start(line.first_token_range.start()),
-                )));
             }
         }
     }
