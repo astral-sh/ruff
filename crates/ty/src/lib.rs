@@ -146,11 +146,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
     })?;
 
+    let time = std::time::Instant::now();
     let exit_status = if watch {
         main_loop.watch(&mut db)?
     } else {
         main_loop.run(&mut db)?
     };
+    eprintln!("type checking took {:?}", time.elapsed());
 
     let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
@@ -168,8 +170,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     }
 
     // Write the database to the persistent cache.
-    if let Err(err) = db.persist() {
-        tracing::warn!("failed to write to persistent cache: {err:?}");
+    if std::env::var("TY_PERSIST").is_ok() {
+        if let Err(err) = db.persist() {
+            tracing::warn!("failed to write to persistent cache: {err:?}");
+        }
     }
 
     std::mem::forget(db);

@@ -5,6 +5,7 @@ use std::{cmp, fmt, io};
 
 pub use self::changes::ChangeResult;
 use crate::metadata::settings::file_settings;
+use crate::metadata::value::{ValueSource, ValueSourceGuard};
 use crate::{CollectReporter, DEFAULT_LINT_REGISTRY};
 use crate::{ProgressReporter, Project, ProjectMetadata};
 use ruff_db::Db as SourceDb;
@@ -69,8 +70,12 @@ impl ProjectDatabase {
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //   cache and load the cache if it exists.
         //   we may want to have a dedicated method for this?
-        if let Err(err) = db.deserialize(&project_metadata) {
-            tracing::warn!("failed to read from persistent cache: {err:?}");
+        if std::env::var("TY_PERSIST").is_ok() {
+            let time = std::time::Instant::now();
+            if let Err(err) = db.deserialize(&project_metadata) {
+                tracing::warn!("failed to read from persistent cache: {err:?}");
+            }
+            eprintln!("deserialization took {:?}", time.elapsed());
         }
 
         // Initialize the `Program` singleton.
@@ -145,6 +150,8 @@ impl ProjectDatabase {
             Err(err) => return Err(err.into()),
         };
 
+        let _guard = ValueSourceGuard::new(ValueSource::Cli, false);
+
         // Deserialize the database.
         let mut deserializer = serde_json::Deserializer::from_slice(&contents);
         <dyn salsa::Database>::deserialize(self, &mut deserializer)?;
@@ -175,12 +182,14 @@ impl ProjectDatabase {
 
     /// Persist the current state of the database to disk.
     pub fn persist(&mut self) -> anyhow::Result<()> {
+        let time = std::time::Instant::now();
         if let Some(cache_dir) = self.system().cache_dir() {
             std::fs::create_dir_all(cache_dir.as_path())?;
 
             let contents = serde_json::to_vec(&<dyn salsa::Database>::as_serialize(self))?;
             std::fs::write(cache_dir.join("db").as_path(), contents)?;
         }
+        eprintln!("serialization took {:?}", time.elapsed());
 
         Ok(())
     }

@@ -9308,7 +9308,18 @@ impl<'db> EnumLiteralType<'db> {
 
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.

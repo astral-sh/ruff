@@ -264,7 +264,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
+        /// Creating a new `ScopeId`.
+        ///
+        /// The reason this is tracked function is because we persist `ScopeId`s to disk.
+        /// However, `ScopeId` is a tracked struct local to its creating query, and we
+        /// don't persist the `semantic_index` query. Having a separate tracked function
+        /// that _is_ persisted ensures that `ScopeId`s are preserved across executions.
+        #[salsa::tracked(persist)]
+        fn new_scope_id(db: &dyn Db, file: File, file_scope_id: FileScopeId) -> ScopeId<'_> {
+            ScopeId::new(db, file, file_scope_id)
+        }
+
+        let scope_id = new_scope_id(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);

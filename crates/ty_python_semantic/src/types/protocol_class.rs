@@ -241,7 +241,17 @@ impl<'db> ProtocolInterface<'db> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    Hash,
+    salsa::Update,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
@@ -319,7 +329,18 @@ impl<'db> ProtocolMemberData<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    salsa::Update,
+    Hash,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 enum ProtocolMemberKind<'db> {
     Method(CallableType<'db>),
     Property(PropertyInstanceType<'db>),
