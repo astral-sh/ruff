@@ -19,8 +19,7 @@ pub mod pyproject;
 pub mod settings;
 pub mod value;
 
-#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct ProjectMetadata {
     pub(super) name: Name,
 

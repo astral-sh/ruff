@@ -148,7 +148,7 @@ impl From<Notebook> for SourceTextKind {
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq, Clone, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub enum SourceTextError {
     #[error("Failed to read notebook: {0}`")]
     FailedToReadNotebook(String),

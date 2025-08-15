@@ -69,7 +69,7 @@ impl ProjectDatabase {
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //   cache and load the cache if it exists.
         //   we may want to have a dedicated method for this?
-        if let Err(err) = db.deserialize() {
+        if let Err(err) = db.deserialize(&project_metadata) {
             tracing::warn!("failed to read from persistent cache: {err:?}");
         }
 
@@ -77,10 +77,13 @@ impl ProjectDatabase {
         let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
         Program::init_or_update(&mut db, program_settings);
 
-        db.project = Some(
-            Project::from_metadata(&db, project_metadata)
-                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
-        );
+        // Initialize the `Project`, unless it was persisted.
+        if db.project.is_none() {
+            db.project = Some(
+                Project::from_metadata(&db, project_metadata)
+                    .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
+            );
+        }
 
         Ok(db)
     }
@@ -130,7 +133,7 @@ impl ProjectDatabase {
     }
 
     /// Deserialize the database from the persistent cache.
-    pub fn deserialize(&mut self) -> anyhow::Result<()> {
+    pub fn deserialize(&mut self, metadata: &ProjectMetadata) -> anyhow::Result<()> {
         let Some(cache_dir) = self.system().cache_dir() else {
             return Ok(());
         };
@@ -154,6 +157,17 @@ impl ProjectDatabase {
 
         for root in FileRoot::load_all(self) {
             self.files.seed_root(root, self);
+        }
+
+        for project in Project::load_all(self) {
+            if project.root(self) == metadata.root() {
+                match project.resolve_settings(self) {
+                    Ok(_) => self.project = Some(project),
+                    Err(err) => tracing::warn!("failed to deserialize project settings: {err:?}"),
+                }
+
+                break;
+            }
         }
 
         Ok(())
@@ -249,8 +263,17 @@ impl std::fmt::Debug for ProjectDatabase {
     }
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
-#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(
+    Default,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum CheckMode {
     /// Checks the open files in the project.
     OpenFiles,

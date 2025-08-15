@@ -17,11 +17,12 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
+use serde::{Deserialize, Serialize};
 use std::backtrace::BacktraceStatus;
 use std::collections::hash_set;
 use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 use tracing::error;
 use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
@@ -55,7 +56,7 @@ pub fn default_lints_registry() -> LintRegistry {
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(persist(serialize = Project::serialize, deserialize = Project::deserialize), heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project, [`None`] if there are no open files.
@@ -81,8 +82,11 @@ pub struct Project {
     /// We box the metadata here because it's a fairly large type and
     /// reducing the size of `Project` helps reduce the size of the
     /// salsa allocated table for `Project`.
-    #[returns(deref)]
-    pub settings: Box<Settings>,
+    ///
+    /// This field is unintialized temporarily after deserialization,
+    /// before calling `Project::resolve_settings`.
+    #[returns(ref)]
+    settings_: OnceLock<Box<Settings>>,
 
     /// The paths that should be included when checking this project.
     ///
@@ -109,14 +113,46 @@ pub struct Project {
     included_paths_list: Vec<SystemPathBuf>,
 
     /// Diagnostics that were generated when resolving the project settings.
-    #[returns(deref)]
-    settings_diagnostics: Vec<OptionDiagnostic>,
+    #[returns(ref)]
+    settings_diagnostics_: OnceLock<Vec<OptionDiagnostic>>,
 
     /// The mode in which the project should be checked.
     ///
     /// This changes the behavior of `check` to either check only the open files or all files in
     /// the project including the virtual files that might exists in the editor.
     #[default]
+    check_mode: CheckMode,
+}
+
+type ProjectFields = (
+    FxHashSet<File>,
+    IndexedFiles,
+    Box<ProjectMetadata>,
+    OnceLock<Box<Settings>>,
+    Vec<SystemPathBuf>,
+    OnceLock<Vec<OptionDiagnostic>>,
+    CheckMode,
+);
+
+/// The serialized representation of a `Project`.
+///
+/// Notably, this type does not contain the `settings` or `settings_diagnostics` fields, as the
+/// resolved settings contain types that are not easily serializable.
+#[derive(serde::Serialize)]
+struct ProjectWireRef<'a> {
+    open_fileset: &'a FxHashSet<File>,
+    file_set: &'a IndexedFiles,
+    metadata: &'a Box<ProjectMetadata>,
+    included_paths_list: &'a Vec<SystemPathBuf>,
+    check_mode: &'a CheckMode,
+}
+
+#[derive(serde::Deserialize)]
+struct ProjectWire {
+    open_fileset: FxHashSet<File>,
+    file_set: IndexedFiles,
+    metadata: Box<ProjectMetadata>,
+    included_paths_list: Vec<SystemPathBuf>,
     check_mode: CheckMode,
 }
 
@@ -179,11 +215,15 @@ impl Project {
         db.files()
             .try_add_root(db, metadata.root(), FileRootKind::Project);
 
-        let project = Project::builder(Box::new(metadata), Box::new(settings), diagnostics)
-            .durability(Durability::MEDIUM)
-            .open_fileset_durability(Durability::LOW)
-            .file_set_durability(Durability::LOW)
-            .new(db);
+        let project = Project::builder(
+            Box::new(metadata),
+            Box::new(settings).into(),
+            diagnostics.into(),
+        )
+        .durability(Durability::MEDIUM)
+        .open_fileset_durability(Durability::LOW)
+        .file_set_durability(Durability::LOW)
+        .new(db);
 
         Ok(project)
     }
@@ -228,20 +268,21 @@ impl Project {
         tracing::debug!("Reloading project");
         assert_eq!(self.root(db), metadata.root());
 
-        if &metadata != self.metadata(db) {
+        if metadata != *self.metadata(db) {
             match metadata.options().to_settings(db, metadata.root()) {
                 Ok((settings, settings_diagnostics)) => {
-                    if self.settings(db) != &settings {
-                        self.set_settings(db).to(Box::new(settings));
+                    if *self.settings(db) != settings {
+                        self.set_settings_(db).to(Box::new(settings).into());
                     }
 
                     if self.settings_diagnostics(db) != settings_diagnostics {
-                        self.set_settings_diagnostics(db).to(settings_diagnostics);
+                        self.set_settings_diagnostics_(db)
+                            .to(settings_diagnostics.into());
                     }
                 }
                 Err(error) => {
-                    self.set_settings_diagnostics(db)
-                        .to(vec![error.into_diagnostic()]);
+                    self.set_settings_diagnostics_(db)
+                        .to(vec![error.into_diagnostic()].into());
                 }
             }
 
@@ -522,6 +563,89 @@ impl Project {
             .map(OptionDiagnostic::to_diagnostic)
             .collect()
     }
+
+    pub fn settings<'db>(&self, db: &'db dyn Db) -> &'db Settings {
+        match self.settings_(db).get() {
+            Some(settings) => settings,
+            None => panic!("`Project::resolve_settings` must be called after deserialization"),
+        }
+    }
+
+    pub fn settings_diagnostics<'db>(&self, db: &'db dyn Db) -> &'db [OptionDiagnostic] {
+        match self.settings_diagnostics_(db).get() {
+            Some(diagnostics) => diagnostics.as_slice(),
+            None => panic!("`Project::resolve_settings` must be called after deserialization"),
+        }
+    }
+
+    pub fn set_settings_diagnostics(self, db: &mut dyn Db, paths: Vec<OptionDiagnostic>) {
+        self.set_settings_diagnostics_(db).to(paths.into());
+    }
+
+    /// Resolve the project settings after deserialization.
+    pub fn resolve_settings(&self, db: &dyn Db) -> Result<(), ToSettingsError> {
+        let metadata = self.metadata(db);
+        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
+
+        self.settings_(db)
+            .set(Box::new(settings))
+            .expect("`Project::resolve_settings` should only be called once");
+
+        self.settings_diagnostics_(db)
+            .set(diagnostics)
+            .expect("`Project::resolve_settings` should only be called once");
+
+        Ok(())
+    }
+
+    /// Loads all existing [`Project`]s in the database.
+    pub fn load_all(db: &dyn Db) -> Vec<Project> {
+        Project::ingredient(db)
+            .entries(db.zalsa())
+            .map(|(key, _)| salsa::plumbing::FromId::from_id(key.key_index()))
+            .collect()
+    }
+
+    fn serialize<S>(fields: &ProjectFields, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let (
+            open_fileset,
+            file_set,
+            metadata,
+            _settings,
+            included_paths_list,
+            _settings_diagnostics,
+            check_mode,
+        ) = fields;
+
+        ProjectWireRef {
+            open_fileset,
+            file_set,
+            metadata,
+            included_paths_list,
+            check_mode,
+        }
+        .serialize(serializer)
+    }
+
+    fn deserialize<'de, D>(deserializer: D) -> Result<ProjectFields, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ProjectWire::deserialize(deserializer)?;
+
+        Ok((
+            wire.open_fileset,
+            wire.file_set,
+            wire.metadata,
+            OnceLock::new(),
+            wire.included_paths_list,
+            OnceLock::new(),
+            wire.check_mode,
+        ))
+    }
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -636,7 +760,7 @@ impl Iterator for ProjectFilesIter<'_> {
 
 impl FusedIterator for ProjectFilesIter<'_> {}
 
-#[derive(Debug, Clone, get_size2::GetSize)]
+#[derive(Debug, Clone, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 pub struct IOErrorDiagnostic {
     file: Option<File>,
     error: IOErrorKind,
@@ -652,7 +776,7 @@ impl IOErrorDiagnostic {
     }
 }
 
-#[derive(Error, Debug, Clone, get_size2::GetSize)]
+#[derive(Error, Debug, Clone, get_size2::GetSize, serde::Serialize, serde::Deserialize)]
 enum IOErrorKind {
     #[error(transparent)]
     Walk(#[from] walk::WalkError),

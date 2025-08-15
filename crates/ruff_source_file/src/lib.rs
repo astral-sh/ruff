@@ -165,6 +165,7 @@ impl SourceFileBuilder {
 /// Cloning a [`SourceFile`] is cheap, because it only requires bumping a reference count.
 #[derive(Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SourceFile {
     inner: Arc<SourceFileInner>,
 }
@@ -228,10 +229,37 @@ impl Ord for SourceFile {
 }
 
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 struct SourceFileInner {
     name: Box<str>,
     code: Box<str>,
+    #[cfg_attr(feature = "serde", serde(with = "line_index_serde"))]
     line_index: OnceLock<LineIndex>,
+}
+
+#[cfg(feature = "serde")]
+mod line_index_serde {
+    use super::*;
+
+    pub(super) fn serialize<S>(
+        line_index: &OnceLock<LineIndex>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        line_index.get().serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<OnceLock<LineIndex>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Option::<LineIndex>::deserialize(deserializer)? {
+            None => Ok(OnceLock::new()),
+            Some(line_index) => Ok(OnceLock::from(line_index)),
+        }
+    }
 }
 
 impl PartialEq for SourceFileInner {

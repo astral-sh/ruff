@@ -1400,7 +1400,17 @@ impl RangedValue<OverrideOptions> {
 }
 
 /// The options for an override but without the include/exclude patterns.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Combine, get_size2::GetSize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Combine,
+    get_size2::GetSize,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub(super) struct InnerOverrideOptions {
     /// Raw rule options as specified in the configuration.
     /// Used when multiple overrides match a file and need to be merged.

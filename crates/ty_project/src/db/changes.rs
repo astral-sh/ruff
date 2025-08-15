@@ -287,8 +287,7 @@ impl ProjectDatabase {
                                 );
 
                                 project
-                                    .set_settings_diagnostics(self)
-                                    .to(vec![error.into_diagnostic()]);
+                                    .set_settings_diagnostics(self, vec![error.into_diagnostic()]);
                             }
                         }
 
