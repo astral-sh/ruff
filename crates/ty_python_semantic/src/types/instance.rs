@@ -12,8 +12,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer,
-    VarianceInferable,
+    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -702,7 +701,11 @@ mod synthesized_protocol {
     }
 
     impl<'db> VarianceInferable<'db> for SynthesizedProtocolType<'db> {
-        fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        fn variance_of(
+            self,
+            db: &'db dyn Db,
+            type_var: BoundTypeVarInstance<'db>,
+        ) -> TypeVarVariance {
             self.0.variance_of(db, type_var)
         }
     }

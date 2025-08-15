@@ -6293,9 +6293,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
-                function_type
-                    .signature(db)
-                    .variance_of(db, type_var)
+                function_type.signature(db).variance_of(db, type_var)
             }
 
             Type::BoundMethod(method_type) => {
@@ -6310,20 +6308,36 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 nominal_instance_type.variance_of(db, type_var)
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, type_var),
-            Type::Callable(callable_type) => callable_type
-                .signatures(db)
-                .variance_of(db, type_var),
-            Type::TypeVar(other_type_var) if other_type_var.typevar(db) == type_var.typevar(db) => {
+            Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, type_var),
+            Type::TypeVar(other_type_var) if other_type_var == type_var => {
                 // type variables are covariant in themselves
                 TypeVarVariance::Covariant
             }
-            Type::ProtocolInstance(protocol_instance_type) => protocol_instance_type.variance_of(db, type_var),
-            Type::Union(union_type) => union_type.elements(db).iter().map(|ty| ty.variance_of(db, type_var)).collect(),
-            Type::Intersection(intersection_type) => intersection_type.positive(db).iter().map(|ty| ty.variance_of(db, type_var)).chain(
-                intersection_type.negative(db).iter().map(|ty| ty.with_polarity(TypeVarVariance::Contravariant).variance_of(db, type_var))).collect(),
-            Type::PropertyInstance(property_instance_type) =>
-                property_instance_type.getter(db).iter().chain(&property_instance_type.setter(db)).map(|ty| ty.variance_of(db, type_var)).collect(),
-            | Type::Dynamic(_)
+            Type::ProtocolInstance(protocol_instance_type) => {
+                protocol_instance_type.variance_of(db, type_var)
+            }
+            Type::Union(union_type) => union_type
+                .elements(db)
+                .iter()
+                .map(|ty| ty.variance_of(db, type_var))
+                .collect(),
+            Type::Intersection(intersection_type) => intersection_type
+                .positive(db)
+                .iter()
+                .map(|ty| ty.variance_of(db, type_var))
+                .chain(intersection_type.negative(db).iter().map(|ty| {
+                    ty.with_polarity(TypeVarVariance::Contravariant)
+                        .variance_of(db, type_var)
+                }))
+                .collect(),
+            Type::PropertyInstance(property_instance_type) => property_instance_type
+                .getter(db)
+                .iter()
+                .chain(&property_instance_type.setter(db))
+                .map(|ty| ty.variance_of(db, type_var))
+                .collect(),
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, type_var),
+            Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
@@ -6341,7 +6355,6 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
-            | Type::SubclassOf(_) // TODO: double check
             | Type::TypeVar(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_)

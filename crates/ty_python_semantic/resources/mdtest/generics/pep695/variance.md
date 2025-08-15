@@ -529,5 +529,103 @@ static_assert(is_subtype_of(D[B], D[A]))
 static_assert(is_subtype_of(D[A], D[B]))
 ```
 
+## Union Types
+
+Union types are covariant in all their members. If `A <: B`, then `A | C <: B | C` and
+`C | A <: C | B`.
+
+```py
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+class C: ...
+
+# Union types are covariant in their members
+static_assert(is_subtype_of(B | C, A | C))
+static_assert(is_subtype_of(C | B, C | A))
+static_assert(not is_subtype_of(A | C, B | C))
+static_assert(not is_subtype_of(C | A, C | B))
+
+# Assignability follows the same pattern
+static_assert(is_assignable_to(B | C, A | C))
+static_assert(is_assignable_to(C | B, C | A))
+static_assert(not is_assignable_to(A | C, B | C))
+static_assert(not is_assignable_to(C | A, C | B))
+```
+
+## Intersection Types
+
+Intersection types cannot be expressed directly in Python syntax, but they occur when type narrowing
+creates constraints through control flow. In ty's representation, intersection types are covariant
+in their positive conjuncts and contravariant in their negative conjuncts.
+
+```py
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert, Intersection, Not
+
+class A: ...
+class B(A): ...
+class C: ...
+
+# Test covariance in positive conjuncts
+# If B <: A, then Intersection[X, B] <: Intersection[X, A]
+static_assert(is_subtype_of(Intersection[C, B], Intersection[C, A]))
+static_assert(not is_subtype_of(Intersection[C, A], Intersection[C, B]))
+
+static_assert(is_assignable_to(Intersection[C, B], Intersection[C, A]))
+static_assert(not is_assignable_to(Intersection[C, A], Intersection[C, B]))
+
+# Test contravariance in negative conjuncts
+# If B <: A, then Intersection[X, Not[A]] <: Intersection[X, Not[B]]
+# (excluding supertype A is more restrictive than excluding subtype B)
+static_assert(is_subtype_of(Intersection[C, Not[A]], Intersection[C, Not[B]]))
+static_assert(not is_subtype_of(Intersection[C, Not[B]], Intersection[C, Not[A]]))
+
+static_assert(is_assignable_to(Intersection[C, Not[A]], Intersection[C, Not[B]]))
+static_assert(not is_assignable_to(Intersection[C, Not[B]], Intersection[C, Not[A]]))
+```
+
+## Subclass Types (type[T])
+
+The `type[T]` construct represents the type of classes that are subclasses of `T`. It is covariant
+in `T` because if `A <: B`, then `type[A] <: type[B]` holds.
+
+```py
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+# type[T] is covariant in T
+static_assert(is_subtype_of(type[B], type[A]))
+static_assert(not is_subtype_of(type[A], type[B]))
+
+static_assert(is_assignable_to(type[B], type[A]))
+static_assert(not is_assignable_to(type[A], type[B]))
+
+# With generic classes using type[T]
+class ClassContainer[T]:
+    def __init__(self, cls: type[T]) -> None:
+        self.cls = cls
+
+    def create_instance(self) -> T:
+        return self.cls()
+
+# ClassContainer is covariant in T due to type[T]
+static_assert(is_subtype_of(ClassContainer[B], ClassContainer[A]))
+static_assert(not is_subtype_of(ClassContainer[A], ClassContainer[B]))
+
+static_assert(is_assignable_to(ClassContainer[B], ClassContainer[A]))
+static_assert(not is_assignable_to(ClassContainer[A], ClassContainer[B]))
+
+# Practical example: you can pass a ClassContainer[B] where ClassContainer[A] is expected
+# because type[B] can safely be used where type[A] is expected
+def use_a_class_container(container: ClassContainer[A]) -> A:
+    return container.create_instance()
+
+b_container = ClassContainer[B](B)
+a_instance: A = use_a_class_container(b_container)  # This should work
+```
+
 [linear-time-variance-talk]: https://www.youtube.com/watch?v=7uixlNTOY4s&t=9705s
 [spec]: https://typing.python.org/en/latest/spec/generics.html#variance
