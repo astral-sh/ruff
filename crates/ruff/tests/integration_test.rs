@@ -307,7 +307,10 @@ fn stdin_up045_nested_optional_flatten_all() {
         .args(["--select", "UP045", "--diff", "--target-version", "py312"])
         .build();
     assert_cmd_snapshot!(cmd.pass_stdin(
-        "from typing import Optional\nnested_optional: Optional[Optional[Optional[str]]] = None"
+        "\
+from typing import Optional
+nested_optional: Optional[Optional[Optional[str]]] = None
+"
     ));
 }
 

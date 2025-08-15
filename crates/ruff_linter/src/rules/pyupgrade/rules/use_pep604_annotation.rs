@@ -171,10 +171,6 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
-                        if checker.semantic().inside_optional() {
-                            return;
-                        }
-
                         // Unwrap all nested Optional[...] and wrap once as `X | None`.
                         let mut inner = slice;
                         while let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = inner {
@@ -187,7 +183,6 @@ pub(crate) fn non_pep604_annotation(
                             }
                         }
 
-                        let inner = inner;
                         let flattened_slice = pep_604_optional(inner);
 
                         diagnostic.set_fix(Fix::applicable_edit(
