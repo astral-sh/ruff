@@ -70,6 +70,56 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A
 ```
 
+## No narrowing for `type(x) is C[int]`
+
+At runtime, `type(x)` will never return a generic alias object (only ever a class-literal object),
+so no narrowing can occur if `type(x)` is compared with a generic alias object.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class A[T]: ...
+class B: ...
+
+def f(x: A[int] | B):
+    if type(x) is A[int]:
+        # this branch is actually unreachable -- we *could* reveal `Never` here!
+        reveal_type(x)  # revealed: A[int] | B
+    else:
+        reveal_type(x)  # revealed: A[int] | B
+
+    if type(x) is A:
+        # TODO: this should be `A[int]`, but `A[int] | B` would be better than `Never`
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: A[int] | B
+
+    if type(x) is B:
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A[int] | B
+
+    if type(x) is not A[int]:
+        reveal_type(x)  # revealed: A[int] | B
+    else:
+        # this branch is actually unreachable -- we *could* reveal `Never` here!
+        reveal_type(x)  # revealed: A[int] | B
+
+    if type(x) is not A:
+        reveal_type(x)  # revealed: A[int] | B
+    else:
+        # TODO: this should be `A[int]`, but `A[int] | B` would be better than `Never`
+        reveal_type(x)  # revealed: Never
+
+    if type(x) is not B:
+        reveal_type(x)  # revealed: A[int] | B
+    else:
+        reveal_type(x)  # revealed: B
+```
+
 ## `type(x) == C`, `type(x) != C`
 
 No narrowing can occur for equality comparisons, since there might be a custom `__eq__`
