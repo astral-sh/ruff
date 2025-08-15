@@ -105,16 +105,17 @@ help: Add missing blank line
 527 528 |         return x
 528 529 | # end
 
-E30.py:983:9: E301 [*] Expected 1 blank line, found 0
+E301 [*] Expected 1 blank line, found 0
+   --> E30.py:983:9
     |
 981 |     async def recv(self, *, length=65536):
 982 |         loop = asyncio.get_event_loop()
 983 |         def callback():
-    |         ^^^ E301
+    |         ^^^
 984 |             loop.remove_reader(self._fd)
 985 |         loop.add_reader(self._fd, callback)
     |
-    = help: Add missing blank line
+help: Add missing blank line
 
 ℹ Safe fix
 980 980 | class foo:
@@ -125,16 +126,17 @@ E30.py:983:9: E301 [*] Expected 1 blank line, found 0
 984 985 |             loop.remove_reader(self._fd)
 985 986 |         loop.add_reader(self._fd, callback)
 
-E30.py:993:9: E301 [*] Expected 1 blank line, found 0
+E301 [*] Expected 1 blank line, found 0
+   --> E30.py:993:9
     |
 991 |     if True:
 992 |         print("conditional")
 993 |         def test():
-    |         ^^^ E301
+    |         ^^^
 994 |             pass
 995 | # end
     |
-    = help: Add missing blank line
+help: Add missing blank line
 
 ℹ Safe fix
 990 990 | class Foo:
