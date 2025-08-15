@@ -6897,31 +6897,6 @@ pub enum TypeVarKind {
     TypingSelf,
 }
 
-/// Whether a typevar is inferable in the current context.
-///
-/// Inside the generic class or function that binds it, a typevar stands for a specific type; we
-/// just don't know what it is yet. In this case, the typevar is _not inferable_. When checking
-/// e.g. assignability, we must verify that the property holds for all possible specializations of
-/// the typevar.
-///
-/// Outside of that generic class or function, the typevar is _inferable_. Assignability checks
-/// only have to hold for _some_ specialization, and we infer the constraints under which the check
-/// holds.
-///
-/// Given the above, typevars typically start off not inferable, when they're defined in Python
-/// code or created synthentically by our type inference logic. They are marked as inferable when
-/// they are used in the generic context of a class or function.
-///
-/// (In [[POPL2015][]] and related papers, inferable typevars are sometimes called _polymorphic_,
-/// and non-inferable ones _monomorphic_.)
-///
-/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
-pub enum Inferable {
-    Inferable,
-    NotInferable,
-}
-
 /// A type variable that has not been bound to a generic context yet.
 ///
 /// This is usually not the type that you want; if you are working with a typevar, in a generic
