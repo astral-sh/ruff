@@ -15,10 +15,12 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeTransformer, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
-use crate::types::{KnownClass, TypeMapping, TypeRelation, TypeVarInstance, todo_type};
+use crate::types::{
+    BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation, todo_type,
+};
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
@@ -64,7 +66,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
@@ -88,10 +90,11 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for signature in &self.overloads {
-            signature.find_legacy_typevars(db, typevars);
+            signature.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -244,7 +247,7 @@ pub struct Signature<'db> {
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(generic_context) = &signature.generic_context {
         walk_generic_context(db, *generic_context, visitor);
@@ -386,7 +389,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
@@ -428,18 +431,19 @@ impl<'db> Signature<'db> {
     pub(crate) fn find_legacy_typevars(
         &self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         for param in &self.parameters {
             if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
             if let Some(ty) = param.default_type() {
-                ty.find_legacy_typevars(db, typevars);
+                ty.find_legacy_typevars(db, binding_context, typevars);
             }
         }
         if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars(db, typevars);
+            ty.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
@@ -1183,7 +1187,7 @@ impl<'db> Parameters<'db> {
         self.value.len()
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<Parameter<'db>> {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
         self.value.iter()
     }
 
@@ -1369,7 +1373,7 @@ impl<'db> Parameter<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
+        visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
             annotated_type,
@@ -1793,11 +1797,7 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        // TODO resolution should not be deferred; we should see A, not A | B
-        assert_eq!(
-            a_annotated_ty.unwrap().display(&db).to_string(),
-            "Unknown | A | B"
-        );
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
     }
 

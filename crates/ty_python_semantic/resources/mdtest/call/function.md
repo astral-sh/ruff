@@ -164,6 +164,78 @@ def _(args: tuple[int, str]) -> None:
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
 ```
 
+### Subclass of fixed-length tuple argument
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class SingleElementTuple(tuple[int]): ...
+
+def _(args: SingleElementTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)
+
+    takes_two(*args)  # error: [missing-argument]
+    takes_two_positional_only(*args)  # error: [missing-argument]
+
+    takes_two_different(*args)  # error: [missing-argument]
+    takes_two_different_positional_only(*args)  # error: [missing-argument]
+
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+
+    takes_at_least_two(*args)  # error: [missing-argument]
+    takes_at_least_two_positional_only(*args)  # error: [missing-argument]
+
+class TwoElementIntTuple(tuple[int, int]): ...
+
+def _(args: TwoElementIntTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStrTuple(tuple[int, str]): ...
+
+def _(args: IntStrTuple) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+```
+
 ### Mixed tuple argument
 
 ```toml
@@ -256,6 +328,142 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_at_least_one(*args)
     takes_at_least_two(*args)  # error: [invalid-argument-type]
     takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+```
+
+### Subclass of mixed tuple argument
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def takes_zero() -> None: ...
+def takes_one(x: int) -> None: ...
+def takes_two(x: int, y: int) -> None: ...
+def takes_two_positional_only(x: int, y: int, /) -> None: ...
+def takes_two_different(x: int, y: str) -> None: ...
+def takes_two_different_positional_only(x: int, y: str, /) -> None: ...
+def takes_at_least_zero(*args) -> None: ...
+def takes_at_least_one(x: int, *args) -> None: ...
+def takes_at_least_two(x: int, y: int, *args) -> None: ...
+def takes_at_least_two_positional_only(x: int, y: int, /, *args) -> None: ...
+
+# Test all of the above with a number of different splatted argument types
+
+class IntStarInt(tuple[int, *tuple[int, ...]]): ...
+
+def _(args: IntStarInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStr(tuple[int, *tuple[str, ...]]): ...
+
+def _(args: IntStarStr) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarInt(tuple[int, int, *tuple[int, ...]]): ...
+
+def _(args: IntIntStarInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntIntStarStr(tuple[int, int, *tuple[str, ...]]): ...
+
+def _(args: IntIntStarStr) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    takes_two(*args)
+    takes_two_positional_only(*args)
+
+    # error: [invalid-argument-type]
+    takes_two_different(*args)
+    # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    takes_at_least_two(*args)
+
+    takes_at_least_two_positional_only(*args)
+
+class IntStarIntInt(tuple[int, *tuple[int, ...], int]): ...
+
+def _(args: IntStarIntInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+    takes_one(*args)  # error: [too-many-positional-arguments]
+    takes_two(*args)
+    takes_two_positional_only(*args)
+    takes_two_different(*args)  # error: [invalid-argument-type]
+    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_zero(*args)
+    takes_at_least_one(*args)
+    takes_at_least_two(*args)
+    takes_at_least_two_positional_only(*args)
+
+class IntStarStrInt(tuple[int, *tuple[str, ...], int]): ...
+
+def _(args: IntStarStrInt) -> None:
+    takes_zero(*args)  # error: [too-many-positional-arguments]
+
+    takes_one(*args)  # error: [too-many-positional-arguments]
+
+    # error: [invalid-argument-type]
+    takes_two(*args)
+    # error: [invalid-argument-type]
+    takes_two_positional_only(*args)
+
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
+
+    takes_at_least_zero(*args)
+
+    takes_at_least_one(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two(*args)
+
+    # error: [invalid-argument-type]
+    takes_at_least_two_positional_only(*args)
 ```
 
 ### String argument

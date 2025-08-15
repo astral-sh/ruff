@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
-snapshot_kind: text
 ---
-<filename>:4:10: PD011 Use `.to_numpy()` instead of `.values`
+PD011 Use `.to_numpy()` instead of `.values`
+ --> <filename>:4:10
   |
 2 | import pandas as pd
 3 | x = pd.DataFrame()
 4 | result = x.values
-  |          ^^^^^^^^ PD011
+  |          ^^^^^^^^
   |

@@ -33,7 +33,7 @@ from _ast import (
 )
 from _typeshed import ReadableBuffer, Unused
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any, ClassVar, Generic, Literal, TypedDict, TypeVar as _TypeVar, overload
+from typing import Any, ClassVar, Generic, Literal, TypedDict, TypeVar as _TypeVar, overload, type_check_only
 from typing_extensions import Self, Unpack, deprecated
 
 if sys.version_info >= (3, 13):
@@ -43,6 +43,7 @@ if sys.version_info >= (3, 13):
 _EndPositionT = typing_extensions.TypeVar("_EndPositionT", int, int | None, default=int | None)
 
 # Corresponds to the names in the `_attributes` class variable which is non-empty in certain AST nodes
+@type_check_only
 class _Attributes(TypedDict, Generic[_EndPositionT], total=False):
     lineno: int
     col_offset: int
@@ -1330,19 +1331,21 @@ class Constant(expr):
     kind: str | None
     if sys.version_info < (3, 14):
         # Aliases for value, for backwards compatibility
-        @deprecated("Will be removed in Python 3.14; use value instead")
         @property
+        @deprecated("Will be removed in Python 3.14. Use `value` instead.")
         def n(self) -> _ConstantValue:
             """Deprecated. Use value instead."""
 
         @n.setter
+        @deprecated("Will be removed in Python 3.14. Use `value` instead.")
         def n(self, value: _ConstantValue) -> None: ...
-        @deprecated("Will be removed in Python 3.14; use value instead")
         @property
+        @deprecated("Will be removed in Python 3.14. Use `value` instead.")
         def s(self) -> _ConstantValue:
             """Deprecated. Use value instead."""
 
         @s.setter
+        @deprecated("Will be removed in Python 3.14. Use `value` instead.")
         def s(self, value: _ConstantValue) -> None: ...
 
     def __init__(self, value: _ConstantValue, kind: str | None = None, **kwargs: Unpack[_Attributes]) -> None: ...
@@ -2121,8 +2124,14 @@ if sys.version_info >= (3, 12):
             ) -> Self:
                 """Return a copy of the AST node with new values for the specified fields."""
 
-class _ABC(type):
-    def __init__(cls, *args: Unused) -> None: ...
+if sys.version_info >= (3, 14):
+    @type_check_only
+    class _ABC(type):
+        def __init__(cls, *args: Unused) -> None: ...
+
+else:
+    class _ABC(type):
+        def __init__(cls, *args: Unused) -> None: ...
 
 if sys.version_info < (3, 14):
     @deprecated("Replaced by ast.Constant; removed in Python 3.14")

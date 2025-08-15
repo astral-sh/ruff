@@ -21,8 +21,9 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
         Expr::List(ast::ExprList { elts, ctx, .. })
         | Expr::Tuple(ast::ExprTuple { elts, ctx, .. }) => {
             *ctx = new_ctx;
-            elts.iter_mut()
-                .for_each(|element| set_expr_ctx(element, new_ctx));
+            for element in elts.iter_mut() {
+                set_expr_ctx(element, new_ctx);
+            }
         }
         _ => {}
     }

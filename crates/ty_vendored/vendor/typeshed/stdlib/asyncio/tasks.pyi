@@ -10,7 +10,7 @@ from _asyncio import (
     _unregister_task as _unregister_task,
 )
 from collections.abc import AsyncIterator, Awaitable, Coroutine, Generator, Iterable, Iterator
-from typing import Any, Literal, Protocol, TypeVar, overload
+from typing import Any, Literal, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeAlias
 
 from . import _CoroutineLike
@@ -89,6 +89,7 @@ FIRST_EXCEPTION = concurrent.futures.FIRST_EXCEPTION
 ALL_COMPLETED = concurrent.futures.ALL_COMPLETED
 
 if sys.version_info >= (3, 13):
+    @type_check_only
     class _SyncAndAsyncIterator(Iterator[_T_co], AsyncIterator[_T_co], Protocol[_T_co]): ...
 
     def as_completed(fs: Iterable[_FutureLike[_T]], *, timeout: float | None = None) -> _SyncAndAsyncIterator[Future[_T]]:
@@ -741,6 +742,7 @@ elif sys.version_info >= (3, 12):
 if sys.version_info >= (3, 12):
     _TaskT_co = TypeVar("_TaskT_co", bound=Task[Any], covariant=True)
 
+    @type_check_only
     class _CustomTaskConstructor(Protocol[_TaskT_co]):
         def __call__(
             self,
@@ -753,6 +755,7 @@ if sys.version_info >= (3, 12):
             eager_start: bool,
         ) -> _TaskT_co: ...
 
+    @type_check_only
     class _EagerTaskFactoryType(Protocol[_TaskT_co]):
         def __call__(
             self,

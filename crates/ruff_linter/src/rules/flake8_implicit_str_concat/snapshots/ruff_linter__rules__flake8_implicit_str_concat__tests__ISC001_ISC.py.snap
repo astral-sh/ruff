@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+ --> ISC.py:1:5
   |
 1 | _ = "a" "b" "c"
-  |     ^^^^^^^ ISC001
+  |     ^^^^^^^
 2 |
 3 | _ = "abc" + "def"
   |
-  = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 1   |-_ = "a" "b" "c"
@@ -17,14 +18,15 @@ ISC.py:1:5: ISC001 [*] Implicitly concatenated string literals on one line
 3 3 | _ = "abc" + "def"
 4 4 | 
 
-ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+ --> ISC.py:1:9
   |
 1 | _ = "a" "b" "c"
-  |         ^^^^^^^ ISC001
+  |         ^^^^^^^
 2 |
 3 | _ = "abc" + "def"
   |
-  = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 1   |-_ = "a" "b" "c"
@@ -33,16 +35,17 @@ ISC.py:1:9: ISC001 [*] Implicitly concatenated string literals on one line
 3 3 | _ = "abc" + "def"
 4 4 | 
 
-ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:38:5
    |
 36 | )
 37 |
 38 | _ = """a""" """b"""
-   |     ^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^
 39 |
 40 | _ = """a
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 35 35 |   b"def"
@@ -54,7 +57,8 @@ ISC.py:38:5: ISC001 [*] Implicitly concatenated string literals on one line
 40 40 | _ = """a
 41 41 | b""" """c
 
-ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:40:5
    |
 38 |   _ = """a""" """b"""
 39 |
@@ -62,11 +66,11 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
    |  _____^
 41 | | b""" """c
 42 | | d"""
-   | |____^ ISC001
+   | |____^
 43 |
 44 |   _ = f"""a""" f"""b"""
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 38 38 | _ = """a""" """b"""
@@ -78,16 +82,17 @@ ISC.py:40:5: ISC001 [*] Implicitly concatenated string literals on one line
 43 43 | 
 44 44 | _ = f"""a""" f"""b"""
 
-ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:44:5
    |
 42 | d"""
 43 |
 44 | _ = f"""a""" f"""b"""
-   |     ^^^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^^^
 45 |
 46 | _ = f"a" "b"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 41 41 | b""" """c
@@ -99,49 +104,53 @@ ISC.py:44:5: ISC001 [*] Implicitly concatenated string literals on one line
 46 46 | _ = f"a" "b"
 47 47 | 
 
-ISC.py:46:5: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC.py:46:5
    |
 44 | _ = f"""a""" f"""b"""
 45 |
 46 | _ = f"a" "b"
-   |     ^^^^^^^^ ISC001
+   |     ^^^^^^^^
 47 |
 48 | _ = """a""" "b"
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC.py:48:5: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC.py:48:5
    |
 46 | _ = f"a" "b"
 47 |
 48 | _ = """a""" "b"
-   |     ^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^
 49 |
 50 | _ = 'a' "b"
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC.py:50:5: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC.py:50:5
    |
 48 | _ = """a""" "b"
 49 |
 50 | _ = 'a' "b"
-   |     ^^^^^^^ ISC001
+   |     ^^^^^^^
 51 |
 52 | _ = rf"a" rf"b"
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:52:5
    |
 50 | _ = 'a' "b"
 51 |
 52 | _ = rf"a" rf"b"
-   |     ^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^
 53 |
 54 | # Single-line explicit concatenation should be ignored.
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 49 49 | 
@@ -153,15 +162,16 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 54 54 | # Single-line explicit concatenation should be ignored.
 55 55 | _ = "abc" + "def" + "ghi"
 
-ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:64:10
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
-   |          ^^^^^^^ ISC001
+   |          ^^^^^^^
 65 | _ = f"""abc {"def" "ghi"} jkl"""
 66 | _ = f"""abc {
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 61 61 | _ = foo + "abc" + bar
@@ -173,15 +183,16 @@ ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 
-ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:64:14
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
-   |              ^^^^^^^ ISC001
+   |              ^^^^^^^
 65 | _ = f"""abc {"def" "ghi"} jkl"""
 66 | _ = f"""abc {
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 61 61 | _ = foo + "abc" + bar
@@ -193,16 +204,17 @@ ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
 66 66 | _ = f"""abc {
 67 67 |     "def"
 
-ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:65:14
    |
 63 | # Multiple strings nested inside a f-string
 64 | _ = f"a {'b' 'c' 'd'} e"
 65 | _ = f"""abc {"def" "ghi"} jkl"""
-   |              ^^^^^^^^^^^ ISC001
+   |              ^^^^^^^^^^^
 66 | _ = f"""abc {
 67 |     "def"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 62 62 | 
@@ -214,35 +226,38 @@ ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
 67 67 |     "def"
 68 68 |     "ghi"
 
-ISC.py:72:5: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC.py:72:5
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |     ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^^^^^^^^
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC.py:72:9: ISC001 Implicitly concatenated string literals on one line
+ISC001 Implicitly concatenated string literals on one line
+  --> ISC.py:72:9
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |         ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |         ^^^^^^^^^^^^^^^^^^^^^^
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
-   = help: Combine string literals
+help: Combine string literals
 
-ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:72:14
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
-   |              ^^^^^^^^^ ISC001
+   |              ^^^^^^^^^
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
 74 | _ = f"b {f"abc" \
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 69 69 | } jkl"""
@@ -254,16 +269,17 @@ ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
 74 74 | _ = f"b {f"abc" \
 75 75 |     f"def"} g"
 
-ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:73:10
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
-   |          ^^^^^^^^^^^^^^^^^^^^^^^ ISC001
+   |          ^^^^^^^^^^^^^^^^^^^^^^^
 74 | _ = f"b {f"abc" \
 75 |     f"def"} g"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 70 70 | 
@@ -275,16 +291,17 @@ ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
 75 75 |     f"def"} g"
 76 76 | 
 
-ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:73:20
    |
 71 | # Nested f-strings
 72 | _ = "a" f"b {f"c" f"d"} e" "f"
 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
-   |                    ^^^^^^^^^ ISC001
+   |                    ^^^^^^^^^
 74 | _ = f"b {f"abc" \
 75 |     f"def"} g"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 70 70 | 
@@ -296,15 +313,16 @@ ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
 75 75 |     f"def"} g"
 76 76 | 
 
-ISC.py:84:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:84:5
    |
 83 | # See https://github.com/astral-sh/ruff/issues/12936
 84 | _ = "\12""0" # fix should be "\0120"
-   |     ^^^^^^^^ ISC001
+   |     ^^^^^^^^
 85 | _ = "\\12""0" # fix should be "\\120"
 86 | _ = "\\\12""0" # fix should be "\\\0120"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 81 81 |     + f"second"} d"
@@ -316,16 +334,17 @@ ISC.py:84:5: ISC001 [*] Implicitly concatenated string literals on one line
 86 86 | _ = "\\\12""0" # fix should be "\\\0120"
 87 87 | _ = "\12 0""0" # fix should be "\12 00"
 
-ISC.py:85:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:85:5
    |
 83 | # See https://github.com/astral-sh/ruff/issues/12936
 84 | _ = "\12""0" # fix should be "\0120"
 85 | _ = "\\12""0" # fix should be "\\120"
-   |     ^^^^^^^^^ ISC001
+   |     ^^^^^^^^^
 86 | _ = "\\\12""0" # fix should be "\\\0120"
 87 | _ = "\12 0""0" # fix should be "\12 00"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 82 82 | 
@@ -337,16 +356,17 @@ ISC.py:85:5: ISC001 [*] Implicitly concatenated string literals on one line
 87 87 | _ = "\12 0""0" # fix should be "\12 00"
 88 88 | _ = r"\12"r"0" # fix should be r"\120"
 
-ISC.py:86:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:86:5
    |
 84 | _ = "\12""0" # fix should be "\0120"
 85 | _ = "\\12""0" # fix should be "\\120"
 86 | _ = "\\\12""0" # fix should be "\\\0120"
-   |     ^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^
 87 | _ = "\12 0""0" # fix should be "\12 00"
 88 | _ = r"\12"r"0" # fix should be r"\120"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 83 83 | # See https://github.com/astral-sh/ruff/issues/12936
@@ -358,16 +378,17 @@ ISC.py:86:5: ISC001 [*] Implicitly concatenated string literals on one line
 88 88 | _ = r"\12"r"0" # fix should be r"\120"
 89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 
-ISC.py:87:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:87:5
    |
 85 | _ = "\\12""0" # fix should be "\\120"
 86 | _ = "\\\12""0" # fix should be "\\\0120"
 87 | _ = "\12 0""0" # fix should be "\12 00"
-   |     ^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^
 88 | _ = r"\12"r"0" # fix should be r"\120"
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 84 84 | _ = "\12""0" # fix should be "\0120"
@@ -379,16 +400,17 @@ ISC.py:87:5: ISC001 [*] Implicitly concatenated string literals on one line
 89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 90 | _ = "\8""0" # fix should be "\80"
 
-ISC.py:88:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:88:5
    |
 86 | _ = "\\\12""0" # fix should be "\\\0120"
 87 | _ = "\12 0""0" # fix should be "\12 00"
 88 | _ = r"\12"r"0" # fix should be r"\120"
-   |     ^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 | _ = "\8""0" # fix should be "\80"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 85 85 | _ = "\\12""0" # fix should be "\\120"
@@ -400,16 +422,17 @@ ISC.py:88:5: ISC001 [*] Implicitly concatenated string literals on one line
 90 90 | _ = "\8""0" # fix should be "\80"
 91 91 | _ = "\12""8" # fix should be "\128"
 
-ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:89:5
    |
 87 | _ = "\12 0""0" # fix should be "\12 00"
 88 | _ = r"\12"r"0" # fix should be r"\120"
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
-   |     ^^^^^^^^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^^^^^^^^
 90 | _ = "\8""0" # fix should be "\80"
 91 | _ = "\12""8" # fix should be "\128"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 86 86 | _ = "\\\12""0" # fix should be "\\\0120"
@@ -421,16 +444,17 @@ ISC.py:89:5: ISC001 [*] Implicitly concatenated string literals on one line
 91 91 | _ = "\12""8" # fix should be "\128"
 92 92 | _ = "\12""foo" # fix should be "\12foo"
 
-ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:90:5
    |
 88 | _ = r"\12"r"0" # fix should be r"\120"
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 | _ = "\8""0" # fix should be "\80"
-   |     ^^^^^^^ ISC001
+   |     ^^^^^^^
 91 | _ = "\12""8" # fix should be "\128"
 92 | _ = "\12""foo" # fix should be "\12foo"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 87 87 | _ = "\12 0""0" # fix should be "\12 00"
@@ -442,16 +466,17 @@ ISC.py:90:5: ISC001 [*] Implicitly concatenated string literals on one line
 92 92 | _ = "\12""foo" # fix should be "\12foo"
 93 93 | _ = "\12" ""  # fix should be "\12"
 
-ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:91:5
    |
 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
 90 | _ = "\8""0" # fix should be "\80"
 91 | _ = "\12""8" # fix should be "\128"
-   |     ^^^^^^^^ ISC001
+   |     ^^^^^^^^
 92 | _ = "\12""foo" # fix should be "\12foo"
 93 | _ = "\12" ""  # fix should be "\12"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 88 88 | _ = r"\12"r"0" # fix should be r"\120"
@@ -463,15 +488,16 @@ ISC.py:91:5: ISC001 [*] Implicitly concatenated string literals on one line
 93 93 | _ = "\12" ""  # fix should be "\12"
 94 94 | 
 
-ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:92:5
    |
 90 | _ = "\8""0" # fix should be "\80"
 91 | _ = "\12""8" # fix should be "\128"
 92 | _ = "\12""foo" # fix should be "\12foo"
-   |     ^^^^^^^^^^ ISC001
+   |     ^^^^^^^^^^
 93 | _ = "\12" ""  # fix should be "\12"
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 89 89 | _ = "\12 and more""0" # fix should be "\12 and more0"
@@ -483,14 +509,15 @@ ISC.py:92:5: ISC001 [*] Implicitly concatenated string literals on one line
 94 94 | 
 95 95 | 
 
-ISC.py:93:5: ISC001 [*] Implicitly concatenated string literals on one line
+ISC001 [*] Implicitly concatenated string literals on one line
+  --> ISC.py:93:5
    |
 91 | _ = "\12""8" # fix should be "\128"
 92 | _ = "\12""foo" # fix should be "\12foo"
 93 | _ = "\12" ""  # fix should be "\12"
-   |     ^^^^^^^^ ISC001
+   |     ^^^^^^^^
    |
-   = help: Combine string literals
+help: Combine string literals
 
 ℹ Safe fix
 90 90 | _ = "\8""0" # fix should be "\80"

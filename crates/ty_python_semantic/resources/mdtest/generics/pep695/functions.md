@@ -377,3 +377,80 @@ def f(
     # error: [invalid-argument-type] "does not satisfy upper bound"
     reveal_type(close_and_return(g))  # revealed: Unknown
 ```
+
+## Opaque decorators don't affect typevar binding
+
+Inside the body of a generic function, we should be able to see that the typevars bound by that
+function are in fact bound by that function. This requires being able to see the enclosing
+function's _undecorated_ type and signature, especially in the case where a gradually typed
+decorator "hides" the function type from outside callers.
+
+```py
+from typing import cast, Any, Callable
+
+def opaque_decorator(f: Any) -> Any:
+    return f
+
+def transparent_decorator[F: Callable[..., Any]](f: F) -> F:
+    return f
+
+@opaque_decorator
+def decorated[T](t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+
+@transparent_decorator
+def decorated[T](t: T) -> None:
+    # error: [redundant-cast]
+    reveal_type(cast(T, t))  # revealed: T@decorated
+```
+
+## Solving TypeVars with upper bounds in unions
+
+```py
+class A: ...
+
+class B[T: A]:
+    x: T
+
+def f[T: A](c: T | None):
+    return None
+
+def g[T: A](b: B[T]):
+    return f(b.x)  # Fine
+```
+
+## Constrained TypeVar in a union
+
+This is a regression test for an issue that surfaced in the primer report of an early version of
+<https://github.com/astral-sh/ruff/pull/19811>, where we failed to solve the `TypeVar` here due to
+the fact that it only appears in the function's type annotations as part of a union:
+
+```py
+def f[T: (str, bytes)](suffix: T | None, prefix: T | None):
+    return None
+
+def g(x: str):
+    f(prefix=x, suffix=".tar.gz")
+```
+
+## Nested functions see typevars bound in outer function
+
+```py
+from typing import overload
+
+def outer[T](t: T) -> None:
+    def inner[T](t: T) -> None: ...
+
+    inner(t)
+
+@overload
+def overloaded_outer() -> None: ...
+@overload
+def overloaded_outer[T](t: T) -> None: ...
+def overloaded_outer[T](t: T | None = None) -> None:
+    def inner(t: T) -> None: ...
+
+    if t is not None:
+        inner(t)
+```

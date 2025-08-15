@@ -152,16 +152,13 @@ class FuzzResult:
 
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
-    # TODO(carljm) remove once we debug the slowness of these seeds
-    skip_check = seed in {120, 160, 335}
-
     code = generate_random_code(seed)
     bug_found = False
     minimizer_callback: Callable[[str], bool] | None = None
 
     if args.baseline_executable_path is None:
         only_new_bugs = False
-        if not skip_check and contains_bug(
+        if contains_bug(
             code, executable=args.executable, executable_path=args.test_executable_path
         ):
             bug_found = True
@@ -172,7 +169,7 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
             )
     else:
         only_new_bugs = True
-        if not skip_check and contains_new_bug(
+        if contains_new_bug(
             code,
             executable=args.executable,
             test_executable_path=args.test_executable_path,

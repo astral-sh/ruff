@@ -263,7 +263,11 @@ impl DisplaySet<'_> {
             if annotation.is_fixable {
                 buffer.append(line_offset, "[", stylesheet.none);
                 buffer.append(line_offset, "*", stylesheet.help);
-                buffer.append(line_offset, "] ", stylesheet.none);
+                buffer.append(line_offset, "]", stylesheet.none);
+                // In the hide-severity case, we need a space instead of the colon and space below.
+                if hide_severity {
+                    buffer.append(line_offset, " ", stylesheet.none);
+                }
             }
 
             if !is_annotation_empty(annotation) {
@@ -298,11 +302,15 @@ impl DisplaySet<'_> {
                 let lineno_color = stylesheet.line_no();
                 buffer.puts(line_offset, lineno_width, header_sigil, *lineno_color);
                 buffer.puts(line_offset, lineno_width + 4, path, stylesheet.none);
-                if let Some((col, row)) = pos {
-                    buffer.append(line_offset, ":", stylesheet.none);
-                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
+                if let Some(Position { row, col, cell }) = pos {
+                    if let Some(cell) = cell {
+                        buffer.append(line_offset, ":", stylesheet.none);
+                        buffer.append(line_offset, &format!("cell {cell}"), stylesheet.none);
+                    }
                     buffer.append(line_offset, ":", stylesheet.none);
                     buffer.append(line_offset, row.to_string().as_str(), stylesheet.none);
+                    buffer.append(line_offset, ":", stylesheet.none);
+                    buffer.append(line_offset, col.to_string().as_str(), stylesheet.none);
                 }
                 Ok(())
             }
@@ -883,6 +891,13 @@ impl DisplaySourceAnnotation<'_> {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct Position {
+    row: usize,
+    col: usize,
+    cell: Option<usize>,
+}
+
 /// Raw line - a line which does not have the `lineno` part and is not considered
 /// a part of the snippet.
 #[derive(Debug, PartialEq)]
@@ -891,7 +906,7 @@ pub(crate) enum DisplayRawLine<'a> {
     /// slice in the project structure.
     Origin {
         path: &'a str,
-        pos: Option<(usize, usize)>,
+        pos: Option<Position>,
         header_type: DisplayHeaderType,
     },
 
@@ -1186,17 +1201,24 @@ fn format_snippet<'m>(
 
     let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
     if is_file_level {
-        assert!(
-            snippet.source.is_empty(),
-            "Non-empty file-level snippet that won't be rendered: {:?}",
-            snippet.source
-        );
-        let header = format_header(origin, main_range, &[], is_first);
+        // TODO(brent) enable this assertion again once we set `is_file_level` for individual rules.
+        // It's causing too many false positives currently when the default is to make any
+        // annotation with a default range file-level. See
+        // https://github.com/astral-sh/ruff/issues/19688.
+        //
+        // assert!(
+        //     snippet.source.is_empty(),
+        //     "Non-empty file-level snippet that won't be rendered: {:?}",
+        //     snippet.source
+        // );
+        let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
         return DisplaySet {
             display_lines: header.map_or_else(Vec::new, |header| vec![header]),
             margin: Margin::new(0, 0, 0, 0, term_width, 0),
         };
     }
+
+    let cell_index = snippet.cell_index;
 
     let mut body = format_body(
         snippet,
@@ -1206,7 +1228,13 @@ fn format_snippet<'m>(
         anonymized_line_numbers,
         cut_indicator,
     );
-    let header = format_header(origin, main_range, &body.display_lines, is_first);
+    let header = format_header(
+        origin,
+        main_range,
+        &body.display_lines,
+        is_first,
+        cell_index,
+    );
 
     if let Some(header) = header {
         body.display_lines.insert(0, header);
@@ -1226,6 +1254,7 @@ fn format_header<'a>(
     main_range: Option<usize>,
     body: &[DisplayLine<'_>],
     is_first: bool,
+    cell_index: Option<usize>,
 ) -> Option<DisplayLine<'a>> {
     let display_header = if is_first {
         DisplayHeaderType::Initial
@@ -1249,12 +1278,19 @@ fn format_header<'a>(
                 ..
             } = item
             {
-                if main_range >= range.0 && main_range < range.1 + max(*end_line as usize, 1) {
+                // At the very end of the `main_range`, report the location as the first character
+                // in the next line instead of falling back to the default location of `1:1`. This
+                // is another divergence from upstream.
+                let end_of_range = range.1 + max(*end_line as usize, 1);
+                if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
                         .chars()
                         .count();
                     col = char_column + 1;
                     line_offset = lineno.unwrap_or(1);
+                    break;
+                } else if main_range == end_of_range {
+                    line_offset = lineno.map_or(1, |line| line + 1);
                     break;
                 }
             }
@@ -1262,7 +1298,11 @@ fn format_header<'a>(
 
         return Some(DisplayLine::Raw(DisplayRawLine::Origin {
             path,
-            pos: Some((line_offset, col)),
+            pos: Some(Position {
+                row: line_offset,
+                col,
+                cell: cell_index,
+            }),
             header_type: display_header,
         }));
     }

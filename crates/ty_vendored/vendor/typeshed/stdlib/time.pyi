@@ -24,7 +24,7 @@ if it is -1, mktime() should guess based on the date and time.
 
 import sys
 from _typeshed import structseq
-from typing import Any, Final, Literal, Protocol, final
+from typing import Any, Final, Literal, Protocol, final, type_check_only
 from typing_extensions import TypeAlias
 
 _TimeTuple: TypeAlias = tuple[int, int, int, int, int, int, int, int, int]
@@ -250,6 +250,7 @@ if sys.platform != "win32":
         should not be relied on.
         """
 
+@type_check_only
 class _ClockInfo(Protocol):
     adjustable: bool
     implementation: str

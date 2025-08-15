@@ -49,7 +49,7 @@ impl<'a> Locator<'a> {
         self.index.get()
     }
 
-    pub fn to_source_code(&self) -> SourceCode {
+    pub fn to_source_code(&self) -> SourceCode<'_, '_> {
         SourceCode::new(self.contents, self.to_index())
     }
 

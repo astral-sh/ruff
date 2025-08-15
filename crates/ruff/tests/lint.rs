@@ -4997,6 +4997,37 @@ fn flake8_import_convention_invalid_aliases_config_module_name() -> Result<()> {
 }
 
 #[test]
+fn flake8_import_convention_nfkc_normalization() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.flake8-import-conventions.aliases]
+"test.module" = "_﹏𝘥𝘦𝘣𝘶𝘨﹏﹏"
+"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .arg("--config")
+            .arg(&ruff_toml)
+    , @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
+        ");});
+    Ok(())
+}
+
+#[test]
 fn flake8_import_convention_unused_aliased_import() {
     assert_cmd_snapshot!(
         Command::new(get_cargo_bin(BIN_NAME))
@@ -5557,15 +5588,15 @@ fn cookiecutter_globbing() -> Result<()> {
                 .args(STDIN_BASE_OPTIONS)
                 .arg("--select=F811")
                 .current_dir(tempdir.path()), @r"
-			success: false
-			exit_code: 1
-			----- stdout -----
-			{{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1
-			Found 1 error.
-			[*] 1 fixable with the `--fix` option.
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
+        Found 1 error.
+        [*] 1 fixable with the `--fix` option.
 
-			----- stderr -----
-		");
+        ----- stderr -----
+        ");
     });
 
     Ok(())
