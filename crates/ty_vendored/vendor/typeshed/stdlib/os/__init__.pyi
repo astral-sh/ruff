@@ -923,12 +923,18 @@ In the future, this property will contain the last metadata change time."""
             # On other Unix systems (such as FreeBSD), the following attributes may be
             # available (but may be only filled out if root tries to use them):
             @property
-            def st_gen(self) -> int: ...  # file generation number
+            def st_gen(self) -> int:  # file generation number
+                """generation number
+"""
             @property
-            def st_birthtime(self) -> float: ...  # time of file creation in seconds
+            def st_birthtime(self) -> float:  # time of file creation in seconds
+                """time of creation
+"""
     if sys.platform == "darwin":
         @property
-        def st_flags(self) -> int: ...  # user defined flags for file
+        def st_flags(self) -> int:  # user defined flags for file
+            """user defined flags for file
+"""
     # Attributes documented as sometimes appearing, but deliberately omitted from the stub: `st_creator`, `st_rsize`, `st_type`.
     # See https://github.com/python/typeshed/pull/6560#issuecomment-991253327
 
@@ -1582,7 +1588,9 @@ Using non-zero flags requires Linux 4.7 or newer.
             headers: Sequence[ReadableBuffer] = ...,
             trailers: Sequence[ReadableBuffer] = ...,
             flags: int = 0,
-        ) -> int: ...  # FreeBSD and Mac OS X only
+        ) -> int:  # FreeBSD and Mac OS X only
+            """Copy count bytes from file descriptor in_fd to file descriptor out_fd.
+"""
 
     def readv(fd: int, buffers: SupportsLenAndGetItem[WriteableBuffer], /) -> int:
         """Read from a file descriptor fd into an iterable of buffers.
@@ -1761,8 +1769,21 @@ dir_fd and follow_symlinks may not be implemented on your platform.
 """
 
 if sys.platform != "win32" and sys.platform != "linux":
-    def chflags(path: StrOrBytesPath, flags: int, follow_symlinks: bool = True) -> None: ...  # some flavors of Unix
-    def lchflags(path: StrOrBytesPath, flags: int) -> None: ...
+    def chflags(path: StrOrBytesPath, flags: int, follow_symlinks: bool = True) -> None:  # some flavors of Unix
+        """Set file flags.
+
+If follow_symlinks is False, and the last element of the path is a symbolic
+  link, chflags will change flags on the symbolic link itself instead of the
+  file the link points to.
+follow_symlinks may not be implemented on your platform.  If it is
+unavailable, using it will raise a NotImplementedError.
+"""
+    def lchflags(path: StrOrBytesPath, flags: int) -> None:
+        """Set file flags.
+
+This function will not follow symbolic links.
+Equivalent to chflags(path, flags, follow_symlinks=False).
+"""
 
 if sys.platform != "win32":
     def chroot(path: StrOrBytesPath) -> None:
