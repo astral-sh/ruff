@@ -4264,10 +4264,6 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
-                Some(KnownClass::NamedTuple) => {
-                    Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
-                }
-
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
@@ -4581,6 +4577,10 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into()
+            }
+
+            Type::SpecialForm(SpecialFormType::NamedTuple) => {
+                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
             }
 
             Type::GenericAlias(_) => {
@@ -5470,6 +5470,19 @@ impl<'db> Type<'db> {
 
                 // TODO: Use an opt-in rule for a bare `Callable`
                 SpecialFormType::Callable => Ok(CallableType::unknown(db)),
+
+                // Special case: `NamedTuple` in a type expression is understood to describe the type
+                // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
+                // This isn't very principled (since at runtime, `NamedTuple` is just a function),
+                // but it appears to be what users often expect, and it improves compatibility with
+                // other type checkers such as mypy.
+                // See conversation in https://github.com/astral-sh/ruff/pull/19915.
+                SpecialFormType::NamedTuple => Ok(IntersectionBuilder::new(db)
+                    .positive_elements([
+                        Type::homogeneous_tuple(db, Type::object(db)),
+                        KnownClass::NamedTupleLike.to_instance(db),
+                    ])
+                    .build()),
 
                 SpecialFormType::TypingSelf => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
