@@ -617,8 +617,9 @@ pub enum Type<'db> {
     /// When the generic class or function binding this typevar is specialized, we will replace the
     /// typevar with its specialization.
     TypeVar(BoundTypeVarInstance<'db>),
-    /// An instance of a typevar inside the generic class or function. In this position, the
-    /// typevar cannot be specialized, and therefore is not eligible for specialization inference.
+    /// An instance of a typevar where we cannot infer a specialization for it. (This is typically
+    /// the body of the generic function or class that binds the typevar.) In these positions,
+    /// properties like assignability must hold for all possible specializations.
     NonInferableTypeVar(BoundTypeVarInstance<'db>),
     /// A bound super object like `super()` or `super(A, A())`
     /// This type doesn't handle an unbound super object like `super(A)`; for that we just use
