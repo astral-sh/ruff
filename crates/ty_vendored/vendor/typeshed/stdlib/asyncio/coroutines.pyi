@@ -15,14 +15,23 @@ _P = ParamSpec("_P")
 
 if sys.version_info < (3, 11):
     @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `async def` instead.")
-    def coroutine(func: _FunctionT) -> _FunctionT: ...
+    def coroutine(func: _FunctionT) -> _FunctionT:
+        """Decorator to mark coroutines.
+
+    If the coroutine is not yielded from before it is destroyed,
+    an error message is logged.
+    """
 
 @overload
-def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool: ...
+def iscoroutinefunction(func: Callable[..., Coroutine[Any, Any, Any]]) -> bool:
+    """Return True if func is a decorated coroutine function.
+"""
 @overload
 def iscoroutinefunction(func: Callable[_P, Awaitable[_T]]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, _T]]]: ...
 @overload
 def iscoroutinefunction(func: Callable[_P, object]) -> TypeGuard[Callable[_P, Coroutine[Any, Any, Any]]]: ...
 @overload
 def iscoroutinefunction(func: object) -> TypeGuard[Callable[..., Coroutine[Any, Any, Any]]]: ...
-def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]: ...
+def iscoroutine(obj: object) -> TypeIs[Coroutine[Any, Any, Any]]:
+    """Return True if obj is a coroutine object.
+"""
