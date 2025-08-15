@@ -1,7 +1,3 @@
-"""Implementation module for SSL socket operations.  See the socket module
-for documentation.
-"""
-
 import sys
 from _typeshed import ReadableBuffer, StrOrBytesPath
 from collections.abc import Callable
@@ -16,14 +12,15 @@ from ssl import (
     SSLWantWriteError as SSLWantWriteError,
     SSLZeroReturnError as SSLZeroReturnError,
 )
-from typing import Any, ClassVar, Literal, TypedDict, final, overload
-from typing_extensions import NotRequired, Self, TypeAlias
+from typing import Any, ClassVar, Final, Literal, TypedDict, final, overload, type_check_only
+from typing_extensions import NotRequired, Self, TypeAlias, deprecated
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
 _PCTRTT: TypeAlias = tuple[tuple[str, str], ...]
 _PCTRTTT: TypeAlias = tuple[_PCTRTT, ...]
 _PeerCertRetDictType: TypeAlias = dict[str, str | _PCTRTTT | _PCTRTT]
 
+@type_check_only
 class _Cipher(TypedDict):
     aead: bool
     alg_bits: int
@@ -37,6 +34,7 @@ class _Cipher(TypedDict):
     strength_bits: int
     symmetric: str
 
+@type_check_only
 class _CertInfo(TypedDict):
     subject: tuple[tuple[tuple[str, str], ...], ...]
     issuer: tuple[tuple[tuple[str, str], ...], ...]
@@ -49,70 +47,26 @@ class _CertInfo(TypedDict):
     caIssuers: NotRequired[tuple[str, ...] | None]
     crlDistributionPoints: NotRequired[tuple[str, ...] | None]
 
-def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None:
-    """Mix string into the OpenSSL PRNG state.
-
-    entropy (a float) is a lower bound on the entropy contained in
-    string.  See RFC 4086.
-    """
-
-def RAND_bytes(n: int, /) -> bytes:
-    """Generate n cryptographically strong pseudo-random bytes."""
+def RAND_add(string: str | ReadableBuffer, entropy: float, /) -> None: ...
+def RAND_bytes(n: int, /) -> bytes: ...
 
 if sys.version_info < (3, 12):
-    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]:
-        """Generate n pseudo-random bytes.
-
-        Return a pair (bytes, is_cryptographic).  is_cryptographic is True
-        if the bytes generated are cryptographically strong.
-        """
+    @deprecated("Deprecated since Python 3.6; removed in Python 3.12. Use `ssl.RAND_bytes()` instead.")
+    def RAND_pseudo_bytes(n: int, /) -> tuple[bytes, bool]: ...
 
 if sys.version_info < (3, 10):
     def RAND_egd(path: str) -> None: ...
 
-def RAND_status() -> bool:
-    """Returns True if the OpenSSL PRNG has been seeded with enough data and False if not.
-
-    It is necessary to seed the PRNG with RAND_add() on some platforms before
-    using the ssl() function.
-    """
-
-def get_default_verify_paths() -> tuple[str, str, str, str]:
-    """Return search paths and environment vars that are used by SSLContext's set_default_verify_paths() to load default CAs.
-
-    The values are 'cert_file_env', 'cert_file', 'cert_dir_env', 'cert_dir'.
-    """
+def RAND_status() -> bool: ...
+def get_default_verify_paths() -> tuple[str, str, str, str]: ...
 
 if sys.platform == "win32":
     _EnumRetType: TypeAlias = list[tuple[bytes, str, set[str] | bool]]
-    def enum_certificates(store_name: str) -> _EnumRetType:
-        """Retrieve certificates from Windows' cert store.
+    def enum_certificates(store_name: str) -> _EnumRetType: ...
+    def enum_crls(store_name: str) -> _EnumRetType: ...
 
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type, trust) tuples.  The encoding_type flag can be interpreted
-        with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
-        a set of OIDs or the boolean True.
-        """
-
-    def enum_crls(store_name: str) -> _EnumRetType:
-        """Retrieve CRLs from Windows' cert store.
-
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type) tuples.  The encoding_type flag can be interpreted with
-        X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.
-        """
-
-def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
-    """Lookup NID, short name, long name and OID of an ASN1_OBJECT.
-
-    By default objects are looked up by OID. With name=True short and
-    long name are also matched.
-    """
-
-def nid2obj(nid: int, /) -> tuple[int, str, str, str]:
-    """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID."""
+def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]: ...
+def nid2obj(nid: int, /) -> tuple[int, str, str, str]: ...
 
 class _SSLContext:
     check_hostname: bool
@@ -129,27 +83,9 @@ class _SSLContext:
     verify_flags: int
     verify_mode: int
     def __new__(cls, protocol: int, /) -> Self: ...
-    def cert_store_stats(self) -> dict[str, int]:
-        """Returns quantities of loaded X.509 certificates.
-
-        X.509 certificates with a CA extension and certificate revocation lists
-        inside the context's cert store.
-
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
-        """
-
+    def cert_store_stats(self) -> dict[str, int]: ...
     @overload
-    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
-        """Returns a list of dicts with information of loaded CA certs.
-
-        If the optional argument is True, returns a DER-encoded copy of the CA
-        certificate.
-
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
-        """
-
+    def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]: ...
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...
     @overload
@@ -180,49 +116,23 @@ class MemoryBIO:
     eof: bool
     pending: int
     def __new__(self) -> Self: ...
-    def read(self, size: int = -1, /) -> bytes:
-        """Read up to size bytes from the memory BIO.
-
-        If size is not specified, read the entire buffer.
-        If the return value is an empty bytes instance, this means either
-        EOF or that no data is available. Use the "eof" property to
-        distinguish between the two.
-        """
-
-    def write(self, b: ReadableBuffer, /) -> int:
-        """Writes the bytes b into the memory BIO.
-
-        Returns the number of bytes written.
-        """
-
-    def write_eof(self) -> None:
-        """Write an EOF marker to the memory BIO.
-
-        When all data has been read, the "eof" property will be True.
-        """
+    def read(self, size: int = -1, /) -> bytes: ...
+    def write(self, b: ReadableBuffer, /) -> int: ...
+    def write_eof(self) -> None: ...
 
 @final
 class SSLSession:
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @property
-    def has_ticket(self) -> bool:
-        """Does the session contain a ticket?"""
-
+    def has_ticket(self) -> bool: ...
     @property
-    def id(self) -> bytes:
-        """Session ID."""
-
+    def id(self) -> bytes: ...
     @property
-    def ticket_lifetime_hint(self) -> int:
-        """Ticket life time hint."""
-
+    def ticket_lifetime_hint(self) -> int: ...
     @property
-    def time(self) -> int:
-        """Session creation time (seconds since epoch)."""
-
+    def time(self) -> int: ...
     @property
-    def timeout(self) -> int:
-        """Session timeout (delta in seconds)."""
+    def timeout(self) -> int: ...
 
 # _ssl.Certificate is weird: it can't be instantiated or subclassed.
 # Instances can only be created via methods of the private _ssl._SSLSocket class,
@@ -252,135 +162,134 @@ if sys.version_info < (3, 12):
     err_names_to_codes: dict[str, tuple[int, int]]
     lib_codes_to_names: dict[int, str]
 
-_DEFAULT_CIPHERS: str
+_DEFAULT_CIPHERS: Final[str]
 
 # SSL error numbers
-SSL_ERROR_ZERO_RETURN: int
-SSL_ERROR_WANT_READ: int
-SSL_ERROR_WANT_WRITE: int
-SSL_ERROR_WANT_X509_LOOKUP: int
-SSL_ERROR_SYSCALL: int
-SSL_ERROR_SSL: int
-SSL_ERROR_WANT_CONNECT: int
-SSL_ERROR_EOF: int
-SSL_ERROR_INVALID_ERROR_CODE: int
+SSL_ERROR_ZERO_RETURN: Final = 6
+SSL_ERROR_WANT_READ: Final = 2
+SSL_ERROR_WANT_WRITE: Final = 3
+SSL_ERROR_WANT_X509_LOOKUP: Final = 4
+SSL_ERROR_SYSCALL: Final = 5
+SSL_ERROR_SSL: Final = 1
+SSL_ERROR_WANT_CONNECT: Final = 7
+SSL_ERROR_EOF: Final = 8
+SSL_ERROR_INVALID_ERROR_CODE: Final = 10
 
 # verify modes
-CERT_NONE: int
-CERT_OPTIONAL: int
-CERT_REQUIRED: int
+CERT_NONE: Final = 0
+CERT_OPTIONAL: Final = 1
+CERT_REQUIRED: Final = 2
 
 # verify flags
-VERIFY_DEFAULT: int
-VERIFY_CRL_CHECK_LEAF: int
-VERIFY_CRL_CHECK_CHAIN: int
-VERIFY_X509_STRICT: int
-VERIFY_X509_TRUSTED_FIRST: int
+VERIFY_DEFAULT: Final = 0
+VERIFY_CRL_CHECK_LEAF: Final = 0x4
+VERIFY_CRL_CHECK_CHAIN: Final = 0x8
+VERIFY_X509_STRICT: Final = 0x20
+VERIFY_X509_TRUSTED_FIRST: Final = 0x8000
 if sys.version_info >= (3, 10):
-    VERIFY_ALLOW_PROXY_CERTS: int
-    VERIFY_X509_PARTIAL_CHAIN: int
+    VERIFY_ALLOW_PROXY_CERTS: Final = 0x40
+    VERIFY_X509_PARTIAL_CHAIN: Final = 0x80000
 
 # alert descriptions
-ALERT_DESCRIPTION_CLOSE_NOTIFY: int
-ALERT_DESCRIPTION_UNEXPECTED_MESSAGE: int
-ALERT_DESCRIPTION_BAD_RECORD_MAC: int
-ALERT_DESCRIPTION_RECORD_OVERFLOW: int
-ALERT_DESCRIPTION_DECOMPRESSION_FAILURE: int
-ALERT_DESCRIPTION_HANDSHAKE_FAILURE: int
-ALERT_DESCRIPTION_BAD_CERTIFICATE: int
-ALERT_DESCRIPTION_UNSUPPORTED_CERTIFICATE: int
-ALERT_DESCRIPTION_CERTIFICATE_REVOKED: int
-ALERT_DESCRIPTION_CERTIFICATE_EXPIRED: int
-ALERT_DESCRIPTION_CERTIFICATE_UNKNOWN: int
-ALERT_DESCRIPTION_ILLEGAL_PARAMETER: int
-ALERT_DESCRIPTION_UNKNOWN_CA: int
-ALERT_DESCRIPTION_ACCESS_DENIED: int
-ALERT_DESCRIPTION_DECODE_ERROR: int
-ALERT_DESCRIPTION_DECRYPT_ERROR: int
-ALERT_DESCRIPTION_PROTOCOL_VERSION: int
-ALERT_DESCRIPTION_INSUFFICIENT_SECURITY: int
-ALERT_DESCRIPTION_INTERNAL_ERROR: int
-ALERT_DESCRIPTION_USER_CANCELLED: int
-ALERT_DESCRIPTION_NO_RENEGOTIATION: int
-ALERT_DESCRIPTION_UNSUPPORTED_EXTENSION: int
-ALERT_DESCRIPTION_CERTIFICATE_UNOBTAINABLE: int
-ALERT_DESCRIPTION_UNRECOGNIZED_NAME: int
-ALERT_DESCRIPTION_BAD_CERTIFICATE_STATUS_RESPONSE: int
-ALERT_DESCRIPTION_BAD_CERTIFICATE_HASH_VALUE: int
-ALERT_DESCRIPTION_UNKNOWN_PSK_IDENTITY: int
+ALERT_DESCRIPTION_CLOSE_NOTIFY: Final = 0
+ALERT_DESCRIPTION_UNEXPECTED_MESSAGE: Final = 10
+ALERT_DESCRIPTION_BAD_RECORD_MAC: Final = 20
+ALERT_DESCRIPTION_RECORD_OVERFLOW: Final = 22
+ALERT_DESCRIPTION_DECOMPRESSION_FAILURE: Final = 30
+ALERT_DESCRIPTION_HANDSHAKE_FAILURE: Final = 40
+ALERT_DESCRIPTION_BAD_CERTIFICATE: Final = 42
+ALERT_DESCRIPTION_UNSUPPORTED_CERTIFICATE: Final = 43
+ALERT_DESCRIPTION_CERTIFICATE_REVOKED: Final = 44
+ALERT_DESCRIPTION_CERTIFICATE_EXPIRED: Final = 45
+ALERT_DESCRIPTION_CERTIFICATE_UNKNOWN: Final = 46
+ALERT_DESCRIPTION_ILLEGAL_PARAMETER: Final = 47
+ALERT_DESCRIPTION_UNKNOWN_CA: Final = 48
+ALERT_DESCRIPTION_ACCESS_DENIED: Final = 49
+ALERT_DESCRIPTION_DECODE_ERROR: Final = 50
+ALERT_DESCRIPTION_DECRYPT_ERROR: Final = 51
+ALERT_DESCRIPTION_PROTOCOL_VERSION: Final = 70
+ALERT_DESCRIPTION_INSUFFICIENT_SECURITY: Final = 71
+ALERT_DESCRIPTION_INTERNAL_ERROR: Final = 80
+ALERT_DESCRIPTION_USER_CANCELLED: Final = 90
+ALERT_DESCRIPTION_NO_RENEGOTIATION: Final = 100
+ALERT_DESCRIPTION_UNSUPPORTED_EXTENSION: Final = 110
+ALERT_DESCRIPTION_CERTIFICATE_UNOBTAINABLE: Final = 111
+ALERT_DESCRIPTION_UNRECOGNIZED_NAME: Final = 112
+ALERT_DESCRIPTION_BAD_CERTIFICATE_STATUS_RESPONSE: Final = 113
+ALERT_DESCRIPTION_BAD_CERTIFICATE_HASH_VALUE: Final = 114
+ALERT_DESCRIPTION_UNKNOWN_PSK_IDENTITY: Final = 115
 
 # protocol versions
-PROTOCOL_SSLv23: int
-PROTOCOL_TLS: int
-PROTOCOL_TLS_CLIENT: int
-PROTOCOL_TLS_SERVER: int
-PROTOCOL_TLSv1: int
-PROTOCOL_TLSv1_1: int
-PROTOCOL_TLSv1_2: int
+PROTOCOL_SSLv23: Final = 2
+PROTOCOL_TLS: Final = 2
+PROTOCOL_TLS_CLIENT: Final = 16
+PROTOCOL_TLS_SERVER: Final = 17
+PROTOCOL_TLSv1: Final = 3
+PROTOCOL_TLSv1_1: Final = 4
+PROTOCOL_TLSv1_2: Final = 5
 
 # protocol options
-OP_ALL: int
-OP_NO_SSLv2: int
-OP_NO_SSLv3: int
-OP_NO_TLSv1: int
-OP_NO_TLSv1_1: int
-OP_NO_TLSv1_2: int
-OP_NO_TLSv1_3: int
-OP_CIPHER_SERVER_PREFERENCE: int
-OP_SINGLE_DH_USE: int
-OP_NO_TICKET: int
-OP_SINGLE_ECDH_USE: int
-OP_NO_COMPRESSION: int
-OP_ENABLE_MIDDLEBOX_COMPAT: int
-OP_NO_RENEGOTIATION: int
+OP_ALL: Final = 0x80000050
+OP_NO_SSLv2: Final = 0x0
+OP_NO_SSLv3: Final = 0x2000000
+OP_NO_TLSv1: Final = 0x4000000
+OP_NO_TLSv1_1: Final = 0x10000000
+OP_NO_TLSv1_2: Final = 0x8000000
+OP_NO_TLSv1_3: Final = 0x20000000
+OP_CIPHER_SERVER_PREFERENCE: Final = 0x400000
+OP_SINGLE_DH_USE: Final = 0x0
+OP_NO_TICKET: Final = 0x4000
+OP_SINGLE_ECDH_USE: Final = 0x0
+OP_NO_COMPRESSION: Final = 0x20000
+OP_ENABLE_MIDDLEBOX_COMPAT: Final = 0x100000
+OP_NO_RENEGOTIATION: Final = 0x40000000
 if sys.version_info >= (3, 11) or sys.platform == "linux":
-    OP_IGNORE_UNEXPECTED_EOF: int
+    OP_IGNORE_UNEXPECTED_EOF: Final = 0x80
 if sys.version_info >= (3, 12):
-    OP_LEGACY_SERVER_CONNECT: int
-    OP_ENABLE_KTLS: int
+    OP_LEGACY_SERVER_CONNECT: Final = 0x4
+    OP_ENABLE_KTLS: Final = 0x8
 
 # host flags
-HOSTFLAG_ALWAYS_CHECK_SUBJECT: int
-HOSTFLAG_NEVER_CHECK_SUBJECT: int
-HOSTFLAG_NO_WILDCARDS: int
-HOSTFLAG_NO_PARTIAL_WILDCARDS: int
-HOSTFLAG_MULTI_LABEL_WILDCARDS: int
-HOSTFLAG_SINGLE_LABEL_SUBDOMAINS: int
+HOSTFLAG_ALWAYS_CHECK_SUBJECT: Final = 0x1
+HOSTFLAG_NEVER_CHECK_SUBJECT: Final = 0x20
+HOSTFLAG_NO_WILDCARDS: Final = 0x2
+HOSTFLAG_NO_PARTIAL_WILDCARDS: Final = 0x4
+HOSTFLAG_MULTI_LABEL_WILDCARDS: Final = 0x8
+HOSTFLAG_SINGLE_LABEL_SUBDOMAINS: Final = 0x10
 
 if sys.version_info >= (3, 10):
     # certificate file types
-    # Typed as Literal so the overload on Certificate.public_bytes can work properly.
-    ENCODING_PEM: Literal[1]
-    ENCODING_DER: Literal[2]
+    ENCODING_PEM: Final = 1
+    ENCODING_DER: Final = 2
 
 # protocol versions
-PROTO_MINIMUM_SUPPORTED: int
-PROTO_MAXIMUM_SUPPORTED: int
-PROTO_SSLv3: int
-PROTO_TLSv1: int
-PROTO_TLSv1_1: int
-PROTO_TLSv1_2: int
-PROTO_TLSv1_3: int
+PROTO_MINIMUM_SUPPORTED: Final = -2
+PROTO_MAXIMUM_SUPPORTED: Final = -1
+PROTO_SSLv3: Final[int]
+PROTO_TLSv1: Final[int]
+PROTO_TLSv1_1: Final[int]
+PROTO_TLSv1_2: Final[int]
+PROTO_TLSv1_3: Final[int]
 
 # feature support
-HAS_SNI: bool
-HAS_TLS_UNIQUE: bool
-HAS_ECDH: bool
-HAS_NPN: bool
+HAS_SNI: Final[bool]
+HAS_TLS_UNIQUE: Final[bool]
+HAS_ECDH: Final[bool]
+HAS_NPN: Final[bool]
 if sys.version_info >= (3, 13):
-    HAS_PSK: bool
-HAS_ALPN: bool
-HAS_SSLv2: bool
-HAS_SSLv3: bool
-HAS_TLSv1: bool
-HAS_TLSv1_1: bool
-HAS_TLSv1_2: bool
-HAS_TLSv1_3: bool
+    HAS_PSK: Final[bool]
+HAS_ALPN: Final[bool]
+HAS_SSLv2: Final[bool]
+HAS_SSLv3: Final[bool]
+HAS_TLSv1: Final[bool]
+HAS_TLSv1_1: Final[bool]
+HAS_TLSv1_2: Final[bool]
+HAS_TLSv1_3: Final[bool]
 if sys.version_info >= (3, 14):
-    HAS_PHA: bool
+    HAS_PHA: Final[bool]
 
 # version info
-OPENSSL_VERSION_NUMBER: int
-OPENSSL_VERSION_INFO: tuple[int, int, int, int, int]
-OPENSSL_VERSION: str
-_OPENSSL_API_VERSION: tuple[int, int, int, int, int]
+OPENSSL_VERSION_NUMBER: Final[int]
+OPENSSL_VERSION_INFO: Final[tuple[int, int, int, int, int]]
+OPENSSL_VERSION: Final[str]
+_OPENSSL_API_VERSION: Final[tuple[int, int, int, int, int]]

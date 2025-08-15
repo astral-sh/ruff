@@ -1,10 +1,10 @@
-"""Documentation"""
-
 import sys
+from typing import type_check_only
 
 if sys.platform == "win32":
     class MSIError(Exception): ...
     # Actual typename View, not exposed by the implementation
+    @type_check_only
     class _View:
         def Execute(self, params: _Record | None = ...) -> None: ...
         def GetColumnInfo(self, kind: int) -> _Record: ...
@@ -16,6 +16,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename SummaryInformation, not exposed by the implementation
+    @type_check_only
     class _SummaryInformation:
         def GetProperty(self, field: int) -> int | bytes | None: ...
         def GetPropertyCount(self) -> int: ...
@@ -26,6 +27,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename Database, not exposed by the implementation
+    @type_check_only
     class _Database:
         def OpenView(self, sql: str) -> _View: ...
         def Commit(self) -> None: ...
@@ -36,6 +38,7 @@ if sys.platform == "win32":
         __init__: None  # type: ignore[assignment]
 
     # Actual typename Record, not exposed by the implementation
+    @type_check_only
     class _Record:
         def GetFieldCount(self) -> int: ...
         def GetInteger(self, field: int) -> int: ...
@@ -48,34 +51,11 @@ if sys.platform == "win32":
         __new__: None  # type: ignore[assignment]
         __init__: None  # type: ignore[assignment]
 
-    def UuidCreate() -> str:
-        """Return the string representation of a new unique identifier."""
+    def UuidCreate() -> str: ...
+    def FCICreate(cabname: str, files: list[str], /) -> None: ...
+    def OpenDatabase(path: str, persist: int, /) -> _Database: ...
+    def CreateRecord(count: int, /) -> _Record: ...
 
-    def FCICreate(cabname: str, files: list[str], /) -> None:
-        """Create a new CAB file.
-
-        cabname
-          the name of the CAB file
-        files
-          a list of tuples, each containing the name of the file on disk,
-          and the name of the file inside the CAB file
-        """
-
-    def OpenDatabase(path: str, persist: int, /) -> _Database:
-        """Return a new database object.
-
-        path
-          the file name of the MSI file
-        persist
-          the persistence mode
-        """
-
-    def CreateRecord(count: int, /) -> _Record:
-        """Return a new record object.
-
-        count
-          the number of fields of the record
-        """
     MSICOLINFO_NAMES: int
     MSICOLINFO_TYPES: int
     MSIDBOPEN_CREATE: int

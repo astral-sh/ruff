@@ -1,20 +1,9 @@
-"""Internationalization and localization support.
-
-This module provides internationalization (I18N) and localization (L10N)
-support for your Python programs by providing an interface to the GNU gettext
-message catalog library.
-
-I18N refers to the operation by which a program is made aware of multiple
-languages.  L10N refers to the adaptation of your program, once
-internationalized, to the local language and cultural habits.
-
-"""
-
 import io
 import sys
 from _typeshed import StrPath
 from collections.abc import Callable, Container, Iterable, Sequence
 from typing import Any, Final, Literal, Protocol, TypeVar, overload, type_check_only
+from typing_extensions import deprecated
 
 __all__ = [
     "NullTranslations",
@@ -55,9 +44,13 @@ class NullTranslations:
     def info(self) -> dict[str, str]: ...
     def charset(self) -> str | None: ...
     if sys.version_info < (3, 11):
+        @deprecated("Deprecated since Python 3.8; removed in Python 3.11.")
         def output_charset(self) -> str | None: ...
+        @deprecated("Deprecated since Python 3.8; removed in Python 3.11.")
         def set_output_charset(self, charset: str) -> None: ...
+        @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `gettext()` instead.")
         def lgettext(self, message: str) -> str: ...
+        @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `ngettext()` instead.")
         def lngettext(self, msgid1: str, msgid2: str, n: int) -> str: ...
 
     def install(self, names: Container[str] | None = None) -> None: ...
@@ -157,9 +150,16 @@ else:
         fallback: bool = False,
         codeset: str | None = None,
     ) -> NullTranslations: ...
+    @overload
     def install(
-        domain: str, localedir: StrPath | None = None, codeset: str | None = None, names: Container[str] | None = None
+        domain: str, localedir: StrPath | None = None, codeset: None = None, names: Container[str] | None = None
     ) -> None: ...
+    @overload
+    @deprecated("The `codeset` parameter is deprecated since Python 3.8; removed in Python 3.11.")
+    def install(domain: str, localedir: StrPath | None, codeset: str, /, names: Container[str] | None = None) -> None: ...
+    @overload
+    @deprecated("The `codeset` parameter is deprecated since Python 3.8; removed in Python 3.11.")
+    def install(domain: str, localedir: StrPath | None = None, *, codeset: str, names: Container[str] | None = None) -> None: ...
 
 def textdomain(domain: str | None = None) -> str: ...
 def bindtextdomain(domain: str, localedir: StrPath | None = None) -> str: ...
@@ -173,15 +173,17 @@ def npgettext(context: str, msgid1: str, msgid2: str, n: int) -> str: ...
 def dnpgettext(domain: str, context: str, msgid1: str, msgid2: str, n: int) -> str: ...
 
 if sys.version_info < (3, 11):
+    @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `gettext()` instead.")
     def lgettext(message: str) -> str: ...
+    @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `dgettext()` instead.")
     def ldgettext(domain: str, message: str) -> str: ...
+    @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `ngettext()` instead.")
     def lngettext(msgid1: str, msgid2: str, n: int) -> str: ...
+    @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `dngettext()` instead.")
     def ldngettext(domain: str, msgid1: str, msgid2: str, n: int) -> str: ...
+    @deprecated("Deprecated since Python 3.8; removed in Python 3.11. Use `bindtextdomain()` instead.")
     def bind_textdomain_codeset(domain: str, codeset: str | None = None) -> str: ...
 
 Catalog = translation
 
-def c2py(plural: str) -> Callable[[int], int]:
-    """Gets a C expression as used in PO files for plural forms and returns a
-    Python function that implements an equivalent expression.
-    """
+def c2py(plural: str) -> Callable[[int], int]: ...

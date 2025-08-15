@@ -1,25 +1,21 @@
-"""Internal classes used by the gzip, lzma and bz2 modules"""
-
 # _compression is replaced by compression._common._streams on Python 3.14+ (PEP-784)
 
 from _typeshed import Incomplete, WriteableBuffer
 from collections.abc import Callable
 from io import DEFAULT_BUFFER_SIZE, BufferedIOBase, RawIOBase
-from typing import Any, Protocol
+from typing import Any, Protocol, type_check_only
 
 BUFFER_SIZE = DEFAULT_BUFFER_SIZE
 
+@type_check_only
 class _Reader(Protocol):
     def read(self, n: int, /) -> bytes: ...
     def seekable(self) -> bool: ...
     def seek(self, n: int, /) -> Any: ...
 
-class BaseStream(BufferedIOBase):
-    """Mode-checking helper functions."""
+class BaseStream(BufferedIOBase): ...
 
 class DecompressReader(RawIOBase):
-    """Adapts the decompressor API to a RawIOBase reader API"""
-
     def __init__(
         self,
         fp: _Reader,
