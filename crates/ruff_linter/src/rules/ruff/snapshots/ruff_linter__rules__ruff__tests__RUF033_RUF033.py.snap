@@ -456,7 +456,8 @@ help: Use `dataclasses.InitVar` instead
 123 124 |         ) -> None:
 124 125 |             ...
 
-RUF033.py:131:50: RUF033 [*] `__post_init__` method with argument defaults
+RUF033 [*] `__post_init__` method with argument defaults
+   --> RUF033.py:131:50
     |
 129 |   @dataclass
 130 |   class C:
@@ -465,10 +466,10 @@ RUF033.py:131:50: RUF033 [*] `__post_init__` method with argument defaults
 132 | |         1,
 133 | |         2,
 134 | |     )) -> None:
-    | |_____^ RUF033
+    | |_____^
 135 |           self.x = x
     |
-    = help: Use `dataclasses.InitVar` instead
+help: Use `dataclasses.InitVar` instead
 
 ℹ Unsafe fix
 128 128 | 

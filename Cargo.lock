@@ -2743,7 +2743,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.7"
+version = "0.12.9"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2874,6 +2874,7 @@ dependencies = [
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_memory_usage",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2995,7 +2996,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.7"
+version = "0.12.9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3021,7 +3022,6 @@ dependencies = [
  "pep440_rs",
  "pyproject-toml",
  "regex",
- "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
@@ -3066,6 +3066,14 @@ dependencies = [
  "quote",
  "ruff_python_trivia",
  "syn",
+]
+
+[[package]]
+name = "ruff_memory_usage"
+version = "0.0.0"
+dependencies = [
+ "get-size2",
+ "ordermap",
 ]
 
 [[package]]
@@ -3327,7 +3335,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.7"
+version = "0.12.9"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3389,6 +3397,7 @@ dependencies = [
  "strum",
  "tempfile",
  "toml 0.9.5",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -3441,7 +3450,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=dba66f1a37acca014c2402f231ed5b361bd7d8fe#dba66f1a37acca014c2402f231ed5b361bd7d8fe"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3454,7 +3463,6 @@ dependencies = [
  "inventory",
  "parking_lot",
  "portable-atomic",
- "rayon",
  "rustc-hash",
  "salsa-macro-rules",
  "salsa-macros",
@@ -3466,12 +3474,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=dba66f1a37acca014c2402f231ed5b361bd7d8fe#dba66f1a37acca014c2402f231ed5b361bd7d8fe"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa?rev=dba66f1a37acca014c2402f231ed5b361bd7d8fe#dba66f1a37acca014c2402f231ed5b361bd7d8fe"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4187,6 +4195,7 @@ dependencies = [
  "argfile",
  "clap",
  "clap_complete_command",
+ "clearscreen",
  "colored 3.0.0",
  "crossbeam",
  "ctrlc",
@@ -4207,11 +4216,22 @@ dependencies = [
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
+ "ty_combine",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
  "ty_static",
  "wild",
+]
+
+[[package]]
+name = "ty_combine"
+version = "0.0.0"
+dependencies = [
+ "ordermap",
+ "ruff_db",
+ "ruff_python_ast",
+ "ty_python_semantic",
 ]
 
 [[package]]
@@ -4255,6 +4275,7 @@ dependencies = [
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
+ "ruff_memory_usage",
  "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
@@ -4266,6 +4287,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml 0.9.5",
  "tracing",
+ "ty_combine",
  "ty_python_semantic",
  "ty_vendored",
 ]
@@ -4296,6 +4318,7 @@ dependencies = [
  "ruff_db",
  "ruff_index",
  "ruff_macros",
+ "ruff_memory_usage",
  "ruff_python_ast",
  "ruff_python_literal",
  "ruff_python_parser",
@@ -4309,6 +4332,7 @@ dependencies = [
  "serde",
  "smallvec",
  "static_assertions",
+ "strsim",
  "strum",
  "strum_macros",
  "tempfile",
@@ -4336,6 +4360,7 @@ dependencies = [
  "lsp-types",
  "regex",
  "ruff_db",
+ "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_source_file",
@@ -4349,6 +4374,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
+ "ty_combine",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",
