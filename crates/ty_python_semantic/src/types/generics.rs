@@ -249,6 +249,10 @@ impl<'db> GenericContext<'db> {
         }
     }
 
+    /// Returns a specialization of this generic context where each typevar is mapped to itself.
+    /// (And in particular, to an _inferable_ version of itself, since this will be used in our
+    /// class constructor invocation machinery to infer a specialization for the class from the
+    /// arguments passed to its constructor.)
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = self
             .variables(db)

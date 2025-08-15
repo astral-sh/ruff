@@ -612,9 +612,10 @@ pub enum Type<'db> {
     LiteralString,
     /// A bytes literal
     BytesLiteral(BytesLiteralType<'db>),
-    /// An instance of a typevar outside of the generic class or function that binds it. When the
-    /// generic class or function is specialized, we will replace this typevar with its
-    /// specialization.
+    /// An instance of a typevar in a context where we can infer a specialization for it. (This is
+    /// typically the signature of a generic function, or of a constructor of a generic class.)
+    /// When the generic class or function binding this typevar is specialized, we will replace the
+    /// typevar with its specialization.
     TypeVar(BoundTypeVarInstance<'db>),
     /// An instance of a typevar inside the generic class or function. In this position, the
     /// typevar cannot be specialized, and therefore is not eligible for specialization inference.
@@ -5146,20 +5147,22 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let (generic_origin, generic_context, self_type) =
-            match self {
-                Type::ClassLiteral(class) => match class.generic_context(db) {
-                    Some(generic_context) => (
-                        Some(class),
-                        Some(generic_context),
-                        Type::from(class.apply_specialization(db, |_| {
-                            generic_context.identity_specialization(db)
-                        })),
-                    ),
-                    _ => (None, None, self),
-                },
+        let (generic_origin, generic_context, self_type) = match self {
+            Type::ClassLiteral(class) => match class.generic_context(db) {
+                Some(generic_context) => (
+                    Some(class),
+                    Some(generic_context),
+                    Type::from(class.apply_specialization(db, |_| {
+                        // It is important that identity_specialization specializes the class with
+                        // _inferable_ typevars, so that our specialization inference logic will
+                        // try to find a specialization for them.
+                        generic_context.identity_specialization(db)
+                    })),
+                ),
                 _ => (None, None, self),
-            };
+            },
+            _ => (None, None, self),
+        };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
