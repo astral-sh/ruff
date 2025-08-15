@@ -1124,12 +1124,9 @@ impl<'db> Parameters<'db> {
             node_index: _,
         } = parameters;
         let default_type = |param: &ast::ParameterWithDefault| {
-            param.default().map(|default| {
-                definition_expression_type(db, definition, default).apply_type_mapping(
-                    db,
-                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
-                )
-            })
+            param
+                .default()
+                .map(|default| definition_expression_type(db, definition, default))
         };
         let positional_only = posonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
