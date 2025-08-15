@@ -7,12 +7,13 @@ import unittest.result
 import unittest.suite
 from collections.abc import Iterable
 from types import ModuleType
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, type_check_only
 from typing_extensions import deprecated
 
 MAIN_EXAMPLES: Final[str]
 MODULE_EXAMPLES: Final[str]
 
+@type_check_only
 class _TestRunner(Protocol):
     def run(self, test: unittest.suite.TestSuite | unittest.case.TestCase, /) -> unittest.result.TestResult: ...
 

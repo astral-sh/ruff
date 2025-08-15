@@ -589,12 +589,14 @@ def getboolean(s):
 
 _Ts = TypeVarTuple("_Ts")
 
+@type_check_only
 class _GridIndexInfo(TypedDict, total=False):
     minsize: _ScreenUnits
     pad: _ScreenUnits
     uniform: str | None
     weight: int
 
+@type_check_only
 class _BusyInfo(TypedDict):
     cursor: _Cursor
 
@@ -2286,6 +2288,7 @@ class Tk(Misc, Wm):
     def loadtk(self) -> None: ...
     def record(self, script, /): ...
     if sys.version_info < (3, 11):
+        @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
         def split(self, arg, /): ...
 
     def splitlist(self, arg, /): ...
@@ -2298,6 +2301,7 @@ def Tcl(screenName: str | None = None, baseName: str | None = None, className: s
 _InMiscTotal = TypedDict("_InMiscTotal", {"in": Misc})
 _InMiscNonTotal = TypedDict("_InMiscNonTotal", {"in": Misc}, total=False)
 
+@type_check_only
 class _PackInfo(_InMiscTotal):
     # 'before' and 'after' never appear in _PackInfo
     anchor: _Anchor
@@ -2365,6 +2369,7 @@ class Pack:
     forget = pack_forget
     propagate = Misc.pack_propagate
 
+@type_check_only
 class _PlaceInfo(_InMiscNonTotal):  # empty dict if widget hasn't been placed
     anchor: _Anchor
     bordermode: Literal["inside", "outside", "ignore"]
@@ -2433,6 +2438,7 @@ class Place:
     place = place_configure
     info = place_info
 
+@type_check_only
 class _GridInfo(_InMiscNonTotal):  # empty dict if widget hasn't been gridded
     column: int
     columnspan: int

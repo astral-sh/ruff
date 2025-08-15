@@ -254,6 +254,11 @@ impl Diagnostic {
             .find(|ann| ann.is_primary)
     }
 
+    /// Returns a mutable borrow of all annotations of this diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        Arc::make_mut(&mut self.inner).annotations.iter_mut()
+    }
+
     /// Returns the "primary" span of this diagnostic if one exists.
     ///
     /// When there are multiple primary spans, then the first one that was
@@ -308,6 +313,11 @@ impl Diagnostic {
 
     pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
         &self.inner.subs
+    }
+
+    /// Returns a mutable borrow of the sub-diagnostics of this diagnostic.
+    pub fn sub_diagnostics_mut(&mut self) -> impl Iterator<Item = &mut SubDiagnostic> {
+        Arc::make_mut(&mut self.inner).subs.iter_mut()
     }
 
     /// Returns the fix for this diagnostic if it exists.
@@ -619,6 +629,11 @@ impl SubDiagnostic {
 
     pub fn annotations(&self) -> &[Annotation] {
         &self.inner.annotations
+    }
+
+    /// Returns a mutable borrow of the annotations of this sub-diagnostic.
+    pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
+        self.inner.annotations.iter_mut()
     }
 
     /// Returns a shared borrow of the "primary" annotation of this diagnostic

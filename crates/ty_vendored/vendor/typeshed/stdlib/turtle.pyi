@@ -80,8 +80,8 @@ from _typeshed import StrPath
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from tkinter import Canvas, Frame, Misc, PhotoImage, Scrollbar
-from typing import Any, ClassVar, Literal, TypedDict, overload
-from typing_extensions import Self, TypeAlias
+from typing import Any, ClassVar, Literal, TypedDict, overload, type_check_only
+from typing_extensions import Self, TypeAlias, deprecated
 
 __all__ = [
     "ScrolledCanvas",
@@ -223,6 +223,7 @@ if sys.version_info < (3, 13):
 _Color: TypeAlias = str | tuple[float, float, float]
 _AnyColor: TypeAlias = Any
 
+@type_check_only
 class _PenState(TypedDict):
     shown: bool
     pendown: bool
@@ -1725,6 +1726,7 @@ class RawTurtle(TPen, TNavigator):  # type: ignore[misc]  # Conflicting methods 
 
         """
     if sys.version_info < (3, 13):
+        @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
         def settiltangle(self, angle: float) -> None:
             """Rotate the turtleshape to point in the specified direction
 
@@ -3619,6 +3621,7 @@ def get_shapepoly() -> _PolygonCoords | None:
     """
 
 if sys.version_info < (3, 13):
+    @deprecated("Deprecated since Python 3.1; removed in Python 3.13. Use `tiltangle()` instead.")
     def settiltangle(angle: float) -> None:
         """Rotate the turtleshape to point in the specified direction
 

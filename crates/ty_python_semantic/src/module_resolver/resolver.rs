@@ -45,10 +45,25 @@ pub fn resolve_real_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Op
 }
 
 /// Which files should be visible when doing a module query
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
 pub(crate) enum ModuleResolveMode {
+    /// Stubs are allowed to appear.
+    ///
+    /// This is the "normal" mode almost everything uses, as type checkers are in fact supposed
+    /// to *prefer* stubs over the actual implementations.
     StubsAllowed,
+    /// Stubs are not allowed to appear.
+    ///
+    /// This is the "goto definition" mode, where we need to ignore the typing spec and find actual
+    /// implementations. When querying searchpaths this also notably replaces typeshed with
+    /// the "real" stdlib.
     StubsNotAllowed,
+}
+
+#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
+#[derive(Debug)]
+pub(crate) struct ModuleResolveModeIngredient<'db> {
+    mode: ModuleResolveMode,
 }
 
 impl ModuleResolveMode {
@@ -124,7 +139,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    let module_name = search_paths(db).find_map(|candidate| {
+    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|candidate| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
@@ -153,18 +168,27 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     }
 }
 
-pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator<'_> {
-    Program::get(db).search_paths(db).iter(db)
+pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
+    Program::get(db).search_paths(db).iter(db, resolve_mode)
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading
     /// ty's configuration settings. These shouldn't ever change unless the
     /// config settings themselves change.
     static_paths: Vec<SearchPath>,
 
-    /// site-packages paths are not included in the above field:
+    /// Path to typeshed, which should come immediately after static paths.
+    ///
+    /// This can currently only be None if the `SystemPath` this points to is already in `static_paths`.
+    stdlib_path: Option<SearchPath>,
+
+    /// Path to the real stdlib, this replaces typeshed (`stdlib_path`) for goto-definition searches
+    /// ([`ModuleResolveMode::StubsNotAllowed`]).
+    real_stdlib_path: Option<SearchPath>,
+
+    /// site-packages paths are not included in the above fields:
     /// if there are multiple site-packages paths, editable installations can appear
     /// *between* the site-packages paths on `sys.path` at runtime.
     /// That means we can't know where a second or third `site-packages` path should sit
@@ -198,6 +222,7 @@ impl SearchPaths {
             src_roots,
             custom_typeshed: typeshed,
             site_packages_paths,
+            real_stdlib_path,
         } = settings;
 
         let mut static_paths = vec![];
@@ -240,7 +265,11 @@ impl SearchPaths {
             )
         };
 
-        static_paths.push(stdlib_path);
+        let real_stdlib_path = if let Some(path) = real_stdlib_path {
+            Some(SearchPath::real_stdlib(system, path.clone())?)
+        } else {
+            None
+        };
 
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
@@ -273,8 +302,37 @@ impl SearchPaths {
             }
         });
 
+        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
+        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
+        // "remember" that fact for static paths.
+        //
+        // (We used to shove these into static_paths, so the above retain implicitly did this. I am opting to
+        // preserve this behaviour to avoid getting into the weeds of corner cases.)
+        let stdlib_path_is_shadowed = stdlib_path
+            .as_system_path()
+            .map(|path| seen_paths.contains(path))
+            .unwrap_or(false);
+        let real_stdlib_path_is_shadowed = real_stdlib_path
+            .as_ref()
+            .and_then(SearchPath::as_system_path)
+            .map(|path| seen_paths.contains(path))
+            .unwrap_or(false);
+
+        let stdlib_path = if stdlib_path_is_shadowed {
+            None
+        } else {
+            Some(stdlib_path)
+        };
+        let real_stdlib_path = if real_stdlib_path_is_shadowed {
+            None
+        } else {
+            real_stdlib_path
+        };
+
         Ok(SearchPaths {
             static_paths,
+            stdlib_path,
+            real_stdlib_path,
             site_packages,
             typeshed_versions,
         })
@@ -291,22 +349,32 @@ impl SearchPaths {
         }
     }
 
-    pub(super) fn iter<'a>(&'a self, db: &'a dyn Db) -> SearchPathIterator<'a> {
+    pub(super) fn iter<'a>(
+        &'a self,
+        db: &'a dyn Db,
+        mode: ModuleResolveMode,
+    ) -> SearchPathIterator<'a> {
+        let stdlib_path = self.stdlib(mode);
         SearchPathIterator {
             db,
             static_paths: self.static_paths.iter(),
+            stdlib_path,
             dynamic_paths: None,
+            mode: ModuleResolveModeIngredient::new(db, mode),
+        }
+    }
+
+    pub(crate) fn stdlib(&self, mode: ModuleResolveMode) -> Option<&SearchPath> {
+        match mode {
+            ModuleResolveMode::StubsAllowed => self.stdlib_path.as_ref(),
+            ModuleResolveMode::StubsNotAllowed => self.real_stdlib_path.as_ref(),
         }
     }
 
     pub(crate) fn custom_stdlib(&self) -> Option<&SystemPath> {
-        self.static_paths.iter().find_map(|search_path| {
-            if search_path.is_standard_library() {
-                search_path.as_system_path()
-            } else {
-                None
-            }
-        })
+        self.stdlib_path
+            .as_ref()
+            .and_then(SearchPath::as_system_path)
     }
 
     pub(crate) fn typeshed_versions(&self) -> &TypeshedVersions {
@@ -323,13 +391,18 @@ impl SearchPaths {
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
+pub(crate) fn dynamic_resolution_paths<'db>(
+    db: &'db dyn Db,
+    mode: ModuleResolveModeIngredient<'db>,
+) -> Vec<SearchPath> {
     tracing::debug!("Resolving dynamic module resolution paths");
 
     let SearchPaths {
         static_paths,
+        stdlib_path,
         site_packages,
         typeshed_versions: _,
+        real_stdlib_path,
     } = Program::get(db).search_paths(db);
 
     let mut dynamic_paths = Vec::new();
@@ -343,6 +416,15 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
         .filter_map(|path| path.as_system_path())
         .map(Cow::Borrowed)
         .collect();
+
+    // Use the `ModuleResolveMode` to determine which stdlib (if any) to mark as existing
+    let stdlib = match mode.mode(db) {
+        ModuleResolveMode::StubsAllowed => stdlib_path,
+        ModuleResolveMode::StubsNotAllowed => real_stdlib_path,
+    };
+    if let Some(path) = stdlib.as_ref().and_then(SearchPath::as_system_path) {
+        existing_paths.insert(Cow::Borrowed(path));
+    }
 
     let files = db.files();
     let system = db.system();
@@ -429,7 +511,9 @@ pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> Vec<SearchPath> {
 pub(crate) struct SearchPathIterator<'db> {
     db: &'db dyn Db,
     static_paths: std::slice::Iter<'db, SearchPath>,
+    stdlib_path: Option<&'db SearchPath>,
     dynamic_paths: Option<std::slice::Iter<'db, SearchPath>>,
+    mode: ModuleResolveModeIngredient<'db>,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
@@ -439,14 +523,19 @@ impl<'db> Iterator for SearchPathIterator<'db> {
         let SearchPathIterator {
             db,
             static_paths,
+            stdlib_path,
+            mode,
             dynamic_paths,
         } = self;
 
-        static_paths.next().or_else(|| {
-            dynamic_paths
-                .get_or_insert_with(|| dynamic_resolution_paths(*db).iter())
-                .next()
-        })
+        static_paths
+            .next()
+            .or_else(|| stdlib_path.take())
+            .or_else(|| {
+                dynamic_paths
+                    .get_or_insert_with(|| dynamic_resolution_paths(*db, *mode).iter())
+                    .next()
+            })
     }
 }
 
@@ -554,7 +643,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct ModuleNameIngredient<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
@@ -583,7 +672,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let stub_name = name.to_stub_package();
     let mut is_namespace_package = false;
 
-    for search_path in search_paths(db) {
+    for search_path in search_paths(db, mode) {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
@@ -974,9 +1063,7 @@ mod tests {
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
-    use ruff_db::testing::{
-        assert_const_function_query_was_not_run, assert_function_query_was_not_run,
-    };
+    use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
@@ -1908,7 +1995,12 @@ not_a_directory
             &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
-        assert_const_function_query_was_not_run(&db, dynamic_resolution_paths, &events);
+        assert_function_query_was_not_run(
+            &db,
+            dynamic_resolution_paths,
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            &events,
+        );
     }
 
     #[test]
@@ -1977,7 +2069,8 @@ not_a_directory
             .with_site_packages_files(&[("_foo.pth", "/src")])
             .build();
 
-        let search_paths: Vec<&SearchPath> = search_paths(&db).collect();
+        let search_paths: Vec<&SearchPath> =
+            search_paths(&db, ModuleResolveMode::StubsAllowed).collect();
 
         assert!(search_paths.contains(
             &&SearchPath::first_party(db.system(), SystemPathBuf::from("/src")).unwrap()

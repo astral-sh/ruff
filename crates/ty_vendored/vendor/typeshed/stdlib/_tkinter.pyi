@@ -1,7 +1,7 @@
 import sys
 from collections.abc import Callable
 from typing import Any, ClassVar, Final, final
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 # _tkinter is meant to be only used internally by tkinter, but some tkinter
 # functions e.g. return _tkinter.Tcl_Obj objects. Tcl_Obj represents a Tcl
@@ -87,6 +87,7 @@ class TkappType:
     def record(self, script, /): ...
     def setvar(self, *ags, **kwargs): ...
     if sys.version_info < (3, 11):
+        @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
         def split(self, arg, /): ...
 
     def splitlist(self, arg, /): ...

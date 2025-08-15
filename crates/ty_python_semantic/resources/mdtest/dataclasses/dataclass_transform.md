@@ -195,7 +195,41 @@ OrderTrueOverwritten(1) < OrderTrueOverwritten(2)
 
 ### `kw_only_default`
 
-To do
+When provided, sets the default value for the `kw_only` parameter of `field()`.
+
+```py
+from typing import dataclass_transform
+from dataclasses import field
+
+@dataclass_transform(kw_only_default=True)
+def create_model(*, init=True): ...
+@create_model()
+class A:
+    name: str
+
+a = A(name="Harry")
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+a = A("Harry")
+```
+
+TODO: This can be overridden by the call to the decorator function.
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(kw_only_default=True)
+def create_model(*, kw_only: bool = True): ...
+@create_model(kw_only=False)
+class CustomerModel:
+    id: int
+    name: str
+
+# TODO: Should not emit errors
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+c = CustomerModel(1, "Harry")
+```
 
 ### `field_specifiers`
 

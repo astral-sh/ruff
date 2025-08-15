@@ -7,6 +7,7 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -14,10 +15,8 @@ use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signatu
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     CallableType, IntersectionType, KnownClass, MethodWrapperKind, Protocol, StringLiteralType,
-    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
-    WrapperDescriptorKind,
+    SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
 };
-use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType<'_> {
@@ -73,9 +72,17 @@ impl Display for DisplayRepresentation<'_> {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
             Type::NominalInstance(instance) => {
-                match (instance.class, instance.class.known(self.db)) {
+                let class = instance.class(self.db);
+
+                match (class, class.known(self.db)) {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::Generic(alias), Some(KnownClass::Tuple)) => alias
+                        .specialization(self.db)
+                        .tuple(self.db)
+                        .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
+                        .display(self.db)
+                        .fmt(f),
                     (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
                     (ClassType::Generic(alias), _) => alias.display(self.db).fmt(f),
                 }
@@ -207,12 +214,9 @@ impl Display for DisplayRepresentation<'_> {
                     name = enum_literal.name(self.db),
                 )
             }
-            Type::Tuple(specialization) => specialization.tuple(self.db).display(self.db).fmt(f),
-            Type::TypeVar(typevar) => {
-                f.write_str(typevar.name(self.db))?;
-                if let Some(binding_context) = typevar
-                    .binding_context(self.db)
-                    .and_then(|def| def.name(self.db))
+            Type::TypeVar(bound_typevar) => {
+                f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+                if let Some(binding_context) = bound_typevar.binding_context(self.db).name(self.db)
                 {
                     write!(f, "@{binding_context}")?;
                 }
@@ -237,9 +241,8 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => {
-                f.write_str(typed_dict.defining_class(self.db).name(self.db))
-            }
+            Type::TypedDict(typed_dict) => f.write_str(typed_dict.defining_class.name(self.db)),
+            Type::TypeAlias(alias) => f.write_str(alias.name(self.db)),
         }
     }
 }
@@ -397,8 +400,8 @@ pub(crate) struct DisplayGenericAlias<'db> {
 
 impl Display for DisplayGenericAlias<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.origin.is_known(self.db, KnownClass::Tuple) {
-            self.specialization.tuple(self.db).display(self.db).fmt(f)
+        if let Some(tuple) = self.specialization.tuple(self.db) {
+            tuple.display(self.db).fmt(f)
         } else {
             write!(
                 f,
@@ -452,7 +455,7 @@ impl Display for DisplayGenericContext<'_> {
 
         let non_implicit_variables: Vec<_> = variables
             .iter()
-            .filter(|var| !var.is_implicit(self.db))
+            .filter(|bound_typevar| !bound_typevar.typevar(self.db).is_implicit(self.db))
             .collect();
 
         if non_implicit_variables.is_empty() {
@@ -460,30 +463,11 @@ impl Display for DisplayGenericContext<'_> {
         }
 
         f.write_char('[')?;
-        for (idx, var) in non_implicit_variables.iter().enumerate() {
+        for (idx, bound_typevar) in non_implicit_variables.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            f.write_str(var.name(self.db))?;
-            match var.bound_or_constraints(self.db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    write!(f, ": {}", bound.display(self.db))?;
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    f.write_str(": (")?;
-                    for (idx, constraint) in constraints.iter(self.db).enumerate() {
-                        if idx > 0 {
-                            f.write_str(", ")?;
-                        }
-                        constraint.display(self.db).fmt(f)?;
-                    }
-                    f.write_char(')')?;
-                }
-                None => {}
-            }
-            if let Some(default_type) = var.default_ty(self.db) {
-                write!(f, " = {}", default_type.display(self.db))?;
-            }
+            f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
         }
         f.write_char(']')
     }
@@ -497,7 +481,6 @@ impl<'db> Specialization<'db> {
         tuple_specialization: TupleSpecialization,
     ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
-            typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
             tuple_specialization,
@@ -506,7 +489,6 @@ impl<'db> Specialization<'db> {
 }
 
 pub struct DisplaySpecialization<'db> {
-    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     tuple_specialization: TupleSpecialization,
@@ -515,7 +497,7 @@ pub struct DisplaySpecialization<'db> {
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('[')?;
-        for (idx, (_, ty)) in self.typevars.iter().zip(self.types).enumerate() {
+        for (idx, ty) in self.types.iter().enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
@@ -1016,20 +998,22 @@ impl Display for DisplayTypeArray<'_, '_> {
 
 impl<'db> StringLiteralType<'db> {
     fn display(&'db self, db: &'db dyn Db) -> DisplayStringLiteralType<'db> {
-        DisplayStringLiteralType { db, ty: self }
+        display_quoted_string(self.value(db))
     }
 }
 
+fn display_quoted_string(string: &str) -> DisplayStringLiteralType<'_> {
+    DisplayStringLiteralType { string }
+}
+
 struct DisplayStringLiteralType<'db> {
-    ty: &'db StringLiteralType<'db>,
-    db: &'db dyn Db,
+    string: &'db str,
 }
 
 impl Display for DisplayStringLiteralType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let value = self.ty.value(self.db);
         f.write_char('"')?;
-        for ch in value.chars() {
+        for ch in self.string.chars() {
             match ch {
                 // `escape_debug` will escape even single quotes, which is not necessary for our
                 // use case as we are already using double quotes to wrap the string.

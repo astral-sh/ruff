@@ -76,9 +76,9 @@ use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundMethodType, CallableType, ClassBase, ClassLiteral, ClassType, DeprecatedInstance,
-    DynamicType, KnownClass, Truthiness, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarInstance, UnionBuilder, all_members, walk_type_mapping,
+    BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
+    DeprecatedInstance, DynamicType, KnownClass, NormalizedVisitor, Truthiness, Type, TypeMapping,
+    TypeRelation, TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -94,7 +94,6 @@ pub(crate) struct FunctionSpans {
     pub(crate) name: Span,
     /// The span of the parameter list, including the opening and
     /// closing parentheses.
-    #[expect(dead_code)]
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
@@ -119,6 +118,8 @@ bitflags! {
         const OVERRIDE = 1 << 6;
     }
 }
+
+impl get_size2::GetSize for FunctionDecorators {}
 
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
@@ -184,7 +185,7 @@ impl Default for DataclassTransformerParams {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
@@ -338,7 +339,7 @@ impl<'db> OverloadLiteral<'db> {
         let definition = self.definition(db);
         let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
-            GenericContext::from_type_params(db, index, type_params)
+            GenericContext::from_type_params(db, index, definition, type_params)
         });
 
         let index = semantic_index(db, scope.file(db));
@@ -406,7 +407,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Ordering is based on the function's id assigned by salsa and not on the function literal's
 /// values. The id may change between runs, or when the function literal was garbage collected and
 /// recreated.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
@@ -433,10 +434,13 @@ pub struct FunctionLiteral<'db> {
     inherited_generic_context: Option<GenericContext<'db>>,
 }
 
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for FunctionLiteral<'_> {}
+
 fn walk_function_literal<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionLiteral<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     if let Some(context) = function.inherited_generic_context(db) {
         walk_generic_context(db, context, visitor);
@@ -575,7 +579,31 @@ impl<'db> FunctionLiteral<'db> {
         }))
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &mut TypeTransformer<'db>) -> Self {
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
+    fn last_definition_signature<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mappings: &'a [TypeMapping<'a, 'db>],
+    ) -> Signature<'db>
+    where
+        'db: 'a,
+    {
+        let inherited_generic_context = self.inherited_generic_context(db);
+        type_mappings.iter().fold(
+            self.last_definition(db)
+                .signature(db, inherited_generic_context),
+            |ty, mapping| ty.apply_type_mapping(db, mapping),
+        )
+    }
+
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let context = self
             .inherited_generic_context(db)
             .map(|ctx| ctx.normalized_impl(db, visitor));
@@ -585,7 +613,7 @@ impl<'db> FunctionLiteral<'db> {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
@@ -603,7 +631,7 @@ impl get_size2::GetSize for FunctionType<'_> {}
 pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
-    visitor: &mut V,
+    visitor: &V,
 ) {
     walk_function_literal(db, function.literal(db), visitor);
     for mapping in function.type_mappings(db) {
@@ -795,6 +823,26 @@ impl<'db> FunctionType<'db> {
         self.literal(db).signature(db, self.type_mappings(db))
     }
 
+    /// Typed externally-visible signature of the last overload or implementation of this function.
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the function's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the function's AST and rerun for every change in that file.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_fn=last_definition_signature_cycle_recover,
+        cycle_initial=last_definition_signature_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+        self.literal(db)
+            .last_definition_signature(db, self.type_mappings(db))
+    }
+
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(db, self.signature(db), false)
@@ -861,24 +909,20 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn find_legacy_typevars(
         self,
         db: &'db dyn Db,
-        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
     ) {
         let signatures = self.signature(db);
         for signature in &signatures.overloads {
-            signature.find_legacy_typevars(db, typevars);
+            signature.find_legacy_typevars(db, binding_context, typevars);
         }
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        let mut visitor = TypeTransformer::default();
-        self.normalized_impl(db, &mut visitor)
+        self.normalized_impl(db, &TypeTransformer::default())
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &mut TypeTransformer<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let mappings: Box<_> = self
             .type_mappings(db)
             .iter()
@@ -900,7 +944,7 @@ fn is_instance_truthiness<'db>(
     let is_instance = |ty: &Type<'_>| {
         if let Type::NominalInstance(instance) = ty {
             if instance
-                .class
+                .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .any(|c| match c {
@@ -949,13 +993,13 @@ fn is_instance_truthiness<'db>(
                 .is_some_and(is_instance),
         ),
 
-        Type::Tuple(..) => always_true_if(class.is_known(db, KnownClass::Tuple)),
-
         Type::FunctionLiteral(..) => {
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
         }
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
+
+        Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
 
         Type::BoundMethod(..)
         | Type::MethodWrapper(..)
@@ -1000,10 +1044,34 @@ fn signature_cycle_initial<'db>(
     CallableSignature::single(Signature::bottom(db))
 }
 
+fn last_definition_signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Signature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Signature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn last_definition_signature_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _function: FunctionType<'db>,
+) -> Signature<'db> {
+    Signature::bottom(db)
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+    Debug,
+    Copy,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    strum_macros::EnumString,
+    strum_macros::IntoStaticStr,
+    get_size2::GetSize,
 )]
 #[strum(serialize_all = "snake_case")]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]

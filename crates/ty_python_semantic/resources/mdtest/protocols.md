@@ -2051,6 +2051,7 @@ python-version = "3.12"
 ```
 
 ```py
+from __future__ import annotations
 from typing import cast, Protocol
 
 class Iterator[T](Protocol):

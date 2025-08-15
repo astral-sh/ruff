@@ -367,6 +367,7 @@ class BytesIO(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc] 
         Returns the new absolute position.
         """
 
+@type_check_only
 class _BufferedReaderStream(Protocol):
     def read(self, n: int = ..., /) -> bytes: ...
     # Optional: def readall(self) -> bytes: ...

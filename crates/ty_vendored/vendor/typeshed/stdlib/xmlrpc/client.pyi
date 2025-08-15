@@ -48,9 +48,10 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
 from io import BytesIO
 from types import TracebackType
-from typing import Any, ClassVar, Final, Literal, Protocol, overload
+from typing import Any, ClassVar, Final, Literal, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
+@type_check_only
 class _SupportsTimeTuple(Protocol):
     def timetuple(self) -> time.struct_time: ...
 

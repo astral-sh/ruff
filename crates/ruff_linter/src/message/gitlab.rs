@@ -88,20 +88,14 @@ impl Serialize for SerializedMessages<'_> {
             }
             fingerprints.insert(message_fingerprint);
 
-            let (description, check_name) = if let Some(code) = diagnostic.secondary_code() {
-                (diagnostic.body().to_string(), code.as_str())
-            } else {
-                let description = diagnostic.body();
-                let description_without_prefix = description
-                    .strip_prefix("SyntaxError: ")
-                    .unwrap_or(description);
-
-                (description_without_prefix.to_string(), "syntax-error")
-            };
+            let description = diagnostic.body();
+            let check_name = diagnostic.secondary_code_or_id();
 
             let value = json!({
                 "check_name": check_name,
-                "description": description,
+                // GitLab doesn't display the separate `check_name` field in a Code Quality report,
+                // so prepend it to the description too.
+                "description": format!("{check_name}: {description}"),
                 "severity": "major",
                 "fingerprint": format!("{:x}", message_fingerprint),
                 "location": {

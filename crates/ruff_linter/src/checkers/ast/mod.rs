@@ -28,7 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Annotation, Diagnostic, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
@@ -3304,6 +3304,17 @@ impl DiagnosticGuard<'_, '_> {
             Ok(Some(fix)) => self.set_fix(fix),
             Err(err) => log::debug!("Failed to create fix for {}: {}", self.name(), err),
         }
+    }
+
+    /// Add a secondary annotation with the given message and range.
+    pub(crate) fn secondary_annotation<'a>(
+        &mut self,
+        message: impl IntoDiagnosticMessage + 'a,
+        range: impl Ranged,
+    ) {
+        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let ann = Annotation::secondary(span).message(message);
+        self.diagnostic.as_mut().unwrap().annotate(ann);
     }
 }
 

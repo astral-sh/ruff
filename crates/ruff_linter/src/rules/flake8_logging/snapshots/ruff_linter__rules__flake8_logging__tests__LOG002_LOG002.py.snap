@@ -1,14 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
 ---
-LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002 [*] Use `__name__` with `logging.getLogger()`
+  --> LOG002.py:11:11
    |
 10 | # LOG002
 11 | getLogger(__file__)
-   |           ^^^^^^^^ LOG002
+   |           ^^^^^^^^
 12 | logging.getLogger(name=__file__)
    |
-   = help: Replace with `__name__`
+help: Replace with `__name__`
 
 ℹ Unsafe fix
 8  8  | logging.getLogger(name="custom")
@@ -20,16 +21,17 @@ LOG002.py:11:11: LOG002 [*] Use `__name__` with `logging.getLogger()`
 13 13 | 
 14 14 | logging.getLogger(__cached__)
 
-LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002 [*] Use `__name__` with `logging.getLogger()`
+  --> LOG002.py:12:24
    |
 10 | # LOG002
 11 | getLogger(__file__)
 12 | logging.getLogger(name=__file__)
-   |                        ^^^^^^^^ LOG002
+   |                        ^^^^^^^^
 13 |
 14 | logging.getLogger(__cached__)
    |
-   = help: Replace with `__name__`
+help: Replace with `__name__`
 
 ℹ Unsafe fix
 9  9  | 
@@ -41,15 +43,16 @@ LOG002.py:12:24: LOG002 [*] Use `__name__` with `logging.getLogger()`
 14 14 | logging.getLogger(__cached__)
 15 15 | getLogger(name=__cached__)
 
-LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002 [*] Use `__name__` with `logging.getLogger()`
+  --> LOG002.py:14:19
    |
 12 | logging.getLogger(name=__file__)
 13 |
 14 | logging.getLogger(__cached__)
-   |                   ^^^^^^^^^^ LOG002
+   |                   ^^^^^^^^^^
 15 | getLogger(name=__cached__)
    |
-   = help: Replace with `__name__`
+help: Replace with `__name__`
 
 ℹ Unsafe fix
 11 11 | getLogger(__file__)
@@ -61,13 +64,14 @@ LOG002.py:14:19: LOG002 [*] Use `__name__` with `logging.getLogger()`
 16 16 | 
 17 17 | 
 
-LOG002.py:15:16: LOG002 [*] Use `__name__` with `logging.getLogger()`
+LOG002 [*] Use `__name__` with `logging.getLogger()`
+  --> LOG002.py:15:16
    |
 14 | logging.getLogger(__cached__)
 15 | getLogger(name=__cached__)
-   |                ^^^^^^^^^^ LOG002
+   |                ^^^^^^^^^^
    |
-   = help: Replace with `__name__`
+help: Replace with `__name__`
 
 ℹ Unsafe fix
 12 12 | logging.getLogger(name=__file__)

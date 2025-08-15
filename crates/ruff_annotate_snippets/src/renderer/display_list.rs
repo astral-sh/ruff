@@ -1201,11 +1201,16 @@ fn format_snippet<'m>(
 
     let is_file_level = snippet.annotations.iter().any(|ann| ann.is_file_level);
     if is_file_level {
-        assert!(
-            snippet.source.is_empty(),
-            "Non-empty file-level snippet that won't be rendered: {:?}",
-            snippet.source
-        );
+        // TODO(brent) enable this assertion again once we set `is_file_level` for individual rules.
+        // It's causing too many false positives currently when the default is to make any
+        // annotation with a default range file-level. See
+        // https://github.com/astral-sh/ruff/issues/19688.
+        //
+        // assert!(
+        //     snippet.source.is_empty(),
+        //     "Non-empty file-level snippet that won't be rendered: {:?}",
+        //     snippet.source
+        // );
         let header = format_header(origin, main_range, &[], is_first, snippet.cell_index);
         return DisplaySet {
             display_lines: header.map_or_else(Vec::new, |header| vec![header]),
@@ -1273,12 +1278,19 @@ fn format_header<'a>(
                 ..
             } = item
             {
-                if main_range >= range.0 && main_range < range.1 + max(*end_line as usize, 1) {
+                // At the very end of the `main_range`, report the location as the first character
+                // in the next line instead of falling back to the default location of `1:1`. This
+                // is another divergence from upstream.
+                let end_of_range = range.1 + max(*end_line as usize, 1);
+                if main_range >= range.0 && main_range < end_of_range {
                     let char_column = text[0..(main_range - range.0).min(text.len())]
                         .chars()
                         .count();
                     col = char_column + 1;
                     line_offset = lineno.unwrap_or(1);
+                    break;
+                } else if main_range == end_of_range {
+                    line_offset = lineno.map_or(1, |line| line + 1);
                     break;
                 }
             }

@@ -322,9 +322,9 @@ dependencies = [
 
 [[package]]
 name = "camino"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0da45bc31171d8d6960122e222a67740df867c1dd53b4d51caa297084c185cab"
+checksum = "5d07aa9a93b00c76f71bc35d598bed923f6d4f3a9ca5c24b7737ae1a292841c0"
 dependencies = [
  "serde",
 ]
@@ -1178,7 +1178,7 @@ checksum = "5697765925a05c9d401dd04a93dfd662d336cc25fdcc3301220385a1ffcfdde5"
 dependencies = [
  "compact_str",
  "get-size-derive2",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "smallvec",
 ]
 
@@ -1264,9 +1264,9 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
-version = "0.15.4"
+version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5971ac85611da7067dbfcabef3c70ebb5606018acd9e2a3903a0da507521e0d5"
+checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
  "allocator-api2",
  "equivalent",
@@ -1279,7 +1279,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -1471,7 +1471,7 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17d34b7d42178945f775e84bc4c36dde7c1c6cdfea656d3354d009056f2bb3d2"
 dependencies = [
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -1491,7 +1491,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
 dependencies = [
  "equivalent",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "serde",
 ]
 
@@ -2473,9 +2473,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.95"
+version = "1.0.96"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02b3e5e68a3a1a02aad3ec490a98007cbc13c37cbe84a3cd7b8e406d76e7f778"
+checksum = "beef09f85ae72cea1ef96ba6870c51e6382ebfa4f0e85b643459331f3daa5be0"
 dependencies = [
  "unicode-ident",
 ]
@@ -2743,7 +2743,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.12.8"
+version = "0.12.9"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2996,7 +2996,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.12.8"
+version = "0.12.9"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3006,7 +3006,7 @@ dependencies = [
  "fern",
  "glob",
  "globset",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "imperative",
  "insta",
  "is-macro",
@@ -3022,7 +3022,6 @@ dependencies = [
  "pep440_rs",
  "pyproject-toml",
  "regex",
- "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_db",
  "ruff_diagnostics",
@@ -3074,6 +3073,7 @@ name = "ruff_memory_usage"
 version = "0.0.0"
 dependencies = [
  "get-size2",
+ "ordermap",
 ]
 
 [[package]]
@@ -3335,7 +3335,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.12.8"
+version = "0.12.9"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3450,13 +3450,13 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=b121ee46c4483ba74c19e933a3522bd548eb7343#b121ee46c4483ba74c19e933a3522bd548eb7343"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "boxcar",
  "compact_str",
  "crossbeam-queue",
  "crossbeam-utils",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "hashlink",
  "indexmap",
  "intrusive-collections",
@@ -3474,12 +3474,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=b121ee46c4483ba74c19e933a3522bd548eb7343#b121ee46c4483ba74c19e933a3522bd548eb7343"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 
 [[package]]
 name = "salsa-macros"
 version = "0.23.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=b121ee46c4483ba74c19e933a3522bd548eb7343#b121ee46c4483ba74c19e933a3522bd548eb7343"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=918d35d873b2b73a0237536144ef4d22e8d57f27#918d35d873b2b73a0237536144ef4d22e8d57f27"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4306,7 +4306,7 @@ dependencies = [
  "drop_bomb",
  "get-size2",
  "glob",
- "hashbrown 0.15.4",
+ "hashbrown 0.15.5",
  "indexmap",
  "insta",
  "itertools 0.14.0",

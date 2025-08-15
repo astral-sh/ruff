@@ -165,9 +165,9 @@ pub(crate) fn attribute_scopes<'db, 's>(
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
-    ChildrenIter::new(index, class_scope_id).filter_map(move |(child_scope_id, scope)| {
+    ChildrenIter::new(&index.scopes, class_scope_id).filter_map(move |(child_scope_id, scope)| {
         let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::Annotation {
+            if scope.node().scope_kind() == ScopeKind::TypeParams {
                 // This could be a generic method with a type-params scope.
                 // Go one level deeper to find the function scope. The first
                 // descendant is the (potential) function scope.
@@ -372,18 +372,18 @@ impl<'db> SemanticIndex<'db> {
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
     pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
-        DescendantsIter::new(self, scope)
+        DescendantsIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
     #[allow(unused)]
     pub(crate) fn child_scopes(&self, scope: FileScopeId) -> ChildrenIter<'_> {
-        ChildrenIter::new(self, scope)
+        ChildrenIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over all ancestors of `scope`, starting with `scope` itself.
     pub(crate) fn ancestor_scopes(&self, scope: FileScopeId) -> AncestorsIter<'_> {
-        AncestorsIter::new(self, scope)
+        AncestorsIter::new(&self.scopes, scope)
     }
 
     /// Returns an iterator over ancestors of `scope` that are visible for name resolution,
@@ -401,7 +401,7 @@ impl<'db> SemanticIndex<'db> {
     /// ```
     /// The `method` function can see the global scope but not the class scope.
     pub(crate) fn visible_ancestor_scopes(&self, scope: FileScopeId) -> VisibleAncestorsIter<'_> {
-        VisibleAncestorsIter::new(self, scope)
+        VisibleAncestorsIter::new(&self.scopes, scope)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
@@ -542,9 +542,9 @@ pub(crate) struct AncestorsIter<'a> {
 }
 
 impl<'a> AncestorsIter<'a> {
-    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
         Self {
-            scopes: &module_table.scopes,
+            scopes,
             next_id: Some(start),
         }
     }
@@ -571,10 +571,10 @@ pub(crate) struct VisibleAncestorsIter<'a> {
 }
 
 impl<'a> VisibleAncestorsIter<'a> {
-    fn new(module_table: &'a SemanticIndex, start: FileScopeId) -> Self {
-        let starting_scope = &module_table.scopes[start];
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, start: FileScopeId) -> Self {
+        let starting_scope = &scopes[start];
         Self {
-            inner: AncestorsIter::new(module_table, start),
+            inner: AncestorsIter::new(scopes, start),
             starting_scope_kind: starting_scope.kind(),
             yielded_count: 0,
         }
@@ -597,8 +597,8 @@ impl<'a> Iterator for VisibleAncestorsIter<'a> {
             // Skip class scopes for subsequent scopes (following Python's lexical scoping rules)
             // Exception: type parameter scopes can see names defined in an immediately-enclosing class scope
             if scope.kind() == ScopeKind::Class {
-                // Allow type parameter scopes to see their immediately-enclosing class scope exactly once
-                if self.starting_scope_kind.is_type_parameter() && self.yielded_count == 2 {
+                // Allow annotation scopes to see their immediately-enclosing class scope exactly once
+                if self.starting_scope_kind.is_annotation() && self.yielded_count == 2 {
                     return Some((scope_id, scope));
                 }
                 continue;
@@ -617,9 +617,9 @@ pub(crate) struct DescendantsIter<'a> {
 }
 
 impl<'a> DescendantsIter<'a> {
-    fn new(index: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
-        let scope = &index.scopes[scope_id];
-        let scopes = &index.scopes[scope.descendants()];
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
+        let scope = &scopes[scope_id];
+        let scopes = &scopes[scope.descendants()];
 
         Self {
             next_id: scope_id + 1,
@@ -654,8 +654,8 @@ pub(crate) struct ChildrenIter<'a> {
 }
 
 impl<'a> ChildrenIter<'a> {
-    pub(crate) fn new(module_index: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendants = DescendantsIter::new(module_index, parent);
+    pub(crate) fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, parent: FileScopeId) -> Self {
+        let descendants = DescendantsIter::new(scopes, parent);
 
         Self {
             parent,
@@ -1317,7 +1317,7 @@ def func[T]():
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(
             ann_scope_id.to_scope_id(&db, file).name(&db, &module),
             "func"
@@ -1361,7 +1361,7 @@ class C[T]:
             panic!("expected one child scope");
         };
 
-        assert_eq!(ann_scope.kind(), ScopeKind::Annotation);
+        assert_eq!(ann_scope.kind(), ScopeKind::TypeParams);
         assert_eq!(ann_scope_id.to_scope_id(&db, file).name(&db, &module), "C");
         let ann_table = index.place_table(ann_scope_id);
         assert_eq!(names(&ann_table), vec!["T"]);

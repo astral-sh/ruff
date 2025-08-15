@@ -30,7 +30,8 @@ class HTMLParser(ParserBase):
     """
 
     CDATA_CONTENT_ELEMENTS: Final[tuple[str, ...]]
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 13):
+        # Added in 3.13.6
         RCDATA_CONTENT_ELEMENTS: Final[tuple[str, ...]]
 
     def __init__(self, *, convert_charrefs: bool = True) -> None:
@@ -70,7 +71,8 @@ class HTMLParser(ParserBase):
     def parse_html_declaration(self, i: int) -> int: ...  # undocumented
     def parse_pi(self, i: int) -> int: ...  # undocumented
     def parse_starttag(self, i: int) -> int: ...  # undocumented
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 13):
+        # `escapable` parameter added in 3.13.6
         def set_cdata_mode(self, elem: str, *, escapable: bool = False) -> None: ...  # undocumented
     else:
         def set_cdata_mode(self, elem: str) -> None: ...  # undocumented

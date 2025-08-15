@@ -9,7 +9,7 @@ pub use resolver::{resolve_module, resolve_real_module};
 use ruff_db::system::SystemPath;
 
 use crate::Db;
-use crate::module_resolver::resolver::search_paths;
+use crate::module_resolver::resolver::{ModuleResolveMode, search_paths};
 use resolver::SearchPathIterator;
 
 mod module;
@@ -23,7 +23,9 @@ mod testing;
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
     SystemModuleSearchPathsIter {
-        inner: search_paths(db),
+        // Always run in `StubsAllowed` mode because we want to include as much as possible
+        // and we don't care about the "real" stdlib
+        inner: search_paths(db, ModuleResolveMode::StubsAllowed),
     }
 }
 

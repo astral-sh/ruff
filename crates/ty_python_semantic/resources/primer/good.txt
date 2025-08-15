@@ -10,7 +10,6 @@ aioredis
 aiortc
 alectryon
 alerta
-altair
 anyio
 apprise
 async-utils
@@ -41,7 +40,6 @@ flake8
 flake8-pyi
 freqtrade
 git-revise
-graphql-core
 httpx-caching
 hydra-zen
 ignite
@@ -64,7 +62,6 @@ more-itertools
 mypy-protobuf
 mypy_primer
 nionutils
-nox
 openlibrary
 operator
 optuna
@@ -107,7 +104,6 @@ starlette
 static-frame
 stone
 strawberry
-streamlit
 svcs
 sympy
 tornado

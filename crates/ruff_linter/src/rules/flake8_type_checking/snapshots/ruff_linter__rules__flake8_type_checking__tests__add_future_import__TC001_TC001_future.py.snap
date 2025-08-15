@@ -1,15 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
-TC001_future.py:2:19: TC001 [*] Move application import `.first_party` into a type-checking block
+TC001 [*] Move application import `.first_party` into a type-checking block
+ --> TC001_future.py:2:19
   |
 1 | def f():
 2 |     from . import first_party
-  |                   ^^^^^^^^^^^ TC001
+  |                   ^^^^^^^^^^^
 3 |
 4 |     def f(x: first_party.foo): ...
   |
-  = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
 1   |-def f():
@@ -23,15 +24,16 @@ TC001_future.py:2:19: TC001 [*] Move application import `.first_party` into a ty
 4 8 |     def f(x: first_party.foo): ...
 5 9 | 
 
-TC001_future.py:57:19: TC001 [*] Move application import `.foo` into a type-checking block
+TC001 [*] Move application import `.foo` into a type-checking block
+  --> TC001_future.py:57:19
    |
 56 | def n():
 57 |     from . import foo
-   |                   ^^^ TC001
+   |                   ^^^
 58 |
 59 |     def f(x: Union[foo.Ty, int]): ...
    |
-   = help: Move into type-checking block
+help: Move into type-checking block
 
 ℹ Unsafe fix
    1  |+from __future__ import annotations
