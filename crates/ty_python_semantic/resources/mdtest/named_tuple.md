@@ -304,8 +304,8 @@ satisfy:
 ```py
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
-    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> Self@_make
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> Self@_replace
+    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> NamedTupleLike
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
@@ -325,7 +325,7 @@ class Point(NamedTuple):
     x: int
     y: int
 
-reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Self@_make
+reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
