@@ -13,7 +13,7 @@ values() methods are not supported.
 import sys
 from _typeshed import ReadOnlyBuffer, StrOrBytesPath
 from types import TracebackType
-from typing import TypeVar, overload
+from typing import TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 if sys.platform != "win32":
@@ -25,6 +25,7 @@ if sys.platform != "win32":
 
     class error(OSError): ...
     # Actual typename gdbm, not exposed by the implementation
+    @type_check_only
     class _gdbm:
         def firstkey(self) -> bytes | None: ...
         def nextkey(self, key: _KeyType) -> bytes | None: ...

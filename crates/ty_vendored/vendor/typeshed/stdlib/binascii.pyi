@@ -2,7 +2,7 @@
 
 import sys
 from _typeshed import ReadableBuffer
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, deprecated
 
 # Many functions in binascii accept buffer objects
 # or ASCII-only strings.
@@ -42,15 +42,19 @@ def b2a_qp(data: ReadableBuffer, quotetabs: bool = False, istext: bool = True, h
     """
 
 if sys.version_info < (3, 11):
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def a2b_hqx(data: _AsciiBuffer, /) -> bytes:
         """Decode .hqx coding."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def rledecode_hqx(data: ReadableBuffer, /) -> bytes:
         """Decode hexbin RLE-coded string."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def rlecode_hqx(data: ReadableBuffer, /) -> bytes:
         """Binhex RLE-code binary data."""
 
+    @deprecated("Deprecated since Python 3.9; removed in Python 3.11.")
     def b2a_hqx(data: ReadableBuffer, /) -> bytes:
         """Encode .hqx data."""
 

@@ -47,7 +47,7 @@ use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex};
+use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
@@ -400,16 +400,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Any lazy snapshots of places that have been reassigned or modified are no longer valid, so delete them.
+    /// Any lazy snapshots of places that have been reassigned are no longer valid, so delete them.
     fn sweep_lazy_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        // Retain only snapshots that are either eager
+        //     || (enclosing_scope != popped_scope && popped_scope is not a visible ancestor of enclosing_scope)
+        //     || enclosing_place is not a symbol or not reassigned
+        // <=> remove those that are lazy
+        //     && (enclosing_scope == popped_scope || popped_scope is a visible ancestor of enclosing_scope)
+        //     && enclosing_place is a symbol and reassigned
         self.enclosing_snapshots.retain(|key, _| {
-            let place_table = &self.place_tables[key.enclosing_scope];
+            let popped_place_table = &self.place_tables[popped_scope_id];
             key.nested_laziness.is_eager()
-                || key.enclosing_scope != popped_scope_id
-                || !key
-                    .enclosing_place
-                    .as_symbol()
-                    .is_some_and(|symbol_id| place_table.symbol(symbol_id).is_reassigned())
+                || (key.enclosing_scope != popped_scope_id
+                    && VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
+                        .all(|(ancestor, _)| ancestor != popped_scope_id))
+                || !key.enclosing_place.as_symbol().is_some_and(|symbol_id| {
+                    let name = &self.place_tables[key.enclosing_scope]
+                        .symbol(symbol_id)
+                        .name();
+                    popped_place_table.symbol_id(name).is_some_and(|symbol_id| {
+                        popped_place_table.symbol(symbol_id).is_reassigned()
+                    })
+                })
         });
     }
 

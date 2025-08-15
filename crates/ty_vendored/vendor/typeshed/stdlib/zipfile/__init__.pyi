@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable, Iterator
 from io import TextIOWrapper
 from os import PathLike
 from types import TracebackType
-from typing import IO, Final, Literal, Protocol, overload
+from typing import IO, Final, Literal, Protocol, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -51,6 +51,7 @@ class LargeZipFile(Exception):
     and those extensions are disabled.
     """
 
+@type_check_only
 class _ZipStream(Protocol):
     def read(self, n: int, /) -> bytes: ...
     # The following methods are optional:
@@ -59,11 +60,13 @@ class _ZipStream(Protocol):
     # def seek(self, n: int, /) -> object: ...
 
 # Stream shape as required by _EndRecData() and _EndRecData64().
+@type_check_only
 class _SupportsReadSeekTell(Protocol):
     def read(self, n: int = ..., /) -> bytes: ...
     def seek(self, cookie: int, whence: int, /) -> object: ...
     def tell(self) -> int: ...
 
+@type_check_only
 class _ClosableZipStream(_ZipStream, Protocol):
     def close(self) -> object: ...
 
@@ -120,18 +123,23 @@ class ZipExtFile(io.BufferedIOBase):
 
     def seek(self, offset: int, whence: int = 0) -> int: ...
 
+@type_check_only
 class _Writer(Protocol):
     def write(self, s: str, /) -> object: ...
 
+@type_check_only
 class _ZipReadable(Protocol):
     def seek(self, offset: int, whence: int = 0, /) -> int: ...
     def read(self, n: int = -1, /) -> bytes: ...
 
+@type_check_only
 class _ZipTellable(Protocol):
     def tell(self) -> int: ...
 
+@type_check_only
 class _ZipReadableTellable(_ZipReadable, _ZipTellable, Protocol): ...
 
+@type_check_only
 class _ZipWritable(Protocol):
     def flush(self) -> None: ...
     def close(self) -> None: ...

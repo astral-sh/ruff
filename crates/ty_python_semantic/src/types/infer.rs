@@ -64,7 +64,7 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::resolve_module;
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -3034,20 +3034,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class_ty = Type::from(ClassLiteral::new(
-            self.db(),
-            name.id.clone(),
-            body_scope,
-            maybe_known_class,
-            deprecated,
-            dataclass_params,
-            dataclass_transformer_params,
-        ));
+        let ty = if maybe_known_class.is_none()
+            && &name.id == "NamedTuple"
+            && matches!(
+                file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
+                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+            ) {
+            Type::SpecialForm(SpecialFormType::NamedTuple)
+        } else {
+            Type::from(ClassLiteral::new(
+                self.db(),
+                name.id.clone(),
+                body_scope,
+                maybe_known_class,
+                deprecated,
+                dataclass_params,
+                dataclass_transformer_params,
+            ))
+        };
 
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(class_ty),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -6207,7 +6216,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Property
                         | KnownClass::Super
                         | KnownClass::TypeVar
-                        | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
@@ -10804,7 +10812,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Tuple => {
                 Type::tuple(self.infer_tuple_type_expression(arguments_slice))
             }
-            SpecialFormType::Generic | SpecialFormType::Protocol => {
+            SpecialFormType::Generic | SpecialFormType::Protocol | SpecialFormType::NamedTuple => {
                 self.infer_expression(arguments_slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(

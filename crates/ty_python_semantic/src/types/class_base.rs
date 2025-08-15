@@ -80,18 +80,6 @@ impl<'db> ClassBase<'db> {
             Type::ClassLiteral(literal) => {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
-                } else if literal.is_known(db, KnownClass::NamedTuple) {
-                    let fields = subclass.own_fields(db, None);
-                    Self::try_from_type(
-                        db,
-                        TupleType::heterogeneous(
-                            db,
-                            fields.values().map(|field| field.declared_ty),
-                        )?
-                        .to_class_type(db)
-                        .into(),
-                        subclass,
-                    )
                 } else {
                     Some(Self::Class(literal.default_specialization(db)))
                 }
@@ -215,6 +203,20 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
+
+                SpecialFormType::NamedTuple => {
+                    let fields = subclass.own_fields(db, None);
+                    Self::try_from_type(
+                        db,
+                        TupleType::heterogeneous(
+                            db,
+                            fields.values().map(|field| field.declared_ty),
+                        )?
+                        .to_class_type(db)
+                        .into(),
+                        subclass,
+                    )
+                }
 
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 SpecialFormType::Dict => {

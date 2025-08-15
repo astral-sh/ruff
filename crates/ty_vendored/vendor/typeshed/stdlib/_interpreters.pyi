@@ -123,8 +123,8 @@ def exec(
 def call(
     id: SupportsIndex,
     callable: Callable[..., _R],
-    args: tuple[object, ...] | None = None,
-    kwargs: dict[str, object] | None = None,
+    args: tuple[Any, ...] | None = None,
+    kwargs: dict[str, Any] | None = None,
     *,
     restrict: bool = False,
 ) -> tuple[_R, types.SimpleNamespace]:
