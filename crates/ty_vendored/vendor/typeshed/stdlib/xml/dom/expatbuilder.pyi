@@ -3,6 +3,7 @@ from a string or file.
 
 This avoids all the overhead of SAX and pulldom to gain performance.
 """
+
 from _typeshed import ReadableBuffer, SupportsRead
 from typing import Any, NoReturn
 from typing_extensions import TypeAlias
@@ -33,30 +34,32 @@ class ElementInfo:
 
 class ExpatBuilder:
     """Document builder that uses Expat to build a ParsedXML.DOM document
-instance.
-"""
+    instance.
+    """
+
     document: Document  # Created in self.reset()
     curNode: DocumentFragment | Element | Document  # Created in self.reset()
     def __init__(self, options: Options | None = None) -> None: ...
     def createParser(self) -> XMLParserType:
-        """Create a new parser object.
-"""
+        """Create a new parser object."""
+
     def getParser(self) -> XMLParserType:
-        """Return the parser object, creating a new one if needed.
-"""
+        """Return the parser object, creating a new one if needed."""
+
     def reset(self) -> None:
-        """Free all data structures used during DOM construction.
-"""
+        """Free all data structures used during DOM construction."""
+
     def install(self, parser: XMLParserType) -> None:
-        """Install the callbacks needed to build the DOM into the parser.
-"""
+        """Install the callbacks needed to build the DOM into the parser."""
+
     def parseFile(self, file: SupportsRead[ReadableBuffer | str]) -> Document:
         """Parse a document from a file object, returning the document
-node.
-"""
+        node.
+        """
+
     def parseString(self, string: str | ReadableBuffer) -> Document:
-        """Parse a document from a string, returning the document node.
-"""
+        """Parse a document from a string, returning the document node."""
+
     def start_doctype_decl_handler(
         self, doctypeName: str, systemId: str | None, publicId: str | None, has_internal_subset: bool
     ) -> None: ...
@@ -88,8 +91,9 @@ node.
 
 class FilterVisibilityController:
     """Wrapper around a DOMBuilderFilter which implements the checks
-to make the whatToShow filter attribute work.
-"""
+    to make the whatToShow filter attribute work.
+    """
+
     filter: DOMBuilderFilter
     def __init__(self, filter: DOMBuilderFilter) -> None: ...
     def startContainer(self, node: Node) -> int: ...
@@ -108,12 +112,13 @@ class Skipper(FilterCrutch):
 
 class FragmentBuilder(ExpatBuilder):
     """Builder which constructs document fragments given XML source
-text and a context node.
+    text and a context node.
 
-The context node is expected to provide information about the
-namespace declarations which are in scope at the start of the
-fragment.
-"""
+    The context node is expected to provide information about the
+    namespace declarations which are in scope at the start of the
+    fragment.
+    """
+
     fragment: DocumentFragment | None
     originalDocument: Document
     context: Node
@@ -121,46 +126,47 @@ fragment.
     def reset(self) -> None: ...
     def parseFile(self, file: SupportsRead[ReadableBuffer | str]) -> DocumentFragment:  # type: ignore[override]
         """Parse a document fragment from a file object, returning the
-fragment node.
-"""
+        fragment node.
+        """
+
     def parseString(self, string: ReadableBuffer | str) -> DocumentFragment:  # type: ignore[override]
         """Parse a document fragment from a string, returning the
-fragment node.
-"""
+        fragment node.
+        """
+
     def external_entity_ref_handler(self, context: str, base: str | None, systemId: str | None, publicId: str | None) -> int: ...
 
 class Namespaces:
-    """Mix-in class for builders; adds support for namespaces.
-"""
+    """Mix-in class for builders; adds support for namespaces."""
+
     def createParser(self) -> XMLParserType:
-        """Create a new namespace-handling parser.
-"""
+        """Create a new namespace-handling parser."""
+
     def install(self, parser: XMLParserType) -> None:
-        """Insert the namespace-handlers onto the parser.
-"""
+        """Insert the namespace-handlers onto the parser."""
+
     def start_namespace_decl_handler(self, prefix: str | None, uri: str) -> None:
-        """Push this namespace declaration on our storage.
-"""
+        """Push this namespace declaration on our storage."""
+
     def start_element_handler(self, name: str, attributes: list[str]) -> None: ...
     def end_element_handler(self, name: str) -> None: ...  # only exists if __debug__
 
 class ExpatBuilderNS(Namespaces, ExpatBuilder):
-    """Document builder that supports namespaces.
-"""
+    """Document builder that supports namespaces."""
+
 class FragmentBuilderNS(Namespaces, FragmentBuilder):
-    """Fragment builder that supports namespaces.
-"""
+    """Fragment builder that supports namespaces."""
+
 class ParseEscape(Exception):
-    """Exception raised to short-circuit parsing in InternalSubsetExtractor.
-"""
+    """Exception raised to short-circuit parsing in InternalSubsetExtractor."""
 
 class InternalSubsetExtractor(ExpatBuilder):
-    """XML processor which can rip out the internal document type subset.
-"""
+    """XML processor which can rip out the internal document type subset."""
+
     subset: str | list[str] | None = None
     def getSubset(self) -> str:
-        """Return the internal subset as a string.
-"""
+        """Return the internal subset as a string."""
+
     def parseFile(self, file: SupportsRead[ReadableBuffer | str]) -> None: ...  # type: ignore[override]
     def parseString(self, string: str | ReadableBuffer) -> None: ...  # type: ignore[override]
     def start_doctype_decl_handler(  # type: ignore[override]
@@ -172,24 +178,27 @@ class InternalSubsetExtractor(ExpatBuilder):
 def parse(file: str | SupportsRead[ReadableBuffer | str], namespaces: bool = True) -> Document:
     """Parse a document, returning the resulting Document node.
 
-'file' may be either a file name or an open file object.
-"""
+    'file' may be either a file name or an open file object.
+    """
+
 def parseString(string: str | ReadableBuffer, namespaces: bool = True) -> Document:
     """Parse a document from a string, returning the resulting
-Document node.
-"""
+    Document node.
+    """
+
 def parseFragment(file: str | SupportsRead[ReadableBuffer | str], context: Node, namespaces: bool = True) -> DocumentFragment:
     """Parse a fragment of a document, given the context from which it
-was originally extracted.  context should be the parent of the
-node(s) which are in the fragment.
+    was originally extracted.  context should be the parent of the
+    node(s) which are in the fragment.
 
-'file' may be either a file name or an open file object.
-"""
+    'file' may be either a file name or an open file object.
+    """
+
 def parseFragmentString(string: str | ReadableBuffer, context: Node, namespaces: bool = True) -> DocumentFragment:
     """Parse a fragment of a document from a string, given the context
-from which it was originally extracted.  context should be the
-parent of the node(s) which are in the fragment.
-"""
+    from which it was originally extracted.  context should be the
+    parent of the node(s) which are in the fragment.
+    """
+
 def makeBuilder(options: Options) -> ExpatBuilderNS | ExpatBuilder:
-    """Create a builder based on an Options object.
-"""
+    """Create a builder based on an Options object."""

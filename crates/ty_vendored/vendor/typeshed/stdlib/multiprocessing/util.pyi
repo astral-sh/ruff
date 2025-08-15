@@ -50,12 +50,14 @@ if sys.version_info >= (3, 14):
 def sub_warning(msg: object, *args: object) -> None: ...
 def get_logger() -> Logger:
     """
-Returns logger used by multiprocessing
-"""
+    Returns logger used by multiprocessing
+    """
+
 def log_to_stderr(level: _LoggingLevel | None = None) -> Logger:
     """
-Turn on logging and add a handler which prints to stderr
-"""
+    Turn on logging and add a handler which prints to stderr
+    """
+
 def is_abstract_socket_namespace(address: str | bytes | None) -> bool: ...
 
 abstract_sockets_supported: bool
@@ -65,8 +67,9 @@ def register_after_fork(obj: _T, func: Callable[[_T], object]) -> None: ...
 
 class Finalize(Generic[_R_co]):
     """
-Class which supports object finalization using weakrefs
-"""
+    Class which supports object finalization using weakrefs
+    """
+
     # "args" and "kwargs" are passed as arguments to "callback".
     @overload
     def __init__(
@@ -99,21 +102,23 @@ Class which supports object finalization using weakrefs
         getpid: Callable[[], int] = ...,
     ) -> _R_co:
         """
-Run the callback unless it has already been called or cancelled
-"""
+        Run the callback unless it has already been called or cancelled
+        """
+
     def cancel(self) -> None:
         """
-Cancel finalization of the object
-"""
+        Cancel finalization of the object
+        """
+
     def still_active(self) -> bool:
         """
-Return whether this finalizer is still waiting to invoke callback
-"""
+        Return whether this finalizer is still waiting to invoke callback
+        """
 
 def is_exiting() -> bool:
     """
-Returns true if the process is shutting down
-"""
+    Returns true if the process is shutting down
+    """
 
 class ForkAwareThreadLock:
     acquire: Callable[[bool, float], bool]

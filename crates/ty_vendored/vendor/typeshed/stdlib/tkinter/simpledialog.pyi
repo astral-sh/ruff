@@ -12,48 +12,54 @@ askfloat -- get a float from the user
 
 askstring -- get a string from the user
 """
+
 from tkinter import Event, Frame, Misc, Toplevel
 
 class Dialog(Toplevel):
     """Class to open dialogs.
 
-This class is intended as a base class for custom dialogs
-"""
+    This class is intended as a base class for custom dialogs
+    """
+
     def __init__(self, parent: Misc | None, title: str | None = None) -> None:
         """Initialize a dialog.
 
-Arguments:
+        Arguments:
 
-    parent -- a parent window (the application window)
+            parent -- a parent window (the application window)
 
-    title -- the dialog title
-"""
+            title -- the dialog title
+        """
+
     def body(self, master: Frame) -> Misc | None:
         """create dialog body.
 
-return widget that should have initial focus.
-This method should be overridden, and is called
-by the __init__ method.
-"""
+        return widget that should have initial focus.
+        This method should be overridden, and is called
+        by the __init__ method.
+        """
+
     def buttonbox(self) -> None:
         """add standard button box.
 
-override if you do not want the standard buttons
-"""
+        override if you do not want the standard buttons
+        """
+
     def ok(self, event: Event[Misc] | None = None) -> None: ...
     def cancel(self, event: Event[Misc] | None = None) -> None: ...
     def validate(self) -> bool:
         """validate the data
 
-This method is called automatically to validate the data before the
-dialog is destroyed. By default, it always validates OK.
-"""
+        This method is called automatically to validate the data before the
+        dialog is destroyed. By default, it always validates OK.
+        """
+
     def apply(self) -> None:
         """process the data
 
-This method is called automatically to process the data, *after*
-the dialog is destroyed. By default, it does nothing.
-"""
+        This method is called automatically to process the data, *after*
+        the dialog is destroyed. By default, it does nothing.
+        """
 
 class SimpleDialog:
     def __init__(
@@ -82,14 +88,15 @@ def askfloat(
 ) -> float | None:
     """get a float from the user
 
-Arguments:
+    Arguments:
 
-    title -- the dialog title
-    prompt -- the label text
-    **kw -- see SimpleDialog class
+        title -- the dialog title
+        prompt -- the label text
+        **kw -- see SimpleDialog class
 
-Return value is a float
-"""
+    Return value is a float
+    """
+
 def askinteger(
     title: str | None,
     prompt: str,
@@ -101,14 +108,15 @@ def askinteger(
 ) -> int | None:
     """get an integer from the user
 
-Arguments:
+    Arguments:
 
-    title -- the dialog title
-    prompt -- the label text
-    **kw -- see SimpleDialog class
+        title -- the dialog title
+        prompt -- the label text
+        **kw -- see SimpleDialog class
 
-Return value is an integer
-"""
+    Return value is an integer
+    """
+
 def askstring(
     title: str | None,
     prompt: str,
@@ -120,11 +128,11 @@ def askstring(
 ) -> str | None:
     """get a string from the user
 
-Arguments:
+    Arguments:
 
-    title -- the dialog title
-    prompt -- the label text
-    **kw -- see SimpleDialog class
+        title -- the dialog title
+        prompt -- the label text
+        **kw -- see SimpleDialog class
 
-Return value is a string
-"""
+    Return value is a string
+    """

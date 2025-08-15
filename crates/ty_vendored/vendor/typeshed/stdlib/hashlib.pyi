@@ -48,6 +48,7 @@ More condensed:
     'a4337bc45a8fc544c03f52dc550cd6e1e87021bc896588bd79e901e2'
 
 """
+
 import sys
 from _blake2 import blake2b as blake2b, blake2s as blake2s
 from _hashlib import (
@@ -118,8 +119,8 @@ else:
 
 def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = ...) -> HASH:
     """new(name, data=b'') - Return a new hashing object using the named algorithm;
-optionally initialized with data (which must be a bytes-like object).
-"""
+    optionally initialized with data (which must be a bytes-like object).
+    """
 
 algorithms_guaranteed: AbstractSet[str]
 algorithms_available: AbstractSet[str]
@@ -139,14 +140,14 @@ if sys.version_info >= (3, 11):
     ) -> HASH:
         """Hash the contents of a file-like object. Returns a digest object.
 
-*fileobj* must be a file-like object opened for reading in binary mode.
-It accepts file objects from open(), io.BytesIO(), and SocketIO objects.
-The function may bypass Python's I/O and use the file descriptor *fileno*
-directly.
+        *fileobj* must be a file-like object opened for reading in binary mode.
+        It accepts file objects from open(), io.BytesIO(), and SocketIO objects.
+        The function may bypass Python's I/O and use the file descriptor *fileno*
+        directly.
 
-*digest* must either be a hash algorithm name as a *str*, a hash
-constructor, or a callable that returns a hash object.
-"""
+        *digest* must either be a hash algorithm name as a *str*, a hash
+        constructor, or a callable that returns a hash object.
+        """
 
 # Legacy typing-only alias
 _Hash = HASH

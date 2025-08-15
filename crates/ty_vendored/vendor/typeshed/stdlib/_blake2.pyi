@@ -1,5 +1,5 @@
-"""_blake2b provides BLAKE2b for hashlib
-"""
+"""_blake2b provides BLAKE2b for hashlib"""
+
 from _typeshed import ReadableBuffer
 from typing import ClassVar, final
 from typing_extensions import Self
@@ -15,8 +15,8 @@ BLAKE2S_SALT_SIZE: int = 8
 
 @final
 class blake2b:
-    """Return a new BLAKE2b hash object.
-"""
+    """Return a new BLAKE2b hash object."""
+
     MAX_DIGEST_SIZE: ClassVar[int] = 64
     MAX_KEY_SIZE: ClassVar[int] = 64
     PERSON_SIZE: ClassVar[int] = 16
@@ -43,22 +43,21 @@ class blake2b:
         usedforsecurity: bool = True,
     ) -> Self: ...
     def copy(self) -> Self:
-        """Return a copy of the hash object.
-"""
+        """Return a copy of the hash object."""
+
     def digest(self) -> bytes:
-        """Return the digest value as a bytes object.
-"""
+        """Return the digest value as a bytes object."""
+
     def hexdigest(self) -> str:
-        """Return the digest value as a string of hexadecimal digits.
-"""
+        """Return the digest value as a string of hexadecimal digits."""
+
     def update(self, data: ReadableBuffer, /) -> None:
-        """Update this hash object's state with the provided bytes-like object.
-"""
+        """Update this hash object's state with the provided bytes-like object."""
 
 @final
 class blake2s:
-    """Return a new BLAKE2s hash object.
-"""
+    """Return a new BLAKE2s hash object."""
+
     MAX_DIGEST_SIZE: ClassVar[int] = 32
     MAX_KEY_SIZE: ClassVar[int] = 32
     PERSON_SIZE: ClassVar[int] = 8
@@ -85,14 +84,13 @@ class blake2s:
         usedforsecurity: bool = True,
     ) -> Self: ...
     def copy(self) -> Self:
-        """Return a copy of the hash object.
-"""
+        """Return a copy of the hash object."""
+
     def digest(self) -> bytes:
-        """Return the digest value as a bytes object.
-"""
+        """Return the digest value as a bytes object."""
+
     def hexdigest(self) -> str:
-        """Return the digest value as a string of hexadecimal digits.
-"""
+        """Return the digest value as a string of hexadecimal digits."""
+
     def update(self, data: ReadableBuffer, /) -> None:
-        """Update this hash object's state with the provided bytes-like object.
-"""
+        """Update this hash object's state with the provided bytes-like object."""

@@ -9,6 +9,7 @@ production use.
 For example usage, see the 'if __name__=="__main__"' block at the end of the
 module.  See also the BaseHTTPServer module docs for other API information.
 """
+
 from _typeshed.wsgi import ErrorStream, StartResponse, WSGIApplication, WSGIEnvironment
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TypeVar, overload
@@ -25,8 +26,8 @@ class ServerHandler(SimpleHandler):  # undocumented
     server_software: str
 
 class WSGIServer(HTTPServer):
-    """BaseHTTPServer that implements the Python WSGI protocol
-"""
+    """BaseHTTPServer that implements the Python WSGI protocol"""
+
     application: WSGIApplication | None
     base_environ: WSGIEnvironment  # only available after call to setup_environ()
     def setup_environ(self) -> None: ...
@@ -44,8 +45,8 @@ _S = TypeVar("_S", bound=WSGIServer)
 
 @overload
 def make_server(host: str, port: int, app: WSGIApplication, *, handler_class: type[WSGIRequestHandler] = ...) -> WSGIServer:
-    """Create a new WSGI server listening on `host` and `port` for `app`
-"""
+    """Create a new WSGI server listening on `host` and `port` for `app`"""
+
 @overload
 def make_server(
     host: str, port: int, app: WSGIApplication, server_class: type[_S], handler_class: type[WSGIRequestHandler] = ...

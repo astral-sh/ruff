@@ -46,6 +46,7 @@ attribute on _Future instances.  These values must match the appropriate
 
 No feature line is ever to be deleted from this file.
 """
+
 from typing_extensions import TypeAlias
 
 _VersionInfo: TypeAlias = tuple[int, int, int, str, int]
@@ -55,14 +56,15 @@ class _Feature:
     def getOptionalRelease(self) -> _VersionInfo:
         """Return first release in which this feature was recognized.
 
-This is a 5-tuple, of the same form as sys.version_info.
-"""
+        This is a 5-tuple, of the same form as sys.version_info.
+        """
+
     def getMandatoryRelease(self) -> _VersionInfo | None:
         """Return release in which this feature will become mandatory.
 
-This is a 5-tuple, of the same form as sys.version_info, or, if
-the feature was dropped, or the release date is undetermined, is None.
-"""
+        This is a 5-tuple, of the same form as sys.version_info, or, if
+        the feature was dropped, or the release date is undetermined, is None.
+        """
     compiler_flag: int
 
 absolute_import: _Feature

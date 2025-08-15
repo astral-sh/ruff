@@ -28,6 +28,7 @@ permutations(p[, r])
 combinations(p, r)
 combinations_with_replacement(p, r)
 """
+
 import sys
 from _typeshed import MaybeNone
 from collections.abc import Callable, Iterable, Iterator
@@ -60,13 +61,14 @@ _Predicate: TypeAlias = Callable[[_T], object]
 class count(Generic[_N]):
     """Return a count object whose .__next__() method returns consecutive values.
 
-Equivalent to:
-    def count(firstval=0, step=1):
-        x = firstval
-        while 1:
-            yield x
-            x += step
-"""
+    Equivalent to:
+        def count(firstval=0, step=1):
+            x = firstval
+            while 1:
+                yield x
+                x += step
+    """
+
     @overload
     def __new__(cls) -> count[int]: ...
     @overload
@@ -74,194 +76,189 @@ Equivalent to:
     @overload
     def __new__(cls, *, step: _N) -> count[_N]: ...
     def __next__(self) -> _N:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
+
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
 
 class cycle(Generic[_T]):
-    """Return elements from the iterable until it is exhausted. Then repeat the sequence indefinitely.
-"""
+    """Return elements from the iterable until it is exhausted. Then repeat the sequence indefinitely."""
+
     def __new__(cls, iterable: Iterable[_T], /) -> Self: ...
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
+
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
 
 class repeat(Generic[_T]):
     """repeat(object [,times]) -> create an iterator which returns the object
-for the specified number of times.  If not specified, returns the object
-endlessly.
-"""
+    for the specified number of times.  If not specified, returns the object
+    endlessly.
+    """
+
     @overload
     def __new__(cls, object: _T) -> Self: ...
     @overload
     def __new__(cls, object: _T, times: int) -> Self: ...
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
+
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __length_hint__(self) -> int:
-        """Private method returning an estimate of len(list(it)).
-"""
+        """Private method returning an estimate of len(list(it))."""
 
 class accumulate(Generic[_T]):
-    """Return series of accumulated sums (or other binary function results).
-"""
+    """Return series of accumulated sums (or other binary function results)."""
+
     @overload
     def __new__(cls, iterable: Iterable[_T], func: None = None, *, initial: _T | None = ...) -> Self: ...
     @overload
     def __new__(cls, iterable: Iterable[_S], func: Callable[[_T, _S], _T], *, initial: _T | None = ...) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class chain(Generic[_T]):
     """Return a chain object whose .__next__() method returns elements from the
-first iterable until it is exhausted, then elements from the next
-iterable, until all of the iterables are exhausted.
-"""
+    first iterable until it is exhausted, then elements from the next
+    iterable, until all of the iterables are exhausted.
+    """
+
     def __new__(cls, *iterables: Iterable[_T]) -> Self: ...
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
+
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     @classmethod
     # We use type[Any] and not type[_S] to not lose the type inference from __iterable
     def from_iterable(cls: type[Any], iterable: Iterable[Iterable[_S]], /) -> chain[_S]:
-        """Alternative chain() constructor taking a single iterable argument that evaluates lazily.
-"""
+        """Alternative chain() constructor taking a single iterable argument that evaluates lazily."""
+
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
-        """See PEP 585
-"""
+        """See PEP 585"""
 
 class compress(Generic[_T]):
     """Return data elements corresponding to true selector elements.
 
-Forms a shorter iterator from selected data elements using the selectors to
-choose the data elements.
-"""
+    Forms a shorter iterator from selected data elements using the selectors to
+    choose the data elements.
+    """
+
     def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class dropwhile(Generic[_T]):
     """Drop items from the iterable while predicate(item) is true.
 
-Afterwards, return every element until the iterable is exhausted.
-"""
+    Afterwards, return every element until the iterable is exhausted.
+    """
+
     def __new__(cls, predicate: _Predicate[_T], iterable: Iterable[_T], /) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class filterfalse(Generic[_T]):
     """Return those items of iterable for which function(item) is false.
 
-If function is None, return the items that are false.
-"""
+    If function is None, return the items that are false.
+    """
+
     def __new__(cls, function: _Predicate[_T] | None, iterable: Iterable[_T], /) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class groupby(Generic[_T_co, _S_co]):
     """make an iterator that returns consecutive keys and groups from the iterable
 
-  iterable
-    Elements to divide into groups according to the key function.
-  key
-    A function for computing the group category for each element.
-    If the key function is not specified or is None, the element itself
-    is used for grouping.
-"""
+    iterable
+      Elements to divide into groups according to the key function.
+    key
+      A function for computing the group category for each element.
+      If the key function is not specified or is None, the element itself
+      is used for grouping.
+    """
+
     @overload
     def __new__(cls, iterable: Iterable[_T1], key: None = None) -> groupby[_T1, _T1]: ...
     @overload
     def __new__(cls, iterable: Iterable[_T1], key: Callable[[_T1], _T2]) -> groupby[_T2, _T1]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> tuple[_T_co, Iterator[_S_co]]:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class islice(Generic[_T]):
     """islice(iterable, stop) --> islice object
-islice(iterable, start, stop[, step]) --> islice object
+    islice(iterable, start, stop[, step]) --> islice object
 
-Return an iterator whose next() method returns selected values from an
-iterable.  If start is specified, will skip all preceding elements;
-otherwise, start defaults to zero.  Step defaults to one.  If
-specified as another value, step determines how many values are
-skipped between successive calls.  Works like a slice() on a list
-but returns an iterator.
-"""
+    Return an iterator whose next() method returns selected values from an
+    iterable.  If start is specified, will skip all preceding elements;
+    otherwise, start defaults to zero.  Step defaults to one.  If
+    specified as another value, step determines how many values are
+    skipped between successive calls.  Works like a slice() on a list
+    but returns an iterator.
+    """
+
     @overload
     def __new__(cls, iterable: Iterable[_T], stop: int | None, /) -> Self: ...
     @overload
     def __new__(cls, iterable: Iterable[_T], start: int | None, stop: int | None, step: int | None = ..., /) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class starmap(Generic[_T_co]):
-    """Return an iterator whose values are returned from the function evaluated with an argument tuple taken from the given sequence.
-"""
+    """Return an iterator whose values are returned from the function evaluated with an argument tuple taken from the given sequence."""
+
     def __new__(cls, function: Callable[..., _T], iterable: Iterable[Iterable[Any]], /) -> starmap[_T]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class takewhile(Generic[_T]):
-    """Return successive entries from an iterable as long as the predicate evaluates to true for each entry.
-"""
+    """Return successive entries from an iterable as long as the predicate evaluates to true for each entry."""
+
     def __new__(cls, predicate: _Predicate[_T], iterable: Iterable[_T], /) -> Self: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 def tee(iterable: Iterable[_T], n: int = 2, /) -> tuple[Iterator[_T], ...]:
-    """Returns a tuple of n independent iterators.
-"""
+    """Returns a tuple of n independent iterators."""
 
 class zip_longest(Generic[_T_co]):
     """Return a zip_longest object whose .__next__() method returns a tuple where
-the i-th element comes from the i-th iterable argument.  The .__next__()
-method continues until the longest iterable in the argument sequence
-is exhausted and then it raises StopIteration.  When the shorter iterables
-are exhausted, the fillvalue is substituted in their place.  The fillvalue
-defaults to None or can be specified by a keyword argument.
-"""
+    the i-th element comes from the i-th iterable argument.  The .__next__()
+    method continues until the longest iterable in the argument sequence
+    is exhausted and then it raises StopIteration.  When the shorter iterables
+    are exhausted, the fillvalue is substituted in their place.  The fillvalue
+    defaults to None or can be specified by a keyword argument.
+    """
+
     # one iterable (fillvalue doesn't matter)
     @overload
     def __new__(cls, iter1: Iterable[_T1], /, *, fillvalue: object = ...) -> zip_longest[tuple[_T1]]: ...
@@ -337,27 +334,27 @@ defaults to None or can be specified by a keyword argument.
         fillvalue: _T,
     ) -> zip_longest[tuple[_T, ...]]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class product(Generic[_T_co]):
     """Cartesian product of input iterables.  Equivalent to nested for-loops.
 
-For example, product(A, B) returns the same as:  ((x,y) for x in A for y in B).
-The leftmost iterators are in the outermost for-loop, so the output tuples
-cycle in a manner similar to an odometer (with the rightmost element changing
-on every iteration).
+    For example, product(A, B) returns the same as:  ((x,y) for x in A for y in B).
+    The leftmost iterators are in the outermost for-loop, so the output tuples
+    cycle in a manner similar to an odometer (with the rightmost element changing
+    on every iteration).
 
-To compute the product of an iterable with itself, specify the number
-of repetitions with the optional repeat keyword argument. For example,
-product(A, repeat=4) means the same as product(A, A, A, A).
+    To compute the product of an iterable with itself, specify the number
+    of repetitions with the optional repeat keyword argument. For example,
+    product(A, repeat=4) means the same as product(A, A, A, A).
 
-product('ab', range(3)) --> ('a',0) ('a',1) ('a',2) ('b',0) ('b',1) ('b',2)
-product((0,1), (0,1), (0,1)) --> (0,0,0) (0,0,1) (0,1,0) (0,1,1) (1,0,0) ...
-"""
+    product('ab', range(3)) --> ('a',0) ('a',1) ('a',2) ('b',0) ('b',1) ('b',2)
+    product((0,1), (0,1), (0,1)) --> (0,0,0) (0,0,1) (0,1,0) (0,1,1) (1,0,0) ...
+    """
+
     @overload
     def __new__(cls, iter1: Iterable[_T1], /) -> product[tuple[_T1]]: ...
     @overload
@@ -440,17 +437,17 @@ product((0,1), (0,1), (0,1)) --> (0,0,0) (0,0,1) (0,1,0) (0,1,1) (1,0,0) ...
     @overload
     def __new__(cls, *iterables: Iterable[_T1], repeat: int = 1) -> product[tuple[_T1, ...]]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class permutations(Generic[_T_co]):
     """Return successive r-length permutations of elements in the iterable.
 
-permutations(range(3), 2) --> (0,1), (0,2), (1,0), (1,2), (2,0), (2,1)
-"""
+    permutations(range(3), 2) --> (0,1), (0,2), (1,0), (1,2), (2,0), (2,1)
+    """
+
     @overload
     def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> permutations[tuple[_T, _T]]: ...
     @overload
@@ -462,17 +459,17 @@ permutations(range(3), 2) --> (0,1), (0,2), (1,0), (1,2), (2,0), (2,1)
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int | None = ...) -> permutations[tuple[_T, ...]]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class combinations(Generic[_T_co]):
     """Return successive r-length combinations of elements in the iterable.
 
-combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)
-"""
+    combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)
+    """
+
     @overload
     def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> combinations[tuple[_T, _T]]: ...
     @overload
@@ -484,17 +481,17 @@ combinations(range(4), 3) --> (0,1,2), (0,1,3), (0,2,3), (1,2,3)
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int) -> combinations[tuple[_T, ...]]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 class combinations_with_replacement(Generic[_T_co]):
     """Return successive r-length combinations of elements in the iterable allowing individual elements to have successive repeats.
 
-combinations_with_replacement('ABC', 2) --> ('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')
-"""
+    combinations_with_replacement('ABC', 2) --> ('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')
+    """
+
     @overload
     def __new__(cls, iterable: Iterable[_T], r: Literal[2]) -> combinations_with_replacement[tuple[_T, _T]]: ...
     @overload
@@ -506,53 +503,52 @@ combinations_with_replacement('ABC', 2) --> ('A','A'), ('A','B'), ('A','C'), ('B
     @overload
     def __new__(cls, iterable: Iterable[_T], r: int) -> combinations_with_replacement[tuple[_T, ...]]: ...
     def __iter__(self) -> Self:
-        """Implement iter(self).
-"""
+        """Implement iter(self)."""
+
     def __next__(self) -> _T_co:
-        """Implement next(self).
-"""
+        """Implement next(self)."""
 
 if sys.version_info >= (3, 10):
     class pairwise(Generic[_T_co]):
         """Return an iterator of overlapping pairs taken from the input iterator.
 
-    s -> (s0,s1), (s1,s2), (s2, s3), ...
-"""
+        s -> (s0,s1), (s1,s2), (s2, s3), ...
+        """
+
         def __new__(cls, iterable: Iterable[_T], /) -> pairwise[tuple[_T, _T]]: ...
         def __iter__(self) -> Self:
-            """Implement iter(self).
-"""
+            """Implement iter(self)."""
+
         def __next__(self) -> _T_co:
-            """Implement next(self).
-"""
+            """Implement next(self)."""
 
 if sys.version_info >= (3, 12):
     class batched(Generic[_T_co]):
         """Batch data into tuples of length n. The last batch may be shorter than n.
 
-Loops over the input iterable and accumulates data into tuples
-up to size n.  The input is consumed lazily, just enough to
-fill a batch.  The result is yielded as soon as a batch is full
-or when the input iterable is exhausted.
+        Loops over the input iterable and accumulates data into tuples
+        up to size n.  The input is consumed lazily, just enough to
+        fill a batch.  The result is yielded as soon as a batch is full
+        or when the input iterable is exhausted.
 
-    >>> for batch in batched('ABCDEFG', 3):
-    ...     print(batch)
-    ...
-    ('A', 'B', 'C')
-    ('D', 'E', 'F')
-    ('G',)
+            >>> for batch in batched('ABCDEFG', 3):
+            ...     print(batch)
+            ...
+            ('A', 'B', 'C')
+            ('D', 'E', 'F')
+            ('G',)
 
-If "strict" is True, raises a ValueError if the final batch is shorter
-than n.
-"""
+        If "strict" is True, raises a ValueError if the final batch is shorter
+        than n.
+        """
+
         if sys.version_info >= (3, 13):
             def __new__(cls, iterable: Iterable[_T_co], n: int, *, strict: bool = False) -> Self: ...
         else:
             def __new__(cls, iterable: Iterable[_T_co], n: int) -> Self: ...
 
         def __iter__(self) -> Self:
-            """Implement iter(self).
-"""
+            """Implement iter(self)."""
+
         def __next__(self) -> tuple[_T_co, ...]:
-            """Implement next(self).
-"""
+            """Implement next(self)."""

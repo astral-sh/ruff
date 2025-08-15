@@ -1,6 +1,7 @@
 """A library of useful helper classes to the SAX classes, for the
 convenience of application and driver writers.
 """
+
 from _typeshed import SupportsWrite
 from codecs import StreamReaderWriter, StreamWriter
 from collections.abc import Mapping
@@ -11,28 +12,30 @@ from xml.sax import _Source, handler, xmlreader
 def escape(data: str, entities: Mapping[str, str] = {}) -> str:
     """Escape &, <, and > in a string of data.
 
-You can escape other strings of data by passing a dictionary as
-the optional entities parameter.  The keys and values must all be
-strings; each key will be replaced with its corresponding value.
-"""
+    You can escape other strings of data by passing a dictionary as
+    the optional entities parameter.  The keys and values must all be
+    strings; each key will be replaced with its corresponding value.
+    """
+
 def unescape(data: str, entities: Mapping[str, str] = {}) -> str:
     """Unescape &amp;, &lt;, and &gt; in a string of data.
 
-You can unescape other strings of data by passing a dictionary as
-the optional entities parameter.  The keys and values must all be
-strings; each key will be replaced with its corresponding value.
-"""
+    You can unescape other strings of data by passing a dictionary as
+    the optional entities parameter.  The keys and values must all be
+    strings; each key will be replaced with its corresponding value.
+    """
+
 def quoteattr(data: str, entities: Mapping[str, str] = {}) -> str:
     """Escape and quote an attribute value.
 
-Escape &, <, and > in a string of data, then quote it for use as
-an attribute value.  The " character will be escaped as well, if
-necessary.
+    Escape &, <, and > in a string of data, then quote it for use as
+    an attribute value.  The " character will be escaped as well, if
+    necessary.
 
-You can escape other strings of data by passing a dictionary as
-the optional entities parameter.  The keys and values must all be
-strings; each key will be replaced with its corresponding value.
-"""
+    You can escape other strings of data by passing a dictionary as
+    the optional entities parameter.  The keys and values must all be
+    strings; each key will be replaced with its corresponding value.
+    """
 
 class XMLGenerator(handler.ContentHandler):
     def __init__(
@@ -42,8 +45,8 @@ class XMLGenerator(handler.ContentHandler):
         short_empty_elements: bool = False,
     ) -> None: ...
     def _qname(self, name: tuple[str | None, str]) -> str:
-        """Builds a qualified name from a (ns_url, localname) pair
-"""
+        """Builds a qualified name from a (ns_url, localname) pair"""
+
     def startDocument(self) -> None: ...
     def endDocument(self) -> None: ...
     def startPrefixMapping(self, prefix: str | None, uri: str) -> None: ...
@@ -58,12 +61,13 @@ class XMLGenerator(handler.ContentHandler):
 
 class XMLFilterBase(xmlreader.XMLReader):
     """This class is designed to sit between an XMLReader and the
-client application's event handlers.  By default, it does nothing
-but pass requests up to the reader and events on to the handlers
-unmodified, but subclasses can override specific methods to modify
-the event stream or the configuration requests as they pass
-through.
-"""
+    client application's event handlers.  By default, it does nothing
+    but pass requests up to the reader and events on to the handlers
+    unmodified, but subclasses can override specific methods to modify
+    the event stream or the configuration requests as they pass
+    through.
+    """
+
     def __init__(self, parent: xmlreader.XMLReader | None = None) -> None: ...
     # ErrorHandler methods
     def error(self, exception: BaseException) -> NoReturn: ...
@@ -101,5 +105,5 @@ through.
 
 def prepare_input_source(source: xmlreader.InputSource | _Source, base: str = "") -> xmlreader.InputSource:
     """This function takes an InputSource and an optional base URL and
-returns a fully resolved InputSource object ready for reading.
-"""
+    returns a fully resolved InputSource object ready for reading.
+    """

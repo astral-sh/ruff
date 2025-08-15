@@ -6,6 +6,7 @@ even the comments and whitespace between tokens.
 
 There's also a pattern matching implementation here.
 """
+
 from _typeshed import Incomplete, SupportsGetItem, SupportsLenAndGetItem, Unused
 from abc import abstractmethod
 from collections.abc import Iterable, Iterator, MutableSequence
@@ -33,6 +34,7 @@ class Base:
 
     A node may be a subnode of at most one parent.
     """
+
     type: int
     parent: Node | None
     prefix: str
@@ -56,6 +58,7 @@ class Base:
         Nodes should be considered equal if they have the same structure,
         ignoring the prefix string and other context information.
         """
+
     @abstractmethod
     def clone(self) -> Self:
         """
@@ -63,6 +66,7 @@ class Base:
 
         This must be implemented by the concrete subclass.
         """
+
     @abstractmethod
     def post_order(self) -> Iterator[Self]:
         """
@@ -70,6 +74,7 @@ class Base:
 
         This must be implemented by the concrete subclass.
         """
+
     @abstractmethod
     def pre_order(self) -> Iterator[Self]:
         """
@@ -77,30 +82,34 @@ class Base:
 
         This must be implemented by the concrete subclass.
         """
+
     def replace(self, new: _NL | list[_NL]) -> None:
-        """Replace this node with a new one in the parent.
-"""
+        """Replace this node with a new one in the parent."""
+
     def get_lineno(self) -> int:
-        """Return the line number which generated the invocant node.
-"""
+        """Return the line number which generated the invocant node."""
+
     def changed(self) -> None: ...
     def remove(self) -> int | None:
         """
         Remove the node from the tree. Returns the position of the node in its
         parent's children before it was removed.
         """
+
     @property
     def next_sibling(self) -> _NL | None:
         """
         The node immediately following the invocant in their parent's children
         list. If the invocant does not have a next sibling, it is None
         """
+
     @property
     def prev_sibling(self) -> _NL | None:
         """
         The node immediately preceding the invocant in their parent's children
         list. If the invocant does not have a previous sibling, it is None.
         """
+
     def leaves(self) -> Iterator[Leaf]: ...
     def depth(self) -> int: ...
     def get_suffix(self) -> str:
@@ -110,8 +119,8 @@ class Base:
         """
 
 class Node(Base):
-    """Concrete implementation for interior nodes.
-"""
+    """Concrete implementation for interior nodes."""
+
     fixers_applied: MutableSequence[BaseFix] | None
     # Is Unbound until set in refactor.RefactoringTool
     future_features: frozenset[Incomplete]
@@ -133,33 +142,37 @@ class Node(Base):
 
         As a side effect, the parent pointers of the children are updated.
         """
+
     def _eq(self, other: Base) -> bool:
-        """Compare two nodes for equality.
-"""
+        """Compare two nodes for equality."""
+
     def clone(self) -> Node:
-        """Return a cloned (deep) copy of self.
-"""
+        """Return a cloned (deep) copy of self."""
+
     def post_order(self) -> Iterator[Self]:
-        """Return a post-order iterator for the tree.
-"""
+        """Return a post-order iterator for the tree."""
+
     def pre_order(self) -> Iterator[Self]:
-        """Return a pre-order iterator for the tree.
-"""
+        """Return a pre-order iterator for the tree."""
+
     def set_child(self, i: int, child: _NL) -> None:
         """
         Equivalent to 'node.children[i] = child'. This method also sets the
         child's parent attribute appropriately.
         """
+
     def insert_child(self, i: int, child: _NL) -> None:
         """
         Equivalent to 'node.children.insert(i, child)'. This method also sets
         the child's parent attribute appropriately.
         """
+
     def append_child(self, child: _NL) -> None:
         """
         Equivalent to 'node.children.append(child)'. This method also sets the
         child's parent attribute appropriately.
         """
+
     def __unicode__(self) -> str:
         """
         Return a pretty string representation.
@@ -168,8 +181,8 @@ class Node(Base):
         """
 
 class Leaf(Base):
-    """Concrete implementation for leaf nodes.
-"""
+    """Concrete implementation for leaf nodes."""
+
     lineno: int
     column: int
     value: str
@@ -188,18 +201,19 @@ class Leaf(Base):
         Takes a type constant (a token number < 256), a string value, and an
         optional context keyword argument.
         """
+
     def _eq(self, other: Base) -> bool:
-        """Compare two nodes for equality.
-"""
+        """Compare two nodes for equality."""
+
     def clone(self) -> Leaf:
-        """Return a cloned (deep) copy of self.
-"""
+        """Return a cloned (deep) copy of self."""
+
     def post_order(self) -> Iterator[Self]:
-        """Return a post-order iterator for the tree.
-"""
+        """Return a post-order iterator for the tree."""
+
     def pre_order(self) -> Iterator[Self]:
-        """Return a pre-order iterator for the tree.
-"""
+        """Return a pre-order iterator for the tree."""
+
     def __unicode__(self) -> str:
         """
         Return a pretty string representation.
@@ -230,6 +244,7 @@ class BasePattern:
     - NodePattern matches a single node (usually non-leaf);
     - WildcardPattern matches a sequence of nodes of variable length.
     """
+
     type: int
     content: str | None
     name: str | None
@@ -239,6 +254,7 @@ class BasePattern:
 
         Returns either self or another node with the same effect.
         """
+
     def match(self, node: _NL, results: _Results | None = None) -> bool:
         """
         Does this pattern exactly match a node?
@@ -250,12 +266,14 @@ class BasePattern:
 
         Default implementation for non-wildcard patterns.
         """
+
     def match_seq(self, nodes: SupportsLenAndGetItem[_NL], results: _Results | None = None) -> bool:
         """
         Does this pattern exactly match a sequence of nodes?
 
         Default implementation for non-wildcard patterns.
         """
+
     def generate_matches(self, nodes: SupportsGetItem[int, _NL]) -> Iterator[tuple[int, _Results]]:
         """
         Generator yielding all matches for this pattern.
@@ -308,6 +326,7 @@ class WildcardPattern(BasePattern):
 
     except it always uses non-greedy matching.
     """
+
     min: int
     max: int
     def __init__(self, content: str | None = None, min: int = 0, max: int = 0x7FFFFFFF, name: str | None = None) -> None:
@@ -359,4 +378,4 @@ def generate_matches(
         (count, results) tuples where:
         count: the entire sequence of patterns matches nodes[:count];
         results: dict containing named submatches.
-        """
+    """
