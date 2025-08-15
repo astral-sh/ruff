@@ -3129,6 +3129,7 @@ pub enum KnownClass {
     InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
+    NamedTupleLike,
     TypedDictFallback,
 }
 
@@ -3227,6 +3228,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3310,6 +3312,7 @@ impl KnownClass {
             | Self::Field
             | Self::SupportsIndex
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback
             | Self::Counter
             | Self::DefaultDict
@@ -3394,6 +3397,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3470,6 +3474,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3545,6 +3550,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::TypedDictFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback => false,
         }
     }
@@ -3567,6 +3573,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Awaitable
+            | Self::NamedTupleLike
             | Self::Generator => true,
 
             Self::Any
@@ -3728,6 +3735,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
+            Self::NamedTupleLike => "NamedTupleLike",
             Self::TypedDictFallback => "TypedDictFallback",
         }
     }
@@ -3985,6 +3993,7 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleLike => KnownModule::TyExtensions,
         }
     }
 
@@ -4062,6 +4071,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(false),
 
             Self::Tuple => None,
@@ -4143,6 +4153,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => false,
         }
     }
@@ -4232,6 +4243,7 @@ impl KnownClass {
             "KW_ONLY" => Self::KwOnly,
             "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
+            "NamedTupleLike" => Self::NamedTupleLike,
             "TypedDictFallback" => Self::TypedDictFallback,
             _ => return None,
         };
@@ -4298,6 +4310,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::NamedTupleLike
             | Self::Awaitable
             | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),

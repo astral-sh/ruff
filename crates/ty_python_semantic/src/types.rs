@@ -5463,6 +5463,13 @@ impl<'db> Type<'db> {
                 // TODO: Use an opt-in rule for a bare `Callable`
                 SpecialFormType::Callable => Ok(CallableType::unknown(db)),
 
+                // Special case: `NamedTuple` in a type expression is understood to describe a
+                // protocol that any `NamedTuple` class would satisfy. This isn't very principled
+                // (since at runtime, `NamedTuple` is just a function), but it appears to be what
+                // users often expect, and it improves compatibility with other type checkers such
+                // as mypy. See conversation in https://github.com/astral-sh/ruff/pull/19915.
+                SpecialFormType::NamedTuple => Ok(KnownClass::NamedTupleLike.to_instance(db)),
+
                 SpecialFormType::TypingSelf => {
                     let module = parsed_module(db, scope_id.file(db)).load(db);
                     let index = semantic_index(db, scope_id.file(db));
@@ -5502,13 +5509,6 @@ impl<'db> Type<'db> {
                 SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
                         InvalidTypeExpression::TypedDict
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::NamedTuple => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::NamedTuple
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -6665,8 +6665,6 @@ enum InvalidTypeExpression<'db> {
     Field,
     /// Same for `typing.TypedDict`
     TypedDict,
-    /// Same for `typing.NamedTuple`
-    NamedTuple,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(SpecialFormType),
@@ -6718,12 +6716,6 @@ impl<'db> InvalidTypeExpression<'db> {
                         f.write_str(
                             "The special form `typing.TypedDict` is not allowed in type expressions. \
                             Did you mean to use a concrete TypedDict or `collections.abc.Mapping[str, object]` instead?")
-                    }
-                    InvalidTypeExpression::NamedTuple => {
-                        f.write_str(
-                            "The special form `typing.NamedTuple` is not allowed in type expressions. \
-                            Consider using a `tuple[]` type, a concrete NamedTuple type, or a protocol that \
-                            specifies the methods you require.")
                     }
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,

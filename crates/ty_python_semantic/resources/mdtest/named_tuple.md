@@ -231,28 +231,33 @@ This means we also understand that all attributes on function objects are availa
 reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
-```
-
-But `NamedTuple` and `type[NamedTuple]` are not valid in type expressions -- there is no object at
-runtime that is an "instance of `NamedTuple`", nor is there any class at runtime that is a "subclass
-of `NamedTuple`" -- these are both impossible, since `NamedTuple` is a function and not a class:
-
-```py
-# error: [invalid-type-form] "The special form `typing.NamedTuple` is not allowed in type expressions. Consider using a `tuple[]` type, a concrete NamedTuple type, or a protocol that specifies the methods you require."
-def f(x: typing.NamedTuple):
-    reveal_type(x)  # revealed: Unknown
-
-# TODO: we should emit `invalid-type-form` here and reveal `Unknown`
-def g(y: type[typing.NamedTuple]):
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
 
 # TODO: this should cause us to emit a diagnostic and reveal `Unknown` (function objects don't have an `__mro__` attribute),
 # but the fact that we don't isn't actually a `NamedTuple` bug (https://github.com/astral-sh/ty/issues/986)
 reveal_type(typing.NamedTuple.__mro__)  # revealed: tuple[<class 'FunctionType'>, <class 'object'>]
 ```
 
-Custom protocols can be used to specify "any class with a `_make` method", or "any class with a
-`_replace` method:
+By the normal rules, `NamedTuple` and `type[NamedTuple]` should not be valid in type expressions --
+there is no object at runtime that is an "instance of `NamedTuple`", nor is there any class at
+runtime that is a "subclass of `NamedTuple`" -- these are both impossible, since `NamedTuple` is a
+function and not a class. However, for compatibility with other type checkers, we allow `NamedTuple`
+in type expressions and understand it as describing an interface that all `NamedTuple` classes would
+satisfy:
+
+```py
+def f(x: typing.NamedTuple):
+    reveal_type(x)  # revealed: NamedTupleLike
+    reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> Self@_make
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> Self@_replace
+    reveal_type(x.__add__)  # revealed: bound method NamedTupleLike.__add__(value: tuple[Any, ...], /) -> tuple[object, ...]
+    reveal_type(x.__iter__)  # revealed: bound method NamedTupleLike.__iter__() -> Iterator[object]
+
+def g(y: type[typing.NamedTuple]):
+    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+```
+
+Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
+annotated with `NamedTuple`:
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -266,13 +271,8 @@ reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterabl
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
-class NamedTupleLike(Protocol):
-    @classmethod
-    def _make(cls, iterable: Iterable[Any]): ...
-    def _asdict(self) -> dict[str, Any]: ...
-    def _replace(self, **kwargs): ...
-
-static_assert(is_assignable_to(Point, NamedTupleLike))
+static_assert(is_assignable_to(Point, NamedTuple))
+f(Point(x=42, y=56))
 ```
 
 ## NamedTuple with custom `__getattr__`
