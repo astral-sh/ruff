@@ -966,6 +966,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1017,9 +1018,10 @@ impl<'db> ClassType<'db> {
                 })
             });
 
+            let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = Type::Callable(CallableType::new(
                 db,
-                dunder_new_signature.bind_self(),
+                dunder_new_signature.bind_self(db, Some(instance_ty)),
                 true,
             ));
 
@@ -1057,9 +1059,10 @@ impl<'db> ClassType<'db> {
 
                 if let Some(signature) = signature {
                     let synthesized_signature = |signature: &Signature<'db>| {
+                        let instance_ty = Type::instance(db, self);
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
                             .with_definition(signature.definition())
-                            .bind_self()
+                            .bind_self(db, Some(instance_ty))
                     };
 
                     let synthesized_dunder_init_signature = CallableSignature::from_overloads(
