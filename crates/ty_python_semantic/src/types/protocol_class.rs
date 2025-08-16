@@ -7,8 +7,8 @@ use ruff_python_ast::name::Name;
 
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
-use crate::types::CallArguments;
 use crate::types::visitor::TypeVisitor;
+use crate::types::{CallArguments, HasRelationToVisitor};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -433,6 +433,7 @@ impl<'db> PropertyMember<'db> {
         other: Type<'db>,
         attribute: &str,
         relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         let Place::Type(attribute_type, Boundness::Bound) = other.member(db, attribute).place
         else {
@@ -440,10 +441,10 @@ impl<'db> PropertyMember<'db> {
         };
         let read_ok = if let Some(getter) = self.get_type {
             if let Ok(member_type) = getter
-                .try_call(db, &CallArguments::positional([other]))
+                .try_call_impl(db, &CallArguments::positional([other]), visitor)
                 .map(|binding| binding.return_type(db))
             {
-                attribute_type.has_relation_to(db, member_type, relation)
+                attribute_type.has_relation_to_impl(db, member_type, relation, visitor)
             } else {
                 false
             }
@@ -601,6 +602,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
@@ -610,7 +612,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ),
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(property) => {
-                property.is_satisfied_by(db, other, self.name, relation)
+                property.is_satisfied_by(db, other, self.name, relation, visitor)
             }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Type(attribute_type, Boundness::Bound) =
@@ -618,8 +620,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 else {
                     return false;
                 };
-                member_type.has_relation_to(db, attribute_type, relation)
-                    && attribute_type.has_relation_to(db, *member_type, relation)
+                member_type.has_relation_to_impl(db, attribute_type, relation, visitor)
+                    && attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
             }
         }
     }

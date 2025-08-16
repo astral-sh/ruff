@@ -1628,9 +1628,9 @@ impl<'db> Type<'db> {
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
             (Type::ProtocolInstance(_), _) => false,
-            (_, Type::ProtocolInstance(protocol)) => {
-                self.satisfies_protocol(db, protocol, relation)
-            }
+            (_, Type::ProtocolInstance(protocol)) => visitor.visit((self, target), || {
+                self.satisfies_protocol(db, protocol, relation, visitor)
+            }),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
@@ -5098,9 +5098,18 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
+        self.try_call_impl(db, argument_types, &HasRelationToVisitor::new(true))
+    }
+
+    fn try_call_impl(
+        self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
         self.bindings(db)
             .match_parameters(argument_types)
-            .check_types(db, argument_types)
+            .check_types_impl(db, argument_types, visitor)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
