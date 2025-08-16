@@ -8,8 +8,9 @@ use rustc_hash::FxHashMap;
 
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
-use crate::types::signatures::ParameterForm;
-use crate::types::{AttributeAssignmentError, CallArguments, HasRelationToVisitor, UnionType};
+use crate::types::{
+    AttributeAssignmentError, CallArguments, HasRelationToVisitor, Signature, UnionType,
+};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -354,21 +355,17 @@ impl<'db> PropertyMember<'db> {
             _ => return None,
         };
 
+        let set_type_from_signature = |sig: &Signature<'db>| match sig.parameters().as_slice() {
+            [_, parameter] if parameter.is_positional() && parameter.form.is_value() => {
+                Some(parameter.annotated_type().unwrap_or_else(Type::unknown))
+            }
+            _ => None,
+        };
+
         let set_type = if let Some(signature) = setter_signature {
-            if let Some(ty) = UnionType::try_from_elements(
-                db,
-                signature
-                    .iter()
-                    .map(|sig| match sig.parameters().as_slice() {
-                        [_, parameter]
-                            if parameter.is_positional()
-                                && parameter.form == ParameterForm::Value =>
-                        {
-                            Some(parameter.annotated_type().unwrap_or_else(Type::unknown))
-                        }
-                        _ => None,
-                    }),
-            ) {
+            if let Some(ty) =
+                UnionType::try_from_elements(db, signature.iter().map(set_type_from_signature))
+            {
                 Some(ty)
             } else {
                 return None;
