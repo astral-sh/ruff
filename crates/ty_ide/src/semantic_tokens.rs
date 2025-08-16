@@ -337,7 +337,9 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
+            Type::NonInferableTypeVar(_) | Type::TypeVar(_) => {
+                (SemanticTokenType::TypeParameter, modifiers)
+            }
             Type::FunctionLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {

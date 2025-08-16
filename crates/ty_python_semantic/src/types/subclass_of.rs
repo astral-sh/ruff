@@ -91,7 +91,7 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::TypeVar(BoundTypeVarInstance::new(
+                    Type::NonInferableTypeVar(BoundTypeVarInstance::new(
                         db,
                         TypeVarInstance::new(
                             db,

@@ -249,6 +249,10 @@ impl<'db> GenericContext<'db> {
         }
     }
 
+    /// Returns a specialization of this generic context where each typevar is mapped to itself.
+    /// (And in particular, to an _inferable_ version of itself, since this will be used in our
+    /// class constructor invocation machinery to infer a specialization for the class from the
+    /// arguments passed to its constructor.)
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = self
             .variables(db)
@@ -777,6 +781,10 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if formal == actual {
+            return Ok(());
+        }
+
         // If the actual type is a subtype of the formal type, then return without adding any new
         // type mappings. (Note that if the formal type contains any typevars, this check will
         // fail, since no non-typevar types are assignable to a typevar. Also note that we are

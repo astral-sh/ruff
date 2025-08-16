@@ -19,7 +19,8 @@ use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
-    BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation, todo_type,
+    BindingContext, BoundTypeVarInstance, KnownClass, NormalizedVisitor, TypeMapping, TypeRelation,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -98,9 +99,16 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    /// Binds the first (presumably `self`) parameter of this signature. If a `self_type` is
+    /// provided, we will replace any occurrences of `typing.Self` in the parameter and return
+    /// annotations with that type.
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         Self {
-            overloads: self.overloads.iter().map(Signature::bind_self).collect(),
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.bind_self(db, self_type))
+                .collect(),
         }
     }
 
@@ -328,8 +336,11 @@ impl<'db> Signature<'db> {
         let parameters =
             Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
-            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref());
-
+            let plain_return_ty = definition_expression_type(db, definition, returns.as_ref())
+                .apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                );
             if function_node.is_async && !is_generator {
                 KnownClass::CoroutineType
                     .to_specialized_instance(db, [Type::any(), Type::any(), plain_return_ty])
@@ -457,13 +468,20 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn bind_self(&self) -> Self {
+    pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
+        let mut parameters = Parameters::new(self.parameters().iter().skip(1).cloned());
+        let mut return_ty = self.return_ty;
+        if let Some(self_type) = self_type {
+            parameters = parameters.apply_type_mapping(db, &TypeMapping::BindSelf(self_type));
+            return_ty =
+                return_ty.map(|ty| ty.apply_type_mapping(db, &TypeMapping::BindSelf(self_type)));
+        }
         Self {
             generic_context: self.generic_context,
             inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
-            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
-            return_ty: self.return_ty,
+            parameters,
+            return_ty,
         }
     }
 
@@ -1432,9 +1450,12 @@ impl<'db> Parameter<'db> {
         kind: ParameterKind<'db>,
     ) -> Self {
         Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
+            annotated_type: parameter.annotation().map(|annotation| {
+                definition_expression_type(db, definition, annotation).apply_type_mapping(
+                    db,
+                    &TypeMapping::MarkTypeVarsInferable(BindingContext::Definition(definition)),
+                )
+            }),
             kind,
             form: ParameterForm::Value,
         }
