@@ -754,7 +754,6 @@ class FooWithZero:
 
 static_assert(is_subtype_of(FooWithZero, HasXWithDefault))
 static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
-
 # TODO: whether or not any of these four assertions should pass is not clearly specified.
 #
 # A test in the typing conformance suite implies that they all should:
@@ -778,12 +777,13 @@ class HasClassVarX(Protocol):
 
 static_assert(is_subtype_of(FooWithZero, HasClassVarX))
 static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+
 # TODO: these should pass
 static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
 static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Qux, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Qux, HasClassVarX))  # error: [static-assert-error]
 
+static_assert(not is_subtype_of(Qux, HasClassVarX))
+static_assert(not is_assignable_to(Qux, HasClassVarX))
 static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
 static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
 static_assert(not is_subtype_of(list[Foo], list[HasX]))
@@ -803,16 +803,14 @@ class A:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class B:
     x: Final = 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class IntSub(int): ...
 
@@ -844,16 +842,14 @@ static_assert(is_assignable_to(MutableDataclass, HasX))
 class ImmutableDataclass:
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(ImmutableDataclass, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ImmutableDataclass, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(ImmutableDataclass, HasX))
+static_assert(not is_assignable_to(ImmutableDataclass, HasX))
 
 class NamedTupleWithX(NamedTuple):
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(NamedTupleWithX, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NamedTupleWithX, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NamedTupleWithX, HasX))
+static_assert(not is_assignable_to(NamedTupleWithX, HasX))
 ```
 
 However, a type with a read-write property `x` *does* satisfy the `HasX` protocol. The `HasX`
@@ -1562,9 +1558,8 @@ class PropertyX:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_assignable_to(PropertyX, ClassVarXProto))  # error: [static-assert-error]
-static_assert(not is_subtype_of(PropertyX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_assignable_to(PropertyX, ClassVarXProto))
+static_assert(not is_subtype_of(PropertyX, ClassVarXProto))
 
 class ClassVarX:
     x: ClassVar[int] = 42
@@ -1865,9 +1860,8 @@ class HasGetAttr:
 static_assert(is_subtype_of(HasGetAttr, HasXProperty))
 static_assert(is_assignable_to(HasGetAttr, HasXProperty))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
 
 class HasGetAttrWithUnsuitableReturn:
     def __getattr__(self, attr: str) -> tuple[int, int]:

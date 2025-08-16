@@ -708,6 +708,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let mut arguments =
+            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
+        let setattr_result = ty.try_call_dunder_with_policy(
+            db,
+            "__setattr__",
+            &mut arguments,
+            TypeContext::default(),
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+        let setattr_returns_never = match &setattr_result {
+            Ok(bindings) => bindings.return_type(db).is_never(),
+            Err(error) => error.return_type(db).is_some_and(|ty| ty.is_never()),
+        };
+        if setattr_returns_never {
+            return self.never();
+        }
+
         let meta_attr = ty.class_member(db, member_name.into());
         if meta_attr
             .qualifiers
@@ -748,19 +765,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.check_type_pair(db, value_ty, instance_attr_ty);
         }
 
-        let mut arguments =
-            CallArguments::positional([Type::string_literal(db, member_name), value_ty]);
-        ConstraintSet::from_bool(
-            self.constraints,
-            ty.try_call_dunder_with_policy(
-                db,
-                "__setattr__",
-                &mut arguments,
-                TypeContext::default(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
-            .is_ok(),
-        )
+        ConstraintSet::from_bool(self.constraints, setattr_result.is_ok())
     }
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
@@ -869,11 +874,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                     return self.never();
                 };
-                self.check_type_pair(db, *member_type, attribute_type).and(
-                    db,
-                    self.constraints,
-                    || self.check_type_pair(db, attribute_type, *member_type),
-                )
+                let read_result = self.check_type_pair(db, attribute_type, *member_type);
+
+                if member.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                    let Place::Defined(DefinedPlace {
+                        ty: meta_attribute_type,
+                        definedness: Definedness::AlwaysDefined,
+                        ..
+                    }) = ty.to_meta_type(db).member(db, member.name).place
+                    else {
+                        return self.never();
+                    };
+                    read_result.and(db, self.constraints, || {
+                        self.check_type_pair(db, meta_attribute_type, *member_type)
+                    })
+                } else {
+                    read_result.and(db, self.constraints, || {
+                        self.check_property_write(db, ty, member.name, *member_type)
+                    })
+                }
             }
         };
         if result.is_never_satisfied(db) {
