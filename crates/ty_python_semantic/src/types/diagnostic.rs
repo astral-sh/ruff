@@ -6,6 +6,7 @@ use super::{
     add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
+use crate::semantic_index::SemanticIndex;
 use crate::suppression::FileSuppressionId;
 use crate::types::LintDiagnosticGuard;
 use crate::types::class::{Field, SolidBase, SolidBaseKind};
@@ -2673,6 +2674,60 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                 slice_ty.display(db),
             )),
         };
+    }
+}
+
+pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    index: &'db SemanticIndex<'db>,
+    field_name: &str,
+    field_with_default: &str,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = class
+        .first_declaration_of_name(db, field_name, index)
+        .and_then(|definition| definition.declaration.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "NamedTuple field without default value cannot follow field(s) with default value(s)",
+    ));
+
+    diagnostic.set_primary_message(format_args!(
+        "Field `{field_name}` defined here without a default value"
+    ));
+
+    let Some(field_with_default_range) = class
+        .first_binding_of_name(db, field_with_default, index)
+        .and_then(|definition| definition.binding.definition())
+        .map(|definition| definition.kind(db).full_range(module))
+    else {
+        return;
+    };
+
+    // If the end-of-scope definition in the class scope of the field-with-a-default-value
+    // occurs after the range of the field-without-a-default-value,
+    // avoid adding a subdiagnostic that points to the definition of the
+    // field-with-a-default-value. It's confusing to talk about a field "before" the
+    // field without the default value but then point to a definition that actually
+    // occurs after the field without-a-default-value.
+    if field_with_default_range.end() < diagnostic_range.start() {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(field_with_default_range)).message(format_args!(
+                "Earlier field `{field_with_default}` defined here with a default value",
+            )),
+        );
+    } else {
+        diagnostic.info(format_args!(
+            "Earlier field `{field_with_default}` was defined with a default value"
+        ));
     }
 }
 
