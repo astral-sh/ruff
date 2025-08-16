@@ -73,7 +73,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::signatures::{CallableSignature, Parameter, Signature};
+use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
@@ -355,13 +355,6 @@ impl<'db> OverloadLiteral<'db> {
         )
     }
 
-    fn parameter_type(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        self.signature(db, None)
-            .parameters()
-            .get(index)
-            .and_then(Parameter::annotated_type)
-    }
-
     pub(crate) fn parameter_span(
         self,
         db: &'db dyn Db,
@@ -496,10 +489,6 @@ impl<'db> FunctionLiteral<'db> {
 
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.last_definition(db).definition(db)
-    }
-
-    fn parameter_type(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        self.last_definition(db).parameter_type(db, index)
     }
 
     fn parameter_span(
@@ -749,10 +738,6 @@ impl<'db> FunctionType<'db> {
     /// over-invalidation.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.literal(db).definition(db)
-    }
-
-    pub(crate) fn parameter_type(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        self.literal(db).parameter_type(db, index)
     }
 
     /// Returns a tuple of two spans. The first is

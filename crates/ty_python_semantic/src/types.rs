@@ -8905,6 +8905,18 @@ impl<'db> CallableType<'db> {
                 .signatures(db)
                 .is_equivalent_to(db, other.signatures(db))
     }
+
+    /// The type of the `index`th parameter from the `CallableType` signature.
+    /// Returns `None` if `index` is out of bounds or if `CallableType` is overloaded.
+    pub(crate) fn parameter_type(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        let [signature] = self.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        signature
+            .parameters()
+            .get(index)
+            .and_then(Parameter::annotated_type)
+    }
 }
 
 /// Represents a specific instance of `types.MethodWrapperType`

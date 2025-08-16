@@ -13,7 +13,7 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ### Fully static
 
 ```py
-from typing_extensions import Literal, LiteralString, Protocol, Never
+from typing_extensions import Literal, LiteralString, Never
 from ty_extensions import Unknown, is_equivalent_to, static_assert, TypeOf, AlwaysTruthy, AlwaysFalsy
 from enum import Enum
 
@@ -44,14 +44,6 @@ static_assert(is_equivalent_to(Single, Literal[Single.VALUE]))
 static_assert(is_equivalent_to(Literal[Single.VALUE], Literal[Single.VALUE]))
 
 static_assert(is_equivalent_to(tuple[Single] | int | str, str | int | tuple[Literal[Single.VALUE]]))
-
-class Protocol1(Protocol):
-    a: Single
-
-class Protocol2(Protocol):
-    a: Literal[Single.VALUE]
-
-static_assert(is_equivalent_to(Protocol1, Protocol2))
 
 static_assert(is_equivalent_to(Never, Never))
 static_assert(is_equivalent_to(AlwaysTruthy, AlwaysTruthy))
@@ -584,6 +576,38 @@ reveal_type(importlib.abc)  # revealed: Unknown
 reveal_type(other_importlib.abc)  # revealed: <module 'importlib.abc'>
 
 static_assert(not is_equivalent_to(TypeOf[importlib], TypeOf[other_importlib]))
+```
+
+## Protocols
+
+Protocols with the same members are considered equivalent. Method or property members are judged to
+be equivalent based on their equivalence as `Callable` types.
+
+```py
+from ty_extensions import is_equivalent_to, static_assert
+from typing_extensions import Literal, Protocol
+from enum import Enum
+
+class Single(Enum):
+    VALUE = 1
+
+class Protocol1(Protocol):
+    a: Single
+
+class Protocol2(Protocol):
+    a: Literal[Single.VALUE]
+
+static_assert(is_equivalent_to(Protocol1, Protocol2))
+
+class A(Protocol):
+    @property
+    def x(self) -> int: ...
+
+class B(Protocol):
+    @property
+    def x(self) -> int: ...
+
+static_assert(is_equivalent_to(A | int | str, str | int | B))
 ```
 
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
