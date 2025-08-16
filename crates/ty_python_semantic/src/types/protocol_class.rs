@@ -9,7 +9,6 @@ use rustc_hash::FxHashMap;
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
 use crate::types::signatures::ParameterForm;
-use crate::types::visitor::TypeVisitor;
 use crate::types::{AttributeAssignmentResult, CallArguments, HasRelationToVisitor, UnionType};
 use crate::{
     Db, FxOrderSet,
@@ -133,7 +132,7 @@ impl<'db> ProtocolInterface<'db> {
     {
         self.inner(db).iter().map(|(name, data)| ProtocolMember {
             name,
-            kind: data.kind,
+            kind: &data.kind,
             qualifiers: data.qualifiers,
         })
     }
@@ -145,7 +144,7 @@ impl<'db> ProtocolInterface<'db> {
     ) -> Option<ProtocolMember<'a, 'db>> {
         self.inner(db).get(name).map(|data| ProtocolMember {
             name,
-            kind: data.kind,
+            kind: &data.kind,
             qualifiers: data.qualifiers,
         })
     }
@@ -291,15 +290,15 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display {
-        struct ProtocolMemberDataDisplay<'db> {
+    fn display(&self, db: &'db dyn Db) -> impl std::fmt::Display + '_ {
+        struct ProtocolMemberDataDisplay<'a, 'db> {
             db: &'db dyn Db,
-            data: ProtocolMemberKind<'db>,
+            data: &'a ProtocolMemberKind<'db>,
         }
 
-        impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
+        impl std::fmt::Display for ProtocolMemberDataDisplay<'_, '_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                match self.data {
+                match &self.data {
                     ProtocolMemberKind::Method(callable) => {
                         write!(f, "MethodMember(`{}`)", callable.display(self.db))
                     }
@@ -313,8 +312,8 @@ impl<'db> ProtocolMemberData<'db> {
                         }
                         d.finish()
                     }
-                    ProtocolMemberKind::Other { ty, .. } => {
-                        write!(f, "AttributeMember(`{}`)", ty.display(self.db))
+                    ProtocolMemberKind::Attribute(attribute) => {
+                        write!(f, "AttributeMember(`{}`)", attribute.ty.display(self.db))
                     }
                 }
             }
@@ -322,12 +321,12 @@ impl<'db> ProtocolMemberData<'db> {
 
         ProtocolMemberDataDisplay {
             db,
-            data: self.kind,
+            data: &self.kind,
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct PropertyMember<'db> {
     get_type: Option<Type<'db>>,
     set_type: Option<Type<'db>>,
@@ -413,19 +412,10 @@ impl<'db> PropertyMember<'db> {
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         Self {
             get_type: self.get_type.map(|ty| ty.materialize(db, variance)),
             set_type: self.set_type.map(|ty| ty.materialize(db, variance)),
-        }
-    }
-
-    fn visit<V: TypeVisitor<'db> + ?Sized>(self, db: &'db dyn Db, visitor: &V) {
-        if let Some(getter) = self.get_type {
-            visitor.visit_type(db, getter);
-        }
-        if let Some(setter) = self.set_type {
-            visitor.visit_type(db, setter);
         }
     }
 
@@ -458,14 +448,97 @@ impl<'db> PropertyMember<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct AttributeMember<'db> {
+    ty: Type<'db>,
+    bound_on_class: BoundOnClass,
+}
+
+impl<'db> AttributeMember<'db> {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self {
+            ty: self.ty.normalized_impl(db, visitor),
+            bound_on_class: self.bound_on_class,
+        }
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        Self {
+            ty: self.ty.apply_type_mapping(db, type_mapping),
+            bound_on_class: self.bound_on_class,
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) {
+        self.ty.find_legacy_typevars(db, binding_context, typevars);
+    }
+
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self {
+            ty: self.ty.materialize(db, variance),
+            bound_on_class: self.bound_on_class,
+        }
+    }
+
+    fn is_satisfied_by(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        attribute: &str,
+        qualifiers: TypeQualifiers,
+        relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> bool {
+        // An attribute member must always be bound on the instance,
+        // and have the correct type.
+        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, attribute).place
+        else {
+            return false;
+        };
+        if !attribute_type.has_relation_to_impl(db, self.ty, relation, visitor) {
+            return false;
+        }
+
+        // If the attribute member was declared as a `ClassVar` in the protocol
+        // or had a class-level default, it must also be bound on the meta-type
+        // of the instance, and have the correct type there too.
+        if self.bound_on_class.is_yes() {
+            let Place::Type(meta_attribute_type, Boundness::Bound) =
+                other.to_meta_type(db).member(db, attribute).place
+            else {
+                return false;
+            };
+            if !meta_attribute_type.has_relation_to_impl(db, self.ty, relation, visitor) {
+                return false;
+            }
+        }
+
+        // If the attribute member was declared as a `ClassVar` in the protocol,
+        // it must be valid to assign to it on the meta-type of the instance.
+        // Otherwise, it must be valid to assign to it on the instance.
+        if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+            other
+                .to_meta_type(db)
+                .validate_attribute_assignment(db, attribute, self.ty)
+                .is_not_err()
+        } else {
+            other
+                .validate_attribute_assignment(db, attribute, self.ty)
+                .is_not_err()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
 enum ProtocolMemberKind<'db> {
     Method(CallableType<'db>),
     Property(PropertyMember<'db>),
-    Other {
-        ty: Type<'db>,
-        bound_on_class: BoundOnClass,
-    },
+    Attribute(AttributeMember<'db>),
 }
 
 impl<'db> ProtocolMemberKind<'db> {
@@ -477,10 +550,9 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Property(property) => {
                 ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
             }
-            ProtocolMemberKind::Other { ty, bound_on_class } => ProtocolMemberKind::Other {
-                ty: ty.normalized_impl(db, visitor),
-                bound_on_class: *bound_on_class,
-            },
+            ProtocolMemberKind::Attribute(attribute) => {
+                ProtocolMemberKind::Attribute(attribute.normalized_impl(db, visitor))
+            }
         }
     }
 
@@ -492,10 +564,9 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Property(property) => {
                 ProtocolMemberKind::Property(property.apply_type_mapping(db, type_mapping))
             }
-            ProtocolMemberKind::Other { ty, bound_on_class } => ProtocolMemberKind::Other {
-                ty: ty.apply_type_mapping(db, type_mapping),
-                bound_on_class: *bound_on_class,
-            },
+            ProtocolMemberKind::Attribute(attribute) => {
+                ProtocolMemberKind::Attribute(attribute.apply_type_mapping(db, type_mapping))
+            }
         }
     }
 
@@ -512,13 +583,13 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Property(property) => {
                 property.find_legacy_typevars(db, binding_context, typevars);
             }
-            ProtocolMemberKind::Other { ty, .. } => {
-                ty.find_legacy_typevars(db, binding_context, typevars);
+            ProtocolMemberKind::Attribute(attribute) => {
+                attribute.find_legacy_typevars(db, binding_context, typevars);
             }
         }
     }
 
-    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+    fn materialize(&self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
                 ProtocolMemberKind::Method(callable.materialize(db, variance))
@@ -526,10 +597,9 @@ impl<'db> ProtocolMemberKind<'db> {
             ProtocolMemberKind::Property(property) => {
                 ProtocolMemberKind::Property(property.materialize(db, variance))
             }
-            ProtocolMemberKind::Other { ty, bound_on_class } => ProtocolMemberKind::Other {
-                ty: ty.materialize(db, variance),
-                bound_on_class,
-            },
+            ProtocolMemberKind::Attribute(attribute) => {
+                ProtocolMemberKind::Attribute(attribute.materialize(db, variance))
+            }
         }
     }
 }
@@ -538,7 +608,7 @@ impl<'db> ProtocolMemberKind<'db> {
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct ProtocolMember<'a, 'db> {
     name: &'a str,
-    kind: ProtocolMemberKind<'db>,
+    kind: &'a ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
 }
 
@@ -548,11 +618,19 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     match member.kind {
-        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
-        ProtocolMemberKind::Property(property) => {
-            property.visit(db, visitor);
+        ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, *method),
+        ProtocolMemberKind::Property(PropertyMember { get_type, set_type }) => {
+            if let Some(get_type) = get_type {
+                visitor.visit_type(db, *get_type);
+            }
+            if let Some(set_type) = set_type {
+                visitor.visit_type(db, *set_type);
+            }
         }
-        ProtocolMemberKind::Other { ty, .. } => visitor.visit_type(db, ty),
+        ProtocolMemberKind::Attribute(AttributeMember {
+            ty,
+            bound_on_class: _,
+        }) => visitor.visit_type(db, *ty),
     }
 }
 
@@ -569,7 +647,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         match self.kind {
             ProtocolMemberKind::Method(callable) => Some(callable.bind_self(db)),
             ProtocolMemberKind::Property(property) => property.get_type,
-            ProtocolMemberKind::Other { ty, .. } => Some(ty),
+            ProtocolMemberKind::Attribute(attribute) => Some(attribute.ty),
         }
     }
 
@@ -580,11 +658,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 .map(Ok)
                 .unwrap_or(Err(AttributeAssignmentResult::ReadOnlyProperty)),
             ProtocolMemberKind::Method(_) => Err(AttributeAssignmentResult::CannotAssign),
-            ProtocolMemberKind::Other { ty, .. } => {
+            ProtocolMemberKind::Attribute(attribute) => {
                 if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
                     Err(AttributeAssignmentResult::CannotAssignToClassVar)
                 } else {
-                    Ok(ty)
+                    Ok(attribute.ty)
                 }
             }
         }
@@ -609,45 +687,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => {
                 property.is_satisfied_by(db, other, self.name, relation, visitor)
             }
-            ProtocolMemberKind::Other {
-                ty: member_type,
-                bound_on_class,
-            } => {
-                let Place::Type(attribute_type, Boundness::Bound) =
-                    other.member(db, self.name).place
-                else {
-                    return false;
-                };
-                if !attribute_type.has_relation_to_impl(db, *member_type, relation, visitor) {
-                    return false;
-                }
-
-                let is_classvar_member = self.qualifiers.contains(TypeQualifiers::CLASS_VAR);
-                if is_classvar_member || bound_on_class.is_yes() {
-                    let Place::Type(meta_attribute_type, Boundness::Bound) =
-                        other.to_meta_type(db).member(db, self.name).place
-                    else {
-                        return false;
-                    };
-                    if !meta_attribute_type.has_relation_to_impl(
-                        db,
-                        *member_type,
-                        relation,
-                        visitor,
-                    ) {
-                        return false;
-                    }
-                }
-
-                if !is_classvar_member
-                    && !other
-                        .validate_attribute_assignment(db, self.name, *member_type)
-                        .is_not_err()
-                {
-                    return false;
-                }
-
-                true
+            ProtocolMemberKind::Attribute(attribute) => {
+                attribute.is_satisfied_by(db, other, self.name, self.qualifiers, relation, visitor)
             }
         }
     }
@@ -699,6 +740,14 @@ enum BoundOnClass {
 }
 
 impl BoundOnClass {
+    fn from_qualifiers(qualifiers: TypeQualifiers) -> Self {
+        if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+            BoundOnClass::Yes
+        } else {
+            BoundOnClass::No
+        }
+    }
+
     const fn is_yes(self) -> bool {
         matches!(self, BoundOnClass::Yes)
     }
@@ -750,7 +799,13 @@ fn cached_protocol_interface<'db>(
                         *ty = new_type;
                         *quals = place.qualifiers;
                     })
-                    .or_insert((new_type, place.qualifiers, BoundOnClass::No));
+                    .or_insert_with(|| {
+                        (
+                            new_type,
+                            place.qualifiers,
+                            BoundOnClass::from_qualifiers(place.qualifiers),
+                        )
+                    });
             }
         }
 
@@ -771,7 +826,10 @@ fn cached_protocol_interface<'db>(
                         (Type::PropertyInstance(property), _) => {
                             PropertyMember::from_property_instance(property, db)
                                 .map(ProtocolMemberKind::Property)
-                                .unwrap_or(ProtocolMemberKind::Other { ty, bound_on_class })
+                                .unwrap_or(ProtocolMemberKind::Attribute(AttributeMember {
+                                    ty,
+                                    bound_on_class,
+                                }))
                         }
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
@@ -781,7 +839,7 @@ fn cached_protocol_interface<'db>(
                         (Type::FunctionLiteral(function), BoundOnClass::Yes) => {
                             ProtocolMemberKind::Method(function.into_callable_type(db))
                         }
-                        _ => ProtocolMemberKind::Other { ty, bound_on_class },
+                        _ => ProtocolMemberKind::Attribute(AttributeMember { ty, bound_on_class }),
                     };
 
                     let member = ProtocolMemberData { kind, qualifiers };

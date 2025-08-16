@@ -347,7 +347,9 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
+    # TODO: add a reveal_type call once it's no longer a `Todo` type
+    # (which plays badly with snapshot testing)
+    x()
 ```
 
 ## Members of a protocol

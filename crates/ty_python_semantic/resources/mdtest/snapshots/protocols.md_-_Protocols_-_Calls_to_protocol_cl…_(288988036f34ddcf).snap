@@ -36,7 +36,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 22 | 
 23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
 24 | def f(x: type[MyProtocol]):
-25 |     reveal_type(x())  # revealed: @Todo(type[T] for protocols)
+25 |     # TODO: add a reveal_type call once it's no longer a `Todo` type
+26 |     # (which plays badly with snapshot testing)
+27 |     x()
 ```
 
 # Diagnostics
@@ -161,19 +163,7 @@ info[revealed-type]: Revealed type
 23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SubclassOfGenericProtocol[int]`
 24 | def f(x: type[MyProtocol]):
-25 |     reveal_type(x())  # revealed: @Todo(type[T] for protocols)
-   |
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:25:17
-   |
-23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
-24 | def f(x: type[MyProtocol]):
-25 |     reveal_type(x())  # revealed: @Todo(type[T] for protocols)
-   |                 ^^^ `@Todo(type[T] for protocols)`
+25 |     # TODO: add a reveal_type call once it's no longer a `Todo` type
    |
 
 ```
