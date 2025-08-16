@@ -407,6 +407,18 @@ reveal_protocol_interface("foo")
 #
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
 reveal_protocol_interface(SupportsAbs[int])
+
+class BaseProto(Protocol):
+    def member(self) -> int: ...
+
+class SubProto(Protocol):
+    def member(self) -> bool: ...
+
+# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(BaseProto)
+
+# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> bool`)}`"
+reveal_protocol_interface(SubProto)
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should

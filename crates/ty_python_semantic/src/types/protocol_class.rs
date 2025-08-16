@@ -769,7 +769,6 @@ fn cached_protocol_interface<'db>(
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
-
         let mut direct_members = FxHashMap::default();
 
         // Bindings in the class body that are not declared in the class body
@@ -809,43 +808,42 @@ fn cached_protocol_interface<'db>(
             }
         }
 
-        members.extend(
-            direct_members
-                .into_iter()
-                .map(|(symbol_id, (member, qualifiers, bound_on_class))| {
-                    (
-                        place_table.symbol(symbol_id).name(),
-                        member,
-                        qualifiers,
-                        bound_on_class,
-                    )
-                })
-                .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
-                .map(|(name, ty, qualifiers, bound_on_class)| {
-                    let kind = match (ty, bound_on_class) {
-                        (Type::PropertyInstance(property), _) => {
-                            PropertyMember::from_property_instance(property, db)
-                                .map(ProtocolMemberKind::Property)
-                                .unwrap_or(ProtocolMemberKind::Attribute(AttributeMember {
-                                    ty,
-                                    bound_on_class,
-                                }))
-                        }
-                        (Type::Callable(callable), BoundOnClass::Yes)
-                            if callable.is_function_like(db) =>
-                        {
-                            ProtocolMemberKind::Method(callable)
-                        }
-                        (Type::FunctionLiteral(function), BoundOnClass::Yes) => {
-                            ProtocolMemberKind::Method(function.into_callable_type(db))
-                        }
-                        _ => ProtocolMemberKind::Attribute(AttributeMember { ty, bound_on_class }),
-                    };
+        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members {
+            let name = place_table.symbol(symbol_id).name();
+            if excluded_from_proto_members(name) {
+                continue;
+            }
+            if members.contains_key(name) {
+                continue;
+            }
 
-                    let member = ProtocolMemberData { kind, qualifiers };
-                    (name.clone(), member)
-                }),
-        );
+            let member = match ty {
+                Type::PropertyInstance(property) => {
+                    PropertyMember::from_property_instance(property, db)
+                        .map(ProtocolMemberKind::Property)
+                        .unwrap_or_else(|| {
+                            ProtocolMemberKind::Attribute(AttributeMember { ty, bound_on_class })
+                        })
+                }
+                Type::Callable(callable)
+                    if bound_on_class.is_yes() && callable.is_function_like(db) =>
+                {
+                    ProtocolMemberKind::Method(callable)
+                }
+                Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
+                    ProtocolMemberKind::Method(function.into_callable_type(db))
+                }
+                _ => ProtocolMemberKind::Attribute(AttributeMember { ty, bound_on_class }),
+            };
+
+            members.insert(
+                name.clone(),
+                ProtocolMemberData {
+                    kind: member,
+                    qualifiers,
+                },
+            );
+        }
     }
 
     ProtocolInterface::new(db, members)
