@@ -237,7 +237,7 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
-We have to add `x: T` to the classes to ensure they're not invariant in `T` (__new__ and __init__
+We have to add `x: T` to the classes to ensure they're not bivariant in `T` (__new__ and __init__
 signatures don't count towards variance).
 
 ### `__new__` only

@@ -7008,7 +7008,7 @@ pub struct TypeVarInstance<'db> {
     /// instead (to evaluate any lazy bound or constraints).
     _bound_or_constraints: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
 
-    /// The explicit variance of the TypeVar
+    /// The explicitly specified variance of the TypeVar
     explicit_variance: Option<TypeVarVariance>,
 
     /// The default type for this TypeVar, if any. Don't use this field directly, use the

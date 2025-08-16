@@ -359,7 +359,7 @@ class D[Y]:
         return C()
 ```
 
-`X` is contravariant in both `C` and `D`:
+`C` is contravariant in `X`, and `D` in `Y`:
 
 - `C` has two occurrences of `X`
     - `X` occurs in the return type of `f` as `D[X]` (`X` is substituted in for `Y`)
@@ -394,7 +394,7 @@ static_assert(not is_subtype_of(D[Any], D[B]))
 
 ### Mutable Attributes
 
-Normal attribtues are mutable, and so are invariant (see [inv]).
+Normal attributes are mutable, and so make the enclosing class invariant in this typevar (see [inv]).
 
 ```py
 from ty_extensions import is_subtype_of, static_assert
@@ -413,7 +413,8 @@ One might think that normal attributes are
 
 ### Immutable Attributes
 
-Immutable attributes can't be written to, and so don't have the same problem as mutable ones.
+Immutable attributes can't be written to, and thus constrain the typevar to covariance, not
+invariance:
 
 ```py
 from dataclasses import dataclass
@@ -445,7 +446,7 @@ static_assert(not is_subtype_of(E[A], E[B]))
 
 ### Properties
 
-Properties are covariant if they are get-only and invariant if they are getset
+Properties constrain to covariance if they are get-only and invariant if they are get-set:
 
 ```py
 class A: ...
@@ -462,7 +463,7 @@ class D[U]:
         return None
 
     @y.setter
-    def value(self, value: U): ...
+    def y(self, value: U): ...
 ```
 
 while accessing `D().x` will give you an `int`, the descriptor methods say this should be
@@ -517,7 +518,7 @@ static_assert(is_subtype_of(C[A], C[B]))
 
 This example is then bivariant because it doesn't use `T` outside of the two exempted methods.
 
-This holds likewise for dataclasses with synthesized **init**
+This holds likewise for dataclasses with synthesized `__init__`:
 
 ```py
 from dataclasses import dataclass
