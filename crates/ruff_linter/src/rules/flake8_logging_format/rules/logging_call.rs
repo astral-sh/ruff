@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
-    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
+    LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat, LoggingPreFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 use crate::{Edit, Fix};
@@ -169,6 +169,24 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
     if let Some(format_arg) = call.arguments.find_argument_value("msg", msg_pos) {
         check_msg(checker, format_arg);
+    }
+
+    // G005
+    let skip = match logging_call_type {
+        LoggingCallType::LevelCall(_) => 1,
+        LoggingCallType::LogCall => 2,
+    };
+    if checker.is_rule_enabled(Rule::LoggingPreFormat) {
+        // Check if any positional args for log message values are calls to pre-format as a string
+        call.arguments.args.iter().skip(skip).for_each(|arg| {
+            if let Expr::Call(ast::ExprCall { func, .. }) = arg {
+                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
+                    if id == "str" || id == "repr" {
+                        checker.report_diagnostic(LoggingPreFormat, arg.range());
+                    }
+                }
+            }
+        });
     }
 
     // G010
