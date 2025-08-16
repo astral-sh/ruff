@@ -227,7 +227,7 @@ impl CodeGeneratorKind {
         code_generator_of_class(db, class)
     }
 
-    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }

@@ -115,15 +115,28 @@ class Location(NamedTuple):
 
 ### Multiple Inheritance
 
-Multiple inheritance is not supported for `NamedTuple` classes:
+<!-- snapshot-diagnostics -->
+
+Multiple inheritance is not supported for `NamedTuple` classes except with `Generic`:
 
 ```py
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
-# This should ideally emit a diagnostic
+# error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
 class C(NamedTuple, object):
     id: int
-    name: str
+
+# fmt: off
+
+class D(
+    int,  # error: [invalid-named-tuple]
+    NamedTuple
+): ...
+
+# fmt: on
+
+# error: [invalid-named-tuple]
+class E(NamedTuple, Protocol): ...
 ```
 
 ### Inheriting from a `NamedTuple`

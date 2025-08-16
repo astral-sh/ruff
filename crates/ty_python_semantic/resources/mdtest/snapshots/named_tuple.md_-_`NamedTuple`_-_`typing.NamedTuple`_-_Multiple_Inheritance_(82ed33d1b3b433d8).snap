@@ -1,0 +1,73 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: named_tuple.md - `NamedTuple` - `typing.NamedTuple` - Multiple Inheritance
+mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import NamedTuple, Protocol
+ 2 | 
+ 3 | # error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
+ 4 | class C(NamedTuple, object):
+ 5 |     id: int
+ 6 | 
+ 7 | # fmt: off
+ 8 | 
+ 9 | class D(
+10 |     int,  # error: [invalid-named-tuple]
+11 |     NamedTuple
+12 | ): ...
+13 | 
+14 | # fmt: on
+15 | 
+16 | # error: [invalid-named-tuple]
+17 | class E(NamedTuple, Protocol): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-named-tuple]: NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`
+ --> src/mdtest_snippet.py:4:21
+  |
+3 | # error: [invalid-named-tuple] "NamedTuple class `C` cannot use multiple inheritance except with `Generic[]`"
+4 | class C(NamedTuple, object):
+  |                     ^^^^^^
+5 |     id: int
+  |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: NamedTuple class `D` cannot use multiple inheritance except with `Generic[]`
+  --> src/mdtest_snippet.py:10:5
+   |
+ 9 | class D(
+10 |     int,  # error: [invalid-named-tuple]
+   |     ^^^
+11 |     NamedTuple
+12 | ): ...
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: NamedTuple class `E` cannot use multiple inheritance except with `Generic[]`
+  --> src/mdtest_snippet.py:17:21
+   |
+16 | # error: [invalid-named-tuple]
+17 | class E(NamedTuple, Protocol): ...
+   |                     ^^^^^^^^
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```

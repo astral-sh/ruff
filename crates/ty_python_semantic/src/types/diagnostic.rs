@@ -57,6 +57,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
+    registry.register_lint(&INVALID_NAMED_TUPLE);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
@@ -443,6 +444,39 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_PROTOCOL = {
         summary: "detects invalid protocol class definitions",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalidly defined `NamedTuple` classes.
+    ///
+    /// ## Why is this bad?
+    /// An invalidly defined `NamedTuple` class may lead to the type checker
+    /// inferring unexpected things. It may also lead to `TypeError`s at runtime.
+    ///
+    /// ## Examples
+    /// A class definition cannot combine `NamedTuple` with other base classes
+    /// in multiple inheritance; doing so raises a `TypeError` at runtime. The sole
+    /// exception to this rule is `Generic[]`, which can be used alongside `NamedTuple`
+    /// in a class's bases list.
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple, object): ...
+    /// ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-1>", line 1, in <module>
+    ///     class Foo(NamedTuple, object): ...
+    ///   File "/python3.13/typing.py", line 2998, in __new__
+    ///     raise TypeError(
+    ///         'can only inherit from a NamedTuple type and Generic')
+    /// TypeError: can only inherit from a NamedTuple type and Generic
+    /// ```
+    pub(crate) static INVALID_NAMED_TUPLE = {
+        summary: "detects invalid `NamedTuple` class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
