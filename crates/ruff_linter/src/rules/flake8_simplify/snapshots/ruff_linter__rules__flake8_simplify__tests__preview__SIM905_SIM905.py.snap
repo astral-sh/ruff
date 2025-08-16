@@ -95,7 +95,7 @@ help: Replace with list literal
 16 16 | "a,b,c,d".split(sep=",")
 17 17 | "a,b,c,d".split(sep=None)
 
-SIM905 Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:15:1
    |
 13 | "a,b,c,d".split(None)
@@ -106,6 +106,16 @@ SIM905 Consider using a list literal instead of `str.split`
 17 | "a,b,c,d".split(sep=None)
    |
 help: Replace with list literal
+
+ℹ Safe fix
+12 12 | "a,b,c,d".split(",")
+13 13 | "a,b,c,d".split(None)
+14 14 | "a,b,c,d".split(",", 1)
+15    |-"a,b,c,d".split(None, 1)
+   15 |+["a,b,c,d"]
+16 16 | "a,b,c,d".split(sep=",")
+17 17 | "a,b,c,d".split(sep=None)
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:16:1
@@ -173,7 +183,7 @@ help: Replace with list literal
 20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
 21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
 
-SIM905 Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:19:1
    |
 17 | "a,b,c,d".split(sep=None)
@@ -184,6 +194,16 @@ SIM905 Consider using a list literal instead of `str.split`
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
    |
 help: Replace with list literal
+
+ℹ Safe fix
+16 16 | "a,b,c,d".split(sep=",")
+17 17 | "a,b,c,d".split(sep=None)
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19    |-"a,b,c,d".split(sep=None, maxsplit=1)
+   19 |+["a,b,c,d"]
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 22 | "a,b,c,d".split(",", maxsplit=1)
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:20:1
@@ -207,7 +227,7 @@ help: Replace with list literal
 22 22 | "a,b,c,d".split(",", maxsplit=1)
 23 23 | "a,b,c,d".split(None, maxsplit=1)
 
-SIM905 Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:21:1
    |
 19 | "a,b,c,d".split(sep=None, maxsplit=1)
@@ -218,6 +238,16 @@ SIM905 Consider using a list literal instead of `str.split`
 23 | "a,b,c,d".split(None, maxsplit=1)
    |
 help: Replace with list literal
+
+ℹ Safe fix
+18 18 | "a,b,c,d".split(sep=",", maxsplit=1)
+19 19 | "a,b,c,d".split(sep=None, maxsplit=1)
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21    |-"a,b,c,d".split(maxsplit=1, sep=None)
+   21 |+["a,b,c,d"]
+22 22 | "a,b,c,d".split(",", maxsplit=1)
+23 23 | "a,b,c,d".split(None, maxsplit=1)
+24 24 | "a,b,c,d".split(maxsplit=1)
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:22:1
@@ -241,7 +271,7 @@ help: Replace with list literal
 24 24 | "a,b,c,d".split(maxsplit=1)
 25 25 | "a,b,c,d".split(maxsplit=1.0)
 
-SIM905 Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:23:1
    |
 21 | "a,b,c,d".split(maxsplit=1, sep=None)
@@ -253,7 +283,17 @@ SIM905 Consider using a list literal instead of `str.split`
    |
 help: Replace with list literal
 
-SIM905 Consider using a list literal instead of `str.split`
+ℹ Safe fix
+20 20 | "a,b,c,d".split(maxsplit=1, sep=",")
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 22 | "a,b,c,d".split(",", maxsplit=1)
+23    |-"a,b,c,d".split(None, maxsplit=1)
+   23 |+["a,b,c,d"]
+24 24 | "a,b,c,d".split(maxsplit=1)
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+26 26 | "a,b,c,d".split(maxsplit=1)
+
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:24:1
    |
 22 | "a,b,c,d".split(",", maxsplit=1)
@@ -265,7 +305,17 @@ SIM905 Consider using a list literal instead of `str.split`
    |
 help: Replace with list literal
 
-SIM905 Consider using a list literal instead of `str.split`
+ℹ Safe fix
+21 21 | "a,b,c,d".split(maxsplit=1, sep=None)
+22 22 | "a,b,c,d".split(",", maxsplit=1)
+23 23 | "a,b,c,d".split(None, maxsplit=1)
+24    |-"a,b,c,d".split(maxsplit=1)
+   24 |+["a,b,c,d"]
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+26 26 | "a,b,c,d".split(maxsplit=1)
+27 27 | "a,b,c,d".split(maxsplit=0)
+
+SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:26:1
    |
 24 | "a,b,c,d".split(maxsplit=1)
@@ -276,6 +326,16 @@ SIM905 Consider using a list literal instead of `str.split`
 28 | "VERB AUX PRON ADP DET".split(" ")
    |
 help: Replace with list literal
+
+ℹ Safe fix
+23 23 | "a,b,c,d".split(None, maxsplit=1)
+24 24 | "a,b,c,d".split(maxsplit=1)
+25 25 | "a,b,c,d".split(maxsplit=1.0)
+26    |-"a,b,c,d".split(maxsplit=1)
+   26 |+["a,b,c,d"]
+27 27 | "a,b,c,d".split(maxsplit=0)
+28 28 | "VERB AUX PRON ADP DET".split(" ")
+29 29 | '   1   2   3   '.split()
 
 SIM905 [*] Consider using a list literal instead of `str.split`
   --> SIM905.py:27:1
@@ -1484,7 +1544,7 @@ help: Replace with list literal
 170 170 | # leading/trailing whitespace should not count towards maxsplit
 171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
 
-SIM905 Consider using a list literal instead of `str.split`
+SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:171:1
     |
 170 | # leading/trailing whitespace should not count towards maxsplit
@@ -1494,7 +1554,15 @@ SIM905 Consider using a list literal instead of `str.split`
     |
 help: Replace with list literal
 
-SIM905 Consider using a list literal instead of `str.split`
+ℹ Safe fix
+168 168 | print("<\x1c\x1d\x1e\x1f".rsplit(maxsplit=0))
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171     |-" a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+    171 |+["a", "b", "c d "]  # ["a", "b", "c d "]
+172 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
    --> SIM905.py:172:1
     |
 170 | # leading/trailing whitespace should not count towards maxsplit
@@ -1503,3 +1571,10 @@ SIM905 Consider using a list literal instead of `str.split`
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Replace with list literal
+
+ℹ Safe fix
+169 169 | 
+170 170 | # leading/trailing whitespace should not count towards maxsplit
+171 171 | " a b c d ".split(maxsplit=2)  # ["a", "b", "c d "]
+172     |-" a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
+    172 |+[" a b", "c", "d"]  # [" a b", "c", "d"]
