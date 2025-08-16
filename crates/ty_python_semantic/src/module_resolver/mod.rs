@@ -1,8 +1,9 @@
 use std::iter::FusedIterator;
 
+pub use list::list_modules;
 pub(crate) use module::KnownModule;
 pub use module::Module;
-pub use path::SearchPathValidationError;
+pub use path::{SearchPath, SearchPathValidationError};
 pub use resolver::SearchPaths;
 pub(crate) use resolver::file_to_module;
 pub use resolver::{resolve_module, resolve_real_module};
@@ -12,6 +13,7 @@ use crate::Db;
 use crate::module_resolver::resolver::{ModuleResolveMode, search_paths};
 use resolver::SearchPathIterator;
 
+mod list;
 mod module;
 mod path;
 mod resolver;

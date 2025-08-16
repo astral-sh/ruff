@@ -18,8 +18,9 @@ use std::fmt::Write;
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
+    Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
+    resolve_module,
 };
 
 mod assertion;
@@ -68,13 +69,16 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
+        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let inconsistencies = run_module_resolution_consistency_test(&db);
+        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        any_failures = any_failures || this_test_failed;
+
+        if this_test_failed && output_format.is_cli() {
+            println!("\n{}\n", test.name().bold().underline());
+        }
+
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
-            any_failures = true;
-
-            if output_format.is_cli() {
-                println!("\n{}\n", test.name().bold().underline());
-            }
-
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -100,19 +104,32 @@ pub fn run(
                     }
                 }
             }
-
-            let escaped_test_name = test.name().replace('\'', "\\'");
-
-            if output_format.is_cli() {
-                println!(
-                    "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
-                    EnvVars::MDTEST_TEST_FILTER,
-                );
-                println!(
-                    "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
-                    EnvVars::MDTEST_TEST_FILTER,
-                );
+        }
+        if let Err(inconsistencies) = run_module_resolution_consistency_test(&db) {
+            any_failures = true;
+            for inconsistency in inconsistencies {
+                match output_format {
+                    OutputFormat::Cli => {
+                        let info = relative_fixture_path.to_string().cyan();
+                        println!("  {info} {inconsistency}");
+                    }
+                    OutputFormat::GitHub => {
+                        println!("::error file={absolute_fixture_path}::{inconsistency}");
+                    }
+                }
             }
+        }
+
+        if this_test_failed && output_format.is_cli() {
+            let escaped_test_name = test.name().replace('\'', "\\'");
+            println!(
+                "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+                EnvVars::MDTEST_TEST_FILTER,
+            );
+            println!(
+                "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+                EnvVars::MDTEST_TEST_FILTER,
+            );
         }
     }
 
@@ -403,6 +420,92 @@ fn run_test(
         Ok(())
     } else {
         Err(failures)
+    }
+}
+
+/// Reports an inconsistency between "list modules" and "resolve module."
+///
+/// Values of this type are only constructed when `from_list` and
+/// `from_resolve` are not equivalent.
+struct ModuleInconsistency<'db> {
+    db: &'db db::Db,
+    /// The module returned from `list_module`.
+    from_list: Module<'db>,
+    /// The module returned, if any, from `resolve_module`.
+    from_resolve: Option<Module<'db>>,
+}
+
+/// Tests that "list modules" is consistent with "resolve module."
+///
+/// This only checks that everything returned by `list_module` is the
+/// identical module we get back from `resolve_module`. It does not
+/// check that all possible outputs of `resolve_module` are captured by
+/// `list_module`.
+fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
+    let mut errs = vec![];
+    for from_list in list_modules(db) {
+        errs.push(match resolve_module(db, from_list.name(db)) {
+            None => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: None,
+            },
+            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                db,
+                from_list,
+                from_resolve: Some(from_resolve),
+            },
+            _ => continue,
+        });
+    }
+    if errs.is_empty() { Ok(()) } else { Err(errs) }
+}
+
+impl std::fmt::Display for ModuleInconsistency<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fn fmt_module(
+            db: &db::Db,
+            f: &mut std::fmt::Formatter,
+            module: &Module<'_>,
+        ) -> std::fmt::Result {
+            let name = module.name(db);
+            let path = module
+                .file(db)
+                .map(|file| file.path(db).to_string())
+                .unwrap_or_else(|| "N/A".to_string());
+            let search_path = module
+                .search_path(db)
+                .map(SearchPath::to_string)
+                .unwrap_or_else(|| "N/A".to_string());
+            let known = module
+                .known(db)
+                .map(|known| known.to_string())
+                .unwrap_or_else(|| "N/A".to_string());
+            write!(
+                f,
+                "Module(\
+                   name={name}, \
+                   file={path}, \
+                   kind={kind:?}, \
+                   search_path={search_path}, \
+                   known={known}\
+                 )",
+                kind = module.kind(db),
+            )
+        }
+        write!(f, "Found ")?;
+        fmt_module(self.db, f, &self.from_list)?;
+        match self.from_resolve {
+            None => write!(
+                f,
+                " when listing modules, but `resolve_module` returned `None`",
+            )?,
+            Some(ref got) => {
+                write!(f, " when listing modules, but `resolve_module` returned ",)?;
+                fmt_module(self.db, f, got)?;
+            }
+        }
+        Ok(())
     }
 }
 
