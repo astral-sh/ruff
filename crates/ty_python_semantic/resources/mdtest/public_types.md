@@ -186,6 +186,60 @@ def outer(x: A | None):
         inner()
 ```
 
+"Reassignment" here refers to a thing that happens after the closure is defined that can actually
+change the inferred type of a captured symbol. Something done before the closure definition is more
+of a shadowing, and doesn't actually invalidate narrowing.
+
+```py
+def outer() -> None:
+    x = None
+
+    def inner() -> None:
+        # In this scope, `x` may refer to `x = None` or `x = 1`.
+        reveal_type(x)  # revealed: None | Literal[1]
+    inner()
+
+    x = 1
+
+    inner()
+
+    def inner2() -> None:
+        # In this scope, `x = None` appears as being shadowed by `x = 1`.
+        reveal_type(x)  # revealed: Literal[1]
+    inner2()
+
+def outer() -> None:
+    x = None
+
+    x = 1
+
+    def inner() -> None:
+        # TODO: ideally, this should be `Literal[1, 2]`
+        reveal_type(x)  # revealed: None | Literal[1, 2]
+    inner()
+
+    x = 2
+
+def outer(x: A | None):
+    if x is None:
+        x = A()
+
+    reveal_type(x)  # revealed: A
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: A
+    inner()
+
+def outer(x: A | None):
+    x = x or A()
+
+    reveal_type(x)  # revealed: A
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: A
+    inner()
+```
+
 ## At module level
 
 The behavior is the same if the outer scope is the global scope of a module:
@@ -265,37 +319,17 @@ def outer() -> None:
     inner()
 ```
 
-This is currently even true if the `inner` function is only defined after the second assignment to
-`x`:
+And, in the current implementation, shadowing of module symbols (i.e., symbols exposed to other
+modules) cannot be recognized from lazy scopes.
 
 ```py
-def outer() -> None:
-    x = None
+class A: ...
+class A: ...
 
-    # [additional code here]
-
-    x = 1
-
-    def inner() -> None:
-        # TODO: this should be `Literal[1]`. Mypy and pyright support this.
-        reveal_type(x)  # revealed: None | Literal[1]
-    inner()
-```
-
-A similar case derived from an ecosystem example, involving declared types:
-
-```py
-class C: ...
-
-def outer(x: C | None):
-    x = x or C()
-
-    reveal_type(x)  # revealed: C
-
-    def inner() -> None:
-        # TODO: this should ideally be `C`
-        reveal_type(x)  # revealed: C | None
-    inner()
+def f(x: A):
+    # TODO: no error
+    # error: [invalid-assignment] "Object of type `A | A` is not assignable to `A`"
+    x = A()
 ```
 
 ### Assignments to nonlocal variables
