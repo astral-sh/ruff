@@ -204,50 +204,54 @@ impl AttributeKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AttributeAssignmentResults<'db>(FxOrderSet<AttributeAssignmentResult<'db>>);
+#[derive(Debug, Default)]
+pub(crate) struct AttributeAssignmentErrors<'db>(FxOrderSet<AttributeAssignmentError<'db>>);
 
-impl<'db> IntoIterator for AttributeAssignmentResults<'db> {
-    type Item = AttributeAssignmentResult<'db>;
-    type IntoIter = ordermap::set::IntoIter<AttributeAssignmentResult<'db>>;
+impl<'db> IntoIterator for AttributeAssignmentErrors<'db> {
+    type Item = AttributeAssignmentError<'db>;
+    type IntoIter = ordermap::set::IntoIter<AttributeAssignmentError<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'db> AttributeAssignmentResults<'db> {
-    fn empty() -> Self {
-        Self(FxOrderSet::default())
-    }
-
-    pub(crate) fn is_not_err(&self) -> bool {
-        self.0.iter().all(AttributeAssignmentResult::is_not_err)
-    }
-
+impl<'db> AttributeAssignmentErrors<'db> {
     pub(crate) fn is_possibly_unbound(&self) -> bool {
         self.0
             .iter()
-            .any(AttributeAssignmentResult::is_possibly_unbound)
+            .any(AttributeAssignmentError::is_possibly_unbound)
     }
 
-    fn insert(&mut self, result: AttributeAssignmentResult<'db>) {
+    fn insert(&mut self, result: AttributeAssignmentError<'db>) {
         self.0.insert(result);
     }
 
-    fn and(mut self, result: AttributeAssignmentResult<'db>) -> Self {
-        if result.is_err() {
-            self.0
-                .retain(|result| !matches!(result, AttributeAssignmentResult::Ok));
+    fn insert_if_error<T>(&mut self, result: Result<T, AttributeAssignmentError<'db>>) {
+        if let Err(error) = result {
+            self.insert(error);
         }
-        self.insert(result);
-        self
+    }
+
+    fn and<T>(mut self, result: Result<T, AttributeAssignmentError<'db>>) -> Result<T, Self> {
+        match result {
+            Ok(value) => {
+                if self.0.is_empty() {
+                    Ok(value)
+                } else {
+                    Err(self)
+                }
+            }
+            Err(error) => {
+                self.0.insert(error);
+                Err(self)
+            }
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum AttributeAssignmentResult<'db> {
-    Ok,
+pub(crate) enum AttributeAssignmentError<'db> {
     PossiblyUnbound,
     TypeMismatch(Type<'db>),
     CannotAssign,
@@ -262,15 +266,7 @@ pub(crate) enum AttributeAssignmentResult<'db> {
     Unresolved,
 }
 
-impl AttributeAssignmentResult<'_> {
-    pub(crate) const fn is_not_err(&self) -> bool {
-        matches!(self, Self::Ok | Self::PossiblyUnbound)
-    }
-
-    pub(crate) const fn is_err(&self) -> bool {
-        !self.is_not_err()
-    }
-
+impl AttributeAssignmentError<'_> {
     pub(crate) const fn is_possibly_unbound(&self) -> bool {
         matches!(self, Self::PossiblyUnbound)
     }
@@ -1970,9 +1966,9 @@ impl<'db> Type<'db> {
                             get_type.is_disjoint_from_impl(db, attribute_type, visitor)
                         })
                 }) || member.instance_set_type().is_ok_and(|set_type| {
-                    !other
+                    other
                         .validate_attribute_assignment(db, attribute, set_type)
-                        .is_not_err()
+                        .is_err()
                 })
             })
         }
@@ -2144,15 +2140,27 @@ impl<'db> Type<'db> {
             }
 
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
-                any_protocol_members_absent_or_disjoint(db, protocol, special_form.instance_fallback(db), visitor)
-                }),
-
+            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
+                visitor.visit((self, other), || {
+                    any_protocol_members_absent_or_disjoint(
+                        db,
+                        protocol,
+                        special_form.instance_fallback(db),
+                        visitor,
+                    )
+                })
+            }
 
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
-            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
-                any_protocol_members_absent_or_disjoint(db, protocol, known_instance.instance_fallback(db), visitor)
-            }),
+            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => visitor
+                .visit((self, other), || {
+                    any_protocol_members_absent_or_disjoint(
+                        db,
+                        protocol,
+                        known_instance.instance_fallback(db),
+                        visitor,
+                    )
+                }),
 
             // The absence of a protocol member on one of these types guarantees
             // that the type will be disjoint from the protocol,
@@ -2191,8 +2199,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)
-                | Type::EnumLiteral(..)
-            ),
+                | Type::EnumLiteral(..)),
                 Type::ProtocolInstance(protocol),
             )
             | (
@@ -2207,26 +2214,32 @@ impl<'db> Type<'db> {
                 | Type::GenericAlias(..)
                 | Type::IntLiteral(..)
                 | Type::EnumLiteral(..)),
-            )  => visitor.visit((self, other), || any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor)),
+            ) => visitor.visit((self, other), || {
+                any_protocol_members_absent_or_disjoint(db, protocol, ty, visitor)
+            }),
 
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
             // (<https://github.com/rust-lang/rust/issues/129967>)
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol))
-                if n.class(db).is_final(db) => visitor.visit((self, other), ||
+                if n.class(db).is_final(db) =>
             {
-                any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
-            }),
+                visitor.visit((self, other), || {
+                    any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
+                })
+            }
 
             (Type::ProtocolInstance(protocol), other_ty)
             | (other_ty, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 protocol.interface(db).members(db).any(|member| {
-                    matches!(
-                        other_ty.member(db, member.name()).place,
-                        Place::Type(attribute_type, _)
-                        if member.instance_get_type(db).is_some_and(|get_type| get_type.is_disjoint_from_impl(db, attribute_type, visitor))
-                    )
+                    member.instance_get_type(db).is_some_and(|get_type| {
+                        matches!(
+                            other_ty.member(db, member.name()).place,
+                            Place::Type(attribute_type, _)
+                            if get_type.is_disjoint_from_impl(db, attribute_type, visitor)
+                        )
+                    })
                 })
             }),
 
@@ -2248,15 +2261,17 @@ impl<'db> Type<'db> {
                 }
             }
 
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => left.is_disjoint_from_impl(db, right),
+            (Type::SubclassOf(left), Type::SubclassOf(right)) => {
+                left.is_disjoint_from_impl(db, right)
+            }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
             // so although the type is dynamic we can still determine disjointedness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) => {
-                    KnownClass::Type.to_instance(db).is_disjoint_from_impl(db, other, visitor)
-                }
+                SubclassOfInner::Dynamic(_) => KnownClass::Type
+                    .to_instance(db)
+                    .is_disjoint_from_impl(db, other, visitor),
                 SubclassOfInner::Class(class) => class
                     .metaclass_instance_type(db)
                     .is_disjoint_from_impl(db, other, visitor),
@@ -2311,9 +2326,11 @@ impl<'db> Type<'db> {
                 !KnownClass::Bytes.is_subclass_of(db, instance.class(db))
             }
 
-            (Type::EnumLiteral(enum_literal), instance@Type::NominalInstance(_))
-            | (instance@Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
-                !enum_literal.enum_class_instance(db).is_subtype_of(db, instance)
+            (Type::EnumLiteral(enum_literal), instance @ Type::NominalInstance(_))
+            | (instance @ Type::NominalInstance(_), Type::EnumLiteral(enum_literal)) => {
+                !enum_literal
+                    .enum_class_instance(db)
+                    .is_subtype_of(db, instance)
             }
             (Type::EnumLiteral(..), _) | (_, Type::EnumLiteral(..)) => true,
 
@@ -4781,12 +4798,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         attribute: &str,
         value_ty: Type<'db>,
-    ) -> AttributeAssignmentResults<'db> {
-        let ensure_assignable_to = |attr_ty| -> AttributeAssignmentResult {
+    ) -> Result<(), AttributeAssignmentErrors<'db>> {
+        let ensure_assignable_to = |attr_ty| -> Result<(), AttributeAssignmentError> {
             if value_ty.is_assignable_to(db, attr_ty) {
-                AttributeAssignmentResult::Ok
+                Ok(())
             } else {
-                AttributeAssignmentResult::TypeMismatch(attr_ty)
+                Err(AttributeAssignmentError::TypeMismatch(attr_ty))
             }
         };
 
@@ -4794,20 +4811,24 @@ impl<'db> Type<'db> {
         let invalid_assignment_to_final =
             |qualifiers: TypeQualifiers| -> bool { qualifiers.contains(TypeQualifiers::FINAL) };
 
-        let mut results = AttributeAssignmentResults::empty();
+        let mut results = AttributeAssignmentErrors::default();
 
         match self {
             Type::Union(union) => {
                 if union.elements(db).iter().all(|elem| {
                     let res = elem.validate_attribute_assignment(db, attribute, value_ty);
-                    if res.is_possibly_unbound() {
-                        results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                    match res {
+                        Ok(()) => true,
+                        Err(errors) if errors.is_possibly_unbound() => {
+                            results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            true
+                        }
+                        _ => false,
                     }
-                    res.is_not_err()
                 }) {
-                    results.and(AttributeAssignmentResult::Ok)
+                    results.and(Ok(()))
                 } else {
-                    results.and(AttributeAssignmentResult::TypeMismatch(self))
+                    results.and(Err(AttributeAssignmentError::TypeMismatch(self)))
                 }
             }
 
@@ -4815,14 +4836,18 @@ impl<'db> Type<'db> {
                 // TODO: Handle negative intersection elements
                 if intersection.positive(db).iter().any(|elem| {
                     let res = elem.validate_attribute_assignment(db, attribute, value_ty);
-                    if res.is_possibly_unbound() {
-                        results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                    match res {
+                        Ok(()) => true,
+                        Err(errors) if errors.is_possibly_unbound() => {
+                            results.insert(AttributeAssignmentError::PossiblyUnbound);
+                            true
+                        }
+                        _ => false,
                     }
-                    res.is_not_err()
                 }) {
-                    results.and(AttributeAssignmentResult::Ok)
+                    results.and(Ok(()))
                 } else {
-                    results.and(AttributeAssignmentResult::TypeMismatch(self))
+                    results.and(Err(AttributeAssignmentError::TypeMismatch(self)))
                 }
             }
 
@@ -4834,11 +4859,11 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance)
                 if instance.class(db).is_known(db, KnownClass::Super) =>
             {
-                results.and(AttributeAssignmentResult::CannotAssign)
+                results.and(Err(AttributeAssignmentError::CannotAssign))
             }
-            Type::BoundSuper(_) => results.and(AttributeAssignmentResult::CannotAssign),
+            Type::BoundSuper(_) => results.and(Err(AttributeAssignmentError::CannotAssign)),
 
-            Type::Dynamic(..) | Type::Never => results.and(AttributeAssignmentResult::Ok),
+            Type::Dynamic(..) | Type::Never => results.and(Ok(())),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -4866,7 +4891,7 @@ impl<'db> Type<'db> {
                 if let Type::ProtocolInstance(protocol) = self {
                     if let Some(member) = protocol.interface(db).member_by_name(db, attribute) {
                         if let Err(err) = member.instance_set_type() {
-                            return results.and(err);
+                            return results.and(Err(err));
                         }
                     }
                 }
@@ -4900,15 +4925,15 @@ impl<'db> Type<'db> {
 
                         let member_exists = !self.member(db, attribute).place.is_unbound();
 
-                        if !member_exists {
-                            AttributeAssignmentResult::CannotAssignToUnresolved
+                        Err(if !member_exists {
+                            AttributeAssignmentError::CannotAssignToUnresolved
                         } else if is_setattr_synthesized {
-                            AttributeAssignmentResult::ReadOnlyProperty
+                            AttributeAssignmentError::ReadOnlyProperty
                         } else {
-                            AttributeAssignmentResult::SetAttrReturnsNeverOrNoReturn
-                        }
+                            AttributeAssignmentError::SetAttrReturnsNeverOrNoReturn
+                        })
                     }
-                    _ => AttributeAssignmentResult::Ok,
+                    _ => Ok(()),
                 };
 
                 match setattr_dunder_call_result {
@@ -4917,12 +4942,12 @@ impl<'db> Type<'db> {
                         results.and(check_setattr_return_type(*bindings))
                     }
                     Err(CallDunderError::CallError(..)) => {
-                        results.and(AttributeAssignmentResult::FailToSetAttr)
+                        results.and(Err(AttributeAssignmentError::FailToSetAttr))
                     }
                     Err(CallDunderError::MethodNotAvailable) => {
                         match self.class_member(db, attribute.into()) {
                             meta_attr @ PlaceAndQualifiers { .. } if meta_attr.is_class_var() => {
-                                results.and(AttributeAssignmentResult::CannotAssignToClassVar)
+                                results.and(Err(AttributeAssignmentError::CannotAssignToClassVar))
                             }
                             PlaceAndQualifiers {
                                 place: Place::Type(meta_attr_ty, meta_attr_boundness),
@@ -4930,7 +4955,7 @@ impl<'db> Type<'db> {
                             } => {
                                 if invalid_assignment_to_final(qualifiers) {
                                     return results
-                                        .and(AttributeAssignmentResult::CannotAssignToFinal);
+                                        .and(Err(AttributeAssignmentError::CannotAssignToFinal));
                                 }
 
                                 // Check if it is assignable to the meta attribute type.
@@ -4948,13 +4973,11 @@ impl<'db> Type<'db> {
                                         )
                                         .is_ok();
 
-                                    if successful_call {
-                                        results.insert(AttributeAssignmentResult::Ok);
-                                    } else {
-                                        results.insert(AttributeAssignmentResult::FailToSet);
+                                    if !successful_call {
+                                        results.insert(AttributeAssignmentError::FailToSet);
                                     }
                                 } else {
-                                    results.insert(ensure_assignable_to(meta_attr_ty));
+                                    results.insert_if_error(ensure_assignable_to(meta_attr_ty));
                                 }
 
                                 // Check if it is assignable to the instance attribute type.
@@ -4970,19 +4993,17 @@ impl<'db> Type<'db> {
                                             instance_attr_boundness,
                                         )
                                     } else {
-                                        (AttributeAssignmentResult::Ok, Boundness::PossiblyUnbound)
+                                        (Ok(()), Boundness::PossiblyUnbound)
                                     };
 
-                                    results.insert(assignable);
+                                    results.insert_if_error(assignable);
 
                                     if boundness == Boundness::PossiblyUnbound {
-                                        results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
                                     }
-                                } else {
-                                    results.insert(AttributeAssignmentResult::Ok);
                                 }
 
-                                results
+                                results.and(Ok(()))
                             }
 
                             PlaceAndQualifiers {
@@ -4995,16 +5016,17 @@ impl<'db> Type<'db> {
                                 } = self.instance_member(db, attribute)
                                 {
                                     if invalid_assignment_to_final(qualifiers) {
-                                        return results
-                                            .and(AttributeAssignmentResult::CannotAssignToFinal);
+                                        return results.and(Err(
+                                            AttributeAssignmentError::CannotAssignToFinal,
+                                        ));
                                     }
 
                                     if instance_attr_boundness == Boundness::PossiblyUnbound {
-                                        results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                                        results.insert(AttributeAssignmentError::PossiblyUnbound);
                                     }
                                     results.and(ensure_assignable_to(instance_attr_ty))
                                 } else {
-                                    results.and(AttributeAssignmentResult::Unresolved)
+                                    results.and(Err(AttributeAssignmentError::Unresolved))
                                 }
                             }
                         }
@@ -5019,7 +5041,7 @@ impl<'db> Type<'db> {
                         qualifiers,
                     } => {
                         if invalid_assignment_to_final(qualifiers) {
-                            return results.and(AttributeAssignmentResult::CannotAssignToFinal);
+                            return results.and(Err(AttributeAssignmentError::CannotAssignToFinal));
                         }
 
                         // Check if it is assignable to the meta attribute type.
@@ -5033,13 +5055,11 @@ impl<'db> Type<'db> {
                                 )
                                 .is_ok();
 
-                            if successful_call {
-                                results.insert(AttributeAssignmentResult::Ok);
-                            } else {
-                                results.insert(AttributeAssignmentResult::FailToSet);
+                            if !successful_call {
+                                results.insert(AttributeAssignmentError::FailToSet);
                             }
                         } else {
-                            results.insert(ensure_assignable_to(meta_attr_ty));
+                            results.insert_if_error(ensure_assignable_to(meta_attr_ty));
                         }
 
                         // Check if it is assignable to the class attribute type.
@@ -5052,19 +5072,17 @@ impl<'db> Type<'db> {
                                 {
                                     (ensure_assignable_to(class_attr_ty), class_attr_boundness)
                                 } else {
-                                    (AttributeAssignmentResult::Ok, Boundness::PossiblyUnbound)
+                                    (Ok(()), Boundness::PossiblyUnbound)
                                 };
 
                             if boundness == Boundness::PossiblyUnbound {
-                                results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
                             }
 
-                            results.insert(assignable);
-                        } else {
-                            results.insert(AttributeAssignmentResult::Ok);
+                            results.insert_if_error(assignable);
                         }
 
-                        results
+                        results.and(Ok(()))
                     }
                     PlaceAndQualifiers {
                         place: Place::Unbound,
@@ -5078,11 +5096,12 @@ impl<'db> Type<'db> {
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                         {
                             if invalid_assignment_to_final(qualifiers) {
-                                return results.and(AttributeAssignmentResult::CannotAssignToFinal);
+                                return results
+                                    .and(Err(AttributeAssignmentError::CannotAssignToFinal));
                             }
 
                             if class_attr_boundness == Boundness::PossiblyUnbound {
-                                results.insert(AttributeAssignmentResult::PossiblyUnbound);
+                                results.insert(AttributeAssignmentError::PossiblyUnbound);
                             }
                             results.and(ensure_assignable_to(class_attr_ty))
                         } else {
@@ -5093,9 +5112,10 @@ impl<'db> Type<'db> {
 
                             // Attribute is declared or bound on instance. Forbid access from the class object
                             if attribute_is_bound_on_instance {
-                                results.and(AttributeAssignmentResult::CannotAssignToInstanceAttr)
+                                results
+                                    .and(Err(AttributeAssignmentError::CannotAssignToInstanceAttr))
                             } else {
-                                results.and(AttributeAssignmentResult::Unresolved)
+                                results.and(Err(AttributeAssignmentError::Unresolved))
                             }
                         }
                     }
@@ -5105,12 +5125,12 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(module) => {
                 if let Place::Type(attr_ty, _) = module.static_member(db, attribute).place {
                     if value_ty.is_assignable_to(db, attr_ty) {
-                        results.and(AttributeAssignmentResult::Ok)
+                        results.and(Ok(()))
                     } else {
-                        results.and(AttributeAssignmentResult::TypeMismatch(attr_ty))
+                        results.and(Err(AttributeAssignmentError::TypeMismatch(attr_ty)))
                     }
                 } else {
-                    results.and(AttributeAssignmentResult::Unresolved)
+                    results.and(Err(AttributeAssignmentError::Unresolved))
                 }
             }
         }

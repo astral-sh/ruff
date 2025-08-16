@@ -117,7 +117,7 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    AttributeAssignmentResult, CallDunderError, CallableType, ClassLiteral, ClassType,
+    AttributeAssignmentError, CallDunderError, CallableType, ClassLiteral, ClassType,
     DataclassParams, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, MetaclassCandidate, PEP695TypeAliasType, Parameter,
     ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
@@ -3882,13 +3882,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         attribute: &str,
         value_ty: Type<'db>,
     ) {
-        for result in object_ty.validate_attribute_assignment(self.db(), attribute, value_ty) {
+        let Err(errors) = object_ty.validate_attribute_assignment(self.db(), attribute, value_ty)
+        else {
+            return;
+        };
+        for result in errors {
             match result {
-                AttributeAssignmentResult::Ok => {}
-                AttributeAssignmentResult::PossiblyUnbound => {
+                AttributeAssignmentError::PossiblyUnbound => {
                     report_possibly_unbound_attribute(&self.context, target, attribute, object_ty);
                 }
-                AttributeAssignmentResult::TypeMismatch(target_ty) => {
+                AttributeAssignmentError::TypeMismatch(target_ty) => {
                     // TODO: This is not a very helpful error message for union/intersection, as it does not include the underlying reason
                     // why the assignment is invalid. This would be a good use case for sub-diagnostics.
                     report_invalid_attribute_assignment(
@@ -3899,7 +3902,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         attribute,
                     );
                 }
-                AttributeAssignmentResult::CannotAssign => {
+                AttributeAssignmentError::CannotAssign => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
                             "Cannot assign to attribute `{attribute}` on type `{}`",
@@ -3907,7 +3910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::CannotAssignToClassVar => {
+                AttributeAssignmentError::CannotAssignToClassVar => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
                     {
@@ -3918,7 +3921,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::CannotAssignToInstanceAttr => {
+                AttributeAssignmentError::CannotAssignToInstanceAttr => {
                     if let Some(builder) =
                         self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
                     {
@@ -3929,7 +3932,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::CannotAssignToFinal => {
+                AttributeAssignmentError::CannotAssignToFinal => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
                             "Cannot assign to final attribute `{attribute}` \
@@ -3938,7 +3941,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::CannotAssignToUnresolved => {
+                AttributeAssignmentError::CannotAssignToUnresolved => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format!(
                             "Can not assign to unresolved attribute `{attribute}` on type `{ty}`",
@@ -3946,7 +3949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::ReadOnlyProperty => {
+                AttributeAssignmentError::ReadOnlyProperty => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
                             "Property `{attribute}` defined in `{ty}` is read-only",
@@ -3954,7 +3957,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::FailToSet => {
+                AttributeAssignmentError::FailToSet => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
                         builder.into_diagnostic(format_args!(
@@ -3964,7 +3967,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::FailToSetAttr => {
+                AttributeAssignmentError::FailToSetAttr => {
                     if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
                         builder.into_diagnostic(format_args!(
                             "Can not assign object of type `{}` to attribute \
@@ -3975,7 +3978,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::SetAttrReturnsNeverOrNoReturn => {
+                AttributeAssignmentError::SetAttrReturnsNeverOrNoReturn => {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
                             "Cannot assign to attribute `{attribute}` on type `{}` \
@@ -3984,7 +3987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
                 }
-                AttributeAssignmentResult::Unresolved => {
+                AttributeAssignmentError::Unresolved => {
                     if let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, target) {
                         builder.into_diagnostic(format_args!(
                             "Unresolved attribute `{}` on type `{}`.",

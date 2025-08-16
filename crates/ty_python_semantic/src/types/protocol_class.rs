@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
 use crate::types::signatures::ParameterForm;
-use crate::types::{AttributeAssignmentResult, CallArguments, HasRelationToVisitor, UnionType};
+use crate::types::{AttributeAssignmentError, CallArguments, HasRelationToVisitor, UnionType};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -437,9 +437,9 @@ impl<'db> PropertyMember<'db> {
             }
         }
         if let Some(set_type) = self.set_type {
-            if !other
+            if other
                 .validate_attribute_assignment(db, attribute, set_type)
-                .is_not_err()
+                .is_err()
             {
                 return false;
             }
@@ -525,11 +525,11 @@ impl<'db> AttributeMember<'db> {
             other
                 .to_meta_type(db)
                 .validate_attribute_assignment(db, attribute, self.ty)
-                .is_not_err()
+                .is_ok()
         } else {
             other
                 .validate_attribute_assignment(db, attribute, self.ty)
-                .is_not_err()
+                .is_ok()
         }
     }
 }
@@ -651,16 +651,16 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn instance_set_type(&self) -> Result<Type<'db>, AttributeAssignmentResult<'db>> {
+    pub(super) fn instance_set_type(&self) -> Result<Type<'db>, AttributeAssignmentError<'db>> {
         match self.kind {
             ProtocolMemberKind::Property(property) => property
                 .set_type
                 .map(Ok)
-                .unwrap_or(Err(AttributeAssignmentResult::ReadOnlyProperty)),
-            ProtocolMemberKind::Method(_) => Err(AttributeAssignmentResult::CannotAssign),
+                .unwrap_or(Err(AttributeAssignmentError::ReadOnlyProperty)),
+            ProtocolMemberKind::Method(_) => Err(AttributeAssignmentError::CannotAssign),
             ProtocolMemberKind::Attribute(attribute) => {
                 if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
-                    Err(AttributeAssignmentResult::CannotAssignToClassVar)
+                    Err(AttributeAssignmentError::CannotAssignToClassVar)
                 } else {
                     Ok(attribute.ty)
                 }
@@ -740,7 +740,7 @@ enum BoundOnClass {
 }
 
 impl BoundOnClass {
-    fn from_qualifiers(qualifiers: TypeQualifiers) -> Self {
+    const fn from_qualifiers(qualifiers: TypeQualifiers) -> Self {
         if qualifiers.contains(TypeQualifiers::CLASS_VAR) {
             BoundOnClass::Yes
         } else {
