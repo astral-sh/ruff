@@ -176,3 +176,25 @@ PERF403 Use a dictionary comprehension instead of a for-loop
     |         ^^^^^^^
     |
 help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:200:9
+    |
+198 |     v = {}
+199 |     for o, (x,) in ["ox"]:
+200 |         v[x,] = o
+    |         ^^^^^^^^^
+201 |     return v
+    |
+help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:207:9
+    |
+205 |     v = {}
+206 |     for (o, p), x in [("op", "x")]:
+207 |         v[x] = o, p
+    |         ^^^^^^^^^^^
+208 |     return v
+    |
+help: Replace for loop with dict comprehension
