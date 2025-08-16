@@ -7,6 +7,8 @@ use ruff_python_ast::name::Name;
 
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
+use crate::types::visitor::TypeVisitor;
+use crate::types::{CallArguments, HasRelationToVisitor};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -107,7 +109,10 @@ impl<'db> ProtocolInterface<'db> {
                     Some(ty.normalized(db)),
                 );
                 let property_getter = CallableType::single(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
+                let property = PropertyMember {
+                    get_type: Some(property_getter),
+                    set_type: None,
+                };
                 (
                     Name::new(name),
                     ProtocolMemberData {
@@ -149,7 +154,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
-                place: Place::bound(member.ty()),
+                place: Place::bound(member.ty(db)),
                 qualifiers: member.qualifiers(),
             })
             .unwrap_or_else(|| Type::object(db).instance_member(db, name))
@@ -296,10 +301,10 @@ impl<'db> ProtocolMemberData<'db> {
                     }
                     ProtocolMemberKind::Property(property) => {
                         let mut d = f.debug_struct("PropertyMember");
-                        if let Some(getter) = property.getter(self.db) {
+                        if let Some(getter) = property.get_type {
                             d.field("getter", &format_args!("`{}`", &getter.display(self.db)));
                         }
-                        if let Some(setter) = property.setter(self.db) {
+                        if let Some(setter) = property.set_type {
                             d.field("setter", &format_args!("`{}`", &setter.display(self.db)));
                         }
                         d.finish()
@@ -318,10 +323,152 @@ impl<'db> ProtocolMemberData<'db> {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct PropertyMember<'db> {
+    get_type: Option<Type<'db>>,
+    set_type: Option<Type<'db>>,
+}
+
+impl<'db> PropertyMember<'db> {
+    fn from_property_instance(property: PropertyInstanceType<'db>, db: &'db dyn Db) -> Self {
+        PropertyMember {
+            // if the getter or setter is a function literal, we should
+            // upcast it to a `CallableType` so that two protocols with identical property
+            // members are recognized as equivalent.
+            get_type: property
+                .getter(db)
+                .map(|ty| ty.into_callable(db).unwrap_or(ty)),
+            set_type: property
+                .setter(db)
+                .map(|ty| ty.into_callable(db).unwrap_or(ty)),
+        }
+    }
+
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self {
+            get_type: self.get_type.map(|ty| ty.normalized_impl(db, visitor)),
+            set_type: self.set_type.map(|ty| ty.normalized_impl(db, visitor)),
+        }
+    }
+
+    fn apply_type_mapping<'a>(&self, db: &'db dyn Db, type_mapping: &TypeMapping<'a, 'db>) -> Self {
+        Self {
+            get_type: self
+                .get_type
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+            set_type: self
+                .set_type
+                .map(|ty| ty.apply_type_mapping(db, type_mapping)),
+        }
+    }
+
+    fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+    ) {
+        if let Some(getter) = self.get_type {
+            getter.find_legacy_typevars(db, binding_context, typevars);
+        }
+        if let Some(setter) = self.set_type {
+            setter.find_legacy_typevars(db, binding_context, typevars);
+        }
+    }
+
+    fn materialize(self, db: &'db dyn Db, variance: TypeVarVariance) -> Self {
+        Self {
+            get_type: self.get_type.map(|ty| ty.materialize(db, variance)),
+            set_type: self.set_type.map(|ty| ty.materialize(db, variance)),
+        }
+    }
+
+    fn visit<V: TypeVisitor<'db> + ?Sized>(self, db: &'db dyn Db, visitor: &V) {
+        if let Some(getter) = self.get_type {
+            visitor.visit_type(db, getter);
+        }
+        if let Some(setter) = self.set_type {
+            visitor.visit_type(db, setter);
+        }
+    }
+
+    fn has_disjoint_type_from(
+        &self,
+        db: &'db dyn Db,
+        object_type: Type<'db>,
+        attribute_type: Type<'db>,
+        attribute: &str,
+        visitor: &IsDisjointVisitor<'db>,
+    ) -> bool {
+        let read_error = if let Some(getter) = self.get_type {
+            if let Ok(getter_return_type) = getter
+                .try_call(db, &CallArguments::positional([object_type]))
+                .map(|binding| binding.return_type(db))
+            {
+                visitor.visit((getter_return_type, attribute_type), || {
+                    getter_return_type.is_disjoint_from_impl(db, attribute_type, visitor)
+                })
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+        if read_error {
+            return true;
+        }
+        if let Some(Type::Callable(setter)) = self.set_type {
+            let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+            !object_type
+                .validate_attribute_assignment(db, attribute, setter_value_type)
+                .is_not_err()
+        } else {
+            false
+        }
+    }
+
+    fn is_satisfied_by(
+        &self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        attribute: &str,
+        relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
+    ) -> bool {
+        let Place::Type(attribute_type, Boundness::Bound) = other.member(db, attribute).place
+        else {
+            return false;
+        };
+        let read_ok = if let Some(getter) = self.get_type {
+            if let Ok(member_type) = getter
+                .try_call_impl(db, &CallArguments::positional([other]), visitor)
+                .map(|binding| binding.return_type(db))
+            {
+                attribute_type.has_relation_to_impl(db, member_type, relation, visitor)
+            } else {
+                false
+            }
+        } else {
+            true
+        };
+        if !read_ok {
+            return false;
+        }
+        if let Some(Type::Callable(setter)) = self.set_type {
+            let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
+            other
+                .validate_attribute_assignment(db, attribute, setter_value_type)
+                .is_not_err()
+        } else {
+            true
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
 enum ProtocolMemberKind<'db> {
     Method(CallableType<'db>),
-    Property(PropertyInstanceType<'db>),
+    Property(PropertyMember<'db>),
     Other(Type<'db>),
 }
 
@@ -404,7 +551,7 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     match member.kind {
         ProtocolMemberKind::Method(method) => visitor.visit_callable_type(db, method),
         ProtocolMemberKind::Property(property) => {
-            visitor.visit_property_instance_type(db, property);
+            property.visit(db, visitor);
         }
         ProtocolMemberKind::Other(ty) => visitor.visit_type(db, ty),
     }
@@ -419,10 +566,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.qualifiers
     }
 
-    fn ty(&self) -> Type<'db> {
+    fn ty(&self, db: &'db dyn Db) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
-            ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
+            ProtocolMemberKind::Property(property) => Type::PropertyInstance(
+                PropertyInstanceType::new(db, property.get_type, property.set_type),
+            ),
             ProtocolMemberKind::Other(ty) => *ty,
         }
     }
@@ -430,13 +579,19 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn has_disjoint_type_from(
         &self,
         db: &'db dyn Db,
-        other: Type<'db>,
+        object_type: Type<'db>,
+        attribute_type: Type<'db>,
         visitor: &IsDisjointVisitor<'db>,
     ) -> bool {
         match &self.kind {
-            // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
-            ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
+            // TODO: implement disjointness for method members as well as property/attribute members
+            ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Property(property) => {
+                property.has_disjoint_type_from(db, object_type, attribute_type, self.name, visitor)
+            }
+            ProtocolMemberKind::Other(ty) => visitor.visit((*ty, attribute_type), || {
+                ty.is_disjoint_from_impl(db, attribute_type, visitor)
+            }),
         }
     }
 
@@ -447,6 +602,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
@@ -455,18 +611,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 Place::Type(_, Boundness::Bound)
             ),
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => matches!(
-                other.member(db, self.name).place,
-                Place::Type(_, Boundness::Bound)
-            ),
+            ProtocolMemberKind::Property(property) => {
+                property.is_satisfied_by(db, other, self.name, relation, visitor)
+            }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Type(attribute_type, Boundness::Bound) =
                     other.member(db, self.name).place
                 else {
                     return false;
                 };
-                member_type.has_relation_to(db, attribute_type, relation)
-                    && attribute_type.has_relation_to(db, *member_type, relation)
+                member_type.has_relation_to_impl(db, attribute_type, relation, visitor)
+                    && attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
             }
         }
     }
@@ -575,12 +730,9 @@ fn cached_protocol_interface<'db>(
                 .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
                 .map(|(name, ty, qualifiers, bound_on_class)| {
                     let kind = match (ty, bound_on_class) {
-                        // TODO: if the getter or setter is a function literal, we should
-                        // upcast it to a `CallableType` so that two protocols with identical property
-                        // members are recognized as equivalent.
-                        (Type::PropertyInstance(property), _) => {
-                            ProtocolMemberKind::Property(property)
-                        }
+                        (Type::PropertyInstance(property), _) => ProtocolMemberKind::Property(
+                            PropertyMember::from_property_instance(property, db),
+                        ),
                         (Type::Callable(callable), BoundOnClass::Yes)
                             if callable.is_function_like(db) =>
                         {
