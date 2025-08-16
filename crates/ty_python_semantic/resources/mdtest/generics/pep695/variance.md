@@ -394,7 +394,8 @@ static_assert(not is_subtype_of(D[Any], D[B]))
 
 ### Mutable Attributes
 
-Normal attributes are mutable, and so make the enclosing class invariant in this typevar (see [inv]).
+Normal attributes are mutable, and so make the enclosing class invariant in this typevar (see
+[inv]).
 
 ```py
 from ty_extensions import is_subtype_of, static_assert
@@ -414,11 +415,12 @@ One might think that normal attributes are
 ### Immutable Attributes
 
 Immutable attributes can't be written to, and thus constrain the typevar to covariance, not
-invariance:
+invariance.
+
+#### Final attributes
 
 ```py
-from dataclasses import dataclass
-from typing import Final, NamedTuple
+from typing import Final
 from ty_extensions import is_subtype_of, static_assert
 
 class A: ...
@@ -427,21 +429,62 @@ class B(A): ...
 class C[T]:
     x: Final[T]
 
+static_assert(is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+#### Frozen dataclasses
+
+```py
+from dataclasses import dataclass
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
 @dataclass(frozen=True)
 class D[U]:
     y: U
 
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+#### NamedTuple
+
+```py
+from typing import NamedTuple
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
 class E[V](NamedTuple):
     z: V
 
-static_assert(is_subtype_of(C[B], C[A]))
-static_assert(not is_subtype_of(C[A], C[B]))
+static_assert(is_subtype_of(E[B], E[A]))
+static_assert(not is_subtype_of(E[A], E[B]))
+```
+
+A subclass of a `NamedTuple` can still be covariant:
+
+```py
+class D[T](E[T]):
+    pass
 
 static_assert(is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
 
-static_assert(is_subtype_of(E[B], E[A]))
-static_assert(not is_subtype_of(E[A], E[B]))
+But adding a new generic attribute on the subclass makes it invariant (the added attribute is not a
+`NamedTuple` field, and thus not immutable):
+
+```py
+class C[T](E[T]):
+    w: T
+
+static_assert(not is_subtype_of(C[B], C[A]))
+static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
 ### Properties

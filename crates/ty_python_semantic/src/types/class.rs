@@ -3066,13 +3066,11 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             .map(|class| class.variance_of(db, type_var));
 
         let default_attribute_variance = {
-            let is_named_tuple = KnownClass::NamedTuple
-                .try_to_class_literal(db)
-                .is_some_and(|named_tuple| self.explicit_bases(db).contains(&named_tuple.into()));
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
             let is_frozen_dataclass = self
                 .dataclass_params(db)
                 .is_some_and(|params| params.contains(DataclassParams::FROZEN));
-            if is_named_tuple || is_frozen_dataclass {
+            if is_namedtuple || is_frozen_dataclass {
                 TypeVarVariance::Covariant
             } else {
                 TypeVarVariance::Invariant
@@ -3108,7 +3106,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
-                    // TODO: Consider whether we need to worry about the Member variant here
                     table
                         .place(symbol_id)
                         .as_symbol()
