@@ -1545,11 +1545,12 @@ class Bar:
 f(Bar())  # error: [invalid-argument-type]
 ```
 
-## Equivalence of protocols with method members
+## Equivalence of protocols with method or property members
 
 Two protocols `P1` and `P2`, both with a method member `x`, are considered equivalent if the
 signature of `P1.x` is equivalent to the signature of `P2.x`, even though ty would normally model
-any two function definitions as inhabiting distinct function-literal types.
+any two function definitions as inhabiting distinct function-literal types. The same is also true
+for property members.
 
 ```py
 from typing import Protocol
@@ -1557,9 +1558,21 @@ from ty_extensions import is_equivalent_to, static_assert
 
 class P1(Protocol):
     def x(self, y: int) -> None: ...
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
 
 class P2(Protocol):
     def x(self, y: int) -> None: ...
+    @property
+    def y(self) -> str: ...
+    @property
+    def z(self) -> bytes: ...
+    @z.setter
+    def z(self, value: int) -> None: ...
 
 static_assert(is_equivalent_to(P1, P2))
 ```
