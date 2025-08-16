@@ -192,3 +192,17 @@ def issue_19005_3():
     c = {}
     for a[0], a[1] in ():
         c[a[0]] = a[1]
+
+
+def issue_19153_1():
+    v = {}
+    for o, (x,) in ["ox"]:
+        v[x,] = o
+    return v
+
+
+def issue_19153_2():
+    v = {}
+    for (o, p), x in [("op", "x")]:
+        v[x] = o, p
+    return v

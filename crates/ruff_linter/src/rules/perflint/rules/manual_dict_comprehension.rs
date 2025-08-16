@@ -354,19 +354,26 @@ fn convert_to_dict_comprehension(
         "for"
     };
     // Handles the case where `key` has a trailing comma, e.g, `dict[x,] = y`
-    let key_range = if let Expr::Tuple(ast::ExprTuple { elts, .. }) = key {
-        let [expr] = elts.as_slice() else {
-            return None;
-        };
-        expr.range()
+    let key_range = key.range();
+    let key_str = locator.slice(key_range);
+    // If key_str ends with a comma and lacks outer parentheses, add them.
+    let key_str = if key_str.ends_with(',') && !key_str.starts_with('(') {
+        format!("({key_str})")
     } else {
-        key.range()
+        key_str.to_string()
     };
-    let elt_str = format!(
-        "{}: {}",
-        locator.slice(key_range),
-        locator.slice(value.range())
-    );
+    let mut value_str = locator.slice(value.range()).to_string();
+
+    // If the value is a tuple without parentheses, add them
+    if let Expr::Tuple(ast::ExprTuple {
+        parenthesized: false,
+        ..
+    }) = value
+    {
+        value_str = format!("({value_str})");
+    }
+
+    let elt_str = format!("{key_str}: {value_str}");
 
     let comprehension_str = format!("{{{elt_str} {for_type} {target_str} in {iter_str}{if_str}}}");
 
