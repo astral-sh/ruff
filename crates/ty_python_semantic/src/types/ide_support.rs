@@ -428,13 +428,13 @@ pub fn definition_kind_for_name<'db>(
 pub fn definitions_for_name<'db>(
     db: &'db dyn Db,
     file: File,
-    name: &ast::ExprName,
+    name_str: &str,
+    enclosing_node: ast::ExprRef,
 ) -> Vec<ResolvedDefinition<'db>> {
     let index = semantic_index(db, file);
-    let name_str = name.id.as_str();
 
     // Get the scope for this name expression
-    let file_scope = index.expression_scope_id(&ast::ExprRef::from(name));
+    let file_scope = index.expression_scope_id(&enclosing_node);
 
     let mut all_definitions = Vec::new();
 

@@ -11,7 +11,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
     let module = parsed.load(db);
 
     // Get the definitions for the symbol at the offset
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(db, file, &module, offset)?;
 
     // Don't allow renaming of import module components
     if matches!(
@@ -60,7 +60,7 @@ pub fn rename(
     let module = parsed.load(db);
 
     // Get the definitions for the symbol at the offset
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(db, file, &module, offset)?;
 
     // Clients shouldn't call us with an empty new name, but just in case...
     if new_name.is_empty() {

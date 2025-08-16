@@ -7,9 +7,14 @@ use std::borrow::Cow;
 
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
+use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::source::source_text;
+use ruff_python_ast::ExprRef;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
+use ruff_python_parser::Tokens;
+use ruff_python_parser::parse_string_annotation;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ImportAliasResolution;
 use ty_python_semantic::ResolvedDefinition;
@@ -138,6 +143,22 @@ pub(crate) enum GotoTarget<'a> {
     /// ```
     TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple),
 
+    /// Go to some name found in a string annotation
+    ///
+    /// ```py
+    /// def my_func(x: "MyType | int"): ...
+    ///                 ^^^^^^
+    /// ```
+    ///
+    /// For various reasons we can't and shouldn't store the sub-AST node,
+    /// and instead store the covering string literal and the name/range
+    /// we parsed out of it.
+    StringAnnotationExprName {
+        string_literal: &'a ast::ExprStringLiteral,
+        name: String,
+        range: TextRange,
+    },
+
     NonLocal {
         identifier: &'a ast::Identifier,
     },
@@ -235,6 +256,11 @@ impl GotoTarget<'_> {
             GotoTarget::ImportModuleAlias { alias } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
+            GotoTarget::StringAnnotationExprName { string_literal, .. } => {
+                // TODO: make a way to ask the inference engine about a sub-expr of a string annotation
+                // for now we just yield the type of the entire string expression
+                string_literal.inferred_type(model)
+            }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
             | GotoTarget::PatternKeywordArgument(_)
@@ -275,13 +301,24 @@ impl GotoTarget<'_> {
         match self {
             GotoTarget::Expression(expression) => match expression {
                 ast::ExprRef::Name(name) => Some(DefinitionsOrTargets::Definitions(
-                    definitions_for_name(db, file, name),
+                    definitions_for_name(db, file, name.id.as_str(), ExprRef::Name(name)),
                 )),
                 ast::ExprRef::Attribute(attribute) => Some(DefinitionsOrTargets::Definitions(
                     ty_python_semantic::definitions_for_attribute(db, file, attribute),
                 )),
                 _ => None,
             },
+
+            GotoTarget::StringAnnotationExprName {
+                string_literal,
+                name,
+                ..
+            } => Some(DefinitionsOrTargets::Definitions(definitions_for_name(
+                db,
+                file,
+                name,
+                ExprRef::StringLiteral(string_literal),
+            ))),
 
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => {
@@ -409,7 +446,6 @@ impl GotoTarget<'_> {
                     None
                 }
             }
-
             _ => None,
         }
     }
@@ -479,11 +515,14 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
+            GotoTarget::StringAnnotationExprName { name, .. } => Some(Cow::Borrowed(name)),
         }
     }
 
     /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
     pub(crate) fn from_covering_node<'a>(
+        db: &dyn crate::Db,
+        file: File,
         covering_node: &crate::find_node::CoveringNode<'a>,
         offset: TextSize,
     ) -> Option<GotoTarget<'a>> {
@@ -634,6 +673,58 @@ impl GotoTarget<'_> {
                 }
             },
 
+            node @ AnyNodeRef::ExprStringLiteral(string_literal) => {
+                // If we encounter a string literal, try to figure out if it's actually
+                // a string annotation by asking the type checker if its type is
+                // a StringLiteral equal to itself
+                let model = SemanticModel::new(db, file);
+                let string_ty = string_literal.inferred_type(&model);
+                if let Type::StringLiteral(string) = string_ty {
+                    if string.value(db) == string_literal.value.to_str() {
+                        return node.as_expr_ref().map(GotoTarget::Expression);
+                    }
+                }
+
+                // Ok it has a different type, that means it's some kind of string annotation,
+                // so try to parse it as a sub-AST
+                let source = source_text(db, file);
+                let sub_ast = parse_string_annotation(
+                    source.as_str(),
+                    string_literal.as_single_part_string()?,
+                )
+                .ok()?;
+
+                // Now we can resume the search for a GotoTarget in the sub-AST.
+                let sub_target = find_goto_target_impl(
+                    db,
+                    file,
+                    sub_ast.tokens(),
+                    sub_ast.syntax().into(),
+                    offset,
+                )?;
+
+                // Our search should only really be considered a success if we found a GotoTarget
+                // for a bare name, as we only care about those things in a string annotation
+                // [CITATION EXTREMELY NEEDED]
+                let GotoTarget::Expression(ExprRef::Name(name)) = sub_target else {
+                    return None;
+                };
+
+                // We *cannot* return this GotoTarget (or the sub-AST node it contains)
+                // but that's ~fine because that node will make basically everything else
+                // freak out because e.g. it has no defined scope in the typechecker.
+                //
+                // Instead we record the covering string literal node and the name/range we parsed.
+                // The string literal will be used in much the same way as ty_python_semantic's
+                // `DeferredExpressionState::InStringAnnotation`.
+                let range = sub_target.range();
+                Some(GotoTarget::StringAnnotationExprName {
+                    string_literal,
+                    name: name.id.to_string(),
+                    range,
+                })
+            }
+
             node => node.as_expr_ref().map(GotoTarget::Expression),
         }
     }
@@ -665,6 +756,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
             GotoTarget::NonLocal { identifier, .. } => identifier.range,
             GotoTarget::Globals { identifier, .. } => identifier.range,
+            GotoTarget::StringAnnotationExprName { range, .. } => *range,
         }
     }
 }
@@ -721,12 +813,23 @@ fn definitions_to_navigation_targets<'db>(
     }
 }
 
-pub(crate) fn find_goto_target(
-    parsed: &ParsedModuleRef,
+pub(crate) fn find_goto_target<'a>(
+    db: &dyn crate::Db,
+    file: File,
+    parsed: &'a ParsedModuleRef,
     offset: TextSize,
-) -> Option<GotoTarget<'_>> {
-    let token = parsed
-        .tokens()
+) -> Option<GotoTarget<'a>> {
+    find_goto_target_impl(db, file, parsed.tokens(), parsed.syntax().into(), offset)
+}
+
+fn find_goto_target_impl<'a>(
+    db: &dyn crate::Db,
+    file: File,
+    tokens: &'a Tokens,
+    root: AnyNodeRef<'a>,
+    offset: TextSize,
+) -> Option<GotoTarget<'a>> {
+    let token = tokens
         .at_offset(offset)
         .max_by_key(|token| match token.kind() {
             TokenKind::Name
@@ -737,11 +840,11 @@ pub(crate) fn find_goto_target(
             _ => 0,
         })?;
 
-    let covering_node = covering_node(parsed.syntax().into(), token.range())
+    let covering_node = covering_node(root, token.range())
         .find_first(|node| node.is_identifier() || node.is_expression())
         .ok()?;
 
-    GotoTarget::from_covering_node(&covering_node, offset)
+    GotoTarget::from_covering_node(db, file, &covering_node, offset)
 }
 
 /// Helper function to resolve a module name and create a navigation target.

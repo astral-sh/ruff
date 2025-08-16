@@ -11,7 +11,7 @@ use ty_python_semantic::types::Type;
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&parsed, offset)?;
+    let goto_target = find_goto_target(db, file, &parsed, offset)?;
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
