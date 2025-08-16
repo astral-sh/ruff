@@ -3067,9 +3067,16 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
-            let is_frozen_dataclass = self
-                .dataclass_params(db)
-                .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+            // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
+            // their field types in contravariant position, thus meaning a frozen dataclass must
+            // still be invariant in its field types. Other synthesized methods on dataclasses are
+            // not considered here, since they don't use field types in their signatures. TODO:
+            // ideally we'd have a single source of truth for information about synthesized
+            // methods, so we just look them up normally and don't hardcode this knowledge here.
+            let is_frozen_dataclass = Program::get(db).python_version(db) <= PythonVersion::PY312
+                && self
+                    .dataclass_params(db)
+                    .is_some_and(|params| params.contains(DataclassParams::FROZEN));
             if is_namedtuple || is_frozen_dataclass {
                 TypeVarVariance::Covariant
             } else {
@@ -3079,18 +3086,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 
         let init_name: &Name = &"__init__".into();
         let new_name: &Name = &"__new__".into();
-        let lt_name: Name = "__lt__".into();
-        let le_name: Name = "__le__".into();
-        let gt_name: Name = "__gt__".into();
-        let ge_name: Name = "__ge__".into();
-        let eq_name: Name = "__eq__".into();
-        let repr_name: Name = "__repr__".into();
-        let hash_name: Name = "__hash__".into();
-
-        let order_methods = [lt_name, le_name, gt_name, ge_name];
-        let eq_methods = [eq_name];
-        let repr_methods = [repr_name];
-        let unsafe_hash_methods = [hash_name];
 
         let use_def_map = index.use_def_map(class_body_scope.file_scope_id(db));
         let table = place_table(db, class_body_scope);
@@ -3114,20 +3109,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                         .then_some(place_and_qual)
                 });
 
-        let extra_dataclass_members = [
-            (DataclassParams::ORDER, &order_methods[..]),
-            (DataclassParams::EQ, &eq_methods[..]),
-            (DataclassParams::REPR, &repr_methods[..]),
-            (DataclassParams::UNSAFE_HASH, &unsafe_hash_methods[..]),
-        ]
-        .into_iter()
-        .flat_map(|(param, members)| {
-            self.dataclass_params(db)
-                .is_some_and(|params| params.contains(param))
-                .then_some(members)
-                .into_iter()
-                .flatten()
-        });
+        // Dataclasses can have some additional synthesized methods (`__eq__`, `__hash__`,
+        // `__lt__`, etc.) but none of these will have field types type variables in their signatures, so we
+        // don't need to consider them for variance.
 
         let attribute_names = attribute_scopes(db, self.body_scope(db))
             .flat_map(|function_scope_id| {
@@ -3142,7 +3126,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
             .dedup();
 
         let attribute_variances = attribute_names
-            .chain(extra_dataclass_members.map(std::string::ToString::to_string))
             .map(|name| self.own_instance_member(db, &name))
             .chain(attribute_places_and_qualifiers)
             .dedup()

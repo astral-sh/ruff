@@ -433,7 +433,40 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
-#### Frozen dataclasses
+#### Frozen dataclasses in Python 3.12 and earlier
+
+```py
+from dataclasses import dataclass, field
+from ty_extensions import is_subtype_of, static_assert
+
+class A: ...
+class B(A): ...
+
+@dataclass(frozen=True)
+class D[U]:
+    y: U
+
+static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[A], D[B]))
+
+@dataclass(frozen=True)
+class E[U]:
+    y: U = field()
+
+static_assert(is_subtype_of(E[B], E[A]))
+static_assert(not is_subtype_of(E[A], E[B]))
+```
+
+#### Frozen dataclasses in Python 3.13 and later
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Python 3.13 introduced a new synthesized `__replace__` method on dataclasses, which uses every field
+type in a contravariant position (as a parameter to `__replace__`). This means that frozen
+dataclasses on Python 3.13+ can't be covariant in their field types.
 
 ```py
 from dataclasses import dataclass
@@ -446,7 +479,7 @@ class B(A): ...
 class D[U]:
     y: U
 
-static_assert(is_subtype_of(D[B], D[A]))
+static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
 ```
 
