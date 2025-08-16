@@ -44,7 +44,7 @@ or pyright's `stubPath` configuration setting.
 
 ```toml
 [tool.ty.environment]
-extra-paths = ["~/shared/my-search-path"]
+extra-paths = ["./shared/my-search-path"]
 ```
 
 ---
