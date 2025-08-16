@@ -344,6 +344,13 @@ impl Diagnostic {
         self.fix().is_some()
     }
 
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn fix_applies(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    }
+
     /// Returns the offset of the parent statement for this diagnostic if it exists.
     ///
     /// This is primarily used for checking noqa/secondary code suppressions.
