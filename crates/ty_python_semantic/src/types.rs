@@ -2832,8 +2832,13 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // TODO: Consider inferring constraints under which the instance member exists.
-            Type::TypeVar(_) => Place::Unbound.into(),
+            Type::TypeVar(_) => {
+                debug_assert!(
+                    false,
+                    "should not be able to access instance member of type variable in inferable position"
+                );
+                Place::Unbound.into()
+            }
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
             Type::BooleanLiteral(_) | Type::TypeIs(_) => {
@@ -3814,8 +3819,13 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // TODO: Infer constraints under which the typevar _is_ callable
-            Type::TypeVar(_) => CallableBinding::not_callable(self).into(),
+            Type::TypeVar(_) => {
+                debug_assert!(
+                    false,
+                    "should not be able to call type variable in inferable position"
+                );
+                CallableBinding::not_callable(self).into()
+            }
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
