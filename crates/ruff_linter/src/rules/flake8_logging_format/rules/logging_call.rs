@@ -1,8 +1,9 @@
 use ruff_python_ast::InterpolatedStringElement;
 use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator, StringFlags};
+
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_f_string_logging_enabled;
@@ -198,7 +199,7 @@ fn check_log_record_attr_clash(checker: &Checker, extra: &Keyword) {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum LoggingCallType {
+pub(crate) enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
     LevelCall(LoggingLevel),
     /// Logging call with an integer level as an argument, e.g., `logger.log(level, ...)`.
@@ -215,39 +216,41 @@ impl LoggingCallType {
     }
 }
 
-/// Check logging calls for violations.
-pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
+pub(crate) fn find_logging_call(
+    checker: &Checker,
+    call: &ast::ExprCall,
+) -> Option<(LoggingCallType, TextRange)> {
     // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
-    let (logging_call_type, range) = match call.func.as_ref() {
+    match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
-            let Some(call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
-                return;
-            };
+            let call_type = LoggingCallType::from_attribute(attr.as_str())?;
             if !logging::is_logger_candidate(
                 &call.func,
                 checker.semantic(),
                 &checker.settings().logger_objects,
             ) {
-                return;
+                return None;
             }
-            (call_type, attr.range())
+            Some((call_type, attr.range()))
         }
         Expr::Name(_) => {
-            let Some(qualified_name) = checker
+            let qualified_name = checker
                 .semantic()
-                .resolve_qualified_name(call.func.as_ref())
-            else {
-                return;
-            };
+                .resolve_qualified_name(call.func.as_ref())?;
             let ["logging", attribute] = qualified_name.segments() else {
-                return;
+                return None;
             };
-            let Some(call_type) = LoggingCallType::from_attribute(attribute) else {
-                return;
-            };
-            (call_type, call.func.range())
+            let call_type = LoggingCallType::from_attribute(attribute)?;
+            Some((call_type, call.func.range()))
         }
-        _ => return,
+        _ => None,
+    }
+}
+
+/// Check logging calls for violations.
+pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
+    let Some((logging_call_type, range)) = find_logging_call(checker, call) else {
+        return;
     };
 
     // G001, G002, G003, G004

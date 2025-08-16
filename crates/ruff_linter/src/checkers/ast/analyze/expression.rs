@@ -1274,6 +1274,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryEmptyIterableWithinDequeCall) {
                 ruff::rules::unnecessary_literal_within_deque_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::LoggingEagerConversion) {
+                ruff::rules::logging_eager_conversion(checker, call);
+            }
             if checker.is_rule_enabled(Rule::StarmapZip) {
                 ruff::rules::starmap_zip(checker, call);
             }
