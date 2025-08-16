@@ -453,15 +453,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 } else {
                     false
                 };
-                let write_error = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                if read_error {
+                    return true;
+                }
+                if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
                     let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
                     !object_type
                         .validate_attribute_assignment(db, self.name, setter_value_type)
                         .is_not_err()
                 } else {
                     false
-                };
-                read_error || write_error
+                }
             }
             ProtocolMemberKind::Other(ty) => visitor.visit((*ty, attribute_type), || {
                 ty.is_disjoint_from_impl(db, attribute_type, visitor)
