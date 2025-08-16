@@ -2204,9 +2204,18 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_any(db, self.constraints, |member| {
-                self.as_relation_checker(TypeRelation::Subtyping)
-                    .type_satisfies_protocol_member(db, other, &member)
-                    .negate(db, self.constraints)
+                other
+                    .member(db, member.name())
+                    .place
+                    .ignore_possibly_undefined()
+                    .when_none_or(db, self.constraints, |attribute_type| {
+                        self.protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
+                            .or(db, self.constraints, || {
+                                self.protocol_property_write_is_definitely_missing_from_ty(
+                                    db, &member, other,
+                                )
+                            })
+                    })
             })
     }
 

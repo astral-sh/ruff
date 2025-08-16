@@ -722,17 +722,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ..
         }) = meta_attr.place
         {
-            if let Place::Defined(DefinedPlace {
-                ty: dunder_set, ..
-            }) = meta_attr_ty.class_member(db, "__set__".into()).place
+            if let Place::Defined(DefinedPlace { ty: dunder_set, .. }) =
+                meta_attr_ty.class_member(db, "__set__".into()).place
             {
                 return ConstraintSet::from_bool(
                     self.constraints,
                     dunder_set
-                        .try_call(
-                            db,
-                            &CallArguments::positional([meta_attr_ty, ty, value_ty]),
-                        )
+                        .try_call(db, &CallArguments::positional([meta_attr_ty, ty, value_ty]))
                         .is_ok(),
                 );
             }
@@ -740,10 +736,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let instance_attr = ty.instance_member(db, member_name);
-        if instance_attr
-            .qualifiers
-            .contains(TypeQualifiers::FINAL)
-        {
+        if instance_attr.qualifiers.contains(TypeQualifiers::FINAL) {
             return self.never();
         }
         if let Place::Defined(DefinedPlace {
@@ -1001,6 +994,31 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
+    pub(super) fn protocol_property_write_is_definitely_missing_from_ty(
+        &self,
+        db: &'db dyn Db,
+        member: &ProtocolMember<'_, 'db>,
+        ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let ProtocolMemberKind::Property(required_property) = member.kind else {
+            return self.never();
+        };
+        if required_property.setter(db).is_none() {
+            return self.never();
+        }
+
+        let Place::Defined(DefinedPlace {
+            ty: Type::PropertyInstance(actual_property),
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = ty.class_member(db, member.name().into()).place
+        else {
+            return self.never();
+        };
+
+        ConstraintSet::from_bool(self.constraints, actual_property.setter(db).is_none())
+    }
+
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
         db: &'db dyn Db,
