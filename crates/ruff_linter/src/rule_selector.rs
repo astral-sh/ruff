@@ -10,6 +10,9 @@ use crate::codes::{RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 use crate::settings::types::PreviewMode;
+use crate::warn_user_once;
+
+const DEPRECATED_SELECTORS: [&str; 2] = ["R", "U"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
@@ -65,6 +68,12 @@ impl FromStr for RuleSelector {
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
+                if DEPRECATED_SELECTORS.contains(&s) {
+                    warn_user_once!(
+                        "Using `{s}` as a selector is deprecated and will be removed in a future version."
+                    );
+                }
+
                 let (s, redirected_from) = match get_redirect(s) {
                     Some((from, target)) => (target, Some(from)),
                     None => (s, None),
