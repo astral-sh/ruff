@@ -29,9 +29,9 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::{
-    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, HasRelationToVisitor,
-    KnownClass, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, SpecialFormType,
-    TypeMapping, TypeRelation, UnionType, WrapperDescriptorKind, enums, ide_support, todo_type,
+    BoundMethodType, ClassLiteral, DataclassParams, FieldInstance, KnownClass, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, SpecialFormType, TypeMapping, UnionType,
+    WrapperDescriptorKind, enums, ide_support, todo_type,
 };
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -120,21 +120,12 @@ impl<'db> Bindings<'db> {
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
     pub(crate) fn check_types(
-        self,
-        db: &'db dyn Db,
-        argument_types: &CallArguments<'_, 'db>,
-    ) -> Result<Self, CallError<'db>> {
-        self.check_types_impl(db, argument_types, &HasRelationToVisitor::new(true))
-    }
-
-    pub(crate) fn check_types_impl(
         mut self,
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
-        visitor: &HasRelationToVisitor<'db>,
     ) -> Result<Self, CallError<'db>> {
         for element in &mut self.elements {
-            element.check_types(db, argument_types, visitor);
+            element.check_types(db, argument_types);
         }
 
         self.evaluate_known_cases(db);
@@ -1258,12 +1249,7 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    fn check_types(
-        &mut self,
-        db: &'db dyn Db,
-        argument_types: &CallArguments<'_, 'db>,
-        visitor: &HasRelationToVisitor<'db>,
-    ) {
+    fn check_types(&mut self, db: &'db dyn Db, argument_types: &CallArguments<'_, 'db>) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
@@ -1275,7 +1261,7 @@ impl<'db> CallableBinding<'db> {
                 // still perform type checking for non-overloaded function to provide better user
                 // experience.
                 if let [overload] = self.overloads.as_mut_slice() {
-                    overload.check_types(db, argument_types.as_ref(), visitor);
+                    overload.check_types(db, argument_types.as_ref());
                 }
                 return;
             }
@@ -1283,7 +1269,7 @@ impl<'db> CallableBinding<'db> {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
                 self.matching_overload_index = Some(index);
-                self.overloads[index].check_types(db, argument_types.as_ref(), visitor);
+                self.overloads[index].check_types(db, argument_types.as_ref());
                 return;
             }
             MatchingOverloadIndex::Multiple(indexes) => {
@@ -1301,7 +1287,7 @@ impl<'db> CallableBinding<'db> {
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, argument_types.as_ref(), visitor);
+            overload.check_types(db, argument_types.as_ref());
         }
 
         match self.matching_overload_index() {
@@ -1353,7 +1339,7 @@ impl<'db> CallableBinding<'db> {
                 let pre_evaluation_snapshot = snapshotter.take(self);
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, expanded_argument_types, visitor);
+                    overload.check_types(db, expanded_argument_types);
                 }
 
                 let return_type = match self.matching_overload_index() {
@@ -2011,20 +1997,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     }
 }
 
-struct ArgumentTypeChecker<'a, 'v, 'db> {
+struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     signature: &'a Signature<'db>,
     arguments: &'a CallArguments<'a, 'db>,
     argument_matches: &'a [MatchedArgument],
     parameter_tys: &'a mut [Option<Type<'db>>],
     errors: &'a mut Vec<BindingError<'db>>,
-    visitor: &'v HasRelationToVisitor<'db>,
 
     specialization: Option<Specialization<'db>>,
     inherited_specialization: Option<Specialization<'db>>,
 }
 
-impl<'a, 'v, 'db> ArgumentTypeChecker<'a, 'v, 'db> {
+impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         signature: &'a Signature<'db>,
@@ -2032,7 +2017,6 @@ impl<'a, 'v, 'db> ArgumentTypeChecker<'a, 'v, 'db> {
         argument_matches: &'a [MatchedArgument],
         parameter_tys: &'a mut [Option<Type<'db>>],
         errors: &'a mut Vec<BindingError<'db>>,
-        visitor: &'v HasRelationToVisitor<'db>,
     ) -> Self {
         Self {
             db,
@@ -2043,7 +2027,6 @@ impl<'a, 'v, 'db> ArgumentTypeChecker<'a, 'v, 'db> {
             errors,
             specialization: None,
             inherited_specialization: None,
-            visitor,
         }
     }
 
@@ -2129,12 +2112,7 @@ impl<'a, 'v, 'db> ArgumentTypeChecker<'a, 'v, 'db> {
                     argument_type.apply_specialization(self.db, inherited_specialization);
                 expected_ty = expected_ty.apply_specialization(self.db, inherited_specialization);
             }
-            if !argument_type.has_relation_to_impl(
-                self.db,
-                expected_ty,
-                TypeRelation::Assignability,
-                self.visitor,
-            ) {
+            if !argument_type.is_assignable_to(self.db, expected_ty) {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                     && !parameter.is_variadic();
                 self.errors.push(BindingError::InvalidArgumentType {
@@ -2334,12 +2312,7 @@ impl<'db> Binding<'db> {
         self.argument_matches = matcher.finish();
     }
 
-    fn check_types(
-        &mut self,
-        db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
-        visitor: &HasRelationToVisitor<'db>,
-    ) {
+    fn check_types(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
         let mut checker = ArgumentTypeChecker::new(
             db,
             &self.signature,
@@ -2347,7 +2320,6 @@ impl<'db> Binding<'db> {
             &self.argument_matches,
             &mut self.parameter_tys,
             &mut self.errors,
-            visitor,
         );
 
         // If this overload is generic, first see if we can infer a specialization of the function
