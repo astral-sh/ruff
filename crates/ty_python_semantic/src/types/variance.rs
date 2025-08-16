@@ -31,12 +31,12 @@ impl TypeVarVariance {
     }
 
     /// Compose two variances: useful for combining use-site and definition-site variances, e.g.
-    /// C[D[T]] or function argument/return position variances.
+    /// `C[D[T]]` or function argument/return position variances.
     ///
     /// `other` is a thunk to avoid unnecessary computation when `self` is `Bivariant`.
     ///
     /// Based on the variance composition/transformation operator in
-    /// https://people.cs.umass.edu/~yannis/variance-extended2011.pdf, page 5
+    /// <https://people.cs.umass.edu/~yannis/variance-extended2011.pdf>, page 5
     ///
     /// While their operation would have `compose(Invariant, Bivariant) ==
     /// Invariant`, we instead have it evaluate to `Bivariant`. This is a valid
@@ -45,7 +45,7 @@ impl TypeVarVariance {
     /// the type
     /// ```python
     /// type ConstantInt[T] = int
-    /// ```     
+    /// ```
     /// We would say `ConstantInt[str]` = `ConstantInt[float]`, so we qualify as
     /// using semantic equivalence.
     #[must_use]
