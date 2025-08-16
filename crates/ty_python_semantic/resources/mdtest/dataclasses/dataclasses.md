@@ -898,6 +898,7 @@ class Foo:
 foo = Foo(1)
 
 reveal_type(foo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(type(foo).__dataclass_fields__)  # revealed: dict[str, Field[Any]]
 reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 reveal_type(asdict(foo))  # revealed: dict[str, Any]
 ```
@@ -918,8 +919,7 @@ reveal_type(fields(Foo))  # revealed: tuple[Field[Any], ...]
 But calling `asdict` on the class object is not allowed:
 
 ```py
-# TODO: this should be a invalid-argument-type error, but we don't properly check the
-# types (and more importantly, the `ClassVar` type qualifier) of protocol members yet.
+# error: [invalid-argument-type] "Argument to function `asdict` is incorrect: Expected `DataclassInstance`, found `<class 'Foo'>`"
 asdict(Foo)
 ```
 

@@ -920,6 +920,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+        match self {
+            Type::Dynamic(dynamic_type) => Some(dynamic_type),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn expect_dynamic(self) -> DynamicType {
+        self.into_dynamic()
+            .expect("Expected a Type::Dynamic variant")
+    }
+
     #[track_caller]
     pub fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.into_class_literal()
@@ -1947,13 +1959,21 @@ impl<'db> Type<'db> {
             visitor: &IsDisjointVisitor<'db>,
         ) -> bool {
             protocol.interface(db).members(db).any(|member| {
-                other
-                    .member(db, member.name())
-                    .place
-                    .ignore_possibly_unbound()
-                    .is_none_or(|attribute_type| {
-                        member.has_disjoint_type_from(db, other, attribute_type, visitor)
-                    })
+                let attribute = member.name();
+
+                member.instance_get_type(db).is_some_and(|get_type| {
+                    other
+                        .member(db, attribute)
+                        .place
+                        .ignore_possibly_unbound()
+                        .is_none_or(|attribute_type| {
+                            get_type.is_disjoint_from_impl(db, attribute_type, visitor)
+                        })
+                }) || member.instance_set_type().is_ok_and(|set_type| {
+                    !other
+                        .validate_attribute_assignment(db, attribute, set_type)
+                        .is_not_err()
+                })
             })
         }
 
@@ -2204,7 +2224,8 @@ impl<'db> Type<'db> {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
                         other_ty.member(db, member.name()).place,
-                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, other_ty, attribute_type, visitor)
+                        Place::Type(attribute_type, _)
+                        if member.instance_get_type(db).is_some_and(|get_type| get_type.is_disjoint_from_impl(db, attribute_type, visitor))
                     )
                 })
             }),
@@ -4842,6 +4863,14 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {
+                if let Type::ProtocolInstance(protocol) = self {
+                    if let Some(member) = protocol.interface(db).member_by_name(db, attribute) {
+                        if let Err(err) = member.instance_set_type() {
+                            return results.and(err);
+                        }
+                    }
+                }
+
                 // First, try to call the `__setattr__` dunder method. If this is present/defined, overrides
                 // assigning the attributed by the normal mechanism.
                 let setattr_dunder_call_result = self.try_call_dunder_with_policy(
@@ -8913,18 +8942,6 @@ impl<'db> CallableType<'db> {
             && self
                 .signatures(db)
                 .is_equivalent_to(db, other.signatures(db))
-    }
-
-    /// The type of the `index`th parameter from the `CallableType` signature.
-    /// Returns `None` if `index` is out of bounds or if `CallableType` is overloaded.
-    pub(crate) fn parameter_type(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
-        let [signature] = self.signatures(db).overloads.as_slice() else {
-            return None;
-        };
-        signature
-            .parameters()
-            .get(index)
-            .and_then(Parameter::annotated_type)
     }
 }
 

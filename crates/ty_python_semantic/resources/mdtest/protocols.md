@@ -347,7 +347,7 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: MyProtocol
+    reveal_type(x())  # revealed: @Todo(type[T] for protocols)
 ```
 
 ## Members of a protocol
@@ -389,7 +389,7 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 from ty_extensions import reveal_protocol_interface
 from typing import SupportsIndex, SupportsAbs
 
-# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `(self) -> str` }, "z": PropertyMember { getter: `(self) -> int`, setter: `(self, z: int) -> None` }}`"
+# error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { get_type: `str` }, "z": PropertyMember { get_type: `int`, set_type: `int` }}`"
 reveal_protocol_interface(Foo)
 # error: [revealed-type] "Revealed protocol interface: `{"__index__": MethodMember(`(self) -> int`)}`"
 reveal_protocol_interface(SupportsIndex)
@@ -613,11 +613,10 @@ class HasXWithDefault(Protocol):
 class FooWithZero:
     x: int = 0
 
-# TODO: these should pass
-static_assert(is_subtype_of(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
-static_assert(is_assignable_to(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Foo, HasXWithDefault))
-static_assert(not is_assignable_to(Foo, HasXWithDefault))
+static_assert(is_subtype_of(FooWithZero, HasXWithDefault))
+static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
+static_assert(is_subtype_of(Foo, HasXWithDefault))
+static_assert(is_assignable_to(Foo, HasXWithDefault))
 static_assert(not is_subtype_of(Qux, HasXWithDefault))
 static_assert(not is_assignable_to(Qux, HasXWithDefault))
 
@@ -626,12 +625,13 @@ class HasClassVarX(Protocol):
 
 static_assert(is_subtype_of(FooWithZero, HasClassVarX))
 static_assert(is_assignable_to(FooWithZero, HasClassVarX))
+
 # TODO: these should pass
 static_assert(not is_subtype_of(Foo, HasClassVarX))  # error: [static-assert-error]
 static_assert(not is_assignable_to(Foo, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Qux, HasClassVarX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(Qux, HasClassVarX))  # error: [static-assert-error]
 
+static_assert(not is_subtype_of(Qux, HasClassVarX))
+static_assert(not is_assignable_to(Qux, HasClassVarX))
 static_assert(is_subtype_of(Sequence[Foo], Sequence[HasX]))
 static_assert(is_assignable_to(Sequence[Foo], Sequence[HasX]))
 static_assert(not is_subtype_of(list[Foo], list[HasX]))
@@ -651,16 +651,14 @@ class A:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class B:
     x: Final = 42
 
-# TODO: these should pass
-static_assert(not is_subtype_of(A, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(A, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(A, HasX))
+static_assert(not is_assignable_to(A, HasX))
 
 class IntSub(int): ...
 
@@ -692,16 +690,14 @@ static_assert(is_assignable_to(MutableDataclass, HasX))
 class ImmutableDataclass:
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(ImmutableDataclass, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(ImmutableDataclass, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(ImmutableDataclass, HasX))
+static_assert(not is_assignable_to(ImmutableDataclass, HasX))
 
 class NamedTupleWithX(NamedTuple):
     x: int
 
-# TODO: these should pass
-static_assert(not is_subtype_of(NamedTupleWithX, HasX))  # error: [static-assert-error]
-static_assert(not is_assignable_to(NamedTupleWithX, HasX))  # error: [static-assert-error]
+static_assert(not is_subtype_of(NamedTupleWithX, HasX))
+static_assert(not is_assignable_to(NamedTupleWithX, HasX))
 ```
 
 However, a type with a read-write property `x` *does* satisfy the `HasX` protocol. The `HasX`
@@ -1191,9 +1187,8 @@ class PropertyX:
     def x(self) -> int:
         return 42
 
-# TODO: these should pass
-static_assert(not is_assignable_to(PropertyX, ClassVarXProto))  # error: [static-assert-error]
-static_assert(not is_subtype_of(PropertyX, ClassVarXProto))  # error: [static-assert-error]
+static_assert(not is_assignable_to(PropertyX, ClassVarXProto))
+static_assert(not is_subtype_of(PropertyX, ClassVarXProto))
 
 class ClassVarX:
     x: ClassVar[int] = 42
@@ -1431,9 +1426,8 @@ class HasGetAttr:
 static_assert(is_subtype_of(HasGetAttr, HasXProperty))
 static_assert(is_assignable_to(HasGetAttr, HasXProperty))
 
-# TODO: these should pass
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
-static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))  # error: [static-assert-error]
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
+static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
 
 class HasGetAttrWithUnsuitableReturn:
     def __getattr__(self, attr: str) -> tuple[int, int]:
@@ -1925,7 +1919,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
