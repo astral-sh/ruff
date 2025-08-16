@@ -1,10 +1,11 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
-use itertools::Itertools;
+use itertools::{Itertools, chain};
+use ruff_python_semantic::NodeId;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
-use ruff_python_semantic::NameImport;
+use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -111,68 +112,81 @@ pub(crate) fn is_import_required_by_isort(
 }
 
 /// UP010
-pub(crate) fn unnecessary_future_import(checker: &Checker, stmt: &Stmt, names: &[Alias]) {
-    let mut unused_imports: Vec<&Alias> = vec![];
-    for alias in names {
-        if alias.asname.is_some() {
-            continue;
-        }
+pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
+    let mut unused_imports: HashMap<NodeId, Vec<&Alias>> = HashMap::new();
+    for future_name in chain(PY33_PLUS_REMOVE_FUTURES, PY37_PLUS_REMOVE_FUTURES).unique() {
+        for binding_id in scope.get_all(future_name) {
+            let binding = checker.semantic().binding(binding_id);
+            if binding.kind.is_future_import() && binding.is_unused() {
+                let Some(node_id) = binding.source else {
+                    continue;
+                };
 
-        if is_import_required_by_isort(
-            &checker.settings().isort.required_imports,
-            stmt.into(),
-            alias,
-        ) {
-            continue;
-        }
+                let stmt = checker.semantic().statement(node_id);
+                if let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt {
+                    let Some(alias) = names
+                        .iter()
+                        .find(|alias| alias.name.as_str() == binding.name(checker.source()))
+                    else {
+                        continue;
+                    };
 
-        if PY33_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
-            || PY37_PLUS_REMOVE_FUTURES.contains(&alias.name.as_str())
-        {
-            unused_imports.push(alias);
+                    if alias.asname.is_some() {
+                        continue;
+                    }
+
+                    if is_import_required_by_isort(
+                        &checker.settings().isort.required_imports,
+                        stmt.into(),
+                        alias,
+                    ) {
+                        continue;
+                    }
+                    unused_imports.entry(node_id).or_default().push(alias);
+                }
+            }
         }
     }
 
-    if unused_imports.is_empty() {
-        return;
+    for (node_id, unused_aliases) in unused_imports {
+        let mut diagnostic = checker.report_diagnostic(
+            UnnecessaryFutureImport {
+                names: unused_aliases
+                    .iter()
+                    .map(|alias| alias.name.to_string())
+                    .sorted()
+                    .collect(),
+            },
+            checker.semantic().statement(node_id).range(),
+        );
+
+        diagnostic.try_set_fix(|| {
+            let statement = checker.semantic().statement(node_id);
+            let parent = checker.semantic().parent_statement(node_id);
+            let edit = fix::edits::remove_unused_imports(
+                unused_aliases
+                    .iter()
+                    .map(|alias| &alias.name)
+                    .map(ast::Identifier::as_str),
+                statement,
+                parent,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+            )?;
+
+            let range = edit.range();
+            let applicability = if checker.comment_ranges().intersects(range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(
+                Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+                    checker.semantic().current_statement_parent_id(),
+                )),
+            )
+        });
     }
-    let mut diagnostic = checker.report_diagnostic(
-        UnnecessaryFutureImport {
-            names: unused_imports
-                .iter()
-                .map(|alias| alias.name.to_string())
-                .sorted()
-                .collect(),
-        },
-        stmt.range(),
-    );
-
-    diagnostic.try_set_fix(|| {
-        let statement = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = fix::edits::remove_unused_imports(
-            unused_imports
-                .iter()
-                .map(|alias| &alias.name)
-                .map(ast::Identifier::as_str),
-            statement,
-            parent,
-            checker.locator(),
-            checker.stylist(),
-            checker.indexer(),
-        )?;
-
-        let range = edit.range();
-        let applicability = if checker.comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
-
-        Ok(
-            Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
-                checker.semantic().current_statement_parent_id(),
-            )),
-        )
-    });
 }
