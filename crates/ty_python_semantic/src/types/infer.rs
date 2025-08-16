@@ -10783,7 +10783,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::TypingSelf
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypedDict
-            | SpecialFormType::Unknown => {
+            | SpecialFormType::Unknown
+            | SpecialFormType::NamedTuple => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
@@ -10808,7 +10809,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::Tuple => {
                 Type::tuple(self.infer_tuple_type_expression(arguments_slice))
             }
-            SpecialFormType::Generic | SpecialFormType::Protocol | SpecialFormType::NamedTuple => {
+            SpecialFormType::Generic | SpecialFormType::Protocol => {
                 self.infer_expression(arguments_slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
