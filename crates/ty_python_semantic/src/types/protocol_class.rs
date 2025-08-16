@@ -504,15 +504,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 } else {
                     true
                 };
-                let write_ok = if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
+                if !read_ok {
+                    return false;
+                }
+                if let Some(Type::FunctionLiteral(setter)) = property.setter(db) {
                     let setter_value_type = setter.parameter_type(db, 1).unwrap_or(Type::unknown());
                     other
                         .validate_attribute_assignment(db, self.name, setter_value_type)
                         .is_not_err()
                 } else {
                     true
-                };
-                read_ok && write_ok
+                }
             }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Type(attribute_type, Boundness::Bound) =
