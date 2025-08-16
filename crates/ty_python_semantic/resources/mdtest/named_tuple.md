@@ -312,6 +312,9 @@ def expects_named_tuple(x: typing.NamedTuple):
 
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+
+# error: [invalid-type-form] "Special form `typing.NamedTuple` expected no type parameter"
+def _(z: typing.NamedTuple[int]): ...
 ```
 
 Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
