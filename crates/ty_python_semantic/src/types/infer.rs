@@ -8659,7 +8659,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .next()
             .expect("valid bindings should have matching overload");
         Type::from(generic_class.apply_specialization(self.db(), |_| {
-            generic_context.specialize_partial(self.db(), overload.parameter_types())
+            generic_context
+                .specialize_partial(self.db(), overload.parameter_types().iter().copied())
         }))
     }
 

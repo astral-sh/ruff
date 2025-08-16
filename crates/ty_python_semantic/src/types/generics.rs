@@ -236,7 +236,8 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
-        let partial = self.specialize_partial(db, &vec![None; self.variables(db).len()]);
+        let partial =
+            self.specialize_partial(db, std::iter::repeat_n(None, self.variables(db).len()));
         if known_class == Some(KnownClass::Tuple) {
             Specialization::new(
                 db,
@@ -318,11 +319,12 @@ impl<'db> GenericContext<'db> {
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
     /// match the number of typevars in the generic context. If any provided type is `None`, we
     /// will use the corresponding typevar's default type.
-    pub(crate) fn specialize_partial(
-        self,
-        db: &'db dyn Db,
-        types: &[Option<Type<'db>>],
-    ) -> Specialization<'db> {
+    pub(crate) fn specialize_partial<I>(self, db: &'db dyn Db, types: I) -> Specialization<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let types = types.into_iter();
         let variables = self.variables(db);
         assert!(variables.len() == types.len());
 
@@ -335,9 +337,9 @@ impl<'db> GenericContext<'db> {
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         let mut expanded = vec![Type::unknown(); types.len()];
-        for (idx, (ty, typevar)) in types.iter().zip(variables).enumerate() {
+        for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
             if let Some(ty) = ty {
-                expanded[idx] = *ty;
+                expanded[idx] = ty;
                 continue;
             }
 
@@ -753,18 +755,12 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
-        let types: Box<[_]> = generic_context
+        let types = generic_context
             .variables(self.db)
             .iter()
-            .map(|variable| {
-                self.types
-                    .get(variable)
-                    .copied()
-                    .unwrap_or(variable.default_type(self.db).unwrap_or(Type::unknown()))
-            })
-            .collect();
+            .map(|variable| self.types.get(variable).copied());
         // TODO Infer the tuple spec for a tuple type
-        Specialization::new(self.db, generic_context, types, None)
+        generic_context.specialize_partial(self.db, types)
     }
 
     fn add_type_mapping(&mut self, bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) {

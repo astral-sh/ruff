@@ -438,6 +438,19 @@ class A[T]:
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Class typevar has another typevar as a default
+
+```py
+#class C[T, U=T]: ...
+
+#reveal_type(C())  # revealed: C[Unknown, Unknown]
+
+class D[T, U=T]:
+    def __init__(self) -> None: ...
+
+reveal_type(D())  # revealed: D[Unknown, Unknown]
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
