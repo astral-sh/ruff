@@ -2835,7 +2835,9 @@ impl<'db> Type<'db> {
             Type::TypeVar(_) => {
                 debug_assert!(
                     false,
-                    "should not be able to access instance member of type variable in inferable position"
+                    "should not be able to access instance member `{name}` \
+                    of type variable {} in inferable position",
+                    self.display(db)
                 );
                 Place::Unbound.into()
             }
@@ -3822,7 +3824,8 @@ impl<'db> Type<'db> {
             Type::TypeVar(_) => {
                 debug_assert!(
                     false,
-                    "should not be able to call type variable in inferable position"
+                    "should not be able to call type variable {} in inferable position",
+                    self.display(db)
                 );
                 CallableBinding::not_callable(self).into()
             }
