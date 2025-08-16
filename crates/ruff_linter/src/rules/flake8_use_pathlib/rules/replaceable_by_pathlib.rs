@@ -8,8 +8,7 @@ use crate::rules::flake8_use_pathlib::helpers::{
 use crate::rules::flake8_use_pathlib::{
     rules::Glob,
     violations::{
-        BuiltinOpen, Joiner, OsListdir, OsMakedirs, OsMkdir, OsPathJoin, OsPathSplitext, OsStat,
-        OsSymlink, PyPath,
+        BuiltinOpen, Joiner, OsListdir, OsPathJoin, OsPathSplitext, OsStat, OsSymlink, PyPath,
     },
 };
 
@@ -20,21 +19,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
     let range = call.func.range();
     match qualified_name.segments() {
-        // PTH102
-        ["os", "makedirs"] => checker.report_diagnostic_if_enabled(OsMakedirs, range),
-        // PTH103
-        ["os", "mkdir"] => {
-            // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
-            // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.mkdir)
-            // ```text
-            //           0     1                2
-            // os.mkdir(path, mode=0o777, *, dir_fd=None)
-            // ```
-            if is_keyword_only_argument_non_default(&call.arguments, "dir_fd") {
-                return;
-            }
-            checker.report_diagnostic_if_enabled(OsMkdir, range)
-        }
         // PTH116
         ["os", "stat"] => {
             // `dir_fd` is not supported by pathlib, so check if it's set to non-default values.
