@@ -285,6 +285,12 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
+        SubclassOfInner::Dynamic(value)
+    }
+}
+
 impl<'db> From<SubclassOfInner<'db>> for Type<'db> {
     fn from(value: SubclassOfInner<'db>) -> Self {
         match value {
