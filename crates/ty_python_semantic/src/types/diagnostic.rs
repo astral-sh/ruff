@@ -1871,7 +1871,7 @@ pub(super) fn report_invalid_attribute_assignment(
         node,
         target_ty,
         format_args!(
-            "Object of type `{}` is not assignable to attribute `{attribute_name}` of type `{}`",
+            "Object of type `{}` is not assignable to attribute `{attribute_name}` on type `{}`",
             source_ty.display(context.db()),
             target_ty.display(context.db()),
         ),

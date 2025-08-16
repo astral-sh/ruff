@@ -37,7 +37,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error[invalid-assignment]: Object of type `Literal[1]` is not assignable to attribute `attr` of type `<class 'C1'> | <class 'C1'>`
+error[invalid-assignment]: Object of type `Literal[1]` is not assignable to attribute `attr` on type `<class 'C1'> | <class 'C1'>`
   --> src/mdtest_snippet.py:11:5
    |
 10 |     # TODO: The error message here could be improved to explain why the assignment fails.
