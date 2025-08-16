@@ -684,7 +684,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
 
         if !search_path.is_standard_library() && resolver_state.mode.stubs_allowed() {
             match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
-                Ok((package_kind, ResolvedName::FileModule(module))) => {
+                Ok((package_kind, _, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
                         tracing::trace!(
                             "Search path `{search_path}` contains a module \
@@ -694,23 +694,30 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                         return Some(ResolvedName::FileModule(module));
                     }
                 }
-                Ok((_, ResolvedName::NamespacePackage)) => {
+                Ok((_, _, ResolvedName::NamespacePackage)) => {
                     is_namespace_package = true;
                 }
-                Err(PackageKind::Root) => {
+                Err((PackageKind::Root, _)) => {
                     tracing::trace!(
                         "Search path `{search_path}` contains no stub package named `{stub_name}`."
                     );
                 }
-                Err(PackageKind::Regular) => {
+                Err((PackageKind::Regular, PyTyped::Partial)) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path}` doesn't contain module: \
+                         `{name}` but it is a partial package, keep going."
+                    );
+                    // stub exists, but the module doesn't. But this is a partial package,
+                    // fall through to looking for a non-stub package
+                }
+                Err((PackageKind::Regular, _)) => {
                     tracing::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: `{name}`"
                     );
                     // stub exists, but the module doesn't.
-                    // TODO: Support partial packages.
                     return None;
                 }
-                Err(PackageKind::Namespace) => {
+                Err((PackageKind::Namespace, _)) => {
                     tracing::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
@@ -723,25 +730,31 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
         }
 
         match resolve_name_in_search_path(&resolver_state, &name, search_path) {
-            Ok((_, ResolvedName::FileModule(module))) => {
+            Ok((_, _, ResolvedName::FileModule(module))) => {
                 return Some(ResolvedName::FileModule(module));
             }
-            Ok((_, ResolvedName::NamespacePackage)) => {
+            Ok((_, _, ResolvedName::NamespacePackage)) => {
                 is_namespace_package = true;
             }
             Err(kind) => match kind {
-                PackageKind::Root => {
+                (PackageKind::Root, _) => {
                     tracing::trace!(
                         "Search path `{search_path}` contains no package named `{name}`."
                     );
                 }
-                PackageKind::Regular => {
+                (PackageKind::Regular, PyTyped::Partial) => {
+                    tracing::trace!(
+                        "Package in `{search_path}` doesn't contain module: \
+                         `{name}` but it is a partial package, keep going."
+                    );
+                }
+                (PackageKind::Regular, _) => {
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
                     tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
                     return None;
                 }
-                PackageKind::Namespace => {
+                (PackageKind::Namespace, _) => {
                     tracing::trace!(
                         "Package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
@@ -796,7 +809,7 @@ fn resolve_name_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
-) -> Result<(PackageKind, ResolvedName), PackageKind> {
+) -> Result<(PackageKind, PyTyped, ResolvedName), (PackageKind, PyTyped)> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
@@ -811,6 +824,7 @@ fn resolve_name_in_search_path(
     if let Some(regular_package) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
+            resolved_package.typed,
             ResolvedName::FileModule(ResolvedFileModule {
                 search_path: search_path.clone(),
                 kind: ModuleKind::Package,
@@ -825,6 +839,7 @@ fn resolve_name_in_search_path(
     if let Some(file_module) = resolve_file_module(&package_path, context) {
         return Ok((
             resolved_package.kind,
+            resolved_package.typed,
             ResolvedName::FileModule(ResolvedFileModule {
                 file: file_module,
                 kind: ModuleKind::Module,
@@ -859,12 +874,16 @@ fn resolve_name_in_search_path(
                     package_path.search_path().as_system_path().unwrap(),
                 )
             {
-                return Ok((resolved_package.kind, ResolvedName::NamespacePackage));
+                return Ok((
+                    resolved_package.kind,
+                    resolved_package.typed,
+                    ResolvedName::NamespacePackage,
+                ));
             }
         }
     }
 
-    Err(resolved_package.kind)
+    Err((resolved_package.kind, resolved_package.typed))
 }
 
 /// If `module` exists on disk with either a `.pyi` or `.py` extension,
@@ -919,7 +938,7 @@ fn resolve_package<'a, 'db, I>(
     module_search_path: &SearchPath,
     components: I,
     resolver_state: &ResolverContext<'db>,
-) -> Result<ResolvedPackage, PackageKind>
+) -> Result<ResolvedPackage, (PackageKind, PyTyped)>
 where
     I: Iterator<Item = &'a str>,
 {
@@ -933,9 +952,12 @@ where
     // `true` if resolving a sub-package. For example, `true` when resolving `bar` of `foo.bar`.
     let mut in_sub_package = false;
 
+    let mut typed = package_path.py_typed(resolver_state);
+
     // For `foo.bar.baz`, test that `foo` and `bar` both contain a `__init__.py`.
     for folder in components {
         package_path.push(folder);
+        typed = package_path.py_typed(resolver_state).inherit_parent(typed);
 
         let is_regular_package = package_path.is_regular_package(resolver_state);
 
@@ -950,13 +972,13 @@ where
             in_namespace_package = true;
         } else if in_namespace_package {
             // Package not found but it is part of a namespace package.
-            return Err(PackageKind::Namespace);
+            return Err((PackageKind::Namespace, typed));
         } else if in_sub_package {
             // A regular sub package wasn't found.
-            return Err(PackageKind::Regular);
+            return Err((PackageKind::Regular, typed));
         } else {
             // We couldn't find `foo` for `foo.bar.baz`, search the next search path.
-            return Err(PackageKind::Root);
+            return Err((PackageKind::Root, typed));
         }
 
         in_sub_package = true;
@@ -973,6 +995,7 @@ where
     Ok(ResolvedPackage {
         kind,
         path: package_path,
+        typed,
     })
 }
 
@@ -980,6 +1003,7 @@ where
 struct ResolvedPackage {
     path: ModulePath,
     kind: PackageKind,
+    typed: PyTyped,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -1003,6 +1027,32 @@ enum PackageKind {
 impl PackageKind {
     pub(crate) const fn is_root(self) -> bool {
         matches!(self, PackageKind::Root)
+    }
+}
+
+/// Info about the `py.typed` file for this package
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) enum PyTyped {
+    /// No `py.typed` was found
+    Untyped,
+    /// A `py.typed` was found containing "partial"
+    Partial,
+    /// A `py.typed` was found (not partial)
+    Full,
+}
+
+impl PyTyped {
+    /// Inherit py.typed info from the parent package
+    ///
+    /// > This marker applies recursively: if a top-level package includes it,
+    /// > all its sub-packages MUST support type checking as well.
+    ///
+    /// This implementation implies that once a `py.typed` is specified
+    /// all child packages inherit it, so they can never become Untyped.
+    /// However they can override whether that's Full or Partial by
+    /// redeclaring a `py.typed` file of their own.
+    fn inherit_parent(self, parent: Self) -> Self {
+        if self == Self::Untyped { parent } else { self }
     }
 }
 
