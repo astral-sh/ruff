@@ -2199,12 +2199,12 @@ impl<'db> Type<'db> {
                 any_protocol_members_absent_or_disjoint(db, protocol, nominal, visitor)
             }),
 
-            (Type::ProtocolInstance(protocol), other)
-            | (other, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
+            (Type::ProtocolInstance(protocol), other_ty)
+            | (other_ty, Type::ProtocolInstance(protocol)) => visitor.visit((self, other), || {
                 protocol.interface(db).members(db).any(|member| {
                     matches!(
-                        other.member(db, member.name()).place,
-                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, other, attribute_type, visitor)
+                        other_ty.member(db, member.name()).place,
+                        Place::Type(attribute_type, _) if member.has_disjoint_type_from(db, other_ty, attribute_type, visitor)
                     )
                 })
             }),
