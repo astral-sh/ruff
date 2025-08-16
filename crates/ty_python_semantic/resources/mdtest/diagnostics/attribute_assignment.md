@@ -24,7 +24,7 @@ instance.attr = "wrong"  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` on type `int`
  --> src/mdtest_snippet.py:8:1
   |
 8 | instance.attr = "wrong"  # snapshot: invalid-assignment
@@ -39,7 +39,7 @@ C.attr = "wrong"  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable to attribute `attr` on type `int`
  --> src/mdtest_snippet.py:9:1
   |
 9 | C.attr = "wrong"  # snapshot: invalid-assignment

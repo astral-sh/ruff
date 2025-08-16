@@ -38,7 +38,7 @@ c_instance.inferred_from_value = "value set on instance"
 # This assignment is also fine:
 c_instance.declared_and_bound = False
 
-# error: [invalid-assignment] "Object of type `Literal["incompatible"]` is not assignable to attribute `declared_and_bound` of type `bool`"
+# error: [invalid-assignment] "Object of type `Literal["incompatible"]` is not assignable to attribute `declared_and_bound` on type `bool`"
 c_instance.declared_and_bound = "incompatible"
 
 # mypy shows no error here, but pyright raises "reportAttributeAccessIssue"
@@ -81,7 +81,7 @@ reveal_type(C.declared_and_bound)  # revealed: str | None
 
 C.declared_and_bound = "overwritten on class"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` of type `str | None`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `declared_and_bound` on type `str | None`"
 c_instance.declared_and_bound = 1
 ```
 
@@ -143,7 +143,7 @@ class C:
         self.bound_in_body_declared_in_init: str | None
 
         if flag:
-            # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `bound_in_body_and_init` of type `int`"
+            # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `bound_in_body_and_init` on type `int`"
             self.bound_in_body_and_init = "a"
 
 c_instance = C(True)
@@ -335,7 +335,7 @@ reveal_type(c_instance.d2)  # revealed: str
 ```py
 class C:
     def __init__(self) -> None:
-        # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `b` of type `list[Literal[2, 3]]`"
+        # error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to attribute `b` on type `list[Literal[2, 3]]`"
         self.a, *self.b = (1, 2, 3)
 
 c_instance = C()
@@ -774,7 +774,7 @@ c_instance.pure_class_variable1 = "value set on instance"
 
 C.pure_class_variable1 = "overwritten on class"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_class_variable1` of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `pure_class_variable1` on type `str`"
 C.pure_class_variable1 = 1
 
 class Subclass(C):
@@ -1283,7 +1283,7 @@ def _(flag: bool):
     reveal_type(C2.y)  # revealed: int | str
 
     C2.y = 100
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` on type `int | str`"
     C2.y = None
     # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
     C2.y = "problematic"
@@ -1303,7 +1303,7 @@ def _(flag: bool):
     reveal_type(C3.y)  # revealed: int | str
 
     C3.y = 100
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` on type `int | str`"
     C3.y = None
     # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
     C3.y = "problematic"
@@ -1321,7 +1321,7 @@ def _(flag: bool):
     reveal_type(C4.y)  # revealed: int | str
 
     C4.y = 100
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` of type `int | str`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `y` on type `int | str`"
     C4.y = None
     # TODO: should be an error, needs more sophisticated union handling in `validate_attribute_assignment`
     C4.y = "problematic"
@@ -1420,7 +1420,7 @@ def _(flag: bool):
     # see a type of `int | Any` above because we have the full union handling of possibly-unbound
     # *instance* attributes.
 
-    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `x` of type `int`"
+    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to attribute `x` on type `int`"
     Derived().x = "a"
 ```
 
@@ -2360,16 +2360,16 @@ import mod
 reveal_type(mod.global_symbol)  # revealed: str
 mod.global_symbol = "b"
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` on type `str`"
 mod.global_symbol = 1
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` on type `str`"
 _, mod.global_symbol = (..., 1)
 
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
 
-# error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
+# error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` on type `str`"
 for mod.global_symbol in range(3):
     pass
 ```

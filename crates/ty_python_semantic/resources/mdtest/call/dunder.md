@@ -110,7 +110,7 @@ def _(flag: bool):
             __getitem__ = external_getitem1
 
         def __init__(self):
-            # error: [invalid-assignment] "Object of type `def external_getitem2(key) -> int` is not assignable to attribute `__getitem__` of type `(instance, key) -> str`"
+            # error: [invalid-assignment] "Object of type `def external_getitem2(key) -> int` is not assignable to attribute `__getitem__` on type `(instance, key) -> str`"
             self.__getitem__ = external_getitem2
 
     this_fails = ThisFails()

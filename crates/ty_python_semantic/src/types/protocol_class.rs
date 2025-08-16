@@ -830,8 +830,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-            ProtocolMemberKind::Property(property) => property_get_type(db, *property)
-                .when_none_or(db, self.constraints, |required_type| {
+            ProtocolMemberKind::Property(property) => {
+                let read_result = if let Some(required_type) = property_get_type(db, *property) {
                     let Place::Defined(DefinedPlace {
                         ty: attribute_type,
                         definedness: Definedness::AlwaysDefined,
@@ -845,14 +845,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return self.never();
                     };
                     self.check_type_pair(db, attribute_type, required_type)
-                })
-                .and(db, self.constraints, || {
+                } else {
+                    self.always()
+                };
+                read_result.and(db, self.constraints, || {
                     property_set_type(db, *property).when_none_or(
                         db,
                         self.constraints,
                         |value_type| self.check_property_write(db, ty, member.name, value_type),
                     )
-                }),
+                })
+            }
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Defined(DefinedPlace {
                     ty: attribute_type,
