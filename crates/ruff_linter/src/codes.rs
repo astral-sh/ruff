@@ -963,6 +963,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8LoggingFormat, "002") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingPercentFormat),
         (Flake8LoggingFormat, "003") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingStringConcat),
         (Flake8LoggingFormat, "004") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingFString),
+        (Flake8LoggingFormat, "005") => (RuleGroup::Preview, rules::flake8_logging_format::violations::LoggingPreFormat),
         (Flake8LoggingFormat, "010") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingWarn),
         (Flake8LoggingFormat, "101") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingExtraAttrClash),
         (Flake8LoggingFormat, "201") => (RuleGroup::Stable, rules::flake8_logging_format::violations::LoggingExcInfo),
