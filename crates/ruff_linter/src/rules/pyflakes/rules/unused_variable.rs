@@ -6,6 +6,7 @@ use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_semantic::Binding;
+use ruff_python_semantic::ScopeKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -256,6 +257,11 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
         return;
     }
 
+    // Skip __class__ in method definitions - it's automatically bound by Python
+    if name == "__class__" && is_binding_in_method_definition(checker, binding) {
+        return;
+    }
+
     let mut diagnostic = checker.report_diagnostic(
         UnusedVariable {
             name: name.to_string(),
@@ -265,4 +271,32 @@ pub(crate) fn unused_variable(checker: &Checker, name: &str, binding: &Binding) 
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+}
+
+fn is_binding_in_method_definition(checker: &Checker, binding: &Binding) -> bool {
+    let semantic = checker.semantic();
+
+    // Get the scope where this binding was created
+    let binding_scope = &semantic.scopes[binding.scope];
+
+    // Check if the binding scope is a function scope
+    if !matches!(binding_scope.kind, ScopeKind::Function(_)) {
+        return false;
+    }
+
+    // Walk up the scope hierarchy to find a class scope, skipping Type scopes
+    let mut current_scope_id = binding.scope;
+    while let Some(parent_scope_id) = semantic.parent_scope_id(current_scope_id) {
+        let parent_scope = &semantic.scopes[parent_scope_id];
+        match parent_scope.kind {
+            ScopeKind::Class(_) => return true,
+            ScopeKind::Type => {
+                // Skip Type scopes (from type annotations) and continue looking
+                current_scope_id = parent_scope_id;
+                continue;
+            }
+            _ => return false,
+        }
+    }
+    false
 }
