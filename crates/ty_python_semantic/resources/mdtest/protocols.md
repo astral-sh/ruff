@@ -389,7 +389,7 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 
 ```py
 from ty_extensions import reveal_protocol_interface
-from typing import SupportsIndex, SupportsAbs
+from typing import SupportsIndex, SupportsAbs, ClassVar
 
 # error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { get_type: `str` }, "z": PropertyMember { get_type: `int`, set_type: `int` }}`"
 reveal_protocol_interface(Foo)
@@ -419,6 +419,12 @@ reveal_protocol_interface(BaseProto)
 
 # error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> bool`)}`"
 reveal_protocol_interface(SubProto)
+
+class ProtoWithClassVar(Protocol):
+    x: ClassVar[int]
+
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+reveal_protocol_interface(ProtoWithClassVar)
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should

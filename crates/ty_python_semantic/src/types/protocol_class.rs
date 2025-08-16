@@ -8,8 +8,9 @@ use rustc_hash::FxHashMap;
 
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
-use crate::types::signatures::ParameterForm;
-use crate::types::{AttributeAssignmentError, CallArguments, HasRelationToVisitor, UnionType};
+use crate::types::{
+    AttributeAssignmentError, CallArguments, HasRelationToVisitor, Signature, UnionType,
+};
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -294,6 +295,7 @@ impl<'db> ProtocolMemberData<'db> {
         struct ProtocolMemberDataDisplay<'a, 'db> {
             db: &'db dyn Db,
             data: &'a ProtocolMemberKind<'db>,
+            qualifiers: TypeQualifiers,
         }
 
         impl std::fmt::Display for ProtocolMemberDataDisplay<'_, '_> {
@@ -312,8 +314,16 @@ impl<'db> ProtocolMemberData<'db> {
                         }
                         d.finish()
                     }
-                    ProtocolMemberKind::Attribute(attribute) => {
-                        write!(f, "AttributeMember(`{}`)", attribute.ty.display(self.db))
+                    ProtocolMemberKind::Attribute(AttributeMember {
+                        ty,
+                        bound_on_class: _,
+                    }) => {
+                        f.write_str("AttributeMember(")?;
+                        write!(f, "`{}`", ty.display(self.db))?;
+                        if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                            f.write_str("; ClassVar")?;
+                        }
+                        f.write_char(')')
                     }
                 }
             }
@@ -322,6 +332,7 @@ impl<'db> ProtocolMemberData<'db> {
         ProtocolMemberDataDisplay {
             db,
             data: &self.kind,
+            qualifiers: self.qualifiers,
         }
     }
 }
@@ -354,21 +365,17 @@ impl<'db> PropertyMember<'db> {
             _ => return None,
         };
 
+        let set_type_from_signature = |sig: &Signature<'db>| match sig.parameters().as_slice() {
+            [_, parameter] if parameter.is_positional() && parameter.form.is_value() => {
+                Some(parameter.annotated_type().unwrap_or_else(Type::unknown))
+            }
+            _ => None,
+        };
+
         let set_type = if let Some(signature) = setter_signature {
-            if let Some(ty) = UnionType::try_from_elements(
-                db,
-                signature
-                    .iter()
-                    .map(|sig| match sig.parameters().as_slice() {
-                        [_, parameter]
-                            if parameter.is_positional()
-                                && parameter.form == ParameterForm::Value =>
-                        {
-                            Some(parameter.annotated_type().unwrap_or_else(Type::unknown))
-                        }
-                        _ => None,
-                    }),
-            ) {
+            if let Some(ty) =
+                UnionType::try_from_elements(db, signature.iter().map(set_type_from_signature))
+            {
                 Some(ty)
             } else {
                 return None;
