@@ -91,7 +91,7 @@ impl<'db> SubclassOfType<'db> {
                 TypeVarVariance::Invariant => {
                     // We need to materialize this to `type[T]` but that isn't representable so
                     // we instead use a type variable with an upper bound of `type`.
-                    Type::NonInferableTypeVar(BoundTypeVarInstance::new(
+                    Type::TypeVar(BoundTypeVarInstance::new(
                         db,
                         TypeVarInstance::new(
                             db,
@@ -282,6 +282,12 @@ impl<'db> SubclassOfInner<'db> {
 impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     fn from(value: ClassType<'db>) -> Self {
         SubclassOfInner::Class(value)
+    }
+}
+
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
+        SubclassOfInner::Dynamic(value)
     }
 }
 
