@@ -137,6 +137,67 @@ class F:
         y: str
 ```
 
+Fields with `init=False` do not participate in the ordering check since they don't appear in
+`__init__`:
+
+```py
+@dataclass
+class GoodWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    z: float = 2.0
+
+@dataclass
+class BadWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+@dataclass
+class GoodWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    z: float = field(kw_only=True, default=2.0)
+
+@dataclass
+class BadWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Fields after a `KW_ONLY` sentinel are also keyword-only and don't participate in ordering checks:
+
+```py
+from dataclasses import KW_ONLY
+
+@dataclass
+class GoodWithKwOnlySentinel:
+    x: int = 1
+    _: KW_ONLY
+    y: str
+    z: float = 2.0
+
+@dataclass
+class BadWithKwOnlySentinel:
+    x: int = 1
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: str
+    _: KW_ONLY
+    z: float
+```
+
 Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:
 
 ```py

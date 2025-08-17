@@ -1365,27 +1365,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut kw_only_field_names = vec![];
                 let mut required_after_default_field_names = vec![];
                 let mut has_seen_default_field = false;
+                let mut kw_only_sentinel_seen = false;
 
                 for (
                     name,
                     Field {
                         declared_ty: field_ty,
                         default_ty,
+                        init,
+                        kw_only,
                         ..
                     },
                 ) in class.fields(self.db(), specialization, field_policy)
                 {
-                    // Check for KW_ONLY
+                    // Check for fields after KW_ONLY sentinel
                     if let Some(instance) = field_ty.into_nominal_instance() {
                         if instance
                             .class(self.db())
                             .is_known(self.db(), KnownClass::KwOnly)
                         {
                             kw_only_field_names.push(name.clone());
+                            kw_only_sentinel_seen = true;
                         }
                     }
 
-                    // Check field ordering
+                    // Check field ordering - only for fields that participate in positional `__init__` args
+                    // Skip `init=False` fields (don't appear in `__init__`)
+                    // Skip `kw_only` fields (go at end of `__init__` signature, not positional)
+                    // Skip fields that come after a `KW_ONLY` sentinel (they're keyword-only)
+                    if !init || kw_only == Some(true) || kw_only_sentinel_seen {
+                        continue;
+                    }
                     if default_ty.is_some() {
                         has_seen_default_field = true;
                     } else if has_seen_default_field {
