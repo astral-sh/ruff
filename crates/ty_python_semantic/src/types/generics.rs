@@ -14,10 +14,10 @@ use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, KnownClass,
-    KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeTransformer,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
-    declaration_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IntersectionBuilder,
+    KnownClass, KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
+    TypeTransformer, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType,
+    binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -343,20 +343,28 @@ impl<'db> GenericContext<'db> {
                 continue;
             }
 
-            let Some(default) = typevar.default_type(db) else {
+            if let Some(default) = typevar.default_type(db) {
+                // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
+                // statically enforced for PEP-695 contexts, and is explicitly called out as a
+                // requirement for legacy contexts.)
+                let partial = PartialSpecialization {
+                    generic_context: self,
+                    types: Cow::Borrowed(&expanded[0..idx]),
+                };
+                let default =
+                    default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
+                expanded[idx] = default;
                 continue;
-            };
+            }
 
-            // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
-            // statically enforced for PEP-695 contexts, and is explicitly called out as a
-            // requirement for legacy contexts.)
-            let partial = PartialSpecialization {
-                generic_context: self,
-                types: Cow::Borrowed(&expanded[0..idx]),
-            };
-            let default =
-                default.apply_type_mapping(db, &TypeMapping::PartialSpecialization(partial));
-            expanded[idx] = default;
+            if let Some(upper_bound) = typevar.typevar(db).upper_bound(db) {
+                let ty = IntersectionBuilder::new(db)
+                    .add_positive(upper_bound)
+                    .add_positive(Type::unknown())
+                    .build();
+                expanded[idx] = ty;
+                continue;
+            }
         }
 
         Specialization::new(db, self, expanded.into_boxed_slice(), None)

@@ -43,6 +43,17 @@ def absurd[T]() -> T:
     raise ValueError("absurd")
 ```
 
+If a typevar is used only once, we still attempt to make use of its upper bound:
+
+```py
+def bounded_typevar[T: int]() -> T:
+    raise NotImplementedError
+
+reveal_type(bounded_typevar())  # revealed: int & Unknown
+reveal_type(bounded_typevar().numerator)  # revealed: int & Unknown
+reveal_type(bounded_typevar().bit_length())  # revealed: @Todo(Type::Intersection.call())
+```
+
 ## Inferring generic function parameter types
 
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
@@ -174,7 +185,8 @@ def f[T: int](x: T) -> T:
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
 # error: [invalid-argument-type]
-reveal_type(f("string"))  # revealed: Unknown
+# error: [invalid-argument-type]
+reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 ## Inferring a constrained typevar
@@ -372,10 +384,12 @@ def f(
     reveal_type(close_and_return(d))  # revealed: ClosableFullyStaticNominal
     reveal_type(close_and_return(e))  # revealed: ClosableNonFullyStaticNominal
 
+    # error: [invalid-argument-type] "Expected `SupportsClose & Unknown`, found `NotClosableProtocol`"
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(f))  # revealed: Unknown
+    reveal_type(close_and_return(f))  # revealed: SupportsClose & Unknown
+    # error: [invalid-argument-type] "Expected `SupportsClose & Unknown`, found `NotClosableNominal`"
     # error: [invalid-argument-type] "does not satisfy upper bound"
-    reveal_type(close_and_return(g))  # revealed: Unknown
+    reveal_type(close_and_return(g))  # revealed: SupportsClose & Unknown
 ```
 
 ## Opaque decorators don't affect typevar binding

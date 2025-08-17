@@ -113,6 +113,7 @@ def _(n: int):
     # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [missing-argument]
     # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Argument type `Literal[3]` does not satisfy upper bound of type variable `T`"
+    # error: [invalid-argument-type] "Argument to function `f4` is incorrect: Expected `str & Unknown`, found `Literal[3]`"
     # error: [invalid-argument-type] "Argument to function `f5` is incorrect: Expected `str`, found `Literal[3]`"
     # error: [no-matching-overload] "No overload of function `f6` matches arguments"
     # error: [call-non-callable] "Object of type `Literal[5]` is not callable"

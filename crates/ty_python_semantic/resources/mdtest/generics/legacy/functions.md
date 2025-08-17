@@ -191,7 +191,8 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
 # error: [invalid-argument-type]
-reveal_type(f("string"))  # revealed: Unknown
+# error: [invalid-argument-type]
+reveal_type(f("string"))  # revealed: int & Unknown
 ```
 
 ## Inferring a constrained typevar

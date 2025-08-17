@@ -91,7 +91,7 @@ class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
 # TODO: Shape
-reveal_type(Shape.bar())  # revealed: Unknown
+reveal_type(Shape.bar())  # revealed: Shape & Unknown
 ```
 
 ## Attributes
