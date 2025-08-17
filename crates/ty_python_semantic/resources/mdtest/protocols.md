@@ -397,7 +397,7 @@ To see the kinds and types of the protocol members, you can use the debugging ai
 
 ```py
 from ty_extensions import reveal_protocol_interface
-from typing import SupportsIndex, SupportsAbs
+from typing import SupportsIndex, SupportsAbs, ClassVar
 
 # error: [revealed-type] "Revealed protocol interface: `{"method_member": MethodMember(`(self) -> bytes`), "x": AttributeMember(`int`), "y": PropertyMember { getter: `def y(self) -> str` }, "z": PropertyMember { getter: `def z(self) -> int`, setter: `def z(self, z: int) -> None` }}`"
 reveal_protocol_interface(Foo)
@@ -415,6 +415,33 @@ reveal_protocol_interface("foo")
 #
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
 reveal_protocol_interface(SupportsAbs[int])
+
+class BaseProto(Protocol):
+    def member(self) -> int: ...
+
+class SubProto(BaseProto, Protocol):
+    def member(self) -> bool: ...
+
+# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> int`)}`"
+reveal_protocol_interface(BaseProto)
+
+# error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> bool`)}`"
+reveal_protocol_interface(SubProto)
+
+class ProtoWithClassVar(Protocol):
+    x: ClassVar[int]
+
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+reveal_protocol_interface(ProtoWithClassVar)
+
+class ProtocolWithDefault(Protocol):
+    x: int = 0
+
+# We used to incorrectly report this as having an `x: Literal[0]` member;
+# declared types should take priority over inferred types for protocol interfaces!
+#
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`)}`"
+reveal_protocol_interface(ProtocolWithDefault)
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -623,13 +650,26 @@ class HasXWithDefault(Protocol):
 class FooWithZero:
     x: int = 0
 
-# TODO: these should pass
-static_assert(is_subtype_of(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
-static_assert(is_assignable_to(FooWithZero, HasXWithDefault))  # error: [static-assert-error]
-static_assert(not is_subtype_of(Foo, HasXWithDefault))
-static_assert(not is_assignable_to(Foo, HasXWithDefault))
-static_assert(not is_subtype_of(Qux, HasXWithDefault))
-static_assert(not is_assignable_to(Qux, HasXWithDefault))
+static_assert(is_subtype_of(FooWithZero, HasXWithDefault))
+static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
+
+# TODO: whether or not any of these four assertions should pass is not clearly specified.
+#
+# A test in the typing conformance suite implies that they all should:
+# that a nominal class with an instance attribute `x`
+# (*without* a default value on the class body)
+# should be understood as satisfying a protocol that has an attribute member `x`
+# even if the protocol's `x` member has a default value on the class body.
+#
+# See <https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/protocols_definition.py#L56-L79>.
+#
+# The implications of this for meta-protocols are not clearly spelled out, however,
+# and the fact that attribute members on protocols can have defaults is only mentioned
+# in a throwaway comment in the spec's prose.
+static_assert(is_subtype_of(Foo, HasXWithDefault))
+static_assert(is_assignable_to(Foo, HasXWithDefault))
+static_assert(is_subtype_of(Qux, HasXWithDefault))
+static_assert(is_assignable_to(Qux, HasXWithDefault))
 
 class HasClassVarX(Protocol):
     x: ClassVar[int]
@@ -2125,6 +2165,30 @@ static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
 # TODO: these should pass
 static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]
 static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
+```
+
+## Regression test for `ClassVar` members in stubs
+
+In an early version of our protocol implementation, we didn't retain the `ClassVar` qualifier for
+protocols defined in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing import ClassVar, Protocol
+
+class Foo(Protocol):
+    x: ClassVar[int]
+```
+
+`main.py`:
+
+```py
+from stub import Foo
+from ty_extensions import reveal_protocol_interface
+
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+reveal_protocol_interface(Foo)
 ```
 
 ## TODO
