@@ -193,6 +193,12 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
     }
 }
 
+impl Type<'_> {
+    pub(crate) fn is_atomic(self) -> bool {
+        matches!(TypeKind::from(self), TypeKind::Atomic)
+    }
+}
+
 fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     non_atomic_type: NonAtomicType<'db>,
