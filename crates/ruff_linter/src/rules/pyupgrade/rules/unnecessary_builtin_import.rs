@@ -28,8 +28,18 @@ use crate::fix;
 /// ```
 ///
 /// ## Fix safety
-/// This fix is marked as unsafe because it may remove comments associated
-/// with the import statement.
+/// This fix is marked as unsafe because removing the import
+/// may change program behavior. For example, in the following
+/// situation:
+///
+/// ```python
+/// def str(x):
+///     return x
+///
+/// from builtins import str
+///
+/// str(1)  # `"1"` with the import, `1` without
+/// ```
 ///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
