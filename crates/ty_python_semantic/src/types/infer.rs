@@ -64,7 +64,7 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::resolve_module;
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -1118,13 +1118,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                if let Some((class, solid_base)) = base_class
-                    .to_class_type(self.db())
-                    .and_then(|class| Some((class, class.nearest_solid_base(self.db())?)))
-                {
-                    solid_bases.insert(solid_base, i, class.class_literal(self.db()).0);
-                }
-
                 let base_class = match base_class {
                     Type::SpecialForm(SpecialFormType::Generic) => {
                         if let Some(builder) = self
@@ -1156,13 +1149,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         continue;
                     }
-                    Type::ClassLiteral(class) => class,
-                    // dynamic/unknown bases are never `@final`
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(class) => ClassType::Generic(*class),
                     _ => continue,
                 };
 
+                if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
+                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                }
+
                 if is_protocol
-                    && !(base_class.is_protocol(self.db())
+                    && !(base_class.class_literal(self.db()).0.is_protocol(self.db())
                         || base_class.is_known(self.db(), KnownClass::Object))
                 {
                     if let Some(builder) = self
@@ -3075,20 +3072,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class_ty = Type::from(ClassLiteral::new(
-            self.db(),
-            name.id.clone(),
-            body_scope,
-            maybe_known_class,
-            deprecated,
-            dataclass_params,
-            dataclass_transformer_params,
-        ));
+        let ty = if maybe_known_class.is_none()
+            && &name.id == "NamedTuple"
+            && matches!(
+                file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
+                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+            ) {
+            Type::SpecialForm(SpecialFormType::NamedTuple)
+        } else {
+            Type::from(ClassLiteral::new(
+                self.db(),
+                name.id.clone(),
+                body_scope,
+                maybe_known_class,
+                deprecated,
+                dataclass_params,
+                dataclass_transformer_params,
+            ))
+        };
 
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(class_ty),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -4060,6 +4066,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
+            | Type::NonInferableTypeVar(..)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -6247,7 +6254,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Property
                         | KnownClass::Super
                         | KnownClass::TypeVar
-                        | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
@@ -6421,7 +6427,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
             value,
         } = await_expression;
-        self.infer_expression(value).resolve_await(self.db())
+        let expr_type = self.infer_expression(value);
+        expr_type.try_await(self.db()).unwrap_or_else(|err| {
+            err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
+            Type::unknown()
+        })
     }
 
     // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
@@ -7263,6 +7273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7604,6 +7615,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7633,6 +7645,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -8684,7 +8697,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .next()
             .expect("valid bindings should have matching overload");
         Type::from(generic_class.apply_specialization(self.db(), |_| {
-            generic_context.specialize_partial(self.db(), overload.parameter_types())
+            generic_context
+                .specialize_partial(self.db(), overload.parameter_types().iter().copied())
         }))
     }
 
@@ -10636,7 +10650,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut signature_iter = callable_binding.into_iter().map(|binding| {
                     if argument_type.is_bound_method() {
-                        binding.signature.bind_self()
+                        binding.signature.bind_self(self.db(), Some(argument_type))
                     } else {
                         binding.signature.clone()
                     }
@@ -10812,7 +10826,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::TypingSelf
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypedDict
-            | SpecialFormType::Unknown => {
+            | SpecialFormType::Unknown
+            | SpecialFormType::NamedTuple => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

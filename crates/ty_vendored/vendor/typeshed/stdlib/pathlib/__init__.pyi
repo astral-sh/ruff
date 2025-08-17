@@ -136,11 +136,20 @@ class PurePath(PathLike[str]):
         """True if the path is absolute (has both a root and, if applicable,
         a drive).
         """
-
-    def is_reserved(self) -> bool:
-        """Return True if the path contains one of the special names reserved
-        by the system, if any.
-        """
+    if sys.version_info >= (3, 13):
+        @deprecated(
+            "Deprecated since Python 3.13; will be removed in Python 3.15. "
+            "Use `os.path.isreserved()` to detect reserved paths on Windows."
+        )
+        def is_reserved(self) -> bool:
+            """Return True if the path contains one of the special names reserved
+            by the system, if any.
+            """
+    else:
+        def is_reserved(self) -> bool:
+            """Return True if the path contains one of the special names reserved
+            by the system, if any.
+            """
     if sys.version_info >= (3, 14):
         def is_relative_to(self, other: StrPath) -> bool:
             """Return True if the path is relative to another path or False."""
@@ -417,7 +426,6 @@ class Path(PurePath):
         Create a new directory at this given path.
         """
     if sys.version_info >= (3, 14):
-
         @property
         def info(self) -> PathInfo:
             """
@@ -518,9 +526,20 @@ class Path(PurePath):
         self, mode: str, buffering: int = -1, encoding: str | None = None, errors: str | None = None, newline: str | None = None
     ) -> IO[Any]: ...
 
-    # These methods do "exist" on Windows on <3.13, but they always raise NotImplementedError.
+    # These methods do "exist" on Windows, but they always raise NotImplementedError.
     if sys.platform == "win32":
-        if sys.version_info < (3, 13):
+        if sys.version_info >= (3, 13):
+            # raises UnsupportedOperation:
+            def owner(self: Never, *, follow_symlinks: bool = True) -> str:  # type: ignore[misc]
+                """
+                Return the login name of the file owner.
+                """
+
+            def group(self: Never, *, follow_symlinks: bool = True) -> str:  # type: ignore[misc]
+                """
+                Return the group name of the file gid.
+                """
+        else:
             def owner(self: Never) -> str:  # type: ignore[misc]
                 """
                 Return the login name of the file owner.
@@ -692,7 +711,7 @@ class Path(PurePath):
             """
     if sys.version_info < (3, 12):
         if sys.version_info >= (3, 10):
-            @deprecated("Deprecated as of Python 3.10 and removed in Python 3.12. Use hardlink_to() instead.")
+            @deprecated("Deprecated since Python 3.10; removed in Python 3.12. Use `hardlink_to()` instead.")
             def link_to(self, target: StrOrBytesPath) -> None:
                 """
                 Make the target path a hard link pointing to this path.

@@ -150,6 +150,14 @@ class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
 # revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(AlsoInvalid.__mro__)
+
+class NotAGenericProtocol[T]: ...
+
+# error: [invalid-protocol] "Protocol class `StillInvalid` cannot inherit from non-protocol class `NotAGenericProtocol`"
+class StillInvalid(NotAGenericProtocol[int], Protocol): ...
+
+# revealed: tuple[<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(StillInvalid.__mro__)
 ```
 
 But two exceptions to this rule are `object` and `Generic`:

@@ -24,7 +24,7 @@ impl<'db> InlayHint<'db> {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InlayHintContent<'db> {
     Type(Type<'db>),
-    FunctionArgumentName(String),
+    CallArgumentName(String),
 }
 
 impl<'db> InlayHintContent<'db> {
@@ -44,7 +44,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
             InlayHintContent::Type(ty) => {
                 write!(f, ": {}", ty.display(self.db))
             }
-            InlayHintContent::FunctionArgumentName(name) => {
+            InlayHintContent::CallArgumentName(name) => {
                 write!(f, "{name}=")
             }
         }
@@ -67,7 +67,7 @@ pub fn inlay_hints<'db>(
 }
 
 /// Settings to control the behavior of inlay hints.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct InlayHintSettings {
     /// Whether to show variable type hints.
     ///
@@ -76,14 +76,24 @@ pub struct InlayHintSettings {
     /// x": Literal[1]" = 1
     /// ```
     pub variable_types: bool,
-    /// Whether to show function argument names.
+
+    /// Whether to show call argument names.
     ///
     /// For example, this would enable / disable hints like the ones quoted below:
     /// ```python
     /// def foo(x: int): pass
     /// foo("x="1)
     /// ```
-    pub function_argument_names: bool,
+    pub call_argument_names: bool,
+}
+
+impl Default for InlayHintSettings {
+    fn default() -> Self {
+        Self {
+            variable_types: true,
+            call_argument_names: true,
+        }
+    }
 }
 
 struct InlayHintVisitor<'a, 'db> {
@@ -117,8 +127,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         });
     }
 
-    fn add_function_argument_name(&mut self, position: TextSize, name: String) {
-        if !self.settings.function_argument_names {
+    fn add_call_argument_name(&mut self, position: TextSize, name: String) {
+        if !self.settings.call_argument_names {
             return;
         }
 
@@ -128,7 +138,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 
         self.hints.push(InlayHint {
             position,
-            content: InlayHintContent::FunctionArgumentName(name),
+            content: InlayHintContent::CallArgumentName(name),
         });
     }
 }
@@ -195,7 +205,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
                 for (index, arg_or_keyword) in call.arguments.arguments_source_order().enumerate() {
                     if let Some(name) = argument_names.get(&index) {
-                        self.add_function_argument_name(
+                        self.add_call_argument_name(
                             arg_or_keyword.range().start(),
                             name.to_string(),
                         );
@@ -291,7 +301,7 @@ mod tests {
         fn inlay_hints(&self) -> String {
             self.inlay_hints_with_settings(&InlayHintSettings {
                 variable_types: true,
-                function_argument_names: true,
+                call_argument_names: true,
             })
         }
 
@@ -818,7 +828,7 @@ mod tests {
             def foo(x: str) -> int: ...
             def foo(x):
                 return x
-            
+
             foo(42)
             foo('hello')",
         );
@@ -847,7 +857,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints_with_settings(&InlayHintSettings {
-            function_argument_names: false,
+            call_argument_names: false,
             ..Default::default()
         }), @r"
         def foo(x: int): pass

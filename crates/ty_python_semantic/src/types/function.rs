@@ -94,7 +94,6 @@ pub(crate) struct FunctionSpans {
     pub(crate) name: Span,
     /// The span of the parameter list, including the opening and
     /// closing parentheses.
-    #[expect(dead_code)]
     pub(crate) parameters: Span,
     /// The span of the annotated return type, if present.
     pub(crate) return_type: Option<Span>,
@@ -1015,6 +1014,7 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
+        | Type::NonInferableTypeVar(..)
         | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)

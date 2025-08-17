@@ -217,7 +217,7 @@ class ZstdDict:
         1. Prefix is compatible with long distance matching, while dictionary is not.
         2. It only works for the first frame, then the compressor/decompressor will
            return to no prefix state.
-        3. When decompressing, must use the same prefix as when compressing."
+        3. When decompressing, must use the same prefix as when compressing.
         """
 
     @property
@@ -239,11 +239,13 @@ class ZstdDict:
 
     @property
     def dict_id(self) -> int:
-        """the Zstandard dictionary, an int between 0 and 2**32.
+        """The Zstandard dictionary, an int between 0 and 2**32.
 
-        A non-zero value represents an ordinary Zstandard dictionary, conforming to the standardised format.
+        A non-zero value represents an ordinary Zstandard dictionary,
+        conforming to the standardised format.
 
-        The special value '0' means a 'raw content' dictionary,without any restrictions on format or content.
+        A value of zero indicates a 'raw content' dictionary,
+        without any restrictions on format or content.
         """
 
 class ZstdError(Exception):

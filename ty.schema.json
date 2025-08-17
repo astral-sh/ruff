@@ -471,6 +471,16 @@
             }
           ]
         },
+        "invalid-await": {
+          "title": "detects awaiting on types that don't support it",
+          "description": "## What it does\nChecks for `await` being used with types that are not [Awaitable].\n\n## Why is this bad?\nSuch expressions will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nimport asyncio\n\nclass InvalidAwait:\n    def __await__(self) -> int:\n        return 5\n\nasync def main() -> None:\n    await InvalidAwait()  # error: [invalid-await]\n    await 42  # error: [invalid-await]\n\nasyncio.run(main())\n```\n\n[Awaitable]: https://docs.python.org/3/library/collections.abc.html#collections.abc.Awaitable",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-base": {
           "title": "detects class bases that will cause the class definition to raise an exception at runtime",
           "description": "## What it does\nChecks for class definitions that have bases which are not instances of `type`.\n\n## Why is this bad?\nClass definitions with bases like this will lead to `TypeError` being raised at runtime.\n\n## Examples\n```python\nclass A(42): ...  # error: [invalid-base]\n```",

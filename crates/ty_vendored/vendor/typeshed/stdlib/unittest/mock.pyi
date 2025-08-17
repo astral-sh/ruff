@@ -3,7 +3,7 @@ from _typeshed import MaybeNone
 from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping, Sequence
 from contextlib import _GeneratorContextManager
 from types import TracebackType
-from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload
+from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload, type_check_only
 from typing_extensions import ParamSpec, Self, TypeAlias
 
 _T = TypeVar("_T")
@@ -456,6 +456,7 @@ class _patch(Generic[_T]):
 # This class does not exist at runtime, it's a hack to make this work:
 #     @patch("foo")
 #     def bar(..., mock: MagicMock) -> None: ...
+@type_check_only
 class _patch_pass_arg(_patch[_T]):
     @overload
     def __call__(self, func: _TT) -> _TT: ...
@@ -514,6 +515,7 @@ class _patch_dict:
 
 # This class does not exist at runtime, it's a hack to add methods to the
 # patch() function.
+@type_check_only
 class _patcher:
     TEST_PREFIX: str
     dict: type[_patch_dict]
