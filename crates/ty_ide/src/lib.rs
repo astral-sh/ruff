@@ -235,7 +235,8 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::Union(union) => union
-                .iter(db)
+                .elements(db)
+                .iter()
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
