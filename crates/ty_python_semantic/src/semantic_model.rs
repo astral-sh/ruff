@@ -474,7 +474,7 @@ mod tests {
         let model = SemanticModel::new(&db, foo);
         let ty = class.inferred_type(&model);
 
-        assert!(ty.is_class_literal());
+        assert!(ty.is_class_singleton());
 
         Ok(())
     }
@@ -495,7 +495,7 @@ mod tests {
         let model = SemanticModel::new(&db, bar);
         let ty = alias.inferred_type(&model);
 
-        assert!(ty.is_class_literal());
+        assert!(ty.is_class_singleton());
 
         Ok(())
     }

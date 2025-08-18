@@ -145,7 +145,7 @@ impl Ty {
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
-                    .expect_class_literal(),
+                    .expect_class_singleton(),
                 Name::new(name),
             )),
             Ty::SingleMemberEnumLiteral => {
@@ -209,7 +209,7 @@ impl Ty {
                 builtins_symbol(db, s)
                     .place
                     .expect_type()
-                    .expect_class_literal()
+                    .expect_class_singleton()
                     .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
@@ -217,7 +217,7 @@ impl Ty {
                 known_module_symbol(db, KnownModule::Abc, s)
                     .place
                     .expect_type()
-                    .expect_class_literal()
+                    .expect_class_singleton()
                     .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,

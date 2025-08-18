@@ -760,7 +760,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsProtocol) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(Type::BooleanLiteral(
-                                    ty.into_class_literal()
+                                    ty.into_class_singleton()
                                         .is_some_and(|class| class.is_protocol(db)),
                                 ));
                             }

@@ -1175,7 +1175,7 @@ mod tests {
             .ignore_possibly_unbound()
             .unwrap();
 
-        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
+        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_singleton(), None)
             .unwrap()
             .collect::<Vec<_>>();
         assert_eq!(literals.len(), 3);

@@ -1428,7 +1428,7 @@ impl KnownFunction {
                     return;
                 };
                 let Some(protocol_class) = param_type
-                    .into_class_literal()
+                    .into_class_singleton()
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(

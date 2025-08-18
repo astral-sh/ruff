@@ -789,7 +789,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     let callable_type = inference.expression_type(&**callable);
 
                     if callable_type
-                        .into_class_literal()
+                        .into_class_singleton()
                         .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let place = self.expect_place(&target);

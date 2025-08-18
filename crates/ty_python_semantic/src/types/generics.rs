@@ -35,7 +35,7 @@ fn enclosing_generic_contexts<'db>(
             NodeWithScopeKind::Class(class) => {
                 let definition = index.expect_single_definition(class.node(module));
                 binding_type(db, definition)
-                    .into_class_literal()?
+                    .into_class_singleton()?
                     .generic_context(db)
             }
             NodeWithScopeKind::Function(function) => {

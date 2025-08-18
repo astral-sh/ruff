@@ -384,7 +384,7 @@ pub(crate) fn nearest_enclosing_class<'db>(
             infer_definition_types(db, definition)
                 .declaration_type(definition)
                 .inner_type()
-                .into_class_literal()
+                .into_class_singleton()
         })
 }
 
@@ -1083,7 +1083,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Filter out class literals that result from imports
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                 ty.inner_type()
-                    .into_class_literal()
+                    .into_class_singleton()
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
                 None
@@ -1524,7 +1524,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.index
                             .expect_single_definition(class_node_ref.node(self.module())),
                     )
-                    .expect_class_literal();
+                    .expect_class_singleton();
 
                     if class.is_protocol(self.db())
                         || (class.is_abstract(self.db())
@@ -2361,7 +2361,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_stmt = class_scope.node().as_class(self.module())?;
         let class_definition = self.index.expect_single_definition(class_stmt);
-        binding_type(self.db(), class_definition).into_class_literal()
+        binding_type(self.db(), class_definition).into_class_singleton()
     }
 
     /// If the current scope is a (non-lambda) function, return that function's AST node.
@@ -9055,7 +9055,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // TODO: properly handle old-style generics; get rid of this temporary hack
             if !value_ty
-                .into_class_literal()
+                .into_class_singleton()
                 .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
             {
                 report_non_subscriptable(context, value_node.into(), value_ty, "__class_getitem__");

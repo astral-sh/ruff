@@ -62,7 +62,7 @@ use crate::types::tuple::TupleSpec;
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassSingletonType, ClassType, GenericAlias, KnownClass};
+pub(crate) use class::{ClassSingletonType, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -842,7 +842,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
+    pub(crate) const fn into_class_singleton(self) -> Option<ClassSingletonType<'db>> {
         match self {
             Type::ClassSingleton(class_type) => Some(class_type),
             _ => None,
@@ -850,9 +850,9 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
-        self.into_class_literal()
-            .expect("Expected a Type::ClassLiteral variant")
+    pub(crate) fn expect_class_singleton(self) -> ClassSingletonType<'db> {
+        self.into_class_singleton()
+            .expect("Expected a Type::ClassSingleton variant")
     }
 
     pub(crate) const fn is_subclass_of(&self) -> bool {
@@ -860,7 +860,7 @@ impl<'db> Type<'db> {
     }
 
     #[cfg(test)]
-    pub(crate) const fn is_class_literal(&self) -> bool {
+    pub(crate) const fn is_class_singleton(&self) -> bool {
         matches!(self, Type::ClassSingleton(..))
     }
 
@@ -889,12 +889,12 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
+    /// Turn a class literal (`Type::ClassSingleton` or `Type::GenericAlias`) into a `ClassType`.
     /// Since a `ClassType` must be specialized, apply the default specialization to any
     /// unspecialized generic class literal.
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::ClassSingleton(class_literal) => Some(class_literal.default_specialization(db)),
+            Type::ClassSingleton(singleton) => Some(singleton.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
         }
@@ -1122,7 +1122,7 @@ impl<'db> Type<'db> {
     /// any `T` of this type.
     ///
     /// This is true for fully static types, but also for some types that may not be fully static.
-    /// For example, a `ClassLiteral` may inherit `Any`, but its subtyping is still reflexive.
+    /// For example, a `ClassSingleton` may inherit `Any`, but its subtyping is still reflexive.
     ///
     /// This method may have false negatives, but it should not have false positives. It should be
     /// a cheap shallow check, not an exhaustive recursive check.
@@ -1195,8 +1195,8 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::ClassSingleton(class_literal) => {
-                Some(ClassType::NonGeneric(class_literal).into_callable(db))
+            Type::ClassSingleton(singleton) => {
+                Some(ClassType::NonGeneric(singleton).into_callable(db))
             }
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
@@ -1812,8 +1812,8 @@ impl<'db> Type<'db> {
                     return false;
                 }
 
-                let class_literal = instance.class(db).class_singleton(db).0;
-                is_single_member_enum(db, class_literal)
+                let singleton = instance.class(db).class_singleton(db).0;
+                is_single_member_enum(db, singleton)
             }
             _ => false,
         }
@@ -2365,7 +2365,7 @@ impl<'db> Type<'db> {
 
             Type::TypeVar(_) => false,
 
-            // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
+            // We eagerly transform `SubclassOf` to `ClassSingleton` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
             Type::BooleanLiteral(_)
@@ -5330,7 +5330,7 @@ impl<'db> Type<'db> {
     /// If we see a value of this type used as a type expression, what type does it name?
     ///
     /// For example, the builtin `int` as a value expression is of type
-    /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
+    /// `Type::ClassSingleton(ClassSingletonType::Literal(builtins.int))`, that is, it is the `int` class itself. As a type
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
     ///
@@ -6132,8 +6132,8 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
-            Self::ClassSingleton(class_literal) => {
-                Some(TypeDefinition::Class(class_literal.definition(db)))
+            Self::ClassSingleton(singleton) => {
+                Some(TypeDefinition::Class(singleton.definition(db)))
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
             Self::NominalInstance(instance) => {
@@ -6257,7 +6257,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassSingleton<'db>> {
         match self {
             Type::GenericAlias(generic) => Some(generic.origin(db)),
             Type::NominalInstance(instance) => {
@@ -9015,7 +9015,7 @@ impl<'db> TypeAliasType<'db> {
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
-    explicit_metaclass_of: ClassLiteral<'db>,
+    explicit_metaclass_of: ClassSingleton<'db>,
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -9497,7 +9497,7 @@ impl<'db> BytesLiteralType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
-    enum_class: ClassLiteral<'db>,
+    enum_class: ClassSingleton<'db>,
     /// The name of the enum member
     #[returns(ref)]
     name: Name,
@@ -9523,8 +9523,8 @@ pub struct TypedDictType<'db> {
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_singleton(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+        let (singleton, specialization) = self.defining_class.class_singleton(db);
+        singleton.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -9646,8 +9646,8 @@ impl<'db> SuperOwnerKind<'db> {
     fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(SuperOwnerKind::Dynamic(dynamic)),
-            Type::ClassSingleton(class_literal) => Some(SuperOwnerKind::Class(
-                class_literal.apply_optional_specialization(db, None),
+            Type::ClassSingleton(singleton) => Some(SuperOwnerKind::Class(
+                singleton.apply_optional_specialization(db, None),
             )),
             Type::NominalInstance(instance) => Some(SuperOwnerKind::Instance(instance)),
             Type::BooleanLiteral(_) => {
@@ -9862,7 +9862,7 @@ impl<'db> BoundSuperType<'db> {
             SuperOwnerKind::Instance(instance) => instance.class(db),
         };
 
-        let (class_literal, _) = class.class_singleton(db);
+        let (singleton, _) = class.class_singleton(db);
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:
@@ -9873,9 +9873,9 @@ impl<'db> BoundSuperType<'db> {
         //  super(B, b_int)
         //  super(B[int], b_unknown)
         //  ```
-        match class_literal.generic_context(db) {
+        match singleton.generic_context(db) {
             Some(_) => Place::bound(todo_type!("super in generic class")).into(),
-            None => class_literal.class_member_from_mro(
+            None => singleton.class_member_from_mro(
                 db,
                 name,
                 policy,
