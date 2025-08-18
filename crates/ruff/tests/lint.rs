@@ -2322,7 +2322,7 @@ requires-python = ">= 3.11"
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -2634,7 +2634,7 @@ requires-python = ">= 3.11"
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -2998,7 +2998,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -3378,7 +3378,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -3706,7 +3706,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -4034,7 +4034,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -4319,7 +4319,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false
@@ -4657,7 +4657,7 @@ from typing import Union;foo: Union[int, str] = 1
         	_name_,
         	_value_,
         ]
-        linter.flake8_tidy_imports.ban_relative_imports = "parents"
+        linter.flake8_tidy_imports.relative_import_style = "parents-absolute"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
         linter.flake8_type_checking.strict = false

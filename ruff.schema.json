@@ -1425,17 +1425,6 @@
       "description": "Options for the `flake8-tidy-imports` plugin",
       "type": "object",
       "properties": {
-        "ban-relative-imports": {
-          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Strictness"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
         "banned-api": {
           "description": "Specific modules or module members that may not be imported or accessed. Note that this rule is only meant to flag accidental uses, and can be circumvented via `eval` or `importlib`.",
           "type": [
@@ -1455,6 +1444,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "relative-import-style": {
+          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImportStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -1613,6 +1613,31 @@
         },
         {
           "type": "string"
+        }
+      ]
+    },
+    "ImportStyle": {
+      "oneOf": [
+        {
+          "description": "Force imports to be relative.",
+          "type": "string",
+          "enum": [
+            "always-relative"
+          ]
+        },
+        {
+          "description": "Ban imports that extend into the parent module or beyond.",
+          "type": "string",
+          "enum": [
+            "parents-absolute"
+          ]
+        },
+        {
+          "description": "Ban all relative imports.",
+          "type": "string",
+          "enum": [
+            "always-absolute"
+          ]
         }
       ]
     },
@@ -4356,24 +4381,6 @@
         "YTT301",
         "YTT302",
         "YTT303"
-      ]
-    },
-    "Strictness": {
-      "oneOf": [
-        {
-          "description": "Ban imports that extend into the parent module or beyond.",
-          "type": "string",
-          "enum": [
-            "parents"
-          ]
-        },
-        {
-          "description": "Ban all relative imports.",
-          "type": "string",
-          "enum": [
-            "all"
-          ]
-        }
       ]
     }
   }
