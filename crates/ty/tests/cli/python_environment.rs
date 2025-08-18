@@ -762,7 +762,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Failed to discover the site-packages directory
-      Cause: Failed to iterate over the contents of the `lib` directory of the Python installation
+      Cause: Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
       |
@@ -771,8 +771,6 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-
-      Cause: No such file or directory (os error 2)
     "#);
 
     Ok(())
