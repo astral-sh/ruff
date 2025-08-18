@@ -5,11 +5,11 @@ use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, Binding, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
-    SubmoduleImport,
+    AnyImport, Binding, BindingId, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId,
+    SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -285,11 +285,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
     for binding in unused_imports_in_scope(checker.semantic(), scope) {
-        if binding.is_used()
-            || binding.is_explicit_export()
-            || binding.is_nonlocal()
-            || binding.is_global()
-        {
+        if binding.is_used() {
             continue;
         }
 
@@ -585,5 +581,122 @@ fn unused_imports_in_scope<'a, 'b>(
     semantic: &'a SemanticModel<'b>,
     scope: &'a Scope,
 ) -> impl Iterator<Item = &'a Binding<'b>> {
-    scope.binding_ids().map(|id| semantic.binding(id))
+    scope
+        .binding_ids()
+        .map(|id| (id, semantic.binding(id)))
+        .filter(|(_, bdg)| {
+            matches!(
+                bdg.kind,
+                BindingKind::Import(_)
+                    | BindingKind::FromImport(_)
+                    | BindingKind::SubmoduleImport(_)
+            )
+        })
+        .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
+        .flat_map(|(id, bdg)| {
+            if scope.shadowed_bindings(id).all(|shadow| {
+                matches!(
+                    semantic.binding(shadow).kind,
+                    BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
+                )
+            }) {
+                unused_imports_from_binding(semantic, id, scope)
+            } else {
+                vec![bdg]
+            }
+        })
+}
+
+fn unused_imports_from_binding<'a, 'b>(
+    semantic: &'a SemanticModel<'b>,
+    id: BindingId,
+    scope: &'a Scope,
+) -> Vec<&'a Binding<'b>> {
+    let binding = semantic.binding(id);
+    let mut unused: Vec<_> = scope
+        .shadowed_bindings(id)
+        .map(|id| semantic.binding(id))
+        .collect();
+
+    for ref_id in binding.references() {
+        let Some(expr_id) = semantic.reference(ref_id).expression_id() else {
+            continue;
+        };
+        remove_uses_of_ref(semantic, &mut unused, expr_id);
+    }
+
+    unused
+}
+
+fn expand_to_qualified_name_attribute<'b>(
+    semantic: &SemanticModel<'b>,
+    expr_id: NodeId,
+) -> Option<QualifiedName<'b>> {
+    let mut builder = QualifiedNameBuilder::with_capacity(16);
+
+    let mut expr_id = expr_id;
+
+    let expr = semantic.expression(expr_id)?;
+
+    let name = expr.as_name_expr()?;
+
+    builder.push(&name.id);
+
+    while let Some(node_id) = semantic.parent_expression_id(expr_id) {
+        let Some(expr) = semantic.expression(node_id) else {
+            break;
+        };
+        let Some(expr_attr) = expr.as_attribute_expr() else {
+            break;
+        };
+        builder.push(expr_attr.attr.as_str());
+        expr_id = node_id;
+    }
+    Some(builder.build())
+}
+
+fn remove_uses_of_ref(semantic: &SemanticModel, unused: &mut Vec<&Binding>, expr_id: NodeId) {
+    let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
+        return;
+    };
+
+    let Some(best) = best_match(unused, &prototype) else {
+        return;
+    };
+
+    let Some(bimp) = best.as_any_import() else {
+        return;
+    };
+
+    let bname = bimp.qualified_name();
+
+    unused.retain(|binding| {
+        binding
+            .as_any_import()
+            .is_some_and(|imp| imp.qualified_name() != bname)
+    });
+}
+
+fn rank_match(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
+    let Some(import) = binding.as_any_import() else {
+        unreachable!()
+    };
+    let qname = import.qualified_name();
+    let left = qname
+        .segments()
+        .iter()
+        .zip(prototype.segments())
+        .take_while(|(x, y)| x == y)
+        .count();
+    (left, std::cmp::Reverse(qname.segments().len()))
+}
+
+fn best_match<'a, 'b, 'c>(
+    unused: &'a Vec<&'b Binding<'c>>,
+    prototype: &'a QualifiedName,
+) -> Option<&'b Binding<'c>> {
+    unused
+        .iter()
+        .max_by_key(|binding| rank_match(binding, prototype))
+        .map(|v| &**v)
 }
