@@ -455,7 +455,7 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// An invalidly defined `NamedTuple` class may lead to the type checker
-    /// inferring unexpected things. It may also lead to `TypeError`s at runtime.
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s at runtime.
     ///
     /// ## Examples
     /// A class definition cannot combine `NamedTuple` with other base classes
@@ -466,13 +466,6 @@ declare_lint! {
     /// ```pycon
     /// >>> from typing import NamedTuple
     /// >>> class Foo(NamedTuple, object): ...
-    /// ...
-    /// Traceback (most recent call last):
-    ///   File "<python-input-1>", line 1, in <module>
-    ///     class Foo(NamedTuple, object): ...
-    ///   File "/python3.13/typing.py", line 2998, in __new__
-    ///     raise TypeError(
-    ///         'can only inherit from a NamedTuple type and Generic')
     /// TypeError: can only inherit from a NamedTuple type and Generic
     /// ```
     pub(crate) static INVALID_NAMED_TUPLE = {
