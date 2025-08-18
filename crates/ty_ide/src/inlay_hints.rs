@@ -85,6 +85,7 @@ pub struct InlayHintSettings {
     /// foo("x="1)
     /// ```
     pub call_argument_names: bool,
+    // Add any new setting that enables additional inlays to `any_enabled`.
 }
 
 impl InlayHintSettings {
