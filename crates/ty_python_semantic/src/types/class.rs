@@ -327,7 +327,7 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
-    NonGeneric(ClassLiteral<'db>),
+    NonGeneric(ClassSingletonType<'db>),
     Generic(GenericAlias<'db>),
 }
 
@@ -2917,7 +2917,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
-        Type::instance(db, ClassType::NonGeneric(self))
+        Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
     /// Return this class' involvement in an inheritance cycle, if any.
@@ -3016,7 +3016,7 @@ impl<'db> From<ClassLiteral<'db>> for ClassSingletonType<'db> {
 
 impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
     fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
-        ClassType::NonGeneric(class)
+        ClassType::NonGeneric(class.into())
     }
 }
 
