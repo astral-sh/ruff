@@ -2,42 +2,6 @@
 
 ## 0.12.9
 
-### New default diagnostic format
-
-Ruff now uses the same default diagnostic format as ty. Below is an example diff for [`F401`](https://docs.astral.sh/ruff/rules/unused-import/):
-
-```diff
--unused.py:8:19: F401 [*] `pathlib` imported but unused
-+F401 [*] `pathlib` imported but unused
-+  --> unused.py:8:19
-    |
-  7 | # Unused, _not_ marked as required (due to the alias).
-  8 | import pathlib as non_alias
--   |                   ^^^^^^^^^ F401
-+   |                   ^^^^^^^^^
-  9 |
- 10 | # Unused, marked as required.
-    |
--   = help: Remove unused import: `pathlib`
-+help: Remove unused import: `pathlib`
-```
-
-For now, the primary change is in the header, but this new representation will allow us to make further additions to Ruff's diagnostics, such as adding sub-diagnostics and multiple annotations to the same snippet. As a sneak peek, this is the new multi-span annotation for [`F811`](https://docs.astral.sh/ruff/rules/redefined-while-unused/), which should come out in the 0.12.10 release:
-
-```text
-F811 Redefinition of unused `FU` from line 1
- --> F811_1.py:1:14
-  |
-1 | import fu as FU, bar as FU
-  |              --         ^^ `FU` redefined here
-  |              |
-  |              previous definition of `FU` here
-  |
-help: Remove definition: `FU`
-```
-
-These changes only apply to the `full` output format. The other formats now use the same representation internally, but their output should be unchanged.
-
 ### Preview features
 
 - \[`airflow`\] Add check for `airflow.secrets.cache.SecretCache` (`AIR301`) ([#17707](https://github.com/astral-sh/ruff/pull/17707))
@@ -60,7 +24,29 @@ These changes only apply to the `full` output format. The other formats now use 
 ### Other changes
 
 - Build `riscv64` binaries for release ([#19819](https://github.com/astral-sh/ruff/pull/19819))
+
 - Add rule code to error description in GitLab output ([#19896](https://github.com/astral-sh/ruff/pull/19896))
+
+- Improve rendering of the `full` output format ([#19415](https://github.com/astral-sh/ruff/pull/19415))
+    Below is an example diff for [`F401`](https://docs.astral.sh/ruff/rules/unused-import/):
+
+    ```diff
+    -unused.py:8:19: F401 [*] `pathlib` imported but unused
+    +F401 [*] `pathlib` imported but unused
+    +  --> unused.py:8:19
+        |
+      7 | # Unused, _not_ marked as required (due to the alias).
+      8 | import pathlib as non_alias
+    -   |                   ^^^^^^^^^ F401
+    +   |                   ^^^^^^^^^
+      9 |
+     10 | # Unused, marked as required.
+        |
+    -   = help: Remove unused import: `pathlib`
+    +help: Remove unused import: `pathlib`
+    ```
+
+    For now, the primary difference is the movement of the filename, line number, and column information to a second line in the header. This new representation will allow us to make further additions to Ruff's diagnostics, such as adding sub-diagnostics and multiple annotations to the same snippet.
 
 ## 0.12.8
 
