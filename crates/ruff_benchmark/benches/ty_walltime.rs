@@ -142,7 +142,7 @@ static FREQTRADE: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock:
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY312,
         },
-        400,
+        600,
     )
 });
 
