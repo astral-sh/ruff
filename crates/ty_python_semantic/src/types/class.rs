@@ -1194,6 +1194,15 @@ enum ClassSingletonType<'db> {
     NewType(NewTypeClass<'db>),
 }
 
+impl<'db> ClassSingletonType<'db> {
+    pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::ClassLiteral(literal) => literal.has_pep_695_type_params(db),
+            Self::NewType(new_type) => false,
+        }
+    }
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
