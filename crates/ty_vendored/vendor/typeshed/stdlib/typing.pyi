@@ -341,12 +341,26 @@ class _SpecialForm(_Final):
         def __ror__(self, other: Any) -> _SpecialForm: ...
 
 Union: _SpecialForm
-Generic: _SpecialForm
 Protocol: _SpecialForm
 Callable: _SpecialForm
 Type: _SpecialForm
 NoReturn: _SpecialForm
 ClassVar: _SpecialForm
+
+@type_check_only
+class _Generic:
+    if sys.version_info < (3, 12):
+        __slots__ = ()
+        _is_protocol: bool = False
+
+    if sys.version_info >= (3, 10):
+        @classmethod
+        def __class_getitem__(cls, args: TypeVar | ParamSpec | tuple[TypeVar | ParamSpec, ...]) -> _Final: ...
+    else:
+        @classmethod
+        def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+
+Generic: type[_Generic]
 
 Optional: _SpecialForm
 Tuple: _SpecialForm
