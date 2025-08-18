@@ -711,7 +711,7 @@
             }
           ]
         },
-        "missing-required-field": {
+        "missing-typed-dict-required-field": {
           "title": "detects missing required fields in `TypedDict` constructors",
           "description": "## What it does\nDetects missing required fields in `TypedDict` constructor calls.\n\n## Why is this bad?\n`TypedDict` requires all non-optional fields to be provided during construction.\nMissing required fields can lead to `KeyError` at runtime when accessing the field.",
           "default": "error",

@@ -106,7 +106,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_missing_required_field_on_typed_dict, report_possibly_unbound_attribute,
+    report_missing_typed_dict_required_field, report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -949,7 +949,7 @@ fn validate_typed_dict_required_fields<'db, 'ast>(
         .collect();
 
     for missing_field in required_fields.difference(provided_fields) {
-        report_missing_required_field_on_typed_dict(
+        report_missing_typed_dict_required_field(
             context,
             error_node,
             Type::TypedDict(typed_dict),

@@ -1257,11 +1257,11 @@ def func(x: int): ...
 func()  # TypeError: func() missing 1 required positional argument: 'x'
 ```
 
-## `missing-required-field`
+## `missing-typed-dict-required-field`
 
 <small>
 Default level: [`error`](../rules.md#rule-levels "This lint has a default level of 'error'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-required-field) ·
+[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20missing-typed-dict-required-field) ·
 [View source](https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1721)
 </small>
 

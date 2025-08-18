@@ -1159,7 +1159,7 @@ impl MethodDecorator {
 /// Kind-specific metadata for different types of fields
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FieldKind<'db> {
-    /// `NamedTuple` field metadata (no special properties)
+    /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
     /// dataclass field metadata
     Dataclass {
@@ -1599,6 +1599,8 @@ impl<'db> ClassLiteral<'db> {
         let mut typed_dict_params = TypedDictParams::default();
 
         // Check for `total` keyword argument in the class definition
+        // Note that it is fine to only check for Boolean literals here
+        // (https://typing.python.org/en/latest/spec/typeddict.html#totality)
         if let Some(arguments) = &class_stmt.arguments {
             for keyword in &arguments.keywords {
                 if keyword.arg.as_deref() == Some("total")

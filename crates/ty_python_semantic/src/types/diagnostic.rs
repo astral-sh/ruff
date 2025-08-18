@@ -90,7 +90,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
-    registry.register_lint(&MISSING_REQUIRED_FIELD);
+    registry.register_lint(&MISSING_TYPED_DICT_REQUIRED_FIELD);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -1725,7 +1725,7 @@ declare_lint! {
     /// ## Why is this bad?
     /// `TypedDict` requires all non-optional fields to be provided during construction.
     /// Missing required fields can lead to `KeyError` at runtime when accessing the field.
-    pub(crate) static MISSING_REQUIRED_FIELD = {
+    pub(crate) static MISSING_TYPED_DICT_REQUIRED_FIELD = {
         summary: "detects missing required fields in `TypedDict` constructors",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
@@ -2691,14 +2691,15 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     }
 }
 
-pub(crate) fn report_missing_required_field_on_typed_dict<'db>(
+pub(crate) fn report_missing_typed_dict_required_field<'db>(
     context: &InferContext<'db, '_>,
     constructor_node: AnyNodeRef,
     typed_dict_ty: Type<'db>,
     missing_field: &str,
 ) {
     let db = context.db();
-    if let Some(builder) = context.report_lint(&MISSING_REQUIRED_FIELD, constructor_node) {
+    if let Some(builder) = context.report_lint(&MISSING_TYPED_DICT_REQUIRED_FIELD, constructor_node)
+    {
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
             "Missing required field '{missing_field}' in TypedDict `{typed_dict_name}` constructor",
