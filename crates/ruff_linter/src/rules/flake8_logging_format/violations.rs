@@ -345,13 +345,6 @@ impl Violation for LoggingFString {
 /// is unnecessary and less efficient to eagerly format the arguments before passing
 /// them in.
 ///
-/// Additionally, the use of `extra` will ensure that the values are made
-/// available to all handlers, which can then be configured to log the values
-/// in a consistent manner.
-///
-/// As an alternative to `extra`, passing values as arguments to the logging
-/// method can also be used to defer string formatting until required.
-///
 /// ## Known problems
 ///
 /// This rule detects uses of the `logging` module via a heuristic.
@@ -377,17 +370,6 @@ impl Violation for LoggingFString {
 /// ```
 ///
 /// Use instead:
-/// ```python
-/// import logging
-///
-/// logging.basicConfig(format="%(user_id)s - %(message)s", level=logging.INFO)
-///
-/// user = "Maria"
-///
-/// logging.info("Something happened", extra=dict(user_id=user))
-/// ```
-///
-/// Or:
 /// ```python
 /// import logging
 ///
