@@ -238,6 +238,57 @@ mod tests {
     }
 
     #[test]
+    fn hover_function_def() {
+        let test = cursor_test(
+            r#"
+        def my_fu<CURSOR>nc(a, b):
+            '''This is such a great func!!
+
+            Args:
+                a: first for a reason
+                b: coming for `a`'s title
+            '''
+            return 0
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def my_func(a, b) -> Unknown
+        ---------------------------------------------
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ---------------------------------------------
+        ```python
+        def my_func(a, b) -> Unknown
+        ```
+        ---
+        ```text
+        This is such a great func!!
+
+        Args:
+            a: first for a reason
+            b: coming for `a`'s title
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:13
+          |
+        2 |         def my_func(a, b):
+          |             ^^^^^-^
+          |             |    |
+          |             |    Cursor offset
+          |             source
+        3 |             '''This is such a great func!!
+          |
+        ");
+    }
+
+    #[test]
     fn hover_class() {
         let test = cursor_test(
             r#"
@@ -301,6 +352,71 @@ mod tests {
            |         |    Cursor offset
            |         source
            |
+        ");
+    }
+
+    #[test]
+    fn hover_class_def() {
+        let test = cursor_test(
+            r#"
+        class MyCla<CURSOR>ss:
+            '''
+                This is such a great class!!
+
+                    Don't you know?
+                
+                Everyone loves my class!!
+
+            '''
+            def __init__(self, val):
+                """initializes MyClass (perfectly)"""
+                self.val = val
+            
+            def my_method(self, a, b):
+                '''This is such a great func!!
+
+                Args:
+                    a: first for a reason
+                    b: coming for `a`'s title
+                '''
+                return 0
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        <class 'MyClass'>
+        ---------------------------------------------
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ---------------------------------------------
+        ```python
+        <class 'MyClass'>
+        ```
+        ---
+        ```text
+        This is such a great class!!
+
+            Don't you know?
+
+        Everyone loves my class!!
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:15
+          |
+        2 |         class MyClass:
+          |               ^^^^^-^
+          |               |    |
+          |               |    Cursor offset
+          |               source
+        3 |             '''
+        4 |                 This is such a great class!!
+          |
         ");
     }
 
@@ -569,6 +685,40 @@ mod tests {
            |                  source
            |
         ");
+    }
+
+    #[test]
+    fn hover_keyword_parameter_def() {
+        let test = cursor_test(
+            r#"
+            def test(a<CURSOR>b: int):
+                """my cool test
+
+                Args:
+                    ab: a nice little integer
+                """
+                return 0
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:22
+          |
+        2 |             def test(ab: int):
+          |                      ^-
+          |                      ||
+          |                      |Cursor offset
+          |                      source
+        3 |                 """my cool test
+          |
+        "#);
     }
 
     #[test]
