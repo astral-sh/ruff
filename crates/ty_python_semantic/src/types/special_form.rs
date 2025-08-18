@@ -253,7 +253,7 @@ impl SpecialFormType {
     }
 
     pub(super) fn to_meta_type(self, db: &dyn Db) -> Type<'_> {
-        self.class().to_class_literal(db)
+        self.class().to_class_singleton(db)
     }
 
     /// Return true if this special form is callable at runtime.

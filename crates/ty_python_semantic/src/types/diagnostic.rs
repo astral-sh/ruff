@@ -2357,7 +2357,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
             ),
         );
         class_def_diagnostic.annotate(Annotation::primary(
-            class.class_literal(db).0.header_span(db),
+            class.class_singleton(db).0.header_span(db),
         ));
         diagnostic.sub(class_def_diagnostic);
     }

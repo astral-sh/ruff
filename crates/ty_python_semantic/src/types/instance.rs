@@ -20,7 +20,7 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        let (class_literal, specialization) = class.class_literal(db);
+        let (class_literal, specialization) = class.class_singleton(db);
 
         match class_literal.known(db) {
             Some(KnownClass::Any) => Type::Dynamic(DynamicType::Any),
@@ -213,7 +213,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(_) => return None,
             NominalInstanceInner::NonTuple(class) => class,
         };
-        let (class, Some(specialization)) = class.class_literal(db) else {
+        let (class, Some(specialization)) = class.class_singleton(db) else {
             return None;
         };
         if !class.is_known(db, KnownClass::Slice) {
@@ -324,7 +324,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .map(KnownClass::is_singleton)
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| is_single_member_enum(db, class.class_singleton(db).0)),
         }
     }
 
@@ -335,7 +335,7 @@ impl<'db> NominalInstanceType<'db> {
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
                 .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| is_single_member_enum(db, class.class_singleton(db).0)),
         }
     }
 
@@ -608,7 +608,7 @@ impl<'db> Protocol<'db> {
     fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
-                .class_literal(db)
+                .class_singleton(db)
                 .0
                 .into_protocol_class(db)
                 .expect("Protocol class literal should be a protocol class")

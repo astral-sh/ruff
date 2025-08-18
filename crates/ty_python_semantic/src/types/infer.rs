@@ -1175,11 +1175,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
-                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                    solid_bases.insert(solid_base, i, base_class.class_singleton(self.db()).0);
                 }
 
                 if is_protocol
-                    && !(base_class.class_literal(self.db()).0.is_protocol(self.db())
+                    && !(base_class
+                        .class_singleton(self.db())
+                        .0
+                        .is_protocol(self.db())
                         || base_class.is_known(self.db(), KnownClass::Object))
                 {
                     if let Some(builder) = self
@@ -6202,7 +6205,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
             if !callable_type.is_subclass_of() {
                 if let Some(protocol) = class
-                    .class_literal(self.db())
+                    .class_singleton(self.db())
                     .0
                     .into_protocol_class(self.db())
                 {
@@ -6245,7 +6248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // until we support the functional syntax for creating enum classes
             if !has_special_cased_constructor
                 && KnownClass::Enum
-                    .to_class_literal(self.db())
+                    .to_class_singleton(self.db())
                     .to_class_type(self.db())
                     .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
             {

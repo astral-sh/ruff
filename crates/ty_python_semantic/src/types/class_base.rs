@@ -62,7 +62,7 @@ impl<'db> ClassBase<'db> {
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
-            .to_class_literal(db)
+            .to_class_singleton(db)
             .to_class_type(db)
             .map_or(Self::unknown(), Self::Class)
     }
@@ -220,38 +220,42 @@ impl<'db> ClassBase<'db> {
 
                 // TODO: Classes inheriting from `typing.Type` et al. also have `Generic` in their MRO
                 SpecialFormType::Dict => {
-                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Dict.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::List => {
-                    Self::try_from_type(db, KnownClass::List.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::List.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::Type => {
-                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Type.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::Tuple => {
-                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::Set => {
-                    Self::try_from_type(db, KnownClass::Set.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Set.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::FrozenSet => {
-                    Self::try_from_type(db, KnownClass::FrozenSet.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::FrozenSet.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::ChainMap => {
-                    Self::try_from_type(db, KnownClass::ChainMap.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::ChainMap.to_class_singleton(db), subclass)
                 }
                 SpecialFormType::Counter => {
-                    Self::try_from_type(db, KnownClass::Counter.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Counter.to_class_singleton(db), subclass)
                 }
-                SpecialFormType::DefaultDict => {
-                    Self::try_from_type(db, KnownClass::DefaultDict.to_class_literal(db), subclass)
-                }
+                SpecialFormType::DefaultDict => Self::try_from_type(
+                    db,
+                    KnownClass::DefaultDict.to_class_singleton(db),
+                    subclass,
+                ),
                 SpecialFormType::Deque => {
-                    Self::try_from_type(db, KnownClass::Deque.to_class_literal(db), subclass)
+                    Self::try_from_type(db, KnownClass::Deque.to_class_singleton(db), subclass)
                 }
-                SpecialFormType::OrderedDict => {
-                    Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db), subclass)
-                }
+                SpecialFormType::OrderedDict => Self::try_from_type(
+                    db,
+                    KnownClass::OrderedDict.to_class_singleton(db),
+                    subclass,
+                ),
                 SpecialFormType::TypedDict => Some(Self::TypedDict),
                 SpecialFormType::Callable => Self::try_from_type(
                     db,
@@ -302,7 +306,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let (class_literal, specialization) = class.class_singleton(db);
                 class_literal
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)

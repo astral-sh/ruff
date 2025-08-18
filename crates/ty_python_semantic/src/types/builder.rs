@@ -577,7 +577,7 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class(self.db).class_literal(self.db).0)
+                if enum_metadata(self.db, instance.class(self.db).class_singleton(self.db).0)
                     .is_some() =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
@@ -602,7 +602,7 @@ impl<'db> IntersectionBuilder<'db> {
                     let db = self.db;
                     self.add_positive(Type::Union(UnionType::new(
                         db,
-                        enum_member_literals(db, instance.class(db).class_literal(db).0, None)
+                        enum_member_literals(db, instance.class(db).class_singleton(db).0, None)
                             .expect("Calling `enum_member_literals` on an enum class")
                             .collect::<Box<[_]>>(),
                     )))

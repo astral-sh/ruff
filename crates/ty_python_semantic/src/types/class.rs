@@ -240,7 +240,7 @@ impl CodeGeneratorKind {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct GenericAlias<'db> {
-    pub(crate) origin: ClassLiteral<'db>,
+    pub(crate) origin: ClassSingletonType<'db>,
     pub(crate) specialization: Specialization<'db>,
 }
 
@@ -367,10 +367,10 @@ impl<'db> ClassType<'db> {
 
     /// Returns the class literal and specialization for this class. For a non-generic class, this
     /// is the class itself. For a generic alias, this is the alias's origin.
-    pub(crate) fn class_literal(
+    pub(crate) fn class_singleton(
         self,
         db: &'db dyn Db,
-    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+    ) -> (ClassSingletonType<'db>, Option<Specialization<'db>>) {
         match self {
             Self::NonGeneric(non_generic) => (non_generic, None),
             Self::Generic(generic) => (generic.origin(db), Some(generic.specialization(db))),
@@ -379,11 +379,11 @@ impl<'db> ClassType<'db> {
 
     /// Returns the class literal and specialization for this class, with an additional
     /// specialization applied if the class is generic.
-    pub(crate) fn class_literal_specialized(
+    pub(crate) fn singleton_specialized(
         self,
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
-    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+    ) -> (ClassSingletonType<'db>, Option<Specialization<'db>>) {
         match self {
             Self::NonGeneric(non_generic) => (non_generic, None),
             Self::Generic(generic) => (
@@ -398,23 +398,28 @@ impl<'db> ClassType<'db> {
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
-        let (class_literal, _) = self.class_literal(db);
-        class_literal.name(db)
+        let (singleton, _) = self.class_singleton(db);
+        singleton.name(db)
     }
 
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
-        let (class_literal, _) = self.class_literal(db);
-        class_literal.known(db)
+        let (singleton, _) = self.class_singleton(db);
+        singleton.known(db)
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let (class_literal, _) = self.class_literal(db);
-        class_literal.definition(db)
+        let (singleton, _) = self.class_singleton(db);
+        singleton.definition(db)
+    }
+
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        let (singleton, _) = self.class_singleton(db);
+        singleton.is_typed_dict(db)
     }
 
     /// Return `Some` if this class is known to be a [`SolidBase`], or `None` if it is not.
     pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
-        self.class_literal(db).0.as_solid_base(db)
+        self.class_singleton(db).0.as_solid_base(db)
     }
 
     /// Return `true` if this class represents `known_class`
@@ -462,8 +467,8 @@ impl<'db> ClassType<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        let (class_literal, specialization) = self.class_literal(db);
-        class_literal.iter_mro(db, specialization)
+        let (singleton, specialization) = self.class_singleton(db);
+        singleton.iter_mro(db, specialization)
     }
 
     /// Iterate over the method resolution order ("MRO") of the class, optionally applying an
@@ -473,15 +478,14 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         additional_specialization: Option<Specialization<'db>>,
     ) -> MroIterator<'db> {
-        let (class_literal, specialization) =
-            self.class_literal_specialized(db, additional_specialization);
-        class_literal.iter_mro(db, specialization)
+        let (singleton, specialization) = self.singleton_specialized(db, additional_specialization);
+        singleton.iter_mro(db, specialization)
     }
 
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
-        let (class_literal, _) = self.class_literal(db);
-        class_literal.is_final(db)
+        let (singleton, _) = self.class_singleton(db);
+        singleton.is_final(db)
     }
 
     /// Return `true` if `other` is present in this class's MRO.
@@ -550,7 +554,7 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let (class_literal, specialization) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_singleton(db);
         class_literal
             .metaclass(db)
             .apply_optional_specialization(db, specialization)
@@ -597,7 +601,7 @@ impl<'db> ClassType<'db> {
         // however, since we end up with infinite recursion in that case due to the fact
         // that `type` is its own metaclass (and we know that `type` can coexist in an MRO
         // with any other arbitrary class, anyway).
-        let type_class = KnownClass::Type.to_class_literal(db);
+        let type_class = KnownClass::Type.to_class_singleton(db);
         let self_metaclass = self.metaclass(db);
         if self_metaclass == type_class {
             return true;
@@ -638,7 +642,7 @@ impl<'db> ClassType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        let (class_literal, specialization) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_singleton(db);
         class_literal.class_member_inner(db, specialization, name, policy)
     }
 
@@ -670,7 +674,7 @@ impl<'db> ClassType<'db> {
             Signature::new(parameters, Some(return_annotation))
         }
 
-        let (class_literal, specialization) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_singleton(db);
 
         let fallback_member_lookup = || {
             class_literal
@@ -944,7 +948,7 @@ impl<'db> ClassType<'db> {
     ///
     /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let (class_literal, specialization) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_singleton(db);
 
         if class_literal.is_typed_dict(db) {
             return Place::Unbound.into();
@@ -958,7 +962,7 @@ impl<'db> ClassType<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        let (class_literal, specialization) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_singleton(db);
         class_literal
             .own_instance_member(db, name)
             .map_type(|ty| ty.apply_optional_specialization(db, specialization))
@@ -1190,16 +1194,77 @@ pub(crate) struct Field<'db> {
     get_size2::GetSize,
 )]
 enum ClassSingletonType<'db> {
-    ClassLiteral(ClassLiteral<'db>),
+    Literal(ClassLiteral<'db>),
     NewType(NewTypeClass<'db>),
 }
 
 impl<'db> ClassSingletonType<'db> {
     pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
         match self {
-            Self::ClassLiteral(literal) => literal.has_pep_695_type_params(db),
-            Self::NewType(new_type) => false,
+            Self::Literal(literal) => literal.has_pep_695_type_params(db),
+            Self::NewType(_) => false,
         }
+    }
+
+    pub(crate) fn name(self, db: &'db dyn Db) -> &Name {
+        match self {
+            Self::Literal(literal) => literal.name(db),
+            Self::NewType(new_type) => new_type.name(db),
+        }
+    }
+
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
+        match self {
+            Self::Literal(literal) => literal.known(db),
+            Self::NewType(_) => None, // a NewType is never a known class
+        }
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        match self {
+            Self::Literal(literal) => literal.definition(db),
+            Self::NewType(_) => todo!(
+                "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX: WHAT DO I DO HERE?"
+            ),
+        }
+    }
+
+    pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Literal(literal) => literal.is_typed_dict(db),
+            Self::NewType(new_type) => new_type.is_typed_dict(db),
+        }
+    }
+
+    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Literal(literal) => literal.is_final(db),
+            Self::NewType(new_type) => new_type.is_final(db),
+        }
+    }
+
+    pub(super) fn as_solid_base(self, db: &'db dyn Db) -> Option<SolidBase<'db>> {
+        match self {
+            Self::Literal(literal) => literal.as_solid_base(db),
+            Self::NewType(_) => None, // a NewType is never a SolidBase
+        }
+    }
+
+    pub(super) fn iter_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> MroIterator<'db> {
+        match self {
+            Self::Literal(literal) => literal.iter_mro(db, specialization),
+            Self::NewType(new_type) => new_type.iter_mro(db, specialization),
+        }
+    }
+}
+
+impl<'db> From<ClassSingletonType<'db>> for Type<'db> {
+    fn from(singleton: ClassSingletonType) -> Type {
+        Type::ClassSingleton(singleton)
     }
 }
 
@@ -1347,10 +1412,14 @@ impl<'db> ClassLiteral<'db> {
         f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
     ) -> ClassType<'db> {
         match self.generic_context(db) {
-            None => ClassType::NonGeneric(self),
+            None => ClassType::NonGeneric(self.into()),
             Some(generic_context) => {
                 let specialization = f(generic_context);
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(GenericAlias::new(
+                    db,
+                    ClassSingletonType::Literal(self),
+                    specialization,
+                ))
             }
         }
     }
@@ -1655,10 +1724,10 @@ impl<'db> ClassLiteral<'db> {
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
-            let (base_class_literal, _) = base_class.class_literal(db);
-            (base_class.metaclass(db), base_class_literal)
+            let (base_class_singleton, _) = base_class.class_singleton(db);
+            (base_class.metaclass(db), base_class_singleton)
         } else {
-            (KnownClass::Type.to_class_literal(db), self)
+            (KnownClass::Type.to_class_singleton(db), self)
         };
 
         let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
@@ -1707,7 +1776,7 @@ impl<'db> ClassLiteral<'db> {
                 continue;
             };
             if metaclass.is_subclass_of(db, candidate.metaclass) {
-                let (base_class_literal, _) = base_class.class_literal(db);
+                let (base_class_literal, _) = base_class.class_singleton(db);
                 candidate = MetaclassCandidate {
                     metaclass,
                     explicit_metaclass_of: base_class_literal,
@@ -1717,7 +1786,7 @@ impl<'db> ClassLiteral<'db> {
             if candidate.metaclass.is_subclass_of(db, metaclass) {
                 continue;
             }
-            let (base_class_literal, _) = base_class.class_literal(db);
+            let (base_class_literal, _) = base_class.class_singleton(db);
             return Err(MetaclassError {
                 kind: MetaclassErrorKind::Conflict {
                     candidate1: candidate,
@@ -1730,7 +1799,7 @@ impl<'db> ClassLiteral<'db> {
             });
         }
 
-        let (metaclass_literal, _) = candidate.metaclass.class_literal(db);
+        let (metaclass_literal, _) = candidate.metaclass.class_singleton(db);
         Ok((
             candidate.metaclass.into(),
             metaclass_literal.dataclass_transformer_params(db),
@@ -1824,7 +1893,7 @@ impl<'db> ClassLiteral<'db> {
                 }
                 ClassBase::TypedDict => {
                     return KnownClass::TypedDictFallback
-                        .to_class_literal(db)
+                        .to_class_singleton(db)
                         .find_name_in_mro_with_policy(db, name, policy)
                         .expect("Will return Some() when called on class literal");
                 }
@@ -2104,7 +2173,7 @@ impl<'db> ClassLiteral<'db> {
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
-                    .to_class_literal(db)
+                    .to_class_singleton(db)
                     .into_class_literal()?
                     .own_class_member(db, self.generic_context(db), None, name)
                     .place
@@ -2263,7 +2332,7 @@ impl<'db> ClassLiteral<'db> {
             Place::bound(member).into()
         } else {
             KnownClass::TypedDictFallback
-                .to_class_literal(db)
+                .to_class_singleton(db)
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("`find_name_in_mro_with_policy` will return `Some()` when called on class literal")
         }
@@ -2288,7 +2357,7 @@ impl<'db> ClassLiteral<'db> {
             .iter_mro(db, specialization)
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
-                    let (class_literal, specialization) = class.class_literal(db);
+                    let (class_literal, specialization) = class.class_singleton(db);
                     if field_policy.matches(db, class_literal) {
                         Some((class_literal, specialization))
                     } else {
@@ -3019,7 +3088,7 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
 
 impl<'db> From<ClassLiteral<'db>> for ClassSingletonType<'db> {
     fn from(class: ClassLiteral<'db>) -> ClassSingletonType<'db> {
-        ClassSingletonType::ClassLiteral(class)
+        ClassSingletonType::Literal(class)
     }
 }
 
@@ -3032,8 +3101,28 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct NewTypeClass<'db> {
+    #[returns(ref)]
     name: Name,
+
     parent: Box<ClassType<'db>>,
+}
+
+impl<'db> NewTypeClass<'db> {
+    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+        self.parent(db).is_typed_dict(db)
+    }
+
+    pub(super) fn iter_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> MroIterator<'db> {
+        self.parent(db).iter_mro(specialization)
+    }
+
+    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+        self.parent(db).is_final(db)
+    }
 }
 
 impl<'db> get_size2::GetSize for NewTypeClass<'_> {}
@@ -3847,7 +3936,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &dyn Db) -> Type<'_> {
-        self.to_class_literal(db)
+        self.to_class_singleton(db)
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
             .unwrap_or_else(Type::unknown)
@@ -3863,7 +3952,7 @@ impl KnownClass {
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<ClassType<'db>> {
-        let Type::ClassSingleton(class_literal) = self.to_class_literal(db) else {
+        let Type::ClassSingleton(class_literal) = self.to_class_singleton(db) else {
             return None;
         };
         let generic_context = class_literal.generic_context(db)?;
@@ -3905,15 +3994,17 @@ impl KnownClass {
     ///
     /// Return an error if the symbol cannot be found in the expected typeshed module,
     /// or if the symbol is not a class definition, or if the symbol is possibly unbound.
-    fn try_to_class_literal_without_logging(
+    fn try_to_class_singleton_without_logging(
         self,
         db: &dyn Db,
-    ) -> Result<ClassLiteral<'_>, KnownClassLookupError<'_>> {
+    ) -> Result<ClassSingletonType<'_>, KnownClassLookupError<'_>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
-            Place::Type(Type::ClassSingleton(class_literal), Boundness::Bound) => Ok(class_literal),
-            Place::Type(Type::ClassSingleton(class_literal), Boundness::PossiblyUnbound) => {
-                Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal })
+            Place::Type(Type::ClassSingleton(singleton), Boundness::Bound) => Ok(singleton),
+            Place::Type(Type::ClassSingleton(singleton), Boundness::PossiblyUnbound) => {
+                Err(KnownClassLookupError::ClassPossiblyUnbound {
+                    class_singleton: singleton,
+                })
             }
             Place::Type(found_type, _) => {
                 Err(KnownClassLookupError::SymbolNotAClass { found_type })
@@ -3925,12 +4016,12 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral<'_>> {
+    pub(crate) fn try_to_class_singleton(self, db: &dyn Db) -> Option<ClassSingletonType<'_>> {
         // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
         // (and therefore that we've already logged a warning for)
         static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
 
-        self.try_to_class_literal_without_logging(db)
+        self.try_to_class_singleton_without_logging(db)
             .or_else(|lookup_error| {
                 if MESSAGES.lock().unwrap().insert(self) {
                     if matches!(
@@ -3947,9 +4038,10 @@ impl KnownClass {
                 }
 
                 match lookup_error {
-                    KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                        Ok(class_literal)
-                    }
+                    KnownClassLookupError::ClassPossiblyUnbound {
+                        class_singleton: class_literal,
+                        ..
+                    } => Ok(class_literal),
                     KnownClassLookupError::ClassNotFound { .. }
                     | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
                 }
@@ -3960,8 +4052,8 @@ impl KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
-        self.try_to_class_literal(db)
+    pub(crate) fn to_class_singleton(self, db: &dyn Db) -> Type<'_> {
+        self.try_to_class_singleton(db)
             .map(Type::ClassSingleton)
             .unwrap_or_else(Type::unknown)
     }
@@ -3971,7 +4063,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_subclass_of(self, db: &dyn Db) -> Type<'_> {
-        self.to_class_literal(db)
+        self.to_class_singleton(db)
             .to_class_type(db)
             .map(|class| SubclassOfType::from(db, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
@@ -3980,7 +4072,7 @@ impl KnownClass {
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.try_to_class_literal_without_logging(db)
+        self.try_to_class_singleton_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
@@ -4715,7 +4807,9 @@ pub(crate) enum KnownClassLookupError<'db> {
     SymbolNotAClass { found_type: Type<'db> },
     /// There is a symbol by that name in the expected typeshed module,
     /// and it's a class definition, but it's possibly unbound.
-    ClassPossiblyUnbound { class_literal: ClassLiteral<'db> },
+    ClassPossiblyUnbound {
+        class_singleton: ClassSingletonType<'db>,
+    },
 }
 
 impl<'db> KnownClassLookupError<'db> {

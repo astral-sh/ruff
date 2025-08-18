@@ -1323,7 +1323,7 @@ mod implicit_globals {
         {
             return Place::Unbound.into();
         }
-        let Type::ClassSingleton(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
+        let Type::ClassSingleton(module_type_class) = KnownClass::ModuleType.to_class_singleton(db)
         else {
             return Place::Unbound.into();
         };
@@ -1402,7 +1402,7 @@ mod implicit_globals {
     #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
-            .to_class_literal(db)
+            .to_class_singleton(db)
             .into_class_literal()
         else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`

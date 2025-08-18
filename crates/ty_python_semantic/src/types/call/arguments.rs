@@ -251,7 +251,8 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db).0, None) {
+            if let Some(enum_members) = enum_member_literals(db, class.class_singleton(db).0, None)
+            {
                 return Some(enum_members.collect());
             }
 

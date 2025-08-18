@@ -211,7 +211,7 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.subclass_of
             .into_class()
-            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+            .is_some_and(|class| class.class_singleton(db).0.is_typed_dict(db))
     }
 }
 

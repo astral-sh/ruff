@@ -95,20 +95,20 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, _specialization) = instance.class(db).class_literal(db);
+                let (class_literal, _specialization) = instance.class(db).class_singleton(db);
                 self.extend_with_instance_members(db, ty, class_literal);
             }
 
             Type::ClassSingleton(class_literal) if class_literal.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_singleton(db));
             }
 
             Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_singleton(db));
             }
 
             Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_singleton(db));
             }
 
             Type::ClassSingleton(class_literal) => {
@@ -126,7 +126,7 @@ impl<'db> AllMembers<'db> {
 
             Type::SubclassOf(subclass_of_type) => {
                 if let Some(class_literal) = subclass_of_type.subclass_of().into_class() {
-                    self.extend_with_class_members(db, ty, class_literal.class_literal(db).0);
+                    self.extend_with_class_members(db, ty, class_literal.class_singleton(db).0);
                 }
             }
 
@@ -160,7 +160,7 @@ impl<'db> AllMembers<'db> {
                 }
                 Type::SubclassOf(subclass_of) => {
                     if let Some(class) = subclass_of.subclass_of().into_class() {
-                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                        self.extend_with_class_members(db, ty, class.class_singleton(db).0);
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
@@ -176,7 +176,7 @@ impl<'db> AllMembers<'db> {
                 }
 
                 if let Type::ClassSingleton(class) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
+                    KnownClass::TypedDictFallback.to_class_singleton(db)
                 {
                     self.extend_with_instance_members(db, ty, class);
                 }
@@ -279,7 +279,7 @@ impl<'db> AllMembers<'db> {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
+            .map(|class| class.class_singleton(db).0)
         {
             let parent_scope = parent.body_scope(db);
             for Member { name, .. } in all_declarations_and_bindings(db, parent_scope) {
@@ -301,7 +301,7 @@ impl<'db> AllMembers<'db> {
         for parent in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
+            .map(|class| class.class_singleton(db).0)
         {
             let class_body_scope = parent.body_scope(db);
             let file = class_body_scope.file(db);
@@ -611,7 +611,7 @@ pub fn definitions_for_attribute<'db>(
         let class_literal = match meta_type {
             Type::ClassSingleton(class_literal) => class_literal,
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class() {
-                Some(cls) => cls.class_literal(db).0,
+                Some(cls) => cls.class_singleton(db).0,
                 None => continue,
             },
             _ => continue,
@@ -621,7 +621,7 @@ pub fn definitions_for_attribute<'db>(
         'scopes: for ancestor in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
-            .map(|cls| cls.class_literal(db).0)
+            .map(|cls| cls.class_singleton(db).0)
         {
             let class_scope = ancestor.body_scope(db);
             let class_place_table = crate::semantic_index::place_table(db, class_scope);

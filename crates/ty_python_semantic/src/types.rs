@@ -1812,7 +1812,7 @@ impl<'db> Type<'db> {
                     return false;
                 }
 
-                let class_literal = instance.class(db).class_literal(db).0;
+                let class_literal = instance.class(db).class_singleton(db).0;
                 is_single_member_enum(db, class_literal)
             }
             _ => false,
@@ -2612,7 +2612,7 @@ impl<'db> Type<'db> {
             // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
             // `BoundSuper` should look up the name in the MRO of `builtins.super`.
             Type::BoundSuper(_) => KnownClass::Super
-                .to_class_literal(db)
+                .to_class_singleton(db)
                 .find_name_in_mro_with_policy(db, name, policy),
 
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`,
@@ -2626,7 +2626,7 @@ impl<'db> Type<'db> {
                     Some(Place::Unbound.into())
                 } else {
                     KnownClass::Object
-                        .to_class_literal(db)
+                        .to_class_singleton(db)
                         .find_name_in_mro_with_policy(db, name, policy)
                 }
             }
@@ -3418,7 +3418,7 @@ impl<'db> Type<'db> {
                     Type::SubclassOf(subclass_of) => subclass_of
                         .subclass_of()
                         .into_class()
-                        .map(|class| class.class_literal(db).0),
+                        .map(|class| class.class_singleton(db).0),
                     _ => None,
                 } {
                     if let Some(metadata) = enum_metadata(db, enum_class) {
@@ -5063,7 +5063,7 @@ impl<'db> Type<'db> {
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
             if class.is_known(db, KnownClass::Generator) {
-                if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                if let Some(specialization) = class.singleton_specialized(db, None).1 {
                     if let [_, _, return_ty] = specialization.types(db) {
                         return Some(*return_ty);
                     }
@@ -5661,22 +5661,22 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
-            Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
+            Type::PropertyInstance(_) => KnownClass::Property.to_class_singleton(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
-            Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
-            Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
+            Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_singleton(db),
+            Type::BytesLiteral(_) => KnownClass::Bytes.to_class_singleton(db),
+            Type::IntLiteral(_) => KnownClass::Int.to_class_singleton(db),
             Type::EnumLiteral(enum_literal) => Type::ClassSingleton(enum_literal.enum_class(db)),
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
-            Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
-            Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
-            Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
-            Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_singleton(db),
+            Type::BoundMethod(_) => KnownClass::MethodType.to_class_singleton(db),
+            Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_singleton(db),
+            Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_singleton(db),
+            Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_singleton(db),
             Type::Callable(callable) if callable.is_function_like(db) => {
-                KnownClass::FunctionType.to_class_literal(db)
+                KnownClass::FunctionType.to_class_singleton(db)
             }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
-            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
+            Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_singleton(db),
             Type::NonInferableTypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => KnownClass::Type.to_instance(db),
@@ -5701,7 +5701,7 @@ impl<'db> Type<'db> {
                 ),
             },
 
-            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
+            Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_singleton(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
             Type::Intersection(_) => SubclassOfType::from(
@@ -5710,7 +5710,7 @@ impl<'db> Type<'db> {
                     .expect("Type::Todo should be a valid `SubclassOfInner`"),
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
-            Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
+            Type::BoundSuper(_) => KnownClass::Super.to_class_singleton(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
@@ -6466,7 +6466,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.class().to_class_literal(db)
+        self.class().to_class_singleton(db)
     }
 
     /// Return the instance type which this type is a subtype of.
@@ -9523,7 +9523,7 @@ pub struct TypedDictType<'db> {
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
+        let (class_literal, specialization) = self.defining_class.class_singleton(db);
         class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
     }
 
@@ -9862,7 +9862,7 @@ impl<'db> BoundSuperType<'db> {
             SuperOwnerKind::Instance(instance) => instance.class(db),
         };
 
-        let (class_literal, _) = class.class_literal(db);
+        let (class_literal, _) = class.class_singleton(db);
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:

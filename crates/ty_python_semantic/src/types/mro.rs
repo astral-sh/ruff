@@ -151,7 +151,7 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(db, *single_base, class.class_literal(db).0).map_or_else(
+                ClassBase::try_from_type(db, *single_base, class.class_singleton(db).0).map_or_else(
                     || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                     |single_base| {
                         if single_base.has_cyclic_mro(db) {
@@ -186,7 +186,7 @@ impl<'db> Mro<'db> {
                             &original_bases[i + 1..],
                         );
                     } else {
-                        match ClassBase::try_from_type(db, *base, class.class_literal(db).0) {
+                        match ClassBase::try_from_type(db, *base, class.class_singleton(db).0) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
                         }
@@ -254,7 +254,7 @@ impl<'db> Mro<'db> {
                     // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
                         let Some(base) =
-                            ClassBase::try_from_type(db, *base, class.class_literal(db).0)
+                            ClassBase::try_from_type(db, *base, class.class_singleton(db).0)
                         else {
                             continue;
                         };

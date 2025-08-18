@@ -528,7 +528,7 @@ fn cached_protocol_interface<'db>(
     for parent_protocol in class
         .iter_mro(db, None)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
+        .filter_map(|class| class.class_singleton(db).0.into_protocol_class(db))
     {
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);

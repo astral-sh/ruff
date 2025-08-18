@@ -201,7 +201,7 @@ impl<'db> TupleType<'db> {
     #[salsa::tracked(cycle_fn=to_class_type_cycle_recover, cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
-            .try_to_class_literal(db)
+            .try_to_class_singleton(db)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
         tuple_class.apply_specialization(db, |generic_context| {
@@ -285,7 +285,7 @@ fn to_class_type_cycle_recover<'db>(
 
 fn to_class_type_cycle_initial<'db>(db: &'db dyn Db, self_: TupleType<'db>) -> ClassType<'db> {
     let tuple_class = KnownClass::Tuple
-        .try_to_class_literal(db)
+        .try_to_class_singleton(db)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
 
     tuple_class.apply_specialization(db, |generic_context| {
