@@ -28,6 +28,7 @@
 - Add rule code to error description in GitLab output ([#19896](https://github.com/astral-sh/ruff/pull/19896))
 
 - Improve rendering of the `full` output format ([#19415](https://github.com/astral-sh/ruff/pull/19415))
+
     Below is an example diff for [`F401`](https://docs.astral.sh/ruff/rules/unused-import/):
 
     ```diff
