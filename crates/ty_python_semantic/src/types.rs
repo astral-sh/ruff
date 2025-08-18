@@ -4869,7 +4869,36 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => {
                 return alias.value_type(db).try_iterate_with_mode(db, mode);
             }
-            _ => {}
+            Type::Dynamic(_)
+            | Type::FunctionLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::ProtocolInstance(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::EnumLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::TypeVar(_)
+            | Type::NonInferableTypeVar(_)
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_)
+            | Type::TypedDict(_) => {}
         }
 
         let try_call_dunder_getitem = || {
