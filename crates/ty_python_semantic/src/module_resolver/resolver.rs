@@ -1476,6 +1476,234 @@ mod tests {
         );
     }
 
+    /// Testing stub packages can be missing modules and we don't fallthrough
+    /// to the impl (when they don't declare py.typed partial)
+    #[test]
+    fn resolve_stub_module_missing_non_partial() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/both.py", "print('Hello, world!')"),
+            ("foo/impl.py", "print('Hello, world!')"),
+            ("foo-stubs/__init__.py", ""),
+            ("foo-stubs/both.pyi", "print('Hello, world!')"),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new().with_site_packages_files(SRC).build();
+
+        let both_module =
+            resolve_module(&db, &ModuleName::new_static("foo.both").unwrap()).unwrap();
+        let both_path = site_packages.join("foo-stubs/both.pyi");
+
+        assert_eq!(&site_packages, both_module.search_path(&db).unwrap());
+        assert_eq!(&both_path, both_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, both_module.kind(&db));
+        assert_eq!(
+            Some(both_module),
+            path_to_module(&db, &FilePath::System(both_path))
+        );
+
+        let impl_module = resolve_module(&db, &ModuleName::new_static("foo.impl").unwrap());
+        assert_eq!(None, impl_module);
+
+        let nonexistent_module =
+            resolve_module(&db, &ModuleName::new_static("foo.nonexistent").unwrap());
+        assert_eq!(None, nonexistent_module);
+    }
+
+    /// Testing stub packages can be missing modules and we don't fallthrough
+    /// to the impl (when they declare a py.typed but it's not "partial")
+    #[test]
+    fn resolve_stub_module_missing_typed() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/both.py", "print('Hello, world!')"),
+            ("foo/impl.py", "print('Hello, world!')"),
+            ("foo-stubs/__init__.py", ""),
+            ("foo-stubs/both.pyi", "print('Hello, world!')"),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new().with_site_packages_files(SRC).build();
+
+        let both_module =
+            resolve_module(&db, &ModuleName::new_static("foo.both").unwrap()).unwrap();
+        let both_path = site_packages.join("foo-stubs/both.pyi");
+
+        assert_eq!(&site_packages, both_module.search_path(&db).unwrap());
+        assert_eq!(&both_path, both_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, both_module.kind(&db));
+        assert_eq!(
+            Some(both_module),
+            path_to_module(&db, &FilePath::System(both_path))
+        );
+
+        let impl_module = resolve_module(&db, &ModuleName::new_static("foo.impl").unwrap());
+        assert_eq!(None, impl_module);
+
+        let nonexistent_module =
+            resolve_module(&db, &ModuleName::new_static("foo.nonexistent").unwrap());
+        assert_eq!(None, nonexistent_module);
+    }
+
+    /// Testing py.typed "partial" packages can be missing modules and we fallthrough to impl
+    #[test]
+    fn resolve_stub_module_missing_partial() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/both.py", "print('Hello, world!')"),
+            ("foo/impl.py", "print('Hello, world!')"),
+            ("foo-stubs/__init__.py", ""),
+            ("foo-stubs/py.typed", "partial\n"),
+            ("foo-stubs/both.pyi", "print('Hello, world!')"),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new().with_site_packages_files(SRC).build();
+
+        let both_module =
+            resolve_module(&db, &ModuleName::new_static("foo.both").unwrap()).unwrap();
+        let both_path = site_packages.join("foo-stubs/both.pyi");
+
+        assert_eq!(&site_packages, both_module.search_path(&db).unwrap());
+        assert_eq!(&both_path, both_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, both_module.kind(&db));
+        assert_eq!(
+            Some(both_module),
+            path_to_module(&db, &FilePath::System(both_path))
+        );
+
+        let impl_module =
+            resolve_module(&db, &ModuleName::new_static("foo.impl").unwrap()).unwrap();
+        let impl_path = site_packages.join("foo/impl.py");
+
+        assert_eq!(&site_packages, impl_module.search_path(&db).unwrap());
+        assert_eq!(&impl_path, impl_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, impl_module.kind(&db));
+        assert_eq!(
+            Some(impl_module),
+            path_to_module(&db, &FilePath::System(impl_path))
+        );
+
+        let nonexistent_module =
+            resolve_module(&db, &ModuleName::new_static("foo.nonexistent").unwrap());
+        assert_eq!(None, nonexistent_module);
+    }
+
+    /// Like `resolve_stub_module_missing_partial` but stressing py.typed inheritance.
+    ///
+    /// In this case, we define a partial py.typed in a parent package and it should
+    /// inherit in the child.
+    #[test]
+    fn resolve_stub_module_missing_partial_inheritance1() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/bar/__init__.py", ""),
+            ("foo/bar/both.py", "print('Hello, world!')"),
+            ("foo/bar/impl.py", "print('Hello, world!')"),
+            ("foo-stubs/__init__.py", ""),
+            ("foo-stubs/bar/__init__.py", ""),
+            // Intentionally mangled string to test permissiveness
+            ("foo-stubs/py.typed", "# partial\\n"),
+            ("foo-stubs/bar/both.pyi", "print('Hello, world!')"),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new().with_site_packages_files(SRC).build();
+
+        let both_module =
+            resolve_module(&db, &ModuleName::new_static("foo.bar.both").unwrap()).unwrap();
+        let both_path = site_packages.join("foo-stubs/bar/both.pyi");
+
+        assert_eq!(&site_packages, both_module.search_path(&db).unwrap());
+        assert_eq!(&both_path, both_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, both_module.kind(&db));
+        assert_eq!(
+            Some(both_module),
+            path_to_module(&db, &FilePath::System(both_path))
+        );
+
+        let impl_module =
+            resolve_module(&db, &ModuleName::new_static("foo.bar.impl").unwrap()).unwrap();
+        let impl_path = site_packages.join("foo/bar/impl.py");
+
+        assert_eq!(&site_packages, impl_module.search_path(&db).unwrap());
+        assert_eq!(&impl_path, impl_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, impl_module.kind(&db));
+        assert_eq!(
+            Some(impl_module),
+            path_to_module(&db, &FilePath::System(impl_path))
+        );
+
+        let nonexistent_module =
+            resolve_module(&db, &ModuleName::new_static("foo.nonexistent").unwrap());
+        assert_eq!(None, nonexistent_module);
+    }
+
+    /// Like `resolve_stub_module_missing_partial` but stressing py.typed inheritance.
+    ///
+    /// In this case, we define a non-partial py.typed in the parent package and have
+    /// one child override it with a partial py.typed (this is not specified but our
+    /// implementation does it, so here's a test for it). The other subpackage doesn't
+    /// override and should cause errors from its missing module.
+    #[test]
+    fn resolve_stub_module_missing_partial_inheritance2() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/bar/__init__.py", ""),
+            ("foo/baz/__init__.py", ""),
+            ("foo/bar/both.py", "print('Hello, world!')"),
+            ("foo/bar/impl.py", "print('Hello, world!')"),
+            ("foo/baz/impl2.py", "print('Hello, world!')"),
+            ("foo-stubs/__init__.py", ""),
+            ("foo-stubs/bar/__init__.py", ""),
+            ("foo-stubs/baz/__init__.py", ""),
+            ("foo-stubs/py.typed", ""),
+            // Intentionally mangled string to test permissiveness
+            ("foo-stubs/bar/py.typed", "PARTIAL/n"),
+            ("foo-stubs/bar/both.pyi", "print('Hello, world!')"),
+        ];
+
+        let TestCase {
+            db, site_packages, ..
+        } = TestCaseBuilder::new().with_site_packages_files(SRC).build();
+
+        let both_module =
+            resolve_module(&db, &ModuleName::new_static("foo.bar.both").unwrap()).unwrap();
+        let both_path = site_packages.join("foo-stubs/bar/both.pyi");
+
+        assert_eq!(&site_packages, both_module.search_path(&db).unwrap());
+        assert_eq!(&both_path, both_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, both_module.kind(&db));
+        assert_eq!(
+            Some(both_module),
+            path_to_module(&db, &FilePath::System(both_path))
+        );
+
+        let impl_module =
+            resolve_module(&db, &ModuleName::new_static("foo.bar.impl").unwrap()).unwrap();
+        let impl_path = site_packages.join("foo/bar/impl.py");
+
+        assert_eq!(&site_packages, impl_module.search_path(&db).unwrap());
+        assert_eq!(&impl_path, impl_module.file(&db).unwrap().path(&db));
+        assert_eq!(ModuleKind::Module, impl_module.kind(&db));
+        assert_eq!(
+            Some(impl_module),
+            path_to_module(&db, &FilePath::System(impl_path))
+        );
+
+        let impl2_module = resolve_module(&db, &ModuleName::new_static("foo.baz.impl2").unwrap());
+        assert_eq!(None, impl2_module);
+
+        let nonexistent_module =
+            resolve_module(&db, &ModuleName::new_static("foo.nonexistent").unwrap());
+        assert_eq!(None, nonexistent_module);
+    }
+
     #[test]
     fn package_priority_over_module() {
         const SRC: &[FileSpec] = &[
