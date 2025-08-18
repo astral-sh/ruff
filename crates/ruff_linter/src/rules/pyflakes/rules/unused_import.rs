@@ -8,7 +8,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
+    AnyImport, Binding, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
     SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -284,9 +284,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
-    for binding_id in scope.binding_ids() {
-        let binding = checker.semantic().binding(binding_id);
-
+    for binding in unused_imports_in_scope(checker.semantic(), scope) {
         if binding.is_used()
             || binding.is_explicit_export()
             || binding.is_nonlocal()
@@ -581,4 +579,11 @@ fn fix_by_reexporting<'a>(
 
     let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
     Ok(Fix::safe_edits(head, tail).isolate(isolation))
+}
+
+fn unused_imports_in_scope<'a, 'b>(
+    semantic: &'a SemanticModel<'b>,
+    scope: &'a Scope,
+) -> impl Iterator<Item = &'a Binding<'b>> {
+    scope.binding_ids().map(|id| semantic.binding(id))
 }
