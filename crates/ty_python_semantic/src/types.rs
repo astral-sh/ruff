@@ -849,6 +849,18 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+        match self {
+            Type::Dynamic(dynamic_type) => Some(dynamic_type),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn expect_dynamic(self) -> DynamicType {
+        self.into_dynamic()
+            .expect("Expected a Type::Dynamic variant")
+    }
+
     #[track_caller]
     pub(crate) fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.into_class_literal()

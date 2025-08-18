@@ -10198,6 +10198,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::ClassLiteral(class_literal) => {
                         if class_literal.is_known(self.db(), KnownClass::Any) {
                             SubclassOfType::subclass_of_any()
+                        } else if class_literal.is_protocol(self.db()) {
+                            SubclassOfType::from(
+                                self.db(),
+                                todo_type!("type[T] for protocols").expect_dynamic(),
+                            )
                         } else {
                             SubclassOfType::from(
                                 self.db(),

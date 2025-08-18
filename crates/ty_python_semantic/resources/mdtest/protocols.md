@@ -355,7 +355,9 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    reveal_type(x())  # revealed: MyProtocol
+    # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
+    # (which doesn't work well with snapshots)
+    x()
 ```
 
 ## Members of a protocol
@@ -1931,7 +1933,7 @@ def _(r: Recursive):
     reveal_type(r.t)  # revealed: tuple[int, tuple[str, Recursive]]
     reveal_type(r.callable1)  # revealed: (int, /) -> Recursive
     reveal_type(r.callable2)  # revealed: (Recursive, /) -> int
-    reveal_type(r.subtype_of)  # revealed: type[Recursive]
+    reveal_type(r.subtype_of)  # revealed: @Todo(type[T] for protocols)
     reveal_type(r.generic)  # revealed: GenericC[Recursive]
     reveal_type(r.method(r))  # revealed: Recursive
     reveal_type(r.nested)  # revealed: Recursive | ((Recursive, tuple[Recursive, Recursive], /) -> Recursive)
@@ -2067,6 +2069,62 @@ class Iterator[T](Protocol):
 
 def f(value: Iterator):
     cast(Iterator, value)  # error: [redundant-cast]
+```
+
+## Meta-protocols
+
+Where `P` is a protocol type, a class object `N` can be said to inhabit the type `type[P]` if:
+
+- All `ClassVar` members on `P` exist on the class object `N`
+- All method members on `P` exist on the class object `N`
+- Instantiating `N` creates an object that would satisfy the protocol `P`
+
+Currently meta-protocols are not fully supported by ty, but we try to keep false positives to a
+minimum in the meantime.
+
+```py
+from typing import Protocol, ClassVar
+from ty_extensions import static_assert, is_assignable_to, TypeOf, is_subtype_of
+
+class Foo(Protocol):
+    x: int
+    y: ClassVar[str]
+    def method(self) -> bytes: ...
+
+def _(f: type[Foo]):
+    reveal_type(f)  # revealed: type[@Todo(type[T] for protocols)]
+
+    # TODO: we should emit `unresolved-attribute` here: although we would accept this for a
+    # nominal class, we would see any class `N` as inhabiting `Foo` if it had an implicit
+    # instance attribute `x`, and implicit instance attributes are rarely bound on the class
+    # object.
+    reveal_type(f.x)  # revealed: @Todo(type[T] for protocols)
+
+    # TODO: should be `str`
+    reveal_type(f.y)  # revealed: @Todo(type[T] for protocols)
+    f.y = "foo"  # fine
+
+    # TODO: should be `Callable[[Foo], bytes]`
+    reveal_type(f.method)  # revealed: @Todo(type[T] for protocols)
+
+class Bar: ...
+
+# TODO: these should pass
+static_assert(not is_assignable_to(type[Bar], type[Foo]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [static-assert-error]
+
+class Baz:
+    x: int
+    y: ClassVar[str] = "foo"
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(is_assignable_to(type[Baz], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
+
+# TODO: these should pass
+static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
 ```
 
 ## TODO
