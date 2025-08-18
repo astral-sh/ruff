@@ -5,6 +5,7 @@ artigraph  # cycle panics (value_type_)
 arviz  # too many iterations on versions of arviz newer than https://github.com/arviz-devs/arviz/commit/3205b82bb4d6097c31f7334d7ac51a6de37002d0
 core  # cycle panics (value_type_)
 cpython  # too many cycle iterations
+cwltool
 graphql-core  # stack overflow
 hydpy  # too many iterations
 ibis  # too many iterations

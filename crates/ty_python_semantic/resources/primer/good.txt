@@ -27,7 +27,6 @@ cloud-init
 colour
 com2ann
 comtypes
-cwltool
 dacite
 dd-trace-py
 dedupe
