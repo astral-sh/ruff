@@ -1169,7 +1169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         continue;
                     }
-                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::ClassSingleton(class) => ClassType::NonGeneric(*class),
                     Type::GenericAlias(class) => ClassType::Generic(*class),
                     _ => continue,
                 };
@@ -4277,7 +4277,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+            Type::ClassSingleton(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
                     PlaceAndQualifiers {
                         place: Place::Type(meta_attr_ty, meta_attr_boundness),
@@ -6186,7 +6186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class = match callable_type {
-            Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
+            Type::ClassSingleton(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
             Type::SubclassOf(subclass) => subclass.subclass_of().into_class(),
             _ => None,
@@ -6289,7 +6289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    Type::ClassLiteral(class) => {
+                    Type::ClassSingleton(class) => {
                         if let Some(known_class) = class.known(self.db()) {
                             known_class.check_call(
                                 &self.context,
@@ -6490,7 +6490,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Check if the given ty is `@deprecated` or not
     fn check_deprecated<T: Ranged>(&self, ranged: T, ty: Type) {
         // First handle classes
-        if let Type::ClassLiteral(class_literal) = ty {
+        if let Type::ClassSingleton(class_literal) = ty {
             let Some(deprecated) = class_literal.deprecated(self.db()) else {
                 return;
             };
@@ -7088,7 +7088,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if report_unresolved_attribute {
                         let bound_on_instance = match value_type {
-                            Type::ClassLiteral(class) => {
+                            Type::ClassSingleton(class) => {
                                 !class.instance_member(db, None, attr).place.is_unbound()
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
@@ -7232,7 +7232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassTransformer(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
+                | Type::ClassSingleton(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
@@ -7574,7 +7574,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
+                | Type::ClassSingleton(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
@@ -7604,7 +7604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassDecorator(_)
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
+                | Type::ClassSingleton(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
@@ -8636,7 +8636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // this callable as the `__class_getitem__` method on `type`. That probably requires
         // updating all of the subscript logic below to use custom callables for all of the _other_
         // special cases, too.
-        if let Type::ClassLiteral(class) = value_ty {
+        if let Type::ClassSingleton(class) = value_ty {
             if class.is_tuple(self.db()) {
                 return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));
             }
@@ -9033,7 +9033,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if let Type::ClassLiteral(class) = value_ty {
+            if let Type::ClassSingleton(class) = value_ty {
                 if class.is_known(db, KnownClass::Type) {
                     return KnownClass::GenericAlias.to_instance(db);
                 }
@@ -9419,7 +9419,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         Type::SpecialForm(SpecialFormType::Final) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
-                        Type::ClassLiteral(class)
+                        Type::ClassSingleton(class)
                             if class.is_known(self.db(), KnownClass::InitVar) =>
                         {
                             if let Some(builder) =
@@ -9535,7 +9535,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         type_and_qualifiers
                     }
-                    Type::ClassLiteral(class) if class.is_known(self.db(), KnownClass::InitVar) => {
+                    Type::ClassSingleton(class)
+                        if class.is_known(self.db(), KnownClass::InitVar) =>
+                    {
                         let arguments = if let ast::Expr::Tuple(tuple) = slice {
                             &*tuple.elts
                         } else {
@@ -10070,7 +10072,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
     ) -> Type<'db> {
         match value_ty {
-            Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
+            Type::ClassSingleton(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(slice)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
@@ -10196,7 +10198,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
-                    Type::ClassLiteral(class_literal) => {
+                    Type::ClassSingleton(class_literal) => {
                         if class_literal.is_known(self.db(), KnownClass::Any) {
                             SubclassOfType::subclass_of_any()
                         } else {
@@ -10289,7 +10291,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(&subscript.slice);
                 Type::unknown()
             }
-            Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
+            Type::ClassSingleton(literal) if literal.is_known(self.db(), KnownClass::Any) => {
                 self.infer_expression(slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic("Type `typing.Any` expected no type parameter");
@@ -10349,7 +10351,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_type_expression(slice);
                 value_ty
             }
-            Type::ClassLiteral(class) => {
+            Type::ClassSingleton(class) => {
                 match class.generic_context(self.db()) {
                     Some(generic_context) => {
                         let specialized_class = self.infer_explicit_class_specialization(

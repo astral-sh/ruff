@@ -99,7 +99,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_instance_members(db, ty, class_literal);
             }
 
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+            Type::ClassSingleton(class_literal) if class_literal.is_typed_dict(db) => {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
@@ -111,10 +111,10 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
-            Type::ClassLiteral(class_literal) => {
+            Type::ClassSingleton(class_literal) => {
                 self.extend_with_class_members(db, ty, class_literal);
 
-                if let Type::ClassLiteral(meta_class_literal) = ty.to_meta_type(db) {
+                if let Type::ClassSingleton(meta_class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, meta_class_literal);
                 }
             }
@@ -155,7 +155,7 @@ impl<'db> AllMembers<'db> {
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
-                Type::ClassLiteral(class_literal) => {
+                Type::ClassSingleton(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
                 Type::SubclassOf(subclass_of) => {
@@ -171,11 +171,11 @@ impl<'db> AllMembers<'db> {
             },
 
             Type::TypedDict(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+                if let Type::ClassSingleton(class_literal) = ty.to_meta_type(db) {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
 
-                if let Type::ClassLiteral(class) =
+                if let Type::ClassSingleton(class) =
                     KnownClass::TypedDictFallback.to_class_literal(db)
                 {
                     self.extend_with_instance_members(db, ty, class);
@@ -222,7 +222,7 @@ impl<'db> AllMembers<'db> {
                             {
                                 continue;
                             }
-                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
+                            Type::ClassSingleton(class) if class.is_protocol(db) => continue,
                             Type::KnownInstance(
                                 KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_),
                             ) => continue,
@@ -605,11 +605,11 @@ pub fn definitions_for_attribute<'db>(
 
         // First, transform the type to its meta type, unless it's already a class-like type.
         let meta_type = match ty {
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
+            Type::ClassSingleton(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
             _ => ty.to_meta_type(db),
         };
         let class_literal = match meta_type {
-            Type::ClassLiteral(class_literal) => class_literal,
+            Type::ClassSingleton(class_literal) => class_literal,
             Type::SubclassOf(subclass) => match subclass.subclass_of().into_class() {
                 Some(cls) => cls.class_literal(db).0,
                 None => continue,

@@ -1323,7 +1323,7 @@ mod implicit_globals {
         {
             return Place::Unbound.into();
         }
-        let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
+        let Type::ClassSingleton(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
         else {
             return Place::Unbound.into();
         };

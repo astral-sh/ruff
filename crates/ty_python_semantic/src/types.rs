@@ -62,7 +62,7 @@ use crate::types::tuple::TupleSpec;
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
+pub(crate) use class::{ClassLiteral, ClassSingletonType, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -569,7 +569,7 @@ pub enum Type<'db> {
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
-    ClassLiteral(ClassLiteral<'db>),
+    ClassSingleton(ClassSingletonType<'db>),
     /// A specialization of a generic class
     GenericAlias(GenericAlias<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
@@ -781,7 +781,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
             | Type::BoundSuper(_) => *self,
 
             Type::PropertyInstance(property_instance) => {
@@ -844,7 +844,7 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
-            Type::ClassLiteral(class_type) => Some(class_type),
+            Type::ClassSingleton(class_type) => Some(class_type),
             _ => None,
         }
     }
@@ -861,7 +861,7 @@ impl<'db> Type<'db> {
 
     #[cfg(test)]
     pub(crate) const fn is_class_literal(&self) -> bool {
-        matches!(self, Type::ClassLiteral(..))
+        matches!(self, Type::ClassSingleton(..))
     }
 
     pub(crate) fn into_enum_literal(self) -> Option<EnumLiteralType<'db>> {
@@ -894,7 +894,7 @@ impl<'db> Type<'db> {
     /// unspecialized generic class literal.
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
+            Type::ClassSingleton(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
         }
@@ -1112,7 +1112,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
             | Type::SpecialForm(_)
             | Type::IntLiteral(_) => self,
         }
@@ -1148,7 +1148,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_)
             // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
              => true,
             Type::Dynamic(_)
             | Type::NominalInstance(_)
@@ -1195,7 +1195,7 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            Type::ClassLiteral(class_literal) => {
+            Type::ClassSingleton(class_literal) => {
                 Some(ClassType::NonGeneric(class_literal).into_callable(db))
             }
 
@@ -1493,14 +1493,14 @@ impl<'db> Type<'db> {
                 Type::StringLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
+                | Type::ClassSingleton(_)
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
                 Type::StringLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
+                | Type::ClassSingleton(_)
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
@@ -1613,18 +1613,20 @@ impl<'db> Type<'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
-                .subclass_of()
-                .into_class()
-                .map(|subclass_of_class| {
-                    ClassType::NonGeneric(class).has_relation_to_impl(
-                        db,
-                        subclass_of_class,
-                        relation,
-                        visitor,
-                    )
-                })
-                .unwrap_or(relation.is_assignability()),
+            (Type::ClassSingleton(class), Type::SubclassOf(target_subclass_ty)) => {
+                target_subclass_ty
+                    .subclass_of()
+                    .into_class()
+                    .map(|subclass_of_class| {
+                        ClassType::NonGeneric(class).has_relation_to_impl(
+                            db,
+                            subclass_of_class,
+                            relation,
+                            visitor,
+                        )
+                    })
+                    .unwrap_or(relation.is_assignability())
+            }
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
@@ -1646,7 +1648,7 @@ impl<'db> Type<'db> {
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (Type::ClassLiteral(class), _) => class
+            (Type::ClassSingleton(class), _) => class
                 .metaclass_instance_type(db)
                 .has_relation_to_impl(db, target, relation, visitor),
             (Type::GenericAlias(alias), _) => ClassType::from(alias)
@@ -1955,7 +1957,7 @@ impl<'db> Type<'db> {
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)
+                | Type::ClassSingleton(..)
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
@@ -1969,7 +1971,7 @@ impl<'db> Type<'db> {
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)
+                | Type::ClassSingleton(..)
                 | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
@@ -2061,7 +2063,7 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::BooleanLiteral(..)
-                | Type::ClassLiteral(..)
+                | Type::ClassSingleton(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
@@ -2076,7 +2078,7 @@ impl<'db> Type<'db> {
                 | Type::StringLiteral(..)
                 | Type::BytesLiteral(..)
                 | Type::BooleanLiteral(..)
-                | Type::ClassLiteral(..)
+                | Type::ClassSingleton(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)
@@ -2104,8 +2106,8 @@ impl<'db> Type<'db> {
                 })
             }),
 
-            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
-            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
+            (Type::SubclassOf(subclass_of_ty), Type::ClassSingleton(class_b))
+            | (Type::ClassSingleton(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => false,
                     SubclassOfInner::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
@@ -2194,8 +2196,8 @@ impl<'db> Type<'db> {
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
-            (Type::ClassLiteral(class), instance @ Type::NominalInstance(_))
-            | (instance @ Type::NominalInstance(_), Type::ClassLiteral(class)) => !class
+            (Type::ClassSingleton(class), instance @ Type::NominalInstance(_))
+            | (instance @ Type::NominalInstance(_), Type::ClassSingleton(class)) => !class
                 .metaclass_instance_type(db)
                 .is_subtype_of(db, instance),
             (Type::GenericAlias(alias), instance @ Type::NominalInstance(_))
@@ -2369,7 +2371,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
-            | Type::ClassLiteral(..)
+            | Type::ClassSingleton(..)
             | Type::GenericAlias(..)
             | Type::ModuleLiteral(..)
             | Type::EnumLiteral(..) => true,
@@ -2439,7 +2441,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::ModuleLiteral(..)
-            | Type::ClassLiteral(..)
+            | Type::ClassSingleton(..)
             | Type::GenericAlias(..)
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
@@ -2562,11 +2564,11 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Place::bound(self).into()),
 
-            Type::ClassLiteral(class) if class.is_typed_dict(db) => {
+            Type::ClassSingleton(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
             }
 
-            Type::ClassLiteral(class) => {
+            Type::ClassSingleton(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
                         Place::bound(Type::WrapperDescriptor(
@@ -2819,7 +2821,7 @@ impl<'db> Type<'db> {
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            Type::ClassSingleton(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
                 Place::Unbound.into()
             }
 
@@ -3200,7 +3202,7 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::ClassLiteral(class)
+            Type::ClassSingleton(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Place::bound(Type::WrapperDescriptor(
@@ -3208,7 +3210,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(class)
+            Type::ClassSingleton(class)
                 if name == "__get__" && class.is_known(db, KnownClass::Property) =>
             {
                 Place::bound(Type::WrapperDescriptor(
@@ -3216,7 +3218,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(class)
+            Type::ClassSingleton(class)
                 if name == "__set__" && class.is_known(db, KnownClass::Property) =>
             {
                 Place::bound(Type::WrapperDescriptor(
@@ -3402,7 +3404,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+            Type::ClassSingleton(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
@@ -3412,7 +3414,7 @@ impl<'db> Type<'db> {
                 }
 
                 if let Some(enum_class) = match self {
-                    Type::ClassLiteral(literal) => Some(literal),
+                    Type::ClassSingleton(literal) => Some(literal),
                     Type::SubclassOf(subclass_of) => subclass_of
                         .subclass_of()
                         .into_class()
@@ -3633,7 +3635,7 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(class) => class
+            Type::ClassSingleton(class) => class
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
             Type::GenericAlias(alias) => ClassType::from(*alias)
@@ -4141,7 +4143,7 @@ impl<'db> Type<'db> {
                 .into(),
             },
 
-            Type::ClassLiteral(class) => match class.known(db) {
+            Type::ClassSingleton(class) => match class.known(db) {
                 // TODO: Ideally we'd use `try_call_constructor` for all constructor calls.
                 // Currently we don't for a few special known types, either because their
                 // constructors are defined with overloads, or because we want to special case
@@ -5107,7 +5109,7 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(
             self,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+            Type::ClassSingleton(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
         ));
 
         // If we are trying to construct a non-specialized generic class, we should use the
@@ -5119,7 +5121,7 @@ impl<'db> Type<'db> {
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
         let (generic_origin, generic_context, self_type) = match self {
-            Type::ClassLiteral(class) => match class.generic_context(db) {
+            Type::ClassSingleton(class) => match class.generic_context(db) {
                 Some(generic_context) => (
                     Some(class),
                     Some(generic_context),
@@ -5283,7 +5285,9 @@ impl<'db> Type<'db> {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(self),
-            Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
+            Type::ClassSingleton(class) => {
+                Some(Type::instance(db, class.default_specialization(db)))
+            }
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
             Type::Union(union) => union.to_instance(db),
@@ -5341,7 +5345,7 @@ impl<'db> Type<'db> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-            Type::ClassLiteral(class) => {
+            Type::ClassSingleton(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Any) => Type::any(),
                     Some(KnownClass::Complex) => UnionType::from_elements(
@@ -5483,7 +5487,7 @@ impl<'db> Type<'db> {
                             ],
                         });
                     };
-                    let instance = Type::ClassLiteral(class).to_instance(db).expect(
+                    let instance = Type::ClassSingleton(class).to_instance(db).expect(
                         "nearest_enclosing_class must return type that can be instantiated",
                     );
                     let class_definition = class.definition(db);
@@ -5662,7 +5666,7 @@ impl<'db> Type<'db> {
             Type::BooleanLiteral(_) | Type::TypeIs(_) => KnownClass::Bool.to_class_literal(db),
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
-            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
+            Type::EnumLiteral(enum_literal) => Type::ClassSingleton(enum_literal.enum_class(db)),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
@@ -5686,7 +5690,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeVar(_) => KnownClass::Type.to_instance(db),
 
-            Type::ClassLiteral(class) => class.metaclass(db),
+            Type::ClassSingleton(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Dynamic(_) => self,
@@ -5933,7 +5937,7 @@ impl<'db> Type<'db> {
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
             // some other generic context's specialization is applied to it.
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_) => self,
@@ -6047,7 +6051,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
@@ -6128,7 +6132,7 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
-            Self::ClassLiteral(class_literal) => {
+            Self::ClassSingleton(class_literal) => {
                 Some(TypeDefinition::Class(class_literal.definition(db)))
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
@@ -9642,7 +9646,7 @@ impl<'db> SuperOwnerKind<'db> {
     fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(SuperOwnerKind::Dynamic(dynamic)),
-            Type::ClassLiteral(class_literal) => Some(SuperOwnerKind::Class(
+            Type::ClassSingleton(class_literal) => Some(SuperOwnerKind::Class(
                 class_literal.apply_optional_specialization(db, None),
             )),
             Type::NominalInstance(instance) => Some(SuperOwnerKind::Instance(instance)),
@@ -9728,7 +9732,7 @@ impl<'db> BoundSuperType<'db> {
         // - There are objects that are not valid in a class's bases list
         //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
         let pivot_class = match pivot_class_type {
-            Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
+            Type::ClassSingleton(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::GenericAlias(class) => ClassBase::Class(ClassType::Generic(class)),
             Type::SubclassOf(subclass_of) if subclass_of.subclass_of().is_dynamic() => {
                 ClassBase::Dynamic(

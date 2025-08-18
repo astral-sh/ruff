@@ -132,7 +132,7 @@ impl FunctionDecorators {
                 Some(KnownFunction::Override) => FunctionDecorators::OVERRIDE,
                 _ => FunctionDecorators::empty(),
             },
-            Type::ClassLiteral(class) => match class.known(db) {
+            Type::ClassSingleton(class) => match class.known(db) {
                 Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
                 Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
                 _ => FunctionDecorators::empty(),
@@ -997,7 +997,7 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&KnownClass::FunctionType.to_instance(db)))
         }
 
-        Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
+        Type::ClassSingleton(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
 
@@ -1414,7 +1414,7 @@ impl KnownFunction {
             }
 
             KnownFunction::GetProtocolMembers => {
-                let [Some(Type::ClassLiteral(class))] = parameter_types else {
+                let [Some(Type::ClassSingleton(class))] = parameter_types else {
                     return;
                 };
                 if class.is_protocol(db) {
@@ -1451,7 +1451,7 @@ impl KnownFunction {
             }
 
             KnownFunction::IsInstance | KnownFunction::IsSubclass => {
-                let [Some(first_arg), Some(Type::ClassLiteral(class))] = parameter_types else {
+                let [Some(first_arg), Some(Type::ClassSingleton(class))] = parameter_types else {
                     return;
                 };
 

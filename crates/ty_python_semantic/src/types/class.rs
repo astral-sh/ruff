@@ -2013,7 +2013,7 @@ impl<'db> ClassLiteral<'db> {
 
                         if let Some(ref mut default_ty) = default_ty {
                             *default_ty = default_ty
-                                .try_call_dunder_get(db, Type::none(db), Type::ClassLiteral(self))
+                                .try_call_dunder_get(db, Type::none(db), Type::ClassSingleton(self))
                                 .map(|(return_ty, _)| return_ty)
                                 .unwrap_or_else(Type::unknown);
                         }
@@ -2938,7 +2938,7 @@ impl<'db> ClassLiteral<'db> {
             let mut result = false;
             for explicit_base in class.explicit_bases(db) {
                 let explicit_base_class_literal = match explicit_base {
-                    Type::ClassLiteral(class_literal) => *class_literal,
+                    Type::ClassSingleton(class_literal) => *class_literal,
                     Type::GenericAlias(generic_alias) => generic_alias.origin(db),
                     _ => continue,
                 };
@@ -3004,7 +3004,7 @@ impl<'db> ClassLiteral<'db> {
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     fn from(class: ClassLiteral<'db>) -> Type<'db> {
-        Type::ClassLiteral(class)
+        Type::ClassSingleton(class)
     }
 }
 
@@ -3854,7 +3854,7 @@ impl KnownClass {
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<ClassType<'db>> {
-        let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
+        let Type::ClassSingleton(class_literal) = self.to_class_literal(db) else {
             return None;
         };
         let generic_context = class_literal.generic_context(db)?;
@@ -3902,8 +3902,8 @@ impl KnownClass {
     ) -> Result<ClassLiteral<'_>, KnownClassLookupError<'_>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
-            Place::Type(Type::ClassLiteral(class_literal), Boundness::Bound) => Ok(class_literal),
-            Place::Type(Type::ClassLiteral(class_literal), Boundness::PossiblyUnbound) => {
+            Place::Type(Type::ClassSingleton(class_literal), Boundness::Bound) => Ok(class_literal),
+            Place::Type(Type::ClassSingleton(class_literal), Boundness::PossiblyUnbound) => {
                 Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal })
             }
             Place::Type(found_type, _) => {
@@ -3953,7 +3953,7 @@ impl KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_class_literal(self, db: &dyn Db) -> Type<'_> {
         self.try_to_class_literal(db)
-            .map(Type::ClassLiteral)
+            .map(Type::ClassSingleton)
             .unwrap_or_else(Type::unknown)
     }
 
@@ -4460,7 +4460,7 @@ impl KnownClass {
 
                         let bound_super = BoundSuperType::build(
                             db,
-                            Type::ClassLiteral(enclosing_class),
+                            Type::ClassSingleton(enclosing_class),
                             first_param,
                         )
                         .unwrap_or_else(|err| {

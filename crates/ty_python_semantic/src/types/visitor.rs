@@ -142,7 +142,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)
             | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
+            | Type::ClassSingleton(_)
             | Type::SpecialForm(_)
             | Type::Dynamic(_) => TypeKind::Atomic,
 

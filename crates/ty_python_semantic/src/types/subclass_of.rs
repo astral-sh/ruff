@@ -268,7 +268,7 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
+            Type::ClassSingleton(literal) => Some(if literal.is_known(db, KnownClass::Any) {
                 Self::Dynamic(DynamicType::Any)
             } else {
                 Self::Class(literal.default_specialization(db))

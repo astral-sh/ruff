@@ -37,7 +37,7 @@ impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
         match self.ty {
-            Type::ClassLiteral(literal) if literal.is_known(self.db, KnownClass::Any) => {
+            Type::ClassSingleton(literal) if literal.is_known(self.db, KnownClass::Any) => {
                 write!(f, "typing.Any")
             }
             Type::IntLiteral(_)
@@ -111,7 +111,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name(self.db))
             }
-            Type::ClassLiteral(class) => {
+            Type::ClassSingleton(class) => {
                 write!(f, "<class '{}'>", class.name(self.db))
             }
             Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),

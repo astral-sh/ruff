@@ -1848,7 +1848,7 @@ fn report_invalid_assignment_with_message(
         return;
     };
     match target_ty {
-        Type::ClassLiteral(class) => {
+        Type::ClassSingleton(class) => {
             let mut diag = builder.into_diagnostic(format_args!(
                 "Implicit shadowing of class `{}`",
                 class.name(context.db()),

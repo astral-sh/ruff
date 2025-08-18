@@ -66,7 +66,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+    if !Type::ClassSingleton(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
         && !class
             .metaclass(db)
             .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
@@ -249,7 +249,7 @@ pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'d
 
 pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
+        Type::ClassSingleton(class_literal) => enum_metadata(db, class_literal).is_some(),
         _ => false,
     }
 }

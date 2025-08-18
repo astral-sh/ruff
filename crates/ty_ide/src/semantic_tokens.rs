@@ -336,7 +336,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         match ty {
-            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
+            Type::ClassSingleton(_) => (SemanticTokenType::Class, modifiers),
             Type::NonInferableTypeVar(_) | Type::TypeVar(_) => {
                 (SemanticTokenType::TypeParameter, modifiers)
             }
@@ -370,7 +370,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // Classify based on the inferred type of the attribute
         match ty {
-            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
+            Type::ClassSingleton(_) => (SemanticTokenType::Class, modifiers),
             Type::FunctionLiteral(_) => {
                 // This is a function accessed as an attribute, likely a method
                 (SemanticTokenType::Method, modifiers)
@@ -1373,10 +1373,10 @@ from typing import List
 
 class MyClass:
     CONSTANT = 42
-    
+
     def method(self):
         return \"hello\"
-    
+
     @property
     def prop(self):
         return self.CONSTANT
@@ -1442,7 +1442,7 @@ u = List.__name__        # __name__ should be variable<CURSOR>
             "
 class MyClass:
     some_attr = \"value\"
-    
+
 obj = MyClass()
 # Test attribute that might not have detailed semantic info
 x = obj.some_attr        # Should fall back to variable, not property
@@ -1476,10 +1476,10 @@ class MyClass:
     lower_case = 24
     MixedCase = 12
     A = 1
-    
+
 obj = MyClass()
 x = obj.UPPER_CASE    # Should have readonly modifier
-y = obj.lower_case    # Should not have readonly modifier  
+y = obj.lower_case    # Should not have readonly modifier
 z = obj.MixedCase     # Should not have readonly modifier
 w = obj.A             # Should not have readonly modifier (length == 1)<CURSOR>
 ",
@@ -1604,7 +1604,7 @@ def test_function(param: int, other: MyClass) -> Optional[List[str]]:
     x: int = 42
     y: MyClass = MyClass()
     z: List[str] = [\"hello\"]
-    
+
     # Type annotations should be Class tokens:
     # int, MyClass, Optional, List, str
     return None<CURSOR>
@@ -1683,7 +1683,7 @@ class MyProtocol(Protocol):
 # Value context - MyProtocol is still a class literal, so should be Class
 my_protocol_var = MyProtocol
 
-# Type annotation context - should be Class  
+# Type annotation context - should be Class
 def test_function(param: MyProtocol) -> MyProtocol:
     return param
 <CURSOR>",
@@ -1719,7 +1719,7 @@ def test_function(param: MyProtocol) -> MyProtocol:
 def func[T](x: T) -> T:
     return x
 
-# Generic function with TypeVarTuple  
+# Generic function with TypeVarTuple
 def func_tuple[*Ts](args: tuple[*Ts]) -> tuple[*Ts]:
     return args
 
@@ -1734,10 +1734,10 @@ class Container[T, U]:
     def __init__(self, value1: T, value2: U):
         self.value1: T = value1
         self.value2: U = value2
-    
+
     def get_first(self) -> T:
         return self.value1
-    
+
     def get_second(self) -> U:
         return self.value2
 
@@ -1892,8 +1892,8 @@ class MyClass:
     fn test_implicitly_concatenated_strings() {
         let test = cursor_test(
             r#"x = "hello" "world"
-y = ("multi" 
-     "line" 
+y = ("multi"
+     "line"
      "string")
 z = 'single' "mixed" 'quotes'<CURSOR>"#,
         );
@@ -1919,8 +1919,8 @@ z = 'single' "mixed" 'quotes'<CURSOR>"#,
     fn test_bytes_literals() {
         let test = cursor_test(
             r#"x = b"hello" b"world"
-y = (b"multi" 
-     b"line" 
+y = (b"multi"
+     b"line"
      b"bytes")
 z = b'single' b"mixed" b'quotes'<CURSOR>"#,
         );
@@ -2040,21 +2040,21 @@ y = "another_global"
 def outer():
     x = "outer_value"
     z = "outer_local"
-    
+
     def inner():
         nonlocal x, z  # These should be variable tokens
         global y       # This should be a variable token
         x = "modified"
         y = "modified_global"
         z = "modified_local"
-        
+
         def deeper():
             nonlocal x    # Variable token
             global y, x   # Both should be variable tokens
             return x + y
-        
+
         return deeper
-    
+
     return inner<CURSOR>
 "#,
         );
@@ -2100,11 +2100,11 @@ def outer():
 def test():
     global x
     nonlocal y
-    
+
     # Multiple variables in one statement
     global a, b, c
     nonlocal d, e, f
-    
+
     return x + y + a + b + c + d + e + f<CURSOR>
 "#,
         );

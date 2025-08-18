@@ -644,7 +644,7 @@ impl<'db> Bindings<'db> {
                                 // TODO: Handle generic functions, and unions/intersections of
                                 // generic types
                                 overload.set_return_type(match ty {
-                                    Type::ClassLiteral(class) => class
+                                    Type::ClassSingleton(class) => class
                                         .generic_context(db)
                                         .map(|generic_context| generic_context.as_tuple(db))
                                         .unwrap_or_else(|| Type::none(db)),
@@ -693,7 +693,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::EnumMembers) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
-                                    Type::ClassLiteral(class) => {
+                                    Type::ClassSingleton(class) => {
                                         if let Some(metadata) = enums::enum_metadata(db, *class) {
                                             Type::heterogeneous_tuple(
                                                 db,
@@ -767,7 +767,8 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::GetProtocolMembers) => {
-                            if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
+                            if let [Some(Type::ClassSingleton(class))] = overload.parameter_types()
+                            {
                                 if let Some(protocol_class) = class.into_protocol_class(db) {
                                     let member_names = protocol_class
                                         .interface(db)
@@ -878,7 +879,7 @@ impl<'db> Bindings<'db> {
                             }
 
                             // `dataclass` being used as a non-decorator
-                            if let [Some(Type::ClassLiteral(class_literal))] =
+                            if let [Some(Type::ClassSingleton(class_literal))] =
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default();
@@ -1008,7 +1009,7 @@ impl<'db> Bindings<'db> {
                         }
                     },
 
-                    Type::ClassLiteral(class) => match class.known(db) {
+                    Type::ClassSingleton(class) => match class.known(db) {
                         Some(KnownClass::Bool) => match overload.parameter_types() {
                             [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
                             [None] => overload.set_return_type(Type::BooleanLiteral(false)),
@@ -2576,7 +2577,7 @@ impl<'db> CallableDescription<'db> {
                 kind: "function",
                 name: function.name(db),
             }),
-            Type::ClassLiteral(class_type) => Some(CallableDescription {
+            Type::ClassSingleton(class_type) => Some(CallableDescription {
                 kind: "class",
                 name: class_type.name(db),
             }),

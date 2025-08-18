@@ -77,7 +77,7 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => {
+            Type::ClassSingleton(literal) => {
                 if literal.is_known(db, KnownClass::Any) {
                     Some(Self::Dynamic(DynamicType::Any))
                 } else {

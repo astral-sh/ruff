@@ -183,7 +183,7 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => {
+            Type::ClassSingleton(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
                 if class_literal.is_known(db, KnownClass::Any) {
@@ -757,7 +757,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                    let Type::ClassSingleton(rhs_class) = rhs_ty else {
                         continue;
                     };
 
@@ -881,7 +881,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
-            Type::ClassLiteral(class_type)
+            Type::ClassSingleton(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
                     && class_type.is_known(self.db, KnownClass::Bool) =>
