@@ -37,6 +37,27 @@ help: Remove unused import: `collections.OrderedDict`
 7 | )
 8 | import multiprocessing.pool
 
+F401 [*] `logging.config` imported but unused
+  --> F401_0.py:11:8
+   |
+ 9 | import multiprocessing.pool
+10 | import multiprocessing.process
+11 | import logging.config
+   |        ^^^^^^^^^^^^^^
+12 | import logging.handlers
+13 | from typing import (
+   |
+help: Remove unused import: `logging.config`
+
+ℹ Safe fix
+8  8  | )
+9  9  | import multiprocessing.pool
+10 10 | import multiprocessing.process
+11    |-import logging.config
+12 11 | import logging.handlers
+13 12 | from typing import (
+14 13 |     TYPE_CHECKING,
+
 F401 [*] `logging.handlers` imported but unused
   --> F401_0.py:12:8
    |
