@@ -1334,30 +1334,6 @@ impl<'db> Type<'db> {
             // handled above. It's always assignable, though.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
 
-            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
-                self_alias
-                    .value_type(db)
-                    .has_relation_to_impl(db, target, relation, visitor)
-            }),
-
-            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
-                self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
-            }),
-
-            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
-            // This allows field definitions like `name: str = field(default="")` in dataclasses
-            // to pass the assignability check of the inferred type to the declared type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
-                if relation.is_assignability() =>
-            {
-                field.default_type(db).has_relation_to(db, right, relation)
-            }
-
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement assignability and subtyping for TypedDict
-                relation.is_assignability()
-            }
-
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
@@ -1493,6 +1469,30 @@ impl<'db> Type<'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => false,
+
+            (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
+                self_alias
+                    .value_type(db)
+                    .has_relation_to_impl(db, target, relation, visitor)
+            }),
+
+            (_, Type::TypeAlias(target_alias)) => visitor.visit((self, target), || {
+                self.has_relation_to_impl(db, target_alias.value_type(db), relation, visitor)
+            }),
+
+            // Pretend that instances of `dataclasses.Field` are assignable to their default type.
+            // This allows field definitions like `name: str = field(default="")` in dataclasses
+            // to pass the assignability check of the inferred type to the declared type.
+            (Type::KnownInstance(KnownInstanceType::Field(field)), right)
+                if relation.is_assignability() =>
+            {
+                field.default_type(db).has_relation_to(db, right, relation)
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement assignability and subtyping for TypedDict
+                relation.is_assignability()
+            }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
