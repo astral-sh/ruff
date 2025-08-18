@@ -1342,6 +1342,10 @@ impl<'db> Type<'db> {
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
             // A similar rule applies in reverse to intersection types.
+            //
+            // TODO: Once assignability generates constraint sets instead of a simple bool, we
+            // won't need these special cases, since the connectives section below will handle this
+            // correctly.
             (Type::NonInferableTypeVar(_), Type::Union(union))
                 if union.elements(db).contains(&self) =>
             {
@@ -1374,6 +1378,23 @@ impl<'db> Type<'db> {
             // These match arms handle our connectives. Surprisingly, there are three of them!
             // Union and intersection are the obvious ones, but a constrained non-inferable typevar
             // is the "one-of" of its constraints.
+
+            // TODO: At the moment, the order of the arms in this section is important. Once
+            // assignability generates constraint sets instead of a simple bool, it shouldn't
+            // matter as much anymore.
+            //
+            // As one example, in
+            //
+            // ```py
+            // def union[T: (Base, Unrelated)](t: T) -> None:
+            //     static_assert(is_assignable_to(T, T | None))
+            // ```
+            //
+            // we need to check that `T <: T | None` for both `T = Base` and `T = Unrelated`. In
+            // this particular example, the lhs is a bare typevar, so you might think that we can
+            // apply the two specializations to the rhs and check each. But the `T` on the lhs
+            // might be arbitrarily deep in the type, and might appear multiple times; we need
+            // constraint sets to be able to express these kinds of consistency requirements.
 
             // A constrained typevar specializes to exactly one of its constraints, but not to any
             // subtype of those constraints, nor to any union of multiple constraints. Since there
