@@ -4866,6 +4866,9 @@ impl<'db> Type<'db> {
                 // diagnostic in unreachable code.
                 return Ok(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
             }
+            Type::TypeAlias(alias) => {
+                return alias.value_type(db).try_iterate_with_mode(db, mode);
+            }
             _ => {}
         }
 
