@@ -87,6 +87,12 @@ pub struct InlayHintSettings {
     pub call_argument_names: bool,
 }
 
+impl InlayHintSettings {
+    pub fn any_enabled(&self) -> bool {
+        self.variable_types || self.call_argument_names
+    }
+}
+
 impl Default for InlayHintSettings {
     fn default() -> Self {
         Self {
