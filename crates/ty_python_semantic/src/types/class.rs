@@ -1176,6 +1176,24 @@ pub(crate) struct Field<'db> {
     pub(crate) kw_only: Option<bool>,
 }
 
+#[derive(
+    Copy,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    salsa::Supertype,
+    salsa::Update,
+    get_size2::GetSize,
+)]
+enum ClassSingletonType<'db> {
+    ClassLiteral(ClassLiteral<'db>),
+    NewType(NewTypeClass<'db>),
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -2990,9 +3008,30 @@ impl<'db> From<ClassLiteral<'db>> for Type<'db> {
     }
 }
 
+impl<'db> From<ClassLiteral<'db>> for ClassSingletonType<'db> {
+    fn from(class: ClassLiteral<'db>) -> ClassSingletonType<'db> {
+        ClassSingletonType::ClassLiteral(class)
+    }
+}
+
 impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
     fn from(class: ClassLiteral<'db>) -> ClassType<'db> {
         ClassType::NonGeneric(class)
+    }
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct NewTypeClass<'db> {
+    name: Name,
+    parent: Box<ClassType<'db>>,
+}
+
+impl<'db> get_size2::GetSize for NewTypeClass<'_> {}
+
+impl<'db> From<NewTypeClass<'db>> for ClassSingletonType<'db> {
+    fn from(class: NewTypeClass<'db>) -> ClassSingletonType<'db> {
+        ClassSingletonType::NewType(class)
     }
 }
 
