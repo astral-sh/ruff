@@ -95,7 +95,7 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
     INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
     POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
@@ -1111,13 +1111,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let is_protocol = class.is_protocol(self.db());
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
             let mut solid_bases = IncompatibleBases::default();
 
             // (2) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
+            //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
+                if is_named_tuple
+                    && !matches!(
+                        base_class,
+                        Type::SpecialForm(SpecialFormType::NamedTuple)
+                            | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                    )
+                {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_NAMED_TUPLE, &class_node.bases()[i])
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "NamedTuple class `{}` cannot use multiple inheritance except with `Generic[]`",
+                            class.name(self.db()),
+                        ));
+                    }
+                }
+
                 let base_class = match base_class {
                     Type::SpecialForm(SpecialFormType::Generic) => {
                         if let Some(builder) = self
@@ -1899,7 +1919,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bound_ty = ty;
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let nonlocal_use_def_map;
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
 
@@ -1959,9 +1978,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
                     // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
-                    nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
-                    declarations =
-                        nonlocal_use_def_map.end_of_scope_symbol_declarations(enclosing_symbol_id);
+                    declarations = self
+                        .index
+                        .use_def_map(enclosing_scope_file_id)
+                        .end_of_scope_symbol_declarations(enclosing_symbol_id);
                     is_local = false;
                     break;
                 }
@@ -2158,8 +2178,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or_fall_back_to(self.db(), || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
-                let place_table = self.index.place_table(scope);
-                let place = place_table.place(declaration.place(self.db()));
+                let place = self
+                    .index
+                    .place_table(scope)
+                    .place(declaration.place(self.db()));
                 if let PlaceExprRef::Symbol(symbol) = &place {
                     if scope.is_global() {
                         module_type_implicit_global_symbol(self.db(), symbol.name())
@@ -2552,8 +2574,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     invalid.ty,
                 );
             }
-            let use_def = self.index.use_def_map(scope_id);
-            if use_def.can_implicitly_return_none(self.db())
+            if self
+                .index
+                .use_def_map(scope_id)
+                .can_implicitly_return_none(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
@@ -5220,20 +5244,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let module_ty = Type::module_literal(self.db(), self.file(), module);
 
-        // The indirection of having `star_import_info` as a separate variable
-        // is required in order to make the borrow checker happy.
-        let star_import_info = definition
-            .kind(self.db())
-            .as_star_import()
-            .map(|star_import| {
-                let place_table = self
-                    .index
-                    .place_table(self.scope().file_scope_id(self.db()));
-                (star_import, place_table)
-            });
-
-        let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
-            symbol_table.symbol(star_import.symbol_id()).name()
+        let name = if let Some(star_import) = definition.kind(self.db()).as_star_import() {
+            self.index
+                .place_table(self.scope().file_scope_id(self.db()))
+                .symbol(star_import.symbol_id())
+                .name()
         } else {
             &alias.name.id
         };

@@ -221,7 +221,7 @@ impl<'db> GenericContext<'db> {
                 // TODO: This should be a new type variant where only these exact types are
                 // assignable, and not subclasses of them, nor a union of them.
                 parameter = parameter
-                    .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
+                    .with_annotated_type(UnionType::from_elements(db, constraints.elements(db)));
             }
             None => {}
         }
@@ -816,10 +816,11 @@ impl<'db> SpecializationBuilder<'db> {
                 // and add a mapping between that typevar and the actual type. (Note that we've
                 // already handled above the case where the actual is assignable to a _non-typevar_
                 // union element.)
-                let mut bound_typevars = formal.iter(self.db).filter_map(|ty| match ty {
-                    Type::TypeVar(bound_typevar) => Some(*bound_typevar),
-                    _ => None,
-                });
+                let mut bound_typevars =
+                    formal.elements(self.db).iter().filter_map(|ty| match ty {
+                        Type::TypeVar(bound_typevar) => Some(*bound_typevar),
+                        _ => None,
+                    });
                 let bound_typevar = bound_typevars.next();
                 let additional_bound_typevars = bound_typevars.next();
                 if let (Some(bound_typevar), None) = (bound_typevar, additional_bound_typevars) {
@@ -849,7 +850,7 @@ impl<'db> SpecializationBuilder<'db> {
                         self.add_type_mapping(bound_typevar, ty);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        for constraint in constraints.iter(self.db) {
+                        for constraint in constraints.elements(self.db) {
                             if ty.is_assignable_to(self.db, *constraint) {
                                 self.add_type_mapping(bound_typevar, *constraint);
                                 return Ok(());

@@ -270,7 +270,7 @@ There are a few exceptions to these rules:
 1. If no config file is found in the filesystem hierarchy, Ruff will fall back to using
     a default configuration. If a user-specific configuration file exists
     at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
-    configuration, with `${config_dir}` being determined via [`etcetera`'s native strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
+    configuration, with `${config_dir}` being determined via [`etcetera`'s base strategy](https://docs.rs/etcetera/latest/etcetera/#native-strategy),
     and all relative paths being again resolved relative to the _current working directory_.
 1. Any config-file-supported settings that are provided on the command-line (e.g., via
     `--select`) will override the settings in _every_ resolved configuration file.
