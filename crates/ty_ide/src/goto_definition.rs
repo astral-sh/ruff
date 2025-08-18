@@ -1,5 +1,4 @@
 use crate::goto::find_goto_target;
-use crate::stub_mapping::StubMapper;
 use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
@@ -20,15 +19,9 @@ pub fn goto_definition(
     let module = parsed_module(db, file).load(db);
     let goto_target = find_goto_target(&module, offset)?;
 
-    // Create a StubMapper to map from stub files to source files
-    let stub_mapper = StubMapper::new(db);
-
-    let definition_targets = goto_target.get_definition_targets(
-        file,
-        db,
-        Some(&stub_mapper),
-        ImportAliasResolution::ResolveAliases,
-    )?;
+    let definition_targets = goto_target
+        .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?
+        .definition_targets(db)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -439,12 +432,12 @@ class MyOtherClass:
         6 |         print(self.val)
           |
         info: Source
-         --> main.py:4:1
+         --> main.py:4:3
           |
         2 | from mymodule import MyClass
         3 | x = MyClass(0)
         4 | x.action()
-          | ^^^^^^^^
+          |   ^^^^^^
           |
         ");
     }
@@ -498,11 +491,11 @@ class MyOtherClass:
         6 |         print("hi!")
           |
         info: Source
-         --> main.py:3:5
+         --> main.py:3:13
           |
         2 | from mymodule import MyClass
         3 | x = MyClass.action()
-          |     ^^^^^^^^^^^^^^
+          |             ^^^^^^
           |
         "#);
     }

@@ -424,142 +424,97 @@ class HeterogeneousTupleSubclass(tuple[I0, I1, I2]): ...
 
 def f(x: HeterogeneousTupleSubclass):
     a, b, c = x
+    reveal_type(a)  # revealed: I0
+    reveal_type(b)  # revealed: I1
+    reveal_type(c)  # revealed: I2
 
-    # TODO: should be `I0`
-    reveal_type(a)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(b)  # revealed: I0 | I1 | I2
-    # TODO: should be `I2`
-    reveal_type(c)  # revealed: I0 | I1 | I2
+    d, e = x  # error: [invalid-assignment] "Too many values to unpack: Expected 2"
 
-    # TODO: should emit a diagnostic ([invalid-assignment] "Too many values to unpack: Expected 2")
-    d, e = x
+    reveal_type(d)  # revealed: Unknown
+    reveal_type(e)  # revealed: Unknown
 
-    reveal_type(d)  # revealed: I0 | I1 | I2
-    reveal_type(e)  # revealed: I0 | I1 | I2
+    f, g, h, i = x  # error: [invalid-assignment] "Not enough values to unpack: Expected 4"
 
-    # TODO: should emit a diagnostic ([invalid-assignment] "Not enough values to unpack: Expected 4")
-    f, g, h, i = x
-
-    reveal_type(f)  # revealed: I0 | I1 | I2
-    reveal_type(g)  # revealed: I0 | I1 | I2
-    reveal_type(h)  # revealed: I0 | I1 | I2
-    reveal_type(i)  # revealed: I0 | I1 | I2
+    reveal_type(f)  # revealed: Unknown
+    reveal_type(g)  # revealed: Unknown
+    reveal_type(h)  # revealed: Unknown
+    reveal_type(i)  # revealed: Unknown
 
     [j, *k] = x
-
-    # TODO: should be `I0`
-    reveal_type(j)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1 | I2]`
-    reveal_type(k)  # revealed: list[I0 | I1 | I2]
+    reveal_type(j)  # revealed: I0
+    reveal_type(k)  # revealed: list[I1 | I2]
 
     [l, m, *n] = x
-
-    # TODO: should be `I0`
-    reveal_type(l)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(m)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I2]`
-    reveal_type(n)  # revealed: list[I0 | I1 | I2]
+    reveal_type(l)  # revealed: I0
+    reveal_type(m)  # revealed: I1
+    reveal_type(n)  # revealed: list[I2]
 
     [o, p, q, *r] = x
+    reveal_type(o)  # revealed: I0
+    reveal_type(p)  # revealed: I1
+    reveal_type(q)  # revealed: I2
+    reveal_type(r)  # revealed: list[Never]
 
-    # TODO: should be `I0`
-    reveal_type(o)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(p)  # revealed: I0 | I1 | I2
-    # TODO: should be `I2`
-    reveal_type(q)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[Never]`
-    reveal_type(r)  # revealed: list[I0 | I1 | I2]
-
-    # TODO: should emit a diagnostic ([invalid-assignment] "Not enough values to unpack: Expected at least 4")
+    # error: [invalid-assignment] "Not enough values to unpack: Expected at least 4"
     [s, t, u, v, *w] = x
-    reveal_type(s)  # revealed: I0 | I1 | I2
-    reveal_type(t)  # revealed: I0 | I1 | I2
-    reveal_type(u)  # revealed: I0 | I1 | I2
-    reveal_type(v)  # revealed: I0 | I1 | I2
-    reveal_type(w)  # revealed: list[I0 | I1 | I2]
+    reveal_type(s)  # revealed: Unknown
+    reveal_type(t)  # revealed: Unknown
+    reveal_type(u)  # revealed: Unknown
+    reveal_type(v)  # revealed: Unknown
+    reveal_type(w)  # revealed: list[Unknown]
 
 class MixedTupleSubclass(tuple[I0, *tuple[I1, ...], I2]): ...
 
 def f(x: MixedTupleSubclass):
-    # TODO: should emit a diagnostic: ([invalid-assignment] "Too many values to unpack: Expected 1"`)
-    (a,) = x
-    reveal_type(a)  # revealed: I0 | I1 | I2
+    (a,) = x  # error: [invalid-assignment] "Too many values to unpack: Expected 1"
+    reveal_type(a)  # revealed: Unknown
 
     c, d = x
-    # TODO: should be `I0`
-    reveal_type(c)  # revealed: I0 | I1 | I2
-    # TODO: should be `I2`
-    reveal_type(d)  # revealed: I0 | I1 | I2
+    reveal_type(c)  # revealed: I0
+    reveal_type(d)  # revealed: I2
 
     e, f, g = x
-
-    # TODO: should be `I0`
-    reveal_type(e)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(f)  # revealed: I0 | I1 | I2
-    # TODO: should be `I2`
-    reveal_type(g)  # revealed: I0 | I1 | I2
+    reveal_type(e)  # revealed: I0
+    reveal_type(f)  # revealed: I1
+    reveal_type(g)  # revealed: I2
 
     h, i, j, k = x
-
-    # TODO: should be `I0`
-    reveal_type(h)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(i)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(j)  # revealed: I0 | I1 | I2
-    # TODO: should be `I2`
-    reveal_type(k)  # revealed: I0 | I1 | I2
+    reveal_type(h)  # revealed: I0
+    reveal_type(i)  # revealed: I1
+    reveal_type(j)  # revealed: I1
+    reveal_type(k)  # revealed: I2
 
     [l, *m] = x
-
-    # TODO: should be `I0`
-    reveal_type(l)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1 | I2]`
-    reveal_type(m)  # revealed: list[I0 | I1 | I2]
+    reveal_type(l)  # revealed: I0
+    reveal_type(m)  # revealed: list[I1 | I2]
 
     [n, o, *p] = x
+    reveal_type(n)  # revealed: I0
 
-    # TODO: should be `I0`
-    reveal_type(n)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1 | I2`
-    reveal_type(o)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1 | I2]`
-    reveal_type(p)  # revealed: list[I0 | I1 | I2]
+    # TODO: `I1 | I2` might be better here? (https://github.com/astral-sh/ty/issues/947)
+    reveal_type(o)  # revealed: I1
+
+    reveal_type(p)  # revealed: list[I1 | I2]
 
     [o, p, q, *r] = x
+    reveal_type(o)  # revealed: I0
 
-    # TODO: should be `I0`
-    reveal_type(o)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1 | I2`
-    reveal_type(p)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1 | I2
-    reveal_type(q)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1 | I2]
-    reveal_type(r)  # revealed: list[I0 | I1 | I2]
+    # TODO: `I1 | I2` might be better for both of these? (https://github.com/astral-sh/ty/issues/947)
+    reveal_type(p)  # revealed: I1
+    reveal_type(q)  # revealed: I1
+
+    reveal_type(r)  # revealed: list[I1 | I2]
 
     s, *t, u = x
-
-    # TODO: should be `I0`
-    reveal_type(s)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1]`
-    reveal_type(t)  # revealed: list[I0 | I1 | I2]
-    # TODO: should be `I2`
-    reveal_type(u)  # revealed: I0 | I1 | I2
+    reveal_type(s)  # revealed: I0
+    reveal_type(t)  # revealed: list[I1]
+    reveal_type(u)  # revealed: I2
 
     aa, bb, *cc, dd = x
-
-    # TODO: should be `I0`
-    reveal_type(aa)  # revealed: I0 | I1 | I2
-    # TODO: should be `I1`
-    reveal_type(bb)  # revealed: I0 | I1 | I2
-    # TODO: should be `list[I1]`
-    reveal_type(cc)  # revealed: list[I0 | I1 | I2]
-    # TODO: should be I2
-    reveal_type(dd)  # revealed: I0 | I1 | I2
+    reveal_type(aa)  # revealed: I0
+    reveal_type(bb)  # revealed: I1
+    reveal_type(cc)  # revealed: list[I1]
+    reveal_type(dd)  # revealed: I2
 ```
 
 ## String

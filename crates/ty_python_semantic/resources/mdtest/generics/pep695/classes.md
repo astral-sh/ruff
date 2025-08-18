@@ -367,10 +367,9 @@ def test_seq[T](x: Sequence[T]) -> Sequence[T]:
     return x
 
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
-    # TODO: should be `Sequence[int | float | complex | list[int]]`
-    reveal_type(test_seq(t1))  # revealed: Sequence[Unknown]
-    # TODO: should be `Sequence[int | str]`
-    reveal_type(test_seq(t2))  # revealed: Sequence[Unknown]
+    reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
+    reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
+
     # TODO: this should be `Sequence[Never]`
     reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```
@@ -392,6 +391,7 @@ wrong_innards: C[int] = C("five", 1)
 ### Some `__init__` overloads only apply to certain specializations
 
 ```py
+from __future__ import annotations
 from typing import overload
 
 class C[T]:
@@ -436,6 +436,19 @@ class A[T]:
     x: T
 
 reveal_type(A(x=1))  # revealed: A[int]
+```
+
+### Class typevar has another typevar as a default
+
+```py
+class C[T, U = T]: ...
+
+reveal_type(C())  # revealed: C[Unknown, Unknown]
+
+class D[T, U = T]:
+    def __init__(self) -> None: ...
+
+reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```
 
 ## Generic subclass
@@ -542,6 +555,23 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Scoping of typevars
+
+### No back-references
+
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+
+```py
+# TODO error
+class C[S: T, T]:
+    pass
+
+class D[S: X]:
+    pass
+
+X = int
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
@@ -592,7 +622,7 @@ class Derived[T](list[Derived[T]]): ...
 
 Inheritance that would result in a cyclic MRO is detected as an error.
 
-```py
+```pyi
 # error: [cyclic-class-definition]
 class C[T](C): ...
 

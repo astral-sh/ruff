@@ -182,14 +182,7 @@ impl ClassInfoConstraintFunction {
         };
 
         match classinfo {
-            Type::Tuple(tuple) => UnionType::try_from_elements(
-                db,
-                tuple
-                    .tuple(db)
-                    .all_elements()
-                    .copied()
-                    .map(|element| self.generate_constraint(db, element)),
-            ),
+            Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
@@ -222,7 +215,10 @@ impl ClassInfoConstraintFunction {
             Type::Union(union) => {
                 union.try_map(db, |element| self.generate_constraint(db, *element))
             }
-            Type::TypeVar(type_var) => match type_var.bound_or_constraints(db)? {
+            Type::NonInferableTypeVar(bound_typevar) => match bound_typevar
+                .typevar(db)
+                .bound_or_constraints(db)?
+            {
                 TypeVarBoundOrConstraints::UpperBound(bound) => self.generate_constraint(db, bound),
                 TypeVarBoundOrConstraints::Constraints(constraints) => {
                     self.generate_constraint(db, Type::Union(constraints))
@@ -232,6 +228,15 @@ impl ClassInfoConstraintFunction {
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
             Type::GenericAlias(_) => None,
+
+            Type::NominalInstance(nominal) => nominal.tuple_spec(db).and_then(|tuple| {
+                UnionType::try_from_elements(
+                    db,
+                    tuple
+                        .all_elements()
+                        .map(|element| self.generate_constraint(db, *element)),
+                )
+            }),
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -249,12 +254,12 @@ impl ClassInfoConstraintFunction {
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::SpecialForm(_)
-            | Type::NominalInstance(_)
             | Type::LiteralString
             | Type::StringLiteral(_)
             | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
+            | Type::TypeVar(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_) => None,
@@ -557,7 +562,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::NominalInstance(instance)
-                        if instance.class.is_known(db, KnownClass::Bool) =>
+                        if instance.class(db).is_known(db, KnownClass::Bool) =>
                     {
                         UnionType::from_elements(
                             db,
@@ -568,11 +573,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class.class_literal(db).0).is_some() =>
+                        if enum_metadata(db, instance.class(db).class_literal(db).0).is_some() =>
                     {
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class.class_literal(db).0, None)
+                            enum_member_literals(db, instance.class(db).class_literal(db).0, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -599,7 +604,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
             (Type::NominalInstance(instance), Type::IntLiteral(i))
-                if instance.class.is_known(self.db, KnownClass::Bool) =>
+                if instance.class(self.db).is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
                     Some(Type::BooleanLiteral(false).negate(self.db))
@@ -620,20 +625,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
-            match rhs_ty {
-                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
-                    self.db,
-                    rhs_tuple.tuple(self.db).all_elements(),
-                )),
-
-                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
+            if let Type::StringLiteral(string_literal) = rhs_ty {
+                Some(UnionType::from_elements(
                     self.db,
                     string_literal
                         .iter_each_char(self.db)
                         .map(Type::StringLiteral),
-                )),
-
-                _ => None,
+                ))
+            } else if let Some(tuple_spec) = rhs_ty.tuple_instance_spec(self.db) {
+                // N.B. Strictly speaking this is unsound, since a tuple subclass might override `__contains__`
+                // but we'd still apply the narrowing here. This seems unlikely, however, and narrowing is
+                // generally unsound in numerous ways anyway (attribute narrowing, subscript, narrowing,
+                // narrowing of globals, etc.). So this doesn't seem worth worrying about too much.
+                Some(UnionType::from_elements(self.db, tuple_spec.all_elements()))
+            } else {
+                None
             }
         } else {
             None
@@ -751,12 +757,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             node_index: _,
                         },
                 }) if keywords.is_empty() => {
-                    let rhs_class = match rhs_ty {
-                        Type::ClassLiteral(class) => class,
-                        Type::GenericAlias(alias) => alias.origin(self.db),
-                        _ => {
-                            continue;
-                        }
+                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
+                        continue;
                     };
 
                     let target = match &**args {
@@ -767,13 +769,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         _ => continue,
                     };
 
-                    let is_valid_constraint = if is_positive {
+                    let is_positive = if is_positive {
                         op == &ast::CmpOp::Is
                     } else {
                         op == &ast::CmpOp::IsNot
                     };
 
-                    if !is_valid_constraint {
+                    // `else`-branch narrowing for `if type(x) is Y` can only be done
+                    // if `Y` is a final class
+                    if !rhs_class.is_final(self.db) && !is_positive {
                         continue;
                     }
 
@@ -786,7 +790,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         let place = self.expect_place(&target);
                         constraints.insert(
                             place,
-                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                .negate_if(self.db, !is_positive),
                         );
                     }
                 }

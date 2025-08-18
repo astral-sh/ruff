@@ -19,11 +19,11 @@ from typing import Any, Final, final, type_check_only
 from typing_extensions import Self
 
 DEFLATED: Final = 8
-DEF_MEM_LEVEL: int  # can change
+DEF_MEM_LEVEL: Final[int]
 DEF_BUF_SIZE: Final = 16384
-MAX_WBITS: int
-ZLIB_VERSION: str  # can change
-ZLIB_RUNTIME_VERSION: str  # can change
+MAX_WBITS: Final[int]
+ZLIB_VERSION: Final[str]
+ZLIB_RUNTIME_VERSION: Final[str]
 Z_NO_COMPRESSION: Final = 0
 Z_PARTIAL_FLUSH: Final = 1
 Z_BEST_COMPRESSION: Final = 9
@@ -40,6 +40,10 @@ Z_NO_FLUSH: Final = 0
 Z_RLE: Final = 3
 Z_SYNC_FLUSH: Final = 2
 Z_TREES: Final = 6
+
+if sys.version_info >= (3, 14) and sys.platform == "win32":
+    # Available when zlib was built with zlib-ng, usually only on Windows
+    ZLIBNG_VERSION: Final[str]
 
 class error(Exception): ...
 

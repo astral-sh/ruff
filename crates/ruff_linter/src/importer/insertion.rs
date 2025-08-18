@@ -63,9 +63,9 @@ impl<'a> Insertion<'a> {
                 return Insertion::inline(" ", location.add(offset).add(TextSize::of(';')), ";");
             }
 
-            // If the first token after the docstring is a continuation character (i.e. "\"), advance
-            // an additional row to prevent inserting in the same logical line.
-            if match_continuation(locator.after(location)).is_some() {
+            // While the first token after the docstring is a continuation character (i.e. "\"), advance
+            // additional rows to prevent inserting in the same logical line.
+            while match_continuation(locator.after(location)).is_some() {
                 location = locator.full_line_end(location);
             }
 
@@ -377,6 +377,17 @@ mod tests {
         assert_eq!(
             insert(contents)?,
             Insertion::own_line("", TextSize::from(22), "\n")
+        );
+
+        let contents = r#"
+"""Hello, world!"""\
+\
+
+"#
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::own_line("", TextSize::from(24), "\n")
         );
 
         let contents = r"

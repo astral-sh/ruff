@@ -222,7 +222,6 @@ impl<'db> Completion<'db> {
                 // "struct" here as a more general "object." ---AG
                 Type::NominalInstance(_)
                 | Type::PropertyInstance(_)
-                | Type::Tuple(_)
                 | Type::BoundSuper(_)
                 | Type::TypedDict(_) => CompletionKind::Struct,
                 Type::IntLiteral(_)
@@ -233,7 +232,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
                 Type::Intersection(intersection) => {
                     intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
@@ -244,6 +243,7 @@ impl<'db> Completion<'db> {
                 | Type::KnownInstance(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy => return None,
+                Type::TypeAlias(alias) => imp(db, alias.value_type(db))?,
             })
         }
         imp(db, self.ty)
