@@ -836,13 +836,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     );
                 }
                 if checker.is_rule_enabled(Rule::RelativeImports) {
-                    flake8_tidy_imports::rules::banned_relative_import(
+                    flake8_tidy_imports::rules::enforce_import_strictness(
                         checker,
                         stmt,
                         level,
                         module,
                         checker.module.qualified_name(),
-                        checker.settings().flake8_tidy_imports.ban_relative_imports,
+                        checker.settings().flake8_tidy_imports.relative_import_style,
                     );
                 }
                 if checker.is_rule_enabled(Rule::Debugger) {

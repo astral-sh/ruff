@@ -13,7 +13,7 @@ mod tests {
     use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::rules::flake8_tidy_imports;
-    use crate::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+    use crate::rules::flake8_tidy_imports::settings::{ApiBan, ImportStyle};
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -82,7 +82,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID252.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    ban_relative_imports: Strictness::Parents,
+                    relative_import_style: ImportStyle::ParentsAbsolute,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::RelativeImports])
@@ -98,7 +98,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID252.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    ban_relative_imports: Strictness::All,
+                    relative_import_style: ImportStyle::AlwaysAbsolute,
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::RelativeImports])
@@ -114,7 +114,7 @@ mod tests {
             Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    ban_relative_imports: Strictness::Parents,
+                    relative_import_style: ImportStyle::ParentsAbsolute,
                     ..Default::default()
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],

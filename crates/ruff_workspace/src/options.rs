@@ -15,7 +15,7 @@ use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
-use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
+use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, ImportStyle};
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pep8_naming::settings::IgnoreNames;
@@ -2007,10 +2007,10 @@ pub struct Flake8TidyImportsOptions {
         value_type = r#""parents" | "all""#,
         example = r#"
             # Disallow all relative imports.
-            ban-relative-imports = "all"
+            relative-import-style = "all"
         "#
     )]
-    pub ban_relative_imports: Option<Strictness>,
+    pub relative_import_style: Option<ImportStyle>,
 
     /// Specific modules or module members that may not be imported or accessed.
     /// Note that this rule is only meant to flag accidental uses,
@@ -2045,7 +2045,9 @@ pub struct Flake8TidyImportsOptions {
 impl Flake8TidyImportsOptions {
     pub fn into_settings(self) -> flake8_tidy_imports::settings::Settings {
         flake8_tidy_imports::settings::Settings {
-            ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
+            relative_import_style: self
+                .relative_import_style
+                .unwrap_or(ImportStyle::ParentsAbsolute),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
         }
