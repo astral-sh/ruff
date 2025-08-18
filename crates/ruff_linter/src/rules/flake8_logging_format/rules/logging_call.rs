@@ -172,11 +172,11 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
     }
 
     // G005
-    let skip = match logging_call_type {
-        LoggingCallType::LevelCall(_) => 1,
-        LoggingCallType::LogCall => 2,
-    };
     if checker.is_rule_enabled(Rule::LoggingPreFormat) {
+        let skip = match logging_call_type {
+            LoggingCallType::LevelCall(_) => 1,
+            LoggingCallType::LogCall => 2,
+        };
         // Check if any positional args for log message values are calls to pre-format as a string
         call.arguments.args.iter().skip(skip).for_each(|arg| {
             if let Expr::Call(ast::ExprCall { func, .. }) = arg {

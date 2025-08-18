@@ -334,15 +334,15 @@ impl Violation for LoggingFString {
 }
 
 /// ## What it does
-/// Checks for pre-formatting of parameters to logging statements.
+/// Checks for pre-formatting of arguments to `logging` calls.
 ///
 /// ## Why is this bad?
 /// The `logging` module provides a mechanism for passing additional values to
 /// be logged using the `extra` keyword argument. This is more consistent, more
 /// efficient, and less error-prone than formatting the string directly.
 ///
-/// Parameters to logging statements will be formatted as strings automatically, so it
-/// is unnecessary and less efficient to eagerly format the parameters before passing
+/// Arguments to `logging` calls will be formatted as strings automatically, so it
+/// is unnecessary and less efficient to eagerly format the arguments before passing
 /// them in.
 ///
 /// Additionally, the use of `extra` will ensure that the values are made
@@ -413,7 +413,6 @@ impl Violation for LoggingPreFormat {
         "Logging statement pre-formats parameters as strings".to_string()
     }
 }
-
 
 /// ## What it does
 /// Checks for uses of `logging.warn` and `logging.Logger.warn`.
