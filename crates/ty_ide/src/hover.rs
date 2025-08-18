@@ -136,7 +136,7 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
             HoverContent::Type(ty) => self
                 .kind
                 .fenced_code_block(
-                    ty.display_with(self.db, DisplaySettings { multiline: true }),
+                    ty.display_with(self.db, DisplaySettings::default().multiline()),
                     "python",
                 )
                 .fmt(f),
@@ -765,22 +765,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        (def foo(
-            a,
-            b
-        ) -> Unknown) | (def bar(
-            a,
-            b
-        ) -> Unknown)
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
         ```python
-        (def foo(
-            a,
-            b
-        ) -> Unknown) | (def bar(
-            a,
-            b
-        ) -> Unknown)
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -794,6 +782,128 @@ mod tests {
            |             source
            |
         ");
+    }
+
+    #[test]
+    fn hover_overload() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def foo(a: int, b):
+                """The first overload"""
+                return 0
+
+            @overload
+            def foo(a: str, b):
+                """The second overload"""
+                return 1
+
+            if random.choice([True, False]):
+                a = 1
+            else:
+                a = "hello"
+
+            foo<CURSOR>(a, 2)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:13
+           |
+        17 |                 a = "hello"
+        18 |
+        19 |             foo(a, 2)
+           |             ^^^- Cursor offset
+           |             |
+           |             source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_overload_compact() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def foo(a: int):
+                """The first overload"""
+                return 0
+
+            @overload
+            def foo(a: str):
+                """The second overload"""
+                return 1
+
+            if random.choice([True, False]):
+                a = 1
+            else:
+                a = "hello"
+
+            foo<CURSOR>(a)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:13
+           |
+        17 |                 a = "hello"
+        18 |
+        19 |             foo(a)
+           |             ^^^- Cursor offset
+           |             |
+           |             source
+           |
+        "#);
     }
 
     #[test]

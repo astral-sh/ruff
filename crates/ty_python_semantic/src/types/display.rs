@@ -25,6 +25,18 @@ pub struct DisplaySettings {
     pub multiline: bool,
 }
 
+impl DisplaySettings {
+    #[must_use]
+    pub fn multiline(self) -> Self {
+        Self { multiline: true }
+    }
+
+    #[must_use]
+    pub fn singleline(self) -> Self {
+        Self { multiline: false }
+    }
+}
+
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType<'_> {
         DisplayType {
@@ -147,14 +159,18 @@ impl Display for DisplayRepresentation<'_> {
             Type::GenericAlias(generic) => write!(
                 f,
                 "<class '{}'>",
-                generic.display_with(self.db, self.settings)
+                generic.display_with(self.db, self.settings.singleline())
             ),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
                     write!(f, "type[{}]", class.name(self.db))
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
-                    write!(f, "type[{}]", alias.display_with(self.db, self.settings))
+                    write!(
+                        f,
+                        "type[{}]",
+                        alias.display_with(self.db, self.settings.singleline())
+                    )
                 }
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
@@ -179,7 +195,7 @@ impl Display for DisplayRepresentation<'_> {
                             f,
                             "bound method {instance}.{method}{type_parameters}{signature}",
                             method = function.name(self.db),
-                            instance = self_ty.display_with(self.db, self.settings),
+                            instance = self_ty.display_with(self.db, self.settings.singleline()),
                             type_parameters = type_parameters,
                             signature = signature
                                 .bind_self(self.db, Some(typing_self_ty))
@@ -188,8 +204,11 @@ impl Display for DisplayRepresentation<'_> {
                     }
                     signatures => {
                         // TODO: How to display overloads?
-                        f.write_str("Overload[")?;
-                        let mut join = f.join(", ");
+                        if !self.settings.multiline {
+                            f.write_str("Overload[")?;
+                        }
+                        let separator = if self.settings.multiline { "\n" } else { ", " };
+                        let mut join = f.join(separator);
                         for signature in signatures {
                             join.entry(
                                 &signature
@@ -197,7 +216,10 @@ impl Display for DisplayRepresentation<'_> {
                                     .display_with(self.db, self.settings),
                             );
                         }
-                        f.write_str("]")
+                        if !self.settings.multiline {
+                            f.write_str("]")?;
+                        }
+                        Ok(())
                     }
                 }
             }
@@ -274,18 +296,18 @@ impl Display for DisplayRepresentation<'_> {
                     f,
                     "<super: {pivot}, {owner}>",
                     pivot = Type::from(bound_super.pivot_class(self.db))
-                        .display_with(self.db, self.settings),
+                        .display_with(self.db, self.settings.singleline()),
                     owner = bound_super
                         .owner(self.db)
                         .into_type()
-                        .display_with(self.db, self.settings)
+                        .display_with(self.db, self.settings.singleline())
                 )
             }
             Type::TypeIs(type_is) => {
                 f.write_str("TypeIs[")?;
                 type_is
                     .return_type(self.db)
-                    .display_with(self.db, self.settings)
+                    .display_with(self.db, self.settings.singleline())
                     .fmt(f)?;
                 if let Some(name) = type_is.place_name(self.db) {
                     f.write_str(" @ ")?;
@@ -328,7 +350,9 @@ impl Display for DisplayTuple<'_> {
                 if elements.is_empty() {
                     f.write_str("()")?;
                 } else {
-                    elements.display_with(self.db, self.settings).fmt(f)?;
+                    elements
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt(f)?;
                 }
             }
 
@@ -348,20 +372,29 @@ impl Display for DisplayTuple<'_> {
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
                 if !tuple.prefix.is_empty() {
-                    tuple.prefix.display_with(self.db, self.settings).fmt(f)?;
+                    tuple
+                        .prefix
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt(f)?;
                     f.write_str(", ")?;
                 }
                 if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
                     f.write_str("*tuple[")?;
                 }
-                tuple.variable.display_with(self.db, self.settings).fmt(f)?;
+                tuple
+                    .variable
+                    .display_with(self.db, self.settings.singleline())
+                    .fmt(f)?;
                 f.write_str(", ...")?;
                 if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
                     f.write_str("]")?;
                 }
                 if !tuple.suffix.is_empty() {
                     f.write_str(", ")?;
-                    tuple.suffix.display_with(self.db, self.settings).fmt(f)?;
+                    tuple
+                        .suffix
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt(f)?;
                 }
             }
         }
@@ -456,12 +489,18 @@ impl Display for DisplayFunctionType<'_> {
             }
             signatures => {
                 // TODO: How to display overloads?
-                f.write_str("Overload[")?;
-                let mut join = f.join(", ");
+                if !self.settings.multiline {
+                    f.write_str("Overload[")?;
+                }
+                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let mut join = f.join(separator);
                 for signature in signatures {
                     join.entry(&signature.display_with(self.db, self.settings));
                 }
-                f.write_str("]")
+                if !self.settings.multiline {
+                    f.write_str("]")?;
+                }
+                Ok(())
             }
         }
     }
@@ -665,13 +704,19 @@ impl Display for DisplayCallableType<'_> {
             [signature] => signature.display_with(self.db, self.settings).fmt(f),
             signatures => {
                 // TODO: How to display overloads?
-                f.write_str("Overload[")?;
-                let mut join = f.join(", ");
+                if !self.settings.multiline {
+                    f.write_str("Overload[")?;
+                }
+                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let mut join = f.join(separator);
                 for signature in signatures {
                     join.entry(&signature.display_with(self.db, self.settings));
                 }
                 join.finish()?;
-                f.write_char(']')
+                if !self.settings.multiline {
+                    f.write_char(']')?;
+                }
+                Ok(())
             }
         }
     }
@@ -762,7 +807,7 @@ impl DisplaySignature<'_> {
                 // Write parameter with range tracking
                 let param_name = parameter.display_name();
                 writer.write_parameter(
-                    &parameter.display_with(self.db, self.settings),
+                    &parameter.display_with(self.db, self.settings.singleline()),
                     param_name.as_deref(),
                 )?;
 
@@ -785,7 +830,7 @@ impl DisplaySignature<'_> {
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
-        writer.write_return_type(&return_ty.display_with(self.db, self.settings))?;
+        writer.write_return_type(&return_ty.display_with(self.db, self.settings.singleline()))?;
 
         Ok(())
     }
@@ -998,14 +1043,14 @@ impl Display for DisplayUnionType<'_> {
                     join.entry(&DisplayLiteralGroup {
                         literals: condensed_types,
                         db: self.db,
-                        settings: self.settings,
+                        settings: self.settings.singleline(),
                     });
                 }
             } else {
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
                     db: self.db,
-                    settings: self.settings,
+                    settings: self.settings.singleline(),
                 });
             }
         }
@@ -1035,7 +1080,7 @@ impl Display for DisplayLiteralGroup<'_> {
             .entries(
                 self.literals
                     .iter()
-                    .map(|ty| ty.representation(self.db, self.settings)),
+                    .map(|ty| ty.representation(self.db, self.settings.singleline())),
             )
             .finish()?;
         f.write_str("]")
@@ -1071,7 +1116,7 @@ impl Display for DisplayIntersectionType<'_> {
             .map(|&ty| DisplayMaybeNegatedType {
                 ty,
                 db: self.db,
-                settings: self.settings,
+                settings: self.settings.singleline(),
                 negated: false,
             })
             .chain(
@@ -1081,7 +1126,7 @@ impl Display for DisplayIntersectionType<'_> {
                     .map(|&ty| DisplayMaybeNegatedType {
                         ty,
                         db: self.db,
-                        settings: self.settings,
+                        settings: self.settings.singleline(),
                         negated: true,
                     }),
             );
@@ -1199,7 +1244,7 @@ impl Display for DisplayTypeArray<'_, '_> {
             .entries(
                 self.types
                     .iter()
-                    .map(|ty| ty.display_with(self.db, self.settings)),
+                    .map(|ty| ty.display_with(self.db, self.settings.singleline())),
             )
             .finish()
     }
