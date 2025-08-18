@@ -2114,7 +2114,8 @@ static_assert(not is_assignable_to(type[Bar], type[Foo]))  # error: [static-asse
 static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [static-assert-error]
 
 class Baz:
-    y: str = "foo"
+    x: int
+    y: ClassVar[str] = "foo"
     def method(self) -> bytes:
         return b"foo"
 
