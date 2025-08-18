@@ -22,7 +22,7 @@ Ruff now uses the same default diagnostic format as ty. Below is an example diff
 +help: Remove unused import: `pathlib`
 ```
 
-For now, the primary change is in the header, but this new representation will allow us to make further additions to Ruff's diagnostics, such as adding sub-diagnostics and multiple annotations to the same snippet. As a sneak peek, this is the new multi-span annotation for [`F811`](https://docs.astral.sh/ruff/rules/redefined-while-unused/), which should come out in the 0.12.10:
+For now, the primary change is in the header, but this new representation will allow us to make further additions to Ruff's diagnostics, such as adding sub-diagnostics and multiple annotations to the same snippet. As a sneak peek, this is the new multi-span annotation for [`F811`](https://docs.astral.sh/ruff/rules/redefined-while-unused/), which should come out in the 0.12.10 release:
 
 ```text
 F811 Redefinition of unused `FU` from line 1
