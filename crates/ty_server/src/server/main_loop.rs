@@ -5,10 +5,8 @@ use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
-use lsp_types::notification::{DidChangeWatchedFiles, Notification};
-use lsp_types::{
-    ConfigurationParams, DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Url,
-};
+use lsp_types::notification::Notification;
+use lsp_types::{ConfigurationParams, Url};
 use serde_json::Value;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
@@ -154,6 +152,10 @@ impl Server {
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
                             .initialize_workspaces(workspaces_with_options, &client);
+                        // We do this here after workspaces have been initialized
+                        // so that the file watcher globs can take project search
+                        // paths into account.
+                        // self.try_register_file_watcher(&client);
                     }
                 },
             }
@@ -195,7 +197,6 @@ impl Server {
 
     fn initialize(&mut self, client: &Client) {
         self.request_workspace_configurations(client);
-        self.try_register_file_watcher(client);
     }
 
     /// Requests workspace configurations from the client for all the workspaces in the session.
@@ -279,68 +280,6 @@ impl Server {
                     .collect();
 
                 client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
-            },
-        );
-    }
-
-    /// Try to register the file watcher provided by the client if the client supports it.
-    fn try_register_file_watcher(&mut self, client: &Client) {
-        static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
-
-        if !self.session.client_capabilities().supports_file_watcher() {
-            tracing::warn!("Client does not support file system watching");
-            return;
-        }
-
-        let registration = lsp_types::Registration {
-            id: FILE_WATCHER_REGISTRATION_ID.to_owned(),
-            method: DidChangeWatchedFiles::METHOD.to_owned(),
-            register_options: Some(
-                serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
-                    watchers: vec![
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/.gitignore".into()),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String(
-                                "**/pyproject.toml".into(),
-                            ),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
-                            kind: None,
-                        },
-                        FileSystemWatcher {
-                            glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
-                            kind: None,
-                        },
-                    ],
-                })
-                .unwrap(),
-            ),
-        };
-
-        client.send_request::<lsp_types::request::RegisterCapability>(
-            &self.session,
-            lsp_types::RegistrationParams {
-                registrations: vec![registration],
-            },
-            |_: &Client, ()| {
-                tracing::info!("File watcher registration completed successfully");
             },
         );
     }
