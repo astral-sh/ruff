@@ -95,16 +95,17 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_instance_layout_conflict,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_return_type,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1110,13 +1111,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let is_protocol = class.is_protocol(self.db());
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
             let mut solid_bases = IncompatibleBases::default();
 
             // (2) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
+            //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
+                if is_named_tuple
+                    && !matches!(
+                        base_class,
+                        Type::SpecialForm(SpecialFormType::NamedTuple)
+                            | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                    )
+                {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_NAMED_TUPLE, &class_node.bases()[i])
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "NamedTuple class `{}` cannot use multiple inheritance except with `Generic[]`",
+                            class.name(self.db()),
+                        ));
+                    }
+                }
+
                 let base_class = match base_class {
                     Type::SpecialForm(SpecialFormType::Generic) => {
                         if let Some(builder) = self
