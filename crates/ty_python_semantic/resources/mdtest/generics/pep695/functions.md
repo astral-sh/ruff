@@ -464,19 +464,21 @@ TypeVar if the TypeVar's upper bound is a type with a precise tuple spec:
 from dataclasses import dataclass
 from typing import NamedTuple, Final
 
-def f[T: tuple[int, str]](x: T) -> None:
+def f[T: tuple[int, str]](x: T) -> T:
     a, b = x
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: str
+    return x
 
 @dataclass
 class Team[T: tuple[int, str]]:
     employees: list[T]
 
-def x[T: tuple[int, str]](team: Team[T]):
+def x[T: tuple[int, str]](team: Team[T]) -> Team[T]:
     age, name = team.employees[0]
     reveal_type(age)  # revealed: int
     reveal_type(name)  # revealed: str
+    return team
 
 class Age(int): ...
 class Name(str): ...
