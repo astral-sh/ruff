@@ -138,6 +138,12 @@ pub enum PythonEnvironment {
 }
 
 impl PythonEnvironment {
+    /// Discover the python environment using the following priorities:
+    ///
+    /// 1. activated virtual environment
+    /// 2. conda (child)
+    /// 3. working dir virtual environment
+    /// 4. conda (base)
     pub fn discover(
         project_root: &SystemPath,
         system: &dyn System,
@@ -160,13 +166,9 @@ impl PythonEnvironment {
             .map(Some);
         }
 
-        if let Ok(conda_env) = system.env_var(EnvVars::CONDA_PREFIX) {
-            return resolve_environment(
-                system,
-                SystemPath::new(&conda_env),
-                SysPrefixPathOrigin::CondaPrefixVar,
-            )
-            .map(Some);
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
         }
 
         tracing::debug!("Discovering virtual environment in `{project_root}`");
@@ -187,6 +189,11 @@ impl PythonEnvironment {
                     );
                 }
             }
+        }
+
+        if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Base) {
+            return resolve_environment(system, &conda_env, SysPrefixPathOrigin::CondaPrefixVar)
+                .map(Some);
         }
 
         Ok(None)
@@ -537,6 +544,62 @@ System stdlib will not be used for module definitions.",
             Err(StdlibDiscoveryError::NoSysPrefixFound(cfg_path))
         }
     }
+}
+
+/// Different kinds of conda environment
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum CondaEnvironmentKind {
+    /// The base Conda environment; treated like a system Python environment.
+    Base,
+    /// Any other Conda environment; treated like a virtual environment.
+    Child,
+}
+
+impl CondaEnvironmentKind {
+    /// Compute the kind of `CONDA_PREFIX` we have.
+    ///
+    /// When the base environment is used, `CONDA_DEFAULT_ENV` will be set to a name, i.e., `base` or
+    /// `root` which does not match the prefix, e.g. `/usr/local` instead of
+    /// `/usr/local/conda/envs/<name>`.
+    fn from_prefix_path(system: &dyn System, path: &SystemPath) -> Self {
+        // If we cannot read `CONDA_DEFAULT_ENV`, there's no way to know if the base environment
+        let Ok(default_env) = system.env_var(EnvVars::CONDA_DEFAULT_ENV) else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        // These are the expected names for the base environment
+        if default_env != "base" && default_env != "root" {
+            return CondaEnvironmentKind::Child;
+        }
+
+        let Some(name) = path.file_name() else {
+            return CondaEnvironmentKind::Child;
+        };
+
+        if name == default_env {
+            CondaEnvironmentKind::Base
+        } else {
+            CondaEnvironmentKind::Child
+        }
+    }
+}
+
+/// Read `CONDA_PREFIX` and confirm that it has the expected kind
+pub(crate) fn conda_environment_from_env(
+    system: &dyn System,
+    kind: CondaEnvironmentKind,
+) -> Option<SystemPathBuf> {
+    let dir = system
+        .env_var(EnvVars::CONDA_PREFIX)
+        .ok()
+        .filter(|value| !value.is_empty())?;
+    let path = SystemPathBuf::from(dir);
+
+    if kind != CondaEnvironmentKind::from_prefix_path(system, &path) {
+        return None;
+    }
+
+    Some(path)
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
