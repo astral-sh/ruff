@@ -2,26 +2,10 @@
 #![expect(dead_code)]
 
 use crate::Db;
-use crate::types::{BoundTypeVarInstance, Type};
-
-/// A constraint establishing an upper and lower bound on a type variable.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Constraint<'db> {
-    pub(crate) lower: Type<'db>,
-    pub(crate) typevar: BoundTypeVarInstance<'db>,
-    pub(crate) upper: Type<'db>,
-}
-
-impl Constraint<'_> {
-    pub(crate) fn is_satisfiable(&self) -> bool {
-        !self.upper.is_never()
-    }
-}
 
 pub(crate) trait Constraints<'db>: Clone + Sized {
     fn never(db: &'db dyn Db) -> Self;
     fn always(db: &'db dyn Db) -> Self;
-    fn from_constraint(db: &'db dyn Db, constraint: Constraint<'db>) -> Self;
     fn is_never(&self, db: &'db dyn Db) -> bool;
     fn is_always(&self, db: &'db dyn Db) -> bool;
     fn union(&mut self, db: &'db dyn Db, other: Self) -> bool;
@@ -76,10 +60,6 @@ impl<'db> Constraints<'db> for bool {
 
     fn always(_db: &'db dyn Db) -> Self {
         true
-    }
-
-    fn from_constraint(_db: &'db dyn Db, constraint: Constraint<'db>) -> Self {
-        constraint.is_satisfiable()
     }
 
     fn is_never(&self, _db: &'db dyn Db) -> bool {
