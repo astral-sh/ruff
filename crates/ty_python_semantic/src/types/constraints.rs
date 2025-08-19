@@ -26,7 +26,10 @@
 //! constraint set implementation, and the `bool` impl of the trait (and possibly the trait itself)
 //! will go away.
 
+use smallvec::{SmallVec, smallvec};
+
 use crate::Db;
+use crate::types::{IntersectionType, Type, TypeVarInstance, UnionType};
 
 /// Encodes the constraints under which a type property (e.g. assignability) holds.
 pub(crate) trait Constraints<'db>: Clone + Sized {
@@ -180,5 +183,200 @@ where
             }
         }
         result
+    }
+}
+
+/// A set of constraint clauses, representing the union of those clauses.
+///
+/// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+#[derive(Clone, Debug)]
+pub(crate) struct ConstraintSet<'db> {
+    clauses: SmallVec<[ConstraintClause<'db>; 2]>,
+}
+
+impl<'db> ConstraintSet<'db> {
+    fn empty() -> Self {
+        Self {
+            clauses: smallvec![],
+        }
+    }
+
+    fn singleton(clause: ConstraintClause<'db>) -> Self {
+        Self {
+            clauses: smallvec![clause],
+        }
+    }
+
+    /// Adds a new clause to this set, ensuring that no clause in the set subsumes another.
+    fn add(&mut self, db: &'db dyn Db, clause: ConstraintClause<'db>) {
+        for existing in &mut self.clauses {
+            // If there is an existing constraint set that subsumes (or is subsumed by) the new
+            // one, we want to keep the _subsumed_ constraint set.
+            if clause.subsumes(db, existing) {
+                return;
+            } else if existing.subsumes(db, &clause) {
+                *existing = clause;
+                return;
+            }
+        }
+        self.clauses.push(clause);
+    }
+}
+
+impl<'db> Constraints<'db> for ConstraintSet<'db> {
+    fn unsatisfiable(_db: &'db dyn Db) -> Self {
+        Self::empty()
+    }
+
+    fn always_satisfiable(_db: &'db dyn Db) -> Self {
+        Self::singleton(ConstraintClause::empty())
+    }
+
+    fn is_never_satisfied(&self, _db: &'db dyn Db) -> bool {
+        self.clauses.is_empty()
+    }
+
+    fn is_always_satisfied(&self, _db: &'db dyn Db) -> bool {
+        self.clauses.len() == 1 && self.clauses[0].constraints.is_empty()
+    }
+
+    fn union(&mut self, db: &'db dyn Db, other: Self) -> &Self {
+        for clause in other.clauses {
+            self.add(db, clause);
+        }
+        self
+    }
+
+    fn intersect(&mut self, db: &'db dyn Db, other: Self) -> &Self {
+        let self_clauses = std::mem::take(&mut self.clauses);
+        for self_clause in self_clauses {
+            for other_clause in &other.clauses {
+                let mut new_clause = self_clause.clone();
+                new_clause.combine(db, other_clause);
+                self.add(db, new_clause);
+            }
+        }
+        self
+    }
+
+    fn negate(self, db: &'db dyn Db) -> Self {
+        let mut result = Self::always_satisfiable(db);
+        for clause in &self.clauses {
+            result.intersect(db, clause.negate(db));
+        }
+        result
+    }
+}
+
+/// A set of merged constraints, representing the intersection of those constraints. We guarantee
+/// that no constraint in the set subsumes another, and that no two constraints in the set have the
+/// same typevar.
+///
+/// This is called a "constraint set", and denoted _C_, in [[POPL2015][]].
+///
+/// [POPL2015]: https://doi.org/10.1145/2676726.2676991
+#[derive(Clone, Debug)]
+pub(crate) struct ConstraintClause<'db> {
+    constraints: SmallVec<[AtomicConstraint<'db>; 1]>,
+}
+
+impl<'db> ConstraintClause<'db> {
+    fn empty() -> Self {
+        Self {
+            constraints: smallvec![],
+        }
+    }
+
+    fn singleton(constraint: AtomicConstraint<'db>) -> Self {
+        Self {
+            constraints: smallvec![constraint],
+        }
+    }
+
+    /// Adds a new constraint to this clause, ensuring that no constraint in the clause subsumes
+    /// another, and that no two constraints in the set have the same typevar.
+    fn add(&mut self, db: &'db dyn Db, constraint: AtomicConstraint<'db>) {
+        for existing in &mut self.constraints {
+            if constraint.typevar == existing.typevar {
+                existing.merge(db, constraint);
+                return;
+            }
+        }
+        self.constraints.push(constraint);
+    }
+
+    /// Combines two constraint clauses, merging any constraints that share the same typevar.
+    fn combine(&mut self, db: &'db dyn Db, other: &Self) {
+        for constraint in &other.constraints {
+            self.add(db, *constraint);
+        }
+    }
+
+    /// Returns whether this constraint set subsumes `other` — if every constraint in `other` is
+    /// subsumed by some constraint in `self`.
+    fn subsumes(&self, db: &'db dyn Db, other: &Self) -> bool {
+        other.constraints.iter().all(|other_constraint| {
+            self.constraints
+                .iter()
+                .any(|self_constraint| self_constraint.subsumes(db, *other_constraint))
+        })
+    }
+
+    fn negate(&self, db: &'db dyn Db) -> ConstraintSet<'db> {
+        let mut result = ConstraintSet::empty();
+        for constraint in &self.constraints {
+            constraint.negate_into(db, &mut result);
+        }
+        result
+    }
+}
+
+/// A constraint that the type `s` must be a subtype of the type `t`. Tallying will find all
+/// substitutions of any type variables in `s` and `t` that ensure that this subtyping holds.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct AtomicConstraint<'db> {
+    pub(crate) lower: Type<'db>,
+    pub(crate) typevar: TypeVarInstance<'db>,
+    pub(crate) upper: Type<'db>,
+}
+
+impl<'db> AtomicConstraint<'db> {
+    /// Returns whether this constraint subsumes `other` — if it constrains the same typevar and
+    /// has tighter bounds.
+    fn subsumes(self, db: &'db dyn Db, other: Self) -> bool {
+        self.typevar == other.typevar
+            && other.lower.is_assignable_to(db, self.lower)
+            && self.upper.is_assignable_to(db, other.upper)
+    }
+
+    /// Merges another constraint into this one. Panics if the two constraints have different
+    /// typevars.
+    fn merge(&mut self, db: &'db dyn Db, other: Self) {
+        debug_assert!(self.typevar == other.typevar);
+        self.lower = UnionType::from_elements(db, [self.lower, other.lower]);
+        self.upper = IntersectionType::from_elements(db, [self.upper, other.upper]);
+    }
+
+    fn negate_into(self, db: &'db dyn Db, set: &mut ConstraintSet<'db>) {
+        if !self.lower.is_never() {
+            let negated_lower = AtomicConstraint {
+                lower: Type::Never,
+                typevar: self.typevar,
+                // TODO: <: not ≤:
+                upper: self.lower,
+            };
+            set.add(db, ConstraintClause::singleton(negated_lower));
+        }
+        if !self.upper.is_object(db) {
+            let negated_upper = AtomicConstraint {
+                // TODO: <: not ≤:
+                lower: self.upper,
+                typevar: self.typevar,
+                upper: Type::object(db),
+            };
+            set.add(db, ConstraintClause::singleton(negated_upper));
+        }
     }
 }
