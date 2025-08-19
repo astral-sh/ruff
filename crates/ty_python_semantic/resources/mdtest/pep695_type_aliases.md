@@ -64,6 +64,17 @@ x: MyIntOrStr = 1
 y: MyIntOrStr = None
 ```
 
+## Unpacking from a type alias
+
+```py
+type T = tuple[int, str]
+
+def f(x: T):
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
 ## Generic type aliases
 
 ```py

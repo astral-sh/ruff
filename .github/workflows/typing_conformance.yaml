@@ -54,6 +54,9 @@ jobs:
 
       - name: Compute diagnostic diff
         shell: bash
+        env:
+          # TODO: Remove this once we fixed the remaining panics in the conformance suite.
+          TY_MAX_PARALLELISM: 1
         run: |
           RUFF_DIR="$GITHUB_WORKSPACE/ruff"
 
@@ -63,15 +66,15 @@ jobs:
 
             echo "new commit"
             git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-            cargo build --release --bin ty
-            mv target/release/ty ty-new
+            cargo build --bin ty
+            mv target/debug/ty ty-new
 
             MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit
-            cargo build --release --bin ty
-            mv target/release/ty ty-old
+            cargo build --bin ty
+            mv target/debug/ty ty-old
           )
 
           (

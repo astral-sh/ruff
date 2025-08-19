@@ -11,8 +11,11 @@ use super::{
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::{
+    BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -227,7 +230,7 @@ impl CodeGeneratorKind {
         code_generator_of_class(db, class)
     }
 
-    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }
@@ -2981,6 +2984,54 @@ impl<'db> ClassLiteral<'db> {
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
         )
+    }
+
+    pub(super) fn declarations_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = DeclarationWithConstraint<'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_declarations(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_declaration_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<DeclarationWithConstraint<'db>> {
+        self.declarations_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
+
+    pub(super) fn bindings_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = BindingWithConstraints<'db, 'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_binding_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<BindingWithConstraints<'db, 'db>> {
+        self.bindings_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
     }
 }
 

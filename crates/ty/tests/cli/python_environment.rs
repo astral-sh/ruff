@@ -345,6 +345,51 @@ import bar",
     Ok(())
 }
 
+/// On Unix systems, a virtual environment can come with multiple `site-packages` directories:
+/// one at `<sys.prefix>/lib/pythonX.Y/site-packages` and one at
+/// `<sys.prefix>/lib64/pythonX.Y/site-packages`. According to [the stdlib docs], the `lib64`
+/// is not *meant* to have any Python files in it (only C extensions and similar). Empirically,
+/// however, it sometimes does indeed have Python files in it: popular tools such as poetry
+/// appear to sometimes install Python packages into the `lib64` site-packages directory even
+/// though they probably shouldn't. We therefore check for both a `lib64` and a `lib` directory,
+/// and add them both as search paths if they both exist.
+///
+/// See:
+/// - <https://github.com/astral-sh/ty/issues/1043>
+/// - <https://github.com/astral-sh/ty/issues/257>.
+///
+/// [the stdlib docs]: https://docs.python.org/3/library/sys.html#sys.platlibdir
+#[cfg(unix)]
+#[test]
+fn lib64_site_packages_directory_on_unix() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (".venv/lib/python3.13/site-packages/foo.py", ""),
+        (".venv/lib64/python3.13/site-packages/bar.py", ""),
+        ("test.py", "import foo, bar, baz"),
+    ])?;
+
+    assert_cmd_snapshot!(case.command().arg("--python").arg(".venv"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `baz`
+     --> test.py:1:18
+      |
+    1 | import foo, bar, baz
+      |                  ^^^
+      |
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -762,7 +807,7 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: Failed to discover the site-packages directory
-      Cause: Failed to iterate over the contents of the `lib` directory of the Python installation
+      Cause: Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation
 
     --> Invalid setting in configuration file `<temp_dir>/pyproject.toml`
       |
@@ -771,8 +816,6 @@ fn unix_system_installation_with_no_lib_directory() -> anyhow::Result<()> {
     3 | python = "directory-but-no-site-packages"
       |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       |
-
-      Cause: No such file or directory (os error 2)
     "#);
 
     Ok(())

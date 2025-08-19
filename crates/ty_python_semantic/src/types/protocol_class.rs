@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, ops::Deref};
 use itertools::Itertools;
 
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 
 use super::TypeVarVariance;
 use crate::semantic_index::place_table;
@@ -286,6 +287,7 @@ impl<'db> ProtocolMemberData<'db> {
         struct ProtocolMemberDataDisplay<'db> {
             db: &'db dyn Db,
             data: ProtocolMemberKind<'db>,
+            qualifiers: TypeQualifiers,
         }
 
         impl std::fmt::Display for ProtocolMemberDataDisplay<'_> {
@@ -305,7 +307,12 @@ impl<'db> ProtocolMemberData<'db> {
                         d.finish()
                     }
                     ProtocolMemberKind::Other(ty) => {
-                        write!(f, "AttributeMember(`{}`)", ty.display(self.db))
+                        f.write_str("AttributeMember(")?;
+                        write!(f, "`{}`", ty.display(self.db))?;
+                        if self.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
+                            f.write_str("; ClassVar")?;
+                        }
+                        f.write_char(')')
                     }
                 }
             }
@@ -314,6 +321,7 @@ impl<'db> ProtocolMemberData<'db> {
         ProtocolMemberDataDisplay {
             db,
             data: self.kind,
+            qualifiers: self.qualifiers,
         }
     }
 }
@@ -517,6 +525,12 @@ enum BoundOnClass {
     No,
 }
 
+impl BoundOnClass {
+    const fn is_yes(self) -> bool {
+        matches!(self, BoundOnClass::Yes)
+    }
+}
+
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
 #[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 fn cached_protocol_interface<'db>(
@@ -533,69 +547,69 @@ fn cached_protocol_interface<'db>(
         let parent_scope = parent_protocol.body_scope(db);
         let use_def_map = use_def_map(db, parent_scope);
         let place_table = place_table(db, parent_scope);
+        let mut direct_members = FxHashMap::default();
 
-        members.extend(
-            use_def_map
-                .all_end_of_scope_symbol_declarations()
-                .map(|(symbol_id, declarations)| {
-                    (
-                        symbol_id,
-                        place_from_declarations(db, declarations).ignore_conflicting_declarations(),
-                    )
-                })
-                .filter_map(|(symbol_id, place)| {
-                    place
-                        .place
-                        .ignore_possibly_unbound()
-                        .map(|ty| (symbol_id, ty, place.qualifiers, BoundOnClass::No))
-                })
-                // Bindings in the class body that are not declared in the class body
-                // are not valid protocol members, and we plan to emit diagnostics for them
-                // elsewhere. Invalid or not, however, it's important that we still consider
-                // them to be protocol members. The implementation of `issubclass()` and
-                // `isinstance()` for runtime-checkable protocols considers them to be protocol
-                // members at runtime, and it's important that we accurately understand
-                // type narrowing that uses `isinstance()` or `issubclass()` with
-                // runtime-checkable protocols.
-                .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
-                    |(symbol_id, bindings)| {
-                        place_from_bindings(db, bindings)
-                            .ignore_possibly_unbound()
-                            .map(|ty| (symbol_id, ty, TypeQualifiers::default(), BoundOnClass::Yes))
-                    },
-                ))
-                .map(|(symbol_id, member, qualifiers, bound_on_class)| {
-                    (
-                        place_table.symbol(symbol_id).name(),
-                        member,
-                        qualifiers,
-                        bound_on_class,
-                    )
-                })
-                .filter(|(name, _, _, _)| !excluded_from_proto_members(name))
-                .map(|(name, ty, qualifiers, bound_on_class)| {
-                    let kind = match (ty, bound_on_class) {
-                        // TODO: if the getter or setter is a function literal, we should
-                        // upcast it to a `CallableType` so that two protocols with identical property
-                        // members are recognized as equivalent.
-                        (Type::PropertyInstance(property), _) => {
-                            ProtocolMemberKind::Property(property)
-                        }
-                        (Type::Callable(callable), BoundOnClass::Yes)
-                            if callable.is_function_like(db) =>
-                        {
-                            ProtocolMemberKind::Method(callable)
-                        }
-                        (Type::FunctionLiteral(function), BoundOnClass::Yes) => {
-                            ProtocolMemberKind::Method(function.into_callable_type(db))
-                        }
-                        _ => ProtocolMemberKind::Other(ty),
-                    };
+        // Bindings in the class body that are not declared in the class body
+        // are not valid protocol members, and we plan to emit diagnostics for them
+        // elsewhere. Invalid or not, however, it's important that we still consider
+        // them to be protocol members. The implementation of `issubclass()` and
+        // `isinstance()` for runtime-checkable protocols considers them to be protocol
+        // members at runtime, and it's important that we accurately understand
+        // type narrowing that uses `isinstance()` or `issubclass()` with
+        // runtime-checkable protocols.
+        for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
+            let Some(ty) = place_from_bindings(db, bindings).ignore_possibly_unbound() else {
+                continue;
+            };
+            direct_members.insert(
+                symbol_id,
+                (ty, TypeQualifiers::default(), BoundOnClass::Yes),
+            );
+        }
 
-                    let member = ProtocolMemberData { kind, qualifiers };
-                    (name.clone(), member)
-                }),
-        );
+        for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+            let place = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+            if let Some(new_type) = place.place.ignore_possibly_unbound() {
+                direct_members
+                    .entry(symbol_id)
+                    .and_modify(|(ty, quals, _)| {
+                        *ty = new_type;
+                        *quals = place.qualifiers;
+                    })
+                    .or_insert((new_type, place.qualifiers, BoundOnClass::No));
+            }
+        }
+
+        for (symbol_id, (ty, qualifiers, bound_on_class)) in direct_members {
+            let name = place_table.symbol(symbol_id).name();
+            if excluded_from_proto_members(name) {
+                continue;
+            }
+            if members.contains_key(name) {
+                continue;
+            }
+
+            let member = match ty {
+                Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),
+                Type::Callable(callable)
+                    if bound_on_class.is_yes() && callable.is_function_like(db) =>
+                {
+                    ProtocolMemberKind::Method(callable)
+                }
+                Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
+                    ProtocolMemberKind::Method(function.into_callable_type(db))
+                }
+                _ => ProtocolMemberKind::Other(ty),
+            };
+
+            members.insert(
+                name.clone(),
+                ProtocolMemberData {
+                    kind: member,
+                    qualifiers,
+                },
+            );
+        }
     }
 
     ProtocolInterface::new(db, members)

@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
+use tracing::Metadata;
 use tracing::level_filters::LevelFilter;
+use tracing::subscriber::Interest;
 use tracing_subscriber::Layer;
 use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
@@ -92,12 +94,8 @@ struct LogLevelFilter {
     filter: LogLevel,
 }
 
-impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
-    fn enabled(
-        &self,
-        meta: &tracing::Metadata<'_>,
-        _: &tracing_subscriber::layer::Context<'_, S>,
-    ) -> bool {
+impl LogLevelFilter {
+    fn is_enabled(&self, meta: &Metadata<'_>) -> bool {
         let filter = if meta.target().starts_with("ty")
             || meta.target().starts_with("ruff")
             || meta.target().starts_with("e2e")
@@ -108,6 +106,27 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
         };
 
         meta.level() <= &filter
+    }
+}
+
+impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
+    fn enabled(
+        &self,
+        meta: &tracing::Metadata<'_>,
+        _: &tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        self.is_enabled(meta)
+    }
+
+    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
+        // The result of `self.enabled(metadata, ...)` will always be
+        // the same for any given `Metadata`, so we can convert it into
+        // an `Interest`:
+        if self.is_enabled(meta) {
+            Interest::always()
+        } else {
+            Interest::never()
+        }
     }
 
     fn max_level_hint(&self) -> Option<LevelFilter> {
