@@ -6597,9 +6597,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let (resolved, constraint_keys) =
-            self.record_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
+            self.infer_place_load(PlaceExprRef::from(&expr), ast::ExprRef::Name(name_node));
 
-        resolved
+        let resolved_after_fallback = resolved
             // Not found in the module's explicitly declared global symbols?
             // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
             // These are looked up as attributes on `types.ModuleType`.
@@ -6635,8 +6635,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Place::Unbound.into()
                 }
-            })
-            .unwrap_with_diagnostic(|lookup_error| match lookup_error {
+            });
+
+        if !resolved_after_fallback.place.is_definitely_bound() {
+            self.all_definitely_bound = false;
+        }
+
+        let ty =
+            resolved_after_fallback.unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
                     self.report_unresolved_reference(name_node);
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
@@ -6647,8 +6653,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     type_when_bound
                 }
-            })
-            .inner_type()
+            });
+
+        ty.inner_type()
     }
 
     fn infer_local_place_load(
@@ -6687,46 +6694,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (place, Some(use_id))
         }
-    }
-
-    // TODO: Not needed
-    fn is_in_method(&self) -> bool {
-        let current_scope_id = self.scope().file_scope_id(self.db());
-        let current_scope = self.index.scope(current_scope_id);
-        let module = &parsed_module(self.db(), self.scope().file(self.db())).load(self.db());
-        let Some(method) = current_scope.node().as_function(module) else {
-            return false;
-        };
-
-        let Some(parent_scope_id) = current_scope.parent() else {
-            return false;
-        };
-        let parent_scope = self.index.scope(parent_scope_id);
-        let Some(_) = parent_scope.node().as_class(module) else {
-            return false;
-        };
-
-        let definition = self.index.expect_single_definition(method);
-        if let DefinitionKind::Function(_) = definition.kind(self.db()) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    /// NOTE: first way, if any of places are not definitely bound then set the value
-    /// Calls infer_place_load and records if the expression is definitely bound.
-    fn record_place_load(
-        &mut self,
-        place_expr: PlaceExprRef,
-        expr_ref: ast::ExprRef,
-    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
-        let place = self.infer_place_load(place_expr, expr_ref);
-        if !place.0.place.is_definitely_bound() {
-            self.all_definitely_bound = false;
-        }
-
-        place
     }
 
     /// Infer the type of a place expression from definitions, assuming a load context.
@@ -8697,7 +8664,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If `value` is a valid reference, we attempt type narrowing by assignment.
         if !value_ty.is_unknown() {
             if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) = self.record_place_load(
+                let (place, keys) = self.infer_place_load(
                     PlaceExprRef::from(&expr),
                     ast::ExprRef::Subscript(subscript),
                 );
@@ -11500,7 +11467,10 @@ mod tests {
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
+    use ruff_db::testing::{
+        assert_function_query_was_not_run, assert_function_query_was_run, setup_logging,
+        setup_logging_with_filter,
+    };
 
     use super::*;
 
@@ -11548,6 +11518,7 @@ mod tests {
 
     #[test]
     fn cyclic_dependant_attributes() {
+        let _ = setup_logging_with_filter("ty=trace");
         let mut db = setup_db();
         let filename = "src/cyclic.py";
         db.write_dedented(
@@ -11565,6 +11536,7 @@ mod tests {
 
         db.clear_salsa_events();
         assert_file_diagnostics(&db, filename, &[]);
+        // assert_file_diagnostics(&db, filename, &["Attribute `x` on type `Toggle` is possibly unbound"]);
         let events = db.take_salsa_events();
         let cycles = salsa::attach(&db, || {
             events
