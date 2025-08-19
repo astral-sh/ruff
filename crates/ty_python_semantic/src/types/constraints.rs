@@ -84,38 +84,6 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
     }
 }
 
-impl<'db> Constraints<'db> for bool {
-    fn unsatisfiable(_db: &'db dyn Db) -> Self {
-        false
-    }
-
-    fn always_satisfiable(_db: &'db dyn Db) -> Self {
-        true
-    }
-
-    fn is_never_satisfied(&self, _db: &'db dyn Db) -> bool {
-        !*self
-    }
-
-    fn is_always_satisfied(&self, _db: &'db dyn Db) -> bool {
-        *self
-    }
-
-    fn union(&mut self, _db: &'db dyn Db, other: Self) -> &Self {
-        *self = *self || other;
-        self
-    }
-
-    fn intersect(&mut self, _db: &'db dyn Db, other: Self) -> &Self {
-        *self = *self && other;
-        self
-    }
-
-    fn negate(self, _db: &'db dyn Db) -> Self {
-        !self
-    }
-}
-
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns [`always_satisfiable`][Constraints::always_satisfiable] if the option is `None`;

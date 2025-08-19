@@ -17,7 +17,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
+use crate::types::constraints::{ConstraintSet, Constraints, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, walk_generic_context};
 use crate::types::{
     BindingContext, BoundTypeVarInstance, HasRelationToVisitor, IsEquivalentVisitor, KnownClass,
@@ -117,7 +117,8 @@ impl<'db> CallableSignature<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.is_subtype_of_impl(db, other)
+        self.is_subtype_of_impl::<ConstraintSet>(db, other)
+            .is_always_satisfied(db)
     }
 
     fn is_subtype_of_impl<C: Constraints<'db>>(&self, db: &'db dyn Db, other: &Self) -> C {
@@ -137,8 +138,9 @@ impl<'db> CallableSignature<'db> {
             db,
             other,
             TypeRelation::Assignability,
-            &HasRelationToVisitor::new(true),
+            &HasRelationToVisitor::new(ConstraintSet::always_satisfiable(db)),
         )
+        .is_always_satisfied(db)
     }
 
     pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
