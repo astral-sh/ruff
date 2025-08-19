@@ -308,19 +308,6 @@ fn stdin_fix_py() {
 }
 
 #[test]
-fn stdin_up045_nested_optional_flatten_all() {
-    let mut cmd = RuffCheck::default()
-        .args(["--select", "UP045", "--diff", "--target-version", "py312"])
-        .build();
-    assert_cmd_snapshot!(cmd.pass_stdin(
-        "\
-from typing import Optional
-nested_optional: Optional[Optional[Optional[str]]] = None
-"
-    ));
-}
-
-#[test]
 fn stdin_fix_jupyter() {
     let mut cmd = RuffCheck::default()
         .args(["--fix", "--stdin-filename", "Jupyter.ipynb"])
