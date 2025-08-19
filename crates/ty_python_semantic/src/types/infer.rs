@@ -106,7 +106,7 @@ use crate::types::diagnostic::{
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_return_type,
-    report_missing_typed_dict_required_field, report_possibly_unbound_attribute,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -117,6 +117,10 @@ use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::typed_dict::{
+    TypedDictAssignmentKind, validate_typed_dict_key_assignment,
+    validate_typed_dict_required_fields,
+};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     CallDunderError, CallableType, ClassLiteral, ClassType, DataclassParams, DynamicType,
@@ -124,8 +128,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, Parameter, ParameterForm,
     Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionBuilder, UnionType, binding_type, todo_type,
+    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
+    UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -841,121 +845,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This is used only when constructing a cycle-recovery `TypeInference`.
     cycle_fallback: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum TypedDictAssignmentKind {
-    /// For subscript assignments like `d["key"] = value`
-    Subscript,
-    /// For constructor arguments like `Dict(key=value)`
-    Constructor,
-}
-
-impl TypedDictAssignmentKind {
-    fn diagnostic_name(self) -> &'static str {
-        match self {
-            Self::Subscript => "assignment",
-            Self::Constructor => "argument",
-        }
-    }
-
-    fn diagnostic_type(self) -> &'static crate::lint::LintMetadata {
-        match self {
-            Self::Subscript => &INVALID_ASSIGNMENT,
-            Self::Constructor => &INVALID_ARGUMENT_TYPE,
-        }
-    }
-}
-
-/// Validates assignment of a value to a specific key on a `TypedDict`.
-/// Returns true if the assignment is valid, false otherwise.
-#[allow(clippy::too_many_arguments)]
-fn validate_typed_dict_key_assignment<'db, 'ast>(
-    context: &InferContext<'db, 'ast>,
-    typed_dict: TypedDictType<'db>,
-    key: &str,
-    value_ty: Type<'db>,
-    typed_dict_node: impl Into<AnyNodeRef<'ast>>,
-    key_node: impl Into<AnyNodeRef<'ast>>,
-    value_node: impl Into<AnyNodeRef<'ast>>,
-    assignment_kind: TypedDictAssignmentKind,
-) -> bool {
-    let db = context.db();
-    let items = typed_dict.items(db);
-
-    // Check if key exists in `TypedDict`
-    let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-        report_invalid_key_on_typed_dict(
-            context,
-            typed_dict_node.into(),
-            key_node.into(),
-            Type::TypedDict(typed_dict),
-            Type::string_literal(db, key),
-            &items,
-        );
-        return false;
-    };
-
-    // Key exists, check if value type is assignable to declared type
-    if value_ty.is_assignable_to(db, item.declared_ty) {
-        return true;
-    }
-
-    // Invalid assignment - emit diagnostic
-    if let Some(builder) = context.report_lint(assignment_kind.diagnostic_type(), value_node.into())
-    {
-        let typed_dict_ty = Type::TypedDict(typed_dict);
-        let typed_dict_d = typed_dict_ty.display(db);
-        let value_d = value_ty.display(db);
-        let item_type_d = item.declared_ty.display(db);
-
-        let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Invalid {} to key \"{key}\" with declared type `{item_type_d}` on TypedDict `{typed_dict_d}`",
-            assignment_kind.diagnostic_name(),
-        ));
-
-        diagnostic.set_primary_message(format_args!("value of type `{value_d}`"));
-
-        diagnostic.annotate(
-            context
-                .secondary(typed_dict_node.into())
-                .message(format_args!("TypedDict `{typed_dict_d}`")),
-        );
-
-        diagnostic.annotate(
-            context
-                .secondary(key_node.into())
-                .message(format_args!("key has declared type `{item_type_d}`")),
-        );
-    }
-
-    false
-}
-
-/// Validates that all required fields are provided in a `TypedDict` construction.
-/// Reports missing required field errors for any fields that are required but not provided.
-fn validate_typed_dict_required_fields<'db, 'ast>(
-    context: &InferContext<'db, 'ast>,
-    typed_dict: TypedDictType<'db>,
-    provided_fields: &OrderSet<&str>,
-    error_node: AnyNodeRef<'ast>,
-) {
-    let db = context.db();
-    let items = typed_dict.items(db);
-
-    let required_fields: OrderSet<&str> = items
-        .iter()
-        .filter_map(|(field_name, field)| field.is_required().then_some(field_name.as_str()))
-        .collect();
-
-    for missing_field in required_fields.difference(provided_fields) {
-        report_missing_typed_dict_required_field(
-            context,
-            error_node,
-            Type::TypedDict(typed_dict),
-            missing_field,
-        );
-    }
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {

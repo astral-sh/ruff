@@ -21,6 +21,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::typed_dict::compute_typed_dict_params_from_class_def;
 use crate::types::{
     ApplyTypeMappingVisitor, BareTypeAliasType, Binding, BoundSuperError, BoundSuperType,
     CallableType, DataclassParams, DeprecatedInstance, HasRelationToVisitor, KnownInstanceType,
@@ -1595,26 +1596,7 @@ impl<'db> ClassLiteral<'db> {
 
         let module = parsed_module(db, self.file(db)).load(db);
         let class_stmt = self.node(db, &module);
-
-        let mut typed_dict_params = TypedDictParams::default();
-
-        // Check for `total` keyword argument in the class definition
-        // Note that it is fine to only check for Boolean literals here
-        // (https://typing.python.org/en/latest/spec/typeddict.html#totality)
-        if let Some(arguments) = &class_stmt.arguments {
-            for keyword in &arguments.keywords {
-                if keyword.arg.as_deref() == Some("total")
-                    && matches!(
-                        &keyword.value,
-                        ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: false, .. })
-                    )
-                {
-                    typed_dict_params.remove(TypedDictParams::TOTAL);
-                }
-            }
-        }
-
-        Some(typed_dict_params)
+        Some(compute_typed_dict_params_from_class_def(class_stmt))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.

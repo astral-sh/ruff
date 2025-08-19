@@ -37,7 +37,6 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
-use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -59,9 +58,10 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters, walk_signature};
 use crate::types::tuple::TupleSpec;
+pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 use crate::unpack::EvaluationMode;
 pub use crate::util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
-use crate::{Db, FxOrderMap, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -90,6 +90,7 @@ mod string_annotation;
 mod subclass_of;
 mod tuple;
 mod type_ordering;
+mod typed_dict;
 mod unpacker;
 mod visitor;
 
@@ -487,33 +488,11 @@ bitflags! {
     }
 }
 
-bitflags! {
-    /// Used for `TypedDict` class parameters.
-    /// Keeps track of the arguments that were passed in class definition.
-    /// (see https://typing.python.org/en/latest/spec/typeddict.html)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct TypedDictParams: u8 {
-        /// Whether fields are required by default (`total=True`)
-        const TOTAL = 1 << 0;
-        // https://peps.python.org/pep-0728/
-        // const EXTRA_ITEMS = 1 << 1;
-        // const CLOSED = 1 << 2;
-    }
-}
-
 impl get_size2::GetSize for DataclassParams {}
-
-impl get_size2::GetSize for TypedDictParams {}
 
 impl Default for DataclassParams {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
-    }
-}
-
-impl Default for TypedDictParams {
-    fn default() -> Self {
-        Self::TOTAL
     }
 }
 
@@ -1011,9 +990,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn typed_dict(defining_class: impl Into<ClassType<'db>>) -> Self {
-        Self::TypedDict(TypedDictType {
-            defining_class: defining_class.into(),
-        })
+        Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
     #[must_use]
@@ -5716,7 +5693,7 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class),
+            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
         }
     }
@@ -6183,7 +6160,7 @@ impl<'db> Type<'db> {
             },
 
             Type::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class.definition(db)))
+                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -9520,43 +9497,6 @@ impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
     }
-}
-
-/// Type that represents the set of all inhabitants (`dict` instances) that conform to
-/// a given `TypedDict` schema.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
-    /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
-    /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
-}
-
-impl<'db> TypedDictType<'db> {
-    pub(crate) fn items(self, db: &'db dyn Db) -> FxOrderMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
-    }
-
-    pub(crate) fn apply_type_mapping_impl<'a>(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
-    ) -> Self {
-        Self {
-            defining_class: self
-                .defining_class
-                .apply_type_mapping_impl(db, type_mapping, visitor),
-        }
-    }
-}
-
-fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    typed_dict: TypedDictType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
