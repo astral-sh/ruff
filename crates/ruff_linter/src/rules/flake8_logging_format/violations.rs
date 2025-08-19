@@ -337,10 +337,6 @@ impl Violation for LoggingFString {
 /// Checks for pre-formatting of arguments to `logging` calls.
 ///
 /// ## Why is this bad?
-/// The `logging` module provides a mechanism for passing additional values to
-/// be logged using the `extra` keyword argument. This is more consistent, more
-/// efficient, and less error-prone than formatting the string directly.
-///
 /// Arguments to `logging` calls will be formatted as strings automatically, so it
 /// is unnecessary and less efficient to eagerly format the arguments before passing
 /// them in.
