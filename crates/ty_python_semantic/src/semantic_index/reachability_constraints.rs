@@ -477,6 +477,8 @@ impl ReachabilityConstraintsBuilder {
             ScopedReachabilityConstraintId::ALWAYS_FALSE
         } else if predicate == ScopedPredicateId::ALWAYS_TRUE {
             ScopedReachabilityConstraintId::ALWAYS_TRUE
+        } else if predicate == ScopedPredicateId::AMBIGUOUS {
+            ScopedReachabilityConstraintId::AMBIGUOUS
         } else {
             self.add_interior(InteriorNode {
                 atom: predicate,
