@@ -702,6 +702,10 @@ impl DefinitionKind<'_> {
         )
     }
 
+    pub(crate) const fn is_unannotated_assignment(&self) -> bool {
+        matches!(self, DefinitionKind::Assignment(_))
+    }
+
     pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
         match self {
             DefinitionKind::TypeVar(type_var) => Some(type_var),
