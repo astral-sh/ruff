@@ -7,6 +7,7 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
@@ -98,17 +99,20 @@ impl<'db> Type<'db> {
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    pub(super) fn satisfies_protocol(
+    pub(super) fn satisfies_protocol<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         protocol
             .inner
             .interface(db)
             .members(db)
-            .all(|member| member.is_satisfied_by(db, self, relation))
+            .when_all(db, |member| {
+                member.is_satisfied_by(db, self, relation, visitor)
+            })
     }
 }
 
@@ -264,13 +268,13 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match (self.0, other.0) {
             (
                 NominalInstanceInner::ExactTuple(tuple1),
@@ -485,7 +489,12 @@ impl<'db> ProtocolInstanceType<'db> {
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
-        if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
+        if object.satisfies_protocol(
+            db,
+            self,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(true),
+        ) {
             return object;
         }
         match self.inner {
@@ -499,16 +508,17 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return `true` if this protocol type has the given type relation to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         _relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         other
             .inner
             .interface(db)
-            .is_sub_interface_of(db, self.inner.interface(db))
+            .is_sub_interface_of(db, self.inner.interface(db), visitor)
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.

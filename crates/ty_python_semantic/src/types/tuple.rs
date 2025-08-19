@@ -24,6 +24,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use crate::semantic_index::definition::Definition;
 use crate::types::Truthiness;
 use crate::types::class::{ClassType, KnownClass};
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, IsDisjointVisitor,
     NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeVarVariance, UnionBuilder, UnionType,
@@ -254,13 +255,13 @@ impl<'db> TupleType<'db> {
             .find_legacy_typevars(db, binding_context, typevars);
     }
 
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         self.tuple(db)
             .has_relation_to_impl(db, other.tuple(db), relation, visitor)
     }
@@ -409,46 +410,52 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match other {
-            Tuple::Fixed(other) => {
-                self.0.len() == other.0.len()
-                    && (self.0.iter()).zip(&other.0).all(|(self_ty, other_ty)| {
-                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
-                    })
-            }
+            Tuple::Fixed(other) => C::from_bool(db, self.0.len() == other.0.len()).and(db, || {
+                (self.0.iter().zip(&other.0)).when_all(db, |(self_ty, other_ty)| {
+                    self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
+                })
+            }),
 
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
+                let mut result = C::always(db);
                 let mut self_iter = self.0.iter();
                 for other_ty in &other.prefix {
                     let Some(self_ty) = self_iter.next() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
-                        return false;
+                    let element_constraints =
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
+                    if result.intersect(db, element_constraints) {
+                        return result;
                     }
                 }
                 for other_ty in other.suffix.iter().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to_impl(db, *other_ty, relation, visitor) {
-                        return false;
+                    let element_constraints =
+                        self_ty.has_relation_to_impl(db, *other_ty, relation, visitor);
+                    if result.intersect(db, element_constraints) {
+                        return result;
                     }
                 }
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                self_iter.all(|self_ty| {
-                    self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
+                result.and(db, || {
+                    self_iter.when_all(db, |self_ty| {
+                        self_ty.has_relation_to_impl(db, other.variable, relation, visitor)
+                    })
                 })
             }
         }
@@ -717,13 +724,13 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match other {
             Tuple::Fixed(other) => {
                 // The `...` length specifier of a variable-length tuple type is interpreted
@@ -738,32 +745,37 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // length.
                 if relation == TypeRelation::Subtyping || !matches!(self.variable, Type::Dynamic(_))
                 {
-                    return false;
+                    return C::never(db);
                 }
 
                 // In addition, the other tuple must have enough elements to match up with this
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
+                let mut result = C::always(db);
                 let mut other_iter = other.elements().copied();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
-                        return false;
+                    let element_constraints =
+                        self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
+                    if result.intersect(db, element_constraints) {
+                        return result;
                     }
                 }
                 let suffix: Vec<_> = self.prenormalized_suffix_elements(db, None).collect();
                 for self_ty in suffix.iter().rev() {
                     let Some(other_ty) = other_iter.next_back() else {
-                        return false;
+                        return C::never(db);
                     };
-                    if !self_ty.has_relation_to_impl(db, other_ty, relation, visitor) {
-                        return false;
+                    let element_constraints =
+                        self_ty.has_relation_to_impl(db, other_ty, relation, visitor);
+                    if result.intersect(db, element_constraints) {
+                        return result;
                     }
                 }
 
-                true
+                result
             }
 
             Tuple::Variable(other) => {
@@ -781,12 +793,13 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
-                if !self
-                    .prenormalized_prefix_elements(db, self_prenormalize_variable)
+                let mut result = C::always(db);
+                let pairwise = (self.prenormalized_prefix_elements(db, self_prenormalize_variable))
                     .zip_longest(
                         other.prenormalized_prefix_elements(db, other_prenormalize_variable),
-                    )
-                    .all(|pair| match pair {
+                    );
+                for pair in pairwise {
+                    let pair_constraints = match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
                             self_ty.has_relation_to_impl(db, other_ty, relation, visitor)
                         }
@@ -796,11 +809,12 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            return C::never(db);
                         }
-                    })
-                {
-                    return false;
+                    };
+                    if result.intersect(db, pair_constraints) {
+                        return result;
+                    }
                 }
 
                 let self_suffix: Vec<_> = self
@@ -809,9 +823,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let other_suffix: Vec<_> = other
                     .prenormalized_suffix_elements(db, other_prenormalize_variable)
                     .collect();
-                if !(self_suffix.iter().rev())
-                    .zip_longest(other_suffix.iter().rev())
-                    .all(|pair| match pair {
+                let pairwise = (self_suffix.iter().rev()).zip_longest(other_suffix.iter().rev());
+                for pair in pairwise {
+                    let pair_constraints = match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
                             self_ty.has_relation_to_impl(db, *other_ty, relation, visitor)
                         }
@@ -821,16 +835,19 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         EitherOrBoth::Right(_) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide.
-                            false
+                            return C::never(db);
                         }
-                    })
-                {
-                    return false;
+                    };
+                    if result.intersect(db, pair_constraints) {
+                        return result;
+                    }
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                self.variable
-                    .has_relation_to_impl(db, other.variable, relation, visitor)
+                result.and(db, || {
+                    self.variable
+                        .has_relation_to_impl(db, other.variable, relation, visitor)
+                })
             }
         }
     }
@@ -1027,13 +1044,13 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match self {
             Tuple::Fixed(self_tuple) => {
                 self_tuple.has_relation_to_impl(db, other, relation, visitor)

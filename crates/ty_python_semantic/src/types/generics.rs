@@ -9,6 +9,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
+use crate::types::constraints::Constraints;
 use crate::types::infer::infer_definition_types;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameter, Parameters, Signature};
@@ -565,16 +566,16 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, tuple_inner)
     }
 
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
-            return false;
+            return C::never(db);
         }
 
         if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
@@ -582,6 +583,7 @@ impl<'db> Specialization<'db> {
             return self_tuple.has_relation_to_impl(db, other_tuple, relation, visitor);
         }
 
+        let mut result = C::always(db);
         for ((bound_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
@@ -589,7 +591,7 @@ impl<'db> Specialization<'db> {
             if self_type.is_dynamic() || other_type.is_dynamic() {
                 match relation {
                     TypeRelation::Assignability => continue,
-                    TypeRelation::Subtyping => return false,
+                    TypeRelation::Subtyping => return C::never(db),
                 }
             }
 
@@ -601,11 +603,14 @@ impl<'db> Specialization<'db> {
             //   - bivariant: skip, can't make subtyping/assignability false
             let compatible = match bound_typevar.typevar(db).variance(db) {
                 TypeVarVariance::Invariant => match relation {
-                    TypeRelation::Subtyping => self_type.is_equivalent_to(db, *other_type),
-                    TypeRelation::Assignability => {
-                        self_type.is_assignable_to(db, *other_type)
-                            && other_type.is_assignable_to(db, *self_type)
+                    TypeRelation::Subtyping => {
+                        C::from_bool(db, self_type.is_equivalent_to(db, *other_type))
                     }
+                    TypeRelation::Assignability => C::from_bool(
+                        db,
+                        self_type.is_assignable_to(db, *other_type)
+                            && other_type.is_assignable_to(db, *self_type),
+                    ),
                 },
                 TypeVarVariance::Covariant => {
                     self_type.has_relation_to_impl(db, *other_type, relation, visitor)
@@ -613,14 +618,14 @@ impl<'db> Specialization<'db> {
                 TypeVarVariance::Contravariant => {
                     other_type.has_relation_to_impl(db, *self_type, relation, visitor)
                 }
-                TypeVarVariance::Bivariant => true,
+                TypeVarVariance::Bivariant => C::always(db),
             };
-            if !compatible {
-                return false;
+            if result.intersect(db, compatible) {
+                return result;
             }
         }
 
-        true
+        result
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {

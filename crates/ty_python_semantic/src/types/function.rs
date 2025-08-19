@@ -65,6 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::call::{Binding, CallArguments};
+use crate::types::constraints::Constraints;
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, TYPE_ASSERTION_FAILURE,
@@ -77,8 +78,8 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
-    DeprecatedInstance, DynamicType, KnownClass, NormalizedVisitor, Truthiness, Type, TypeMapping,
-    TypeRelation, UnionBuilder, all_members, walk_type_mapping,
+    DeprecatedInstance, DynamicType, HasRelationToVisitor, KnownClass, NormalizedVisitor,
+    Truthiness, Type, TypeMapping, TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -857,15 +858,16 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-    ) -> bool {
+        _visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match relation {
-            TypeRelation::Subtyping => self.is_subtype_of(db, other),
-            TypeRelation::Assignability => self.is_assignable_to(db, other),
+            TypeRelation::Subtyping => C::from_bool(db, self.is_subtype_of(db, other)),
+            TypeRelation::Assignability => C::from_bool(db, self.is_assignable_to(db, other)),
         }
     }
 

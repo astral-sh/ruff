@@ -2,6 +2,7 @@ use ruff_python_ast::name::Name;
 
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::constraints::Constraints;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
     HasRelationToVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor, Type, TypeMapping,
@@ -158,21 +159,23 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                relation.is_assignability()
+                C::from_bool(db, relation.is_assignability())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                other_class.is_object(db) || relation.is_assignability()
+                C::from_bool(db, other_class.is_object(db) || relation.is_assignability())
             }
-            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => relation.is_assignability(),
+            (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
+                C::from_bool(db, relation.is_assignability())
+            }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.

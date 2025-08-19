@@ -18,7 +18,7 @@ impl Constraint<'_> {
     }
 }
 
-pub(crate) trait Constraints<'db>: Sized {
+pub(crate) trait Constraints<'db>: Clone + Sized {
     fn never(db: &'db dyn Db) -> Self;
     fn always(db: &'db dyn Db) -> Self;
     fn from_constraint(db: &'db dyn Db, constraint: Constraint<'db>) -> Self;

@@ -13,9 +13,10 @@ use crate::{
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{definition::Definition, use_def_map},
     types::{
-        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, IsDisjointVisitor,
-        KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation,
+        BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, HasRelationToVisitor,
+        IsDisjointVisitor, KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type,
+        TypeMapping, TypeQualifiers, TypeRelation,
+        constraints::{Constraints, IteratorConstraintsExtension},
         signatures::{Parameter, Parameters},
     },
 };
@@ -159,10 +160,17 @@ impl<'db> ProtocolInterface<'db> {
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.inner(db)
-            .keys()
-            .all(|member_name| other.inner(db).contains_key(member_name))
+    pub(super) fn is_sub_interface_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        // TODO: This could just return a bool as written, but this form is what will be needed to
+        // combine the constraints when we do assignability checks on each member.
+        self.inner(db).keys().when_all(db, |member_name| {
+            C::from_bool(db, other.inner(db).contains_key(member_name))
+        })
     }
 
     pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -450,31 +458,41 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
-    pub(super) fn is_satisfied_by(
+    pub(super) fn is_satisfied_by<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
         relation: TypeRelation,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match &self.kind {
             // TODO: consider the types of the attribute on `other` for method members
-            ProtocolMemberKind::Method(_) => matches!(
-                other.to_meta_type(db).member(db, self.name).place,
-                Place::Type(_, Boundness::Bound)
+            ProtocolMemberKind::Method(_) => C::from_bool(
+                db,
+                matches!(
+                    other.to_meta_type(db).member(db, self.name).place,
+                    Place::Type(_, Boundness::Bound)
+                ),
             ),
             // TODO: consider the types of the attribute on `other` for property members
-            ProtocolMemberKind::Property(_) => matches!(
-                other.member(db, self.name).place,
-                Place::Type(_, Boundness::Bound)
+            ProtocolMemberKind::Property(_) => C::from_bool(
+                db,
+                matches!(
+                    other.member(db, self.name).place,
+                    Place::Type(_, Boundness::Bound)
+                ),
             ),
             ProtocolMemberKind::Other(member_type) => {
                 let Place::Type(attribute_type, Boundness::Bound) =
                     other.member(db, self.name).place
                 else {
-                    return false;
+                    return C::never(db);
                 };
-                member_type.has_relation_to(db, attribute_type, relation)
-                    && attribute_type.has_relation_to(db, *member_type, relation)
+                member_type
+                    .has_relation_to_impl(db, attribute_type, relation, visitor)
+                    .and(db, || {
+                        attribute_type.has_relation_to_impl(db, *member_type, relation, visitor)
+                    })
             }
         }
     }

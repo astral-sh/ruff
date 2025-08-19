@@ -16,6 +16,7 @@ use crate::semantic_index::scope::NodeWithScopeKind;
 use crate::semantic_index::{
     BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
 };
+use crate::types::constraints::{Constraints, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -497,41 +498,44 @@ impl<'db> ClassType<'db> {
         )
     }
 
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
-        self.iter_mro(db).any(|base| {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
+        self.iter_mro(db).when_any(db, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
-                    TypeRelation::Subtyping => other.is_object(db),
-                    TypeRelation::Assignability => !other.is_final(db),
+                    TypeRelation::Subtyping => C::from_bool(db, other.is_object(db)),
+                    TypeRelation::Assignability => C::from_bool(db, !other.is_final(db)),
                 },
 
                 // Protocol and Generic are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic => false,
+                ClassBase::Protocol | ClassBase::Generic => C::never(db),
 
                 ClassBase::Class(base) => match (base, other) {
-                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => base == other,
+                    (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
+                        C::from_bool(db, base == other)
+                    }
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        base.origin(db) == other.origin(db)
-                            && base.specialization(db).has_relation_to_impl(
+                        C::from_bool(db, base.origin(db) == other.origin(db)).and(db, || {
+                            base.specialization(db).has_relation_to_impl(
                                 db,
                                 other.specialization(db),
                                 relation,
                                 visitor,
                             )
+                        })
                     }
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
-                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => false,
+                    | (ClassType::NonGeneric(_), ClassType::Generic(_)) => C::never(db),
                 },
 
                 ClassBase::TypedDict => {
                     // TODO: Implement subclassing and assignability for TypedDicts.
-                    true
+                    C::always(db)
                 }
             }
         })

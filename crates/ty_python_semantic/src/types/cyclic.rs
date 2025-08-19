@@ -41,7 +41,7 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag> = CycleDetector<Tag, (Type<'db>, Type<'db>), bool>;
+pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<Tag, (Type<'db>, Type<'db>), C>;
 
 #[derive(Debug)]
 pub(crate) struct CycleDetector<Tag, T, R> {

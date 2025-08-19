@@ -39,6 +39,9 @@ use crate::suppression::check_suppressions;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 use crate::types::class::{CodeGeneratorKind, Field};
 pub(crate) use crate::types::class_base::ClassBase;
+use crate::types::constraints::{
+    Constraints, IteratorConstraintsExtension, OptionConstraintsExtension,
+};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::enums::{enum_metadata, is_single_member_enum};
@@ -174,14 +177,14 @@ fn definition_expression_type<'db>(
 pub(crate) type ApplyTypeMappingVisitor<'db> = TypeTransformer<'db, TypeMapping<'db, 'db>>;
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db> = PairVisitor<'db, TypeRelation>;
+pub(crate) type HasRelationToVisitor<'db, C> = PairVisitor<'db, TypeRelation, C>;
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint>;
+pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, bool>;
 pub(crate) struct IsDisjoint;
 
 /// A [`PairVisitor`] that is used in `is_equivalent` methods.
-pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent>;
+pub(crate) type IsEquivalentVisitor<'db> = PairVisitor<'db, IsEquivalent, bool>;
 pub(crate) struct IsEquivalent;
 
 /// A [`TypeTransformer`] that is used in `normalized` methods.
@@ -1309,33 +1312,35 @@ impl<'db> Type<'db> {
         self.has_relation_to_impl(db, target, relation, &HasRelationToVisitor::new(true))
     }
 
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
         relation: TypeRelation,
-        visitor: &HasRelationToVisitor<'db>,
-    ) -> bool {
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
         // Note that we could do a full equivalence check here, but that would be both expensive
         // and unnecessary. This early return is only an optimisation.
         if (relation.is_assignability() || self.subtyping_is_always_reflexive()) && self == target {
-            return true;
+            return C::always(db);
         }
 
         match (self, target) {
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(instance)) if instance.is_object(db) => true,
+            (_, Type::NominalInstance(instance)) if instance.is_object(db) => C::always(db),
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
-            (Type::Never, _) => true,
+            (Type::Never, _) => C::always(db),
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => relation.is_assignability(),
+            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+                C::from_bool(db, relation.is_assignability())
+            }
 
             (Type::TypeAlias(self_alias), _) => visitor.visit((self, target), || {
                 self_alias
@@ -1353,12 +1358,14 @@ impl<'db> Type<'db> {
             (Type::KnownInstance(KnownInstanceType::Field(field)), right)
                 if relation.is_assignability() =>
             {
-                field.default_type(db).has_relation_to(db, right, relation)
+                field
+                    .default_type(db)
+                    .has_relation_to_impl(db, right, relation, visitor)
             }
 
             (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
                 // TODO: Implement assignability and subtyping for TypedDict
-                relation.is_assignability()
+                C::from_bool(db, relation.is_assignability())
             }
 
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
@@ -1372,17 +1379,17 @@ impl<'db> Type<'db> {
             (Type::NonInferableTypeVar(_), Type::Union(union))
                 if union.elements(db).contains(&self) =>
             {
-                true
+                C::always(db)
             }
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.positive(db).contains(&target) =>
             {
-                true
+                C::always(db)
             }
             (Type::Intersection(intersection), Type::NonInferableTypeVar(_))
                 if intersection.negative(db).contains(&target) =>
             {
-                false
+                C::always(db)
             }
 
             // Two identical typevars must always solve to the same type, so they are always
@@ -1393,7 +1400,7 @@ impl<'db> Type<'db> {
             (
                 Type::NonInferableTypeVar(lhs_bound_typevar),
                 Type::NonInferableTypeVar(rhs_bound_typevar),
-            ) if lhs_bound_typevar == rhs_bound_typevar => true,
+            ) if lhs_bound_typevar == rhs_bound_typevar => C::always(db),
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
@@ -1407,7 +1414,7 @@ impl<'db> Type<'db> {
                         bound.has_relation_to_impl(db, target, relation, visitor)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().all(|constraint| {
+                        constraints.elements(db).iter().when_all(db, |constraint| {
                             constraint.has_relation_to_impl(db, target, relation, visitor)
                         })
                     }
@@ -1418,69 +1425,79 @@ impl<'db> Type<'db> {
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
             (_, Type::NonInferableTypeVar(bound_typevar))
-                if bound_typevar
+                if !bound_typevar
                     .typevar(db)
                     .constraints(db)
-                    .is_some_and(|constraints| {
-                        constraints.iter().all(|constraint| {
+                    .when_some_and(db, |constraints| {
+                        constraints.iter().when_all(db, |constraint| {
                             self.has_relation_to_impl(db, *constraint, relation, visitor)
                         })
-                    }) =>
+                    })
+                    .is_never(db) =>
             {
-                true
+                // TODO: The repetition here isn't great, but we really need the fallthrough logic,
+                // where this arm only engages if it returns true (or in the world of constraints,
+                // not false). Once we're using real constraint sets instead of bool, we should be
+                // able to simplify the typevar logic.
+                bound_typevar
+                    .typevar(db)
+                    .constraints(db)
+                    .when_some_and(db, |constraints| {
+                        constraints.iter().when_all(db, |constraint| {
+                            self.has_relation_to_impl(db, *constraint, relation, visitor)
+                        })
+                    })
             }
 
             // `Never` is the bottom type, the empty set.
             // Other than one unlikely edge case (TypeVars bound to `Never`),
             // no other type is a subtype of or assignable to `Never`.
-            (_, Type::Never) => false,
+            (_, Type::Never) => C::never(db),
 
-            (Type::Union(union), _) => union
-                .elements(db)
-                .iter()
-                .all(|&elem_ty| elem_ty.has_relation_to_impl(db, target, relation, visitor)),
+            (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
+                elem_ty.has_relation_to_impl(db, target, relation, visitor)
+            }),
 
-            (_, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|&elem_ty| self.has_relation_to_impl(db, elem_ty, relation, visitor)),
+            (_, Type::Union(union)) => union.elements(db).iter().when_any(db, |&elem_ty| {
+                self.has_relation_to_impl(db, elem_ty, relation, visitor)
+            }),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .all(|&pos_ty| self.has_relation_to_impl(db, pos_ty, relation, visitor))
-                    && intersection
-                        .negative(db)
-                        .iter()
-                        .all(|&neg_ty| self.is_disjoint_from(db, neg_ty))
+            (_, Type::Intersection(intersection)) => (intersection.positive(db).iter())
+                .when_all(db, |&pos_ty| {
+                    self.has_relation_to_impl(db, pos_ty, relation, visitor)
+                })
+                .and(db, || {
+                    intersection.negative(db).iter().when_all(db, |&neg_ty| {
+                        C::from_bool(db, self.is_disjoint_from(db, neg_ty))
+                    })
+                }),
+            (Type::Intersection(intersection), _) => {
+                intersection.positive(db).iter().when_any(db, |&elem_ty| {
+                    elem_ty.has_relation_to_impl(db, target, relation, visitor)
+                })
             }
-
-            (Type::Intersection(intersection), _) => intersection
-                .positive(db)
-                .iter()
-                .any(|&elem_ty| elem_ty.has_relation_to_impl(db, target, relation, visitor)),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::NonInferableTypeVar(_)) => false,
+            (_, Type::NonInferableTypeVar(_)) => C::never(db),
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => false,
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => C::never(db),
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (left, Type::AlwaysFalsy) => left.bool(db).is_always_false(),
-            (left, Type::AlwaysTruthy) => left.bool(db).is_always_true(),
+            (left, Type::AlwaysFalsy) => C::from_bool(db, left.bool(db).is_always_false()),
+            (left, Type::AlwaysTruthy) => C::from_bool(db, left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.is_equivalent_to(db, Type::object(db))
+                // XXX
+                C::from_bool(db, target.is_equivalent_to(db, Type::object(db)))
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1489,13 +1506,13 @@ impl<'db> Type<'db> {
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
             (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.has_relation_to(db, target_function, relation)
+                self_function.has_relation_to_impl(db, target_function, relation, visitor)
             }
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.has_relation_to(db, target_method, relation)
+                self_method.has_relation_to_impl(db, target_method, relation, visitor)
             }
             (Type::MethodWrapper(self_method), Type::MethodWrapper(target_method)) => {
-                self_method.has_relation_to(db, target_method, relation)
+                self_method.has_relation_to_impl(db, target_method, relation, visitor)
             }
 
             // No literal type is a subtype of any other literal type, unless they are the same
@@ -1517,36 +1534,39 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
-            ) => false,
+            ) => C::never(db),
 
             (Type::Callable(self_callable), Type::Callable(other_callable)) => {
-                self_callable.has_relation_to(db, other_callable, relation)
+                self_callable.has_relation_to_impl(db, other_callable, relation, visitor)
             }
 
-            (_, Type::Callable(_)) => self.into_callable(db).is_some_and(|callable| {
+            (_, Type::Callable(_)) => self.into_callable(db).when_some_and(db, |callable| {
                 callable.has_relation_to_impl(db, target, relation, visitor)
             }),
 
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
-                left.has_relation_to(db, right, relation)
+                left.has_relation_to_impl(db, right, relation, visitor)
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            (Type::ProtocolInstance(_), _) => false,
+            (Type::ProtocolInstance(_), _) => C::never(db),
             (_, Type::ProtocolInstance(protocol)) => {
-                self.satisfies_protocol(db, protocol, relation)
+                self.satisfies_protocol(db, protocol, relation, visitor)
             }
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::StringLiteral(_), Type::LiteralString) => true,
+            (Type::StringLiteral(_), Type::LiteralString) => C::always(db),
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
                 if target_enum_literal.enum_class_instance(db) != self {
-                    return false;
+                    return C::never(db);
                 }
 
-                is_single_member_enum(db, target_enum_literal.enum_class(db))
+                C::from_bool(
+                    db,
+                    is_single_member_enum(db, target_enum_literal.enum_class(db)),
+                )
             }
 
             // Except for the special `LiteralString` case above,
@@ -1561,7 +1581,7 @@ impl<'db> Type<'db> {
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_),
                 _,
-            ) => (self.literal_fallback_instance(db)).is_some_and(|instance| {
+            ) => (self.literal_fallback_instance(db)).when_some_and(db, |instance| {
                 instance.has_relation_to_impl(db, target, relation, visitor)
             }),
 
@@ -1569,7 +1589,7 @@ impl<'db> Type<'db> {
             // so it also, for now, just delegates to its instance fallback.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
                 .to_instance(db)
-                .has_relation_to(db, target, relation),
+                .has_relation_to_impl(db, target, relation, visitor),
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => KnownClass::MethodType
@@ -1584,23 +1604,21 @@ impl<'db> Type<'db> {
 
             (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
-                false
+                C::never(db)
             }
 
             // `TypeIs` is invariant.
-            (Type::TypeIs(left), Type::TypeIs(right)) => {
-                left.return_type(db).has_relation_to_impl(
-                    db,
-                    right.return_type(db),
-                    relation,
-                    visitor,
-                ) && right.return_type(db).has_relation_to_impl(
-                    db,
-                    left.return_type(db),
-                    relation,
-                    visitor,
-                )
-            }
+            (Type::TypeIs(left), Type::TypeIs(right)) => left
+                .return_type(db)
+                .has_relation_to_impl(db, right.return_type(db), relation, visitor)
+                .and(db, || {
+                    right.return_type(db).has_relation_to_impl(
+                        db,
+                        left.return_type(db),
+                        relation,
+                        visitor,
+                    )
+                }),
 
             // `TypeIs[T]` is a subtype of `bool`.
             (Type::TypeIs(_), _) => KnownClass::Bool
@@ -1608,18 +1626,18 @@ impl<'db> Type<'db> {
                 .has_relation_to_impl(db, target, relation, visitor),
 
             // Function-like callables are subtypes of `FunctionType`
-            (Type::Callable(callable), _)
-                if callable.is_function_like(db)
-                    && KnownClass::FunctionType
-                        .to_instance(db)
-                        .has_relation_to_impl(db, target, relation, visitor) =>
-            {
-                true
+            (Type::Callable(callable), _) if callable.is_function_like(db) => {
+                KnownClass::FunctionType
+                    .to_instance(db)
+                    .has_relation_to_impl(db, target, relation, visitor)
             }
 
-            (Type::Callable(_), _) => false,
+            (Type::Callable(_), _) => C::never(db),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
+            // XXX
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
+                C::from_bool(db, self.is_equivalent_to(db, target))
+            }
             (Type::BoundSuper(_), _) => KnownClass::Super
                 .to_instance(db)
                 .has_relation_to_impl(db, target, relation, visitor),
@@ -1637,7 +1655,7 @@ impl<'db> Type<'db> {
                         visitor,
                     )
                 })
-                .unwrap_or(relation.is_assignability()),
+                .unwrap_or_else(|| C::from_bool(db, relation.is_assignability())),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
@@ -1649,7 +1667,7 @@ impl<'db> Type<'db> {
                         visitor,
                     )
                 })
-                .unwrap_or(relation.is_assignability()),
+                .unwrap_or_else(|| C::from_bool(db, relation.is_assignability())),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
@@ -1671,13 +1689,16 @@ impl<'db> Type<'db> {
                 KnownClass::Type
                     .to_instance(db)
                     .has_relation_to_impl(db, other, relation, visitor)
-                    || (relation.is_assignability()
-                        && other.has_relation_to_impl(
-                            db,
-                            KnownClass::Type.to_instance(db),
-                            relation,
-                            visitor,
-                        ))
+                    .or(db, || {
+                        C::from_bool(db, relation.is_assignability()).and(db, || {
+                            other.has_relation_to_impl(
+                                db,
+                                KnownClass::Type.to_instance(db),
+                                relation,
+                                visitor,
+                            )
+                        })
+                    })
             }
 
             // Any `type[...]` type is assignable to `type[Any]`
@@ -1732,7 +1753,7 @@ impl<'db> Type<'db> {
 
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
-            (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => false,
+            (Type::NominalInstance(_) | Type::NonInferableTypeVar(_), _) => C::never(db),
         }
     }
 
@@ -8470,16 +8491,27 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
         // bound self parameter, are contravariant.)
         self.function(db)
-            .has_relation_to(db, other.function(db), relation)
-            && other
-                .self_instance(db)
-                .has_relation_to(db, self.self_instance(db), relation)
+            .has_relation_to_impl(db, other.function(db), relation, visitor)
+            .and(db, || {
+                other.self_instance(db).has_relation_to_impl(
+                    db,
+                    self.self_instance(db),
+                    relation,
+                    visitor,
+                )
+            })
     }
 
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -8608,12 +8640,18 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         if other.is_function_like(db) && !self.is_function_like(db) {
-            return false;
+            return C::never(db);
         }
         self.signatures(db)
-            .has_relation_to(db, other.signatures(db), relation)
+            .has_relation_to_impl(db, other.signatures(db), relation, visitor)
     }
 
     /// Check whether this callable type is equivalent to another callable type.
@@ -8677,22 +8715,28 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> MethodWrapperKind<'db> {
-    fn has_relation_to(self, db: &'db dyn Db, other: Self, relation: TypeRelation) -> bool {
+    fn has_relation_to_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db, C>,
+    ) -> C {
         match (self, other) {
             (
                 MethodWrapperKind::FunctionTypeDunderGet(self_function),
                 MethodWrapperKind::FunctionTypeDunderGet(other_function),
-            ) => self_function.has_relation_to(db, other_function, relation),
+            ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
 
             (
                 MethodWrapperKind::FunctionTypeDunderCall(self_function),
                 MethodWrapperKind::FunctionTypeDunderCall(other_function),
-            ) => self_function.has_relation_to(db, other_function, relation),
+            ) => self_function.has_relation_to_impl(db, other_function, relation, visitor),
 
             (MethodWrapperKind::PropertyDunderGet(_), MethodWrapperKind::PropertyDunderGet(_))
             | (MethodWrapperKind::PropertyDunderSet(_), MethodWrapperKind::PropertyDunderSet(_))
             | (MethodWrapperKind::StrStartswith(_), MethodWrapperKind::StrStartswith(_)) => {
-                self == other
+                C::from_bool(db, self == other)
             }
 
             (
@@ -8706,7 +8750,7 @@ impl<'db> MethodWrapperKind<'db> {
                 | MethodWrapperKind::PropertyDunderGet(_)
                 | MethodWrapperKind::PropertyDunderSet(_)
                 | MethodWrapperKind::StrStartswith(_),
-            ) => false,
+            ) => C::never(db),
         }
     }
 
