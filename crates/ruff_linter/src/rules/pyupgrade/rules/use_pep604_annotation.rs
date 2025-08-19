@@ -183,12 +183,10 @@ pub(crate) fn non_pep604_annotation(
                             }
                         }
 
-                        let flattened_slice = pep_604_optional(inner);
-
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
                                 pad(
-                                    checker.generator().expr(&flattened_slice),
+                                    checker.generator().expr(&pep_604_optional(inner)),
                                     expr.range(),
                                     checker.locator(),
                                 ),
