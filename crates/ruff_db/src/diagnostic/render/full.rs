@@ -187,7 +187,7 @@ impl std::fmt::Display for Diff<'_> {
                                 change.new_index(),
                             ),
                             ChangeTag::Equal => (
-                                " ",
+                                "|",
                                 self.stylesheet.none,
                                 self.stylesheet.line_no,
                                 change.old_index(),
@@ -198,10 +198,10 @@ impl std::fmt::Display for Diff<'_> {
 
                         write!(
                             f,
-                            "{}{}",
+                            "{}{} ",
                             fmt_styled(
                                 format_args!(
-                                    "{} |",
+                                    "{} ",
                                     Line {
                                         index,
                                         width: digit_with
@@ -209,7 +209,7 @@ impl std::fmt::Display for Diff<'_> {
                                 ),
                                 self.stylesheet.line_no,
                             ),
-                            fmt_styled(sign, style),
+                            fmt_styled(sign, line_no_style),
                         )?;
 
                         for (emphasized, value) in change.iter_strings_lossy() {
