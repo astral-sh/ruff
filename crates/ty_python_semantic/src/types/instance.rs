@@ -407,8 +407,8 @@ pub(crate) struct SliceLiteral {
 }
 
 impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.class(db).variance_of(db, type_var)
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.class(db).variance_of(db, typevar)
     }
 }
 
@@ -600,8 +600,8 @@ impl<'db> ProtocolInstanceType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.inner.variance_of(db, type_var)
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.inner.variance_of(db, typevar)
     }
 }
 
@@ -631,11 +631,11 @@ impl<'db> Protocol<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
-            Protocol::FromClass(class_type) => class_type.variance_of(db, type_var),
+            Protocol::FromClass(class_type) => class_type.variance_of(db, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
-                synthesized_protocol_type.variance_of(db, type_var)
+                synthesized_protocol_type.variance_of(db, typevar)
             }
         }
     }
@@ -704,9 +704,9 @@ mod synthesized_protocol {
         fn variance_of(
             self,
             db: &'db dyn Db,
-            type_var: BoundTypeVarInstance<'db>,
+            typevar: BoundTypeVarInstance<'db>,
         ) -> TypeVarVariance {
-            self.0.variance_of(db, type_var)
+            self.0.variance_of(db, typevar)
         }
     }
 }

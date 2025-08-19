@@ -217,10 +217,10 @@ impl<'db> SubclassOfType<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
-    fn variance_of(self, db: &dyn Db, type_var: BoundTypeVarInstance<'_>) -> TypeVarVariance {
+    fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => TypeVarVariance::Bivariant,
-            SubclassOfInner::Class(class) => class.variance_of(db, type_var),
+            SubclassOfInner::Class(class) => class.variance_of(db, typevar),
         }
     }
 }

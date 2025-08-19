@@ -225,10 +225,10 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.overloads
             .iter()
-            .map(|signature| signature.variance_of(db, type_var))
+            .map(|signature| signature.variance_of(db, typevar))
             .collect()
     }
 }
@@ -993,10 +993,10 @@ impl std::hash::Hash for Signature<'_> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         tracing::debug!(
             "Checking variance of `{tvar}` in `{self:?}`",
-            tvar = type_var.typevar(db).name(db)
+            tvar = typevar.typevar(db).name(db)
         );
         itertools::chain(
             self.parameters
@@ -1005,10 +1005,10 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                     ParameterForm::Type => None,
                     ParameterForm::Value => parameter.annotated_type().map(|ty| {
                         ty.with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, type_var)
+                            .variance_of(db, typevar)
                     }),
                 }),
-            self.return_ty.map(|ty| ty.variance_of(db, type_var)),
+            self.return_ty.map(|ty| ty.variance_of(db, typevar)),
         )
         .collect()
     }

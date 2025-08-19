@@ -319,26 +319,25 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
     #[salsa::tracked]
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
         let specialization = self.specialization(db);
 
         // if the class is the thing defining the variable, then it can
         // reference it without it being applied to the specialization
-        std::iter::once(origin.variance_of(db, type_var))
+        std::iter::once(origin.variance_of(db, typevar))
             .chain(
                 specialization
                     .generic_context(db)
                     .variables(db)
                     .iter()
                     .zip(specialization.types(db))
-                    .map(|(generic_type_var, ty)| {
+                    .map(|(generic_typevar, ty)| {
                         if let Some(explicit_variance) =
-                            generic_type_var.typevar(db).explicit_variance(db)
+                            generic_typevar.typevar(db).explicit_variance(db)
                         {
-                            ty.with_polarity(explicit_variance)
-                                .variance_of(db, type_var)
+                            ty.with_polarity(explicit_variance).variance_of(db, typevar)
                         } else {
                             // `with_polarity` composes the passed variance with the
                             // inferred one. The inference is done lazily, as we can
@@ -351,11 +350,10 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                             // If salsa let us look at the cache, we could check first
                             // to see if the class literal query was already run.
 
-                            let type_var_variance_in_substituted_type =
-                                ty.variance_of(db, type_var);
+                            let typevar_variance_in_substituted_type = ty.variance_of(db, typevar);
                             origin
-                                .with_polarity(type_var_variance_in_substituted_type)
-                                .variance_of(db, *generic_type_var)
+                                .with_polarity(typevar_variance_in_substituted_type)
+                                .variance_of(db, *generic_typevar)
                         }
                     }),
             )
@@ -1186,10 +1184,10 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for ClassType<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
-            Self::NonGeneric(class) => class.variance_of(db, type_var),
-            Self::Generic(generic) => generic.variance_of(db, type_var),
+            Self::NonGeneric(class) => class.variance_of(db, typevar),
+            Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
 }
@@ -3121,12 +3119,12 @@ impl<'db> From<ClassLiteral<'db>> for ClassType<'db> {
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     #[salsa::tracked(cycle_fn=crate::types::variance_cycle_recover, cycle_initial=crate::types::variance_cycle_initial)]
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        let type_var_in_generic_context = self
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let typevar_in_generic_context = self
             .generic_context(db)
-            .is_some_and(|generic_context| generic_context.variables(db).contains(&type_var));
+            .is_some_and(|generic_context| generic_context.variables(db).contains(&typevar));
 
-        if !type_var_in_generic_context {
+        if !typevar_in_generic_context {
             return TypeVarVariance::Bivariant;
         }
         let class_body_scope = self.body_scope(db);
@@ -3137,7 +3135,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
         let explicit_bases_variances = self
             .explicit_bases(db)
             .iter()
-            .map(|class| class.variance_of(db, type_var));
+            .map(|class| class.variance_of(db, typevar));
 
         let default_attribute_variance = {
             let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self);
@@ -3225,7 +3223,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     } else {
                         default_attribute_variance
                     };
-                    ty.with_polarity(variance).variance_of(db, type_var)
+                    ty.with_polarity(variance).variance_of(db, typevar)
                 })
             });
 

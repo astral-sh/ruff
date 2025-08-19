@@ -108,7 +108,7 @@ impl std::iter::FromIterator<Self> for TypeVarVariance {
 }
 
 pub(crate) trait VarianceInferable<'db>: Sized {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance;
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance;
 
     fn with_polarity(self, polarity: TypeVarVariance) -> WithPolarity<Self> {
         WithPolarity {
@@ -127,12 +127,12 @@ impl<'db, T> VarianceInferable<'db> for WithPolarity<T>
 where
     T: VarianceInferable<'db>,
 {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let WithPolarity {
             variance_inferable,
             polarity,
         } = self;
 
-        polarity.compose_thunk(|| variance_inferable.variance_of(db, type_var))
+        polarity.compose_thunk(|| variance_inferable.variance_of(db, typevar))
     }
 }

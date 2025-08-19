@@ -330,7 +330,7 @@ fn variance_cycle_recover<'db, T>(
     _value: &TypeVarVariance,
     count: u32,
     _self: T,
-    _type_var: BoundTypeVarInstance<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
 ) -> salsa::CycleRecoveryAction<TypeVarVariance> {
     assert!(
         count <= 2,
@@ -342,7 +342,7 @@ fn variance_cycle_recover<'db, T>(
 fn variance_cycle_initial<'db, T>(
     _db: &'db dyn Db,
     _self: T,
-    _type_var: BoundTypeVarInstance<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
 ) -> TypeVarVariance {
     TypeVarVariance::Bivariant
 }
@@ -6343,19 +6343,19 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for Type<'db> {
-    fn variance_of(self, db: &'db dyn Db, type_var: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         tracing::debug!(
             "Checking variance of '{tvar}' in `{ty:?}`",
-            tvar = type_var.typevar(db).name(db),
+            tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
         );
 
         let v = match self {
-            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, type_var),
+            Type::ClassLiteral(class_literal) => class_literal.variance_of(db, typevar),
 
             Type::FunctionLiteral(function_type) => {
                 // TODO: do we need to replace self?
-                function_type.signature(db).variance_of(db, type_var)
+                function_type.signature(db).variance_of(db, typevar)
             }
 
             Type::BoundMethod(method_type) => {
@@ -6363,44 +6363,44 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 method_type
                     .function(db)
                     .signature(db)
-                    .variance_of(db, type_var)
+                    .variance_of(db, typevar)
             }
 
             Type::NominalInstance(nominal_instance_type) => {
-                nominal_instance_type.variance_of(db, type_var)
+                nominal_instance_type.variance_of(db, typevar)
             }
-            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, type_var),
-            Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, type_var),
-            Type::TypeVar(other_type_var) | Type::NonInferableTypeVar(other_type_var)
-                if other_type_var == type_var =>
+            Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, typevar),
+            Type::Callable(callable_type) => callable_type.signatures(db).variance_of(db, typevar),
+            Type::TypeVar(other_typevar) | Type::NonInferableTypeVar(other_typevar)
+                if other_typevar == typevar =>
             {
                 // type variables are covariant in themselves
                 TypeVarVariance::Covariant
             }
             Type::ProtocolInstance(protocol_instance_type) => {
-                protocol_instance_type.variance_of(db, type_var)
+                protocol_instance_type.variance_of(db, typevar)
             }
             Type::Union(union_type) => union_type
                 .elements(db)
                 .iter()
-                .map(|ty| ty.variance_of(db, type_var))
+                .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
             Type::Intersection(intersection_type) => intersection_type
                 .positive(db)
                 .iter()
-                .map(|ty| ty.variance_of(db, type_var))
+                .map(|ty| ty.variance_of(db, typevar))
                 .chain(intersection_type.negative(db).iter().map(|ty| {
                     ty.with_polarity(TypeVarVariance::Contravariant)
-                        .variance_of(db, type_var)
+                        .variance_of(db, typevar)
                 }))
                 .collect(),
             Type::PropertyInstance(property_instance_type) => property_instance_type
                 .getter(db)
                 .iter()
                 .chain(&property_instance_type.setter(db))
-                .map(|ty| ty.variance_of(db, type_var))
+                .map(|ty| ty.variance_of(db, typevar))
                 .collect(),
-            Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, type_var),
+            Type::SubclassOf(subclass_of_type) => subclass_of_type.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
@@ -6428,7 +6428,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
 
         tracing::debug!(
             "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
-            tvar = type_var.typevar(db).name(db),
+            tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
         );
         v
