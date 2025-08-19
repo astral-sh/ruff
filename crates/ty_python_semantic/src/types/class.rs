@@ -1176,6 +1176,16 @@ pub(crate) struct Field<'db> {
     pub(crate) kw_only: Option<bool>,
 }
 
+impl<'db> Field<'db> {
+    /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
+    /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
+    pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
+        self.declared_ty
+            .into_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
+    }
+}
+
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
 /// generic class that has not been specialized.
 ///
@@ -1929,10 +1939,9 @@ impl<'db> ClassLiteral<'db> {
             Type::instance(db, self.apply_optional_specialization(db, specialization));
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Option<Type<'db>>| {
-            let mut kw_only_field_seen = false;
             for (
                 field_name,
-                Field {
+                field @ Field {
                     declared_ty: mut field_ty,
                     mut default_ty,
                     init_only: _,
@@ -1946,14 +1955,10 @@ impl<'db> ClassLiteral<'db> {
                     continue;
                 }
 
-                if field_ty
-                    .into_nominal_instance()
-                    .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::KwOnly))
-                {
+                if field.is_kw_only_sentinel(db) {
                     // Attributes annotated with `dataclass.KW_ONLY` are not present in the synthesized
                     // `__init__` method; they are used to indicate that the following parameters are
                     // keyword-only.
-                    kw_only_field_seen = true;
                     continue;
                 }
 
@@ -2003,9 +2008,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(
-                        has_dataclass_param(DataclassParams::KW_ONLY) || kw_only_field_seen,
-                    );
+                    || kw_only.unwrap_or(has_dataclass_param(DataclassParams::KW_ONLY));
 
                 let mut parameter = if is_kw_only {
                     Parameter::keyword_only(field_name)
@@ -2304,6 +2307,7 @@ impl<'db> ClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
+        let mut kw_only_sentinel_field_seen = false;
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
@@ -2348,16 +2352,25 @@ impl<'db> ClassLiteral<'db> {
                     kw_only = field.kw_only(db);
                 }
 
-                attributes.insert(
-                    symbol.name().clone(),
-                    Field {
-                        declared_ty: attr_ty.apply_optional_specialization(db, specialization),
-                        default_ty,
-                        init_only: attr.is_init_var(),
-                        init,
-                        kw_only,
-                    },
-                );
+                let mut field = Field {
+                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    default_ty,
+                    init_only: attr.is_init_var(),
+                    init,
+                    kw_only,
+                };
+
+                // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
+                if field.is_kw_only_sentinel(db) {
+                    kw_only_sentinel_field_seen = true;
+                }
+
+                // If no explicit kw_only setting and we've seen KW_ONLY sentinel, mark as keyword-only
+                if field.kw_only.is_none() && kw_only_sentinel_field_seen {
+                    field.kw_only = Some(true);
+                }
+
+                attributes.insert(symbol.name().clone(), field);
             }
         }
 
