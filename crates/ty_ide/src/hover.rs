@@ -6,8 +6,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::SemanticModel;
 use ty_python_semantic::types::Type;
+use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -135,7 +135,10 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
         match self.content {
             HoverContent::Type(ty) => self
                 .kind
-                .fenced_code_block(ty.display(self.db), "python")
+                .fenced_code_block(
+                    ty.display_with(self.db, DisplaySettings::default().multiline()),
+                    "python",
+                )
                 .fmt(f),
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
@@ -201,7 +204,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -211,7 +217,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
@@ -253,7 +262,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -263,7 +275,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        def my_func(a, b) -> Unknown
+        def my_func(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
@@ -519,7 +534,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        bound method MyClass.my_method(a, b) -> Unknown
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         This is such a great func!!
 
@@ -529,7 +547,10 @@ mod tests {
 
         ---------------------------------------------
         ```python
-        bound method MyClass.my_method(a, b) -> Unknown
+        bound method MyClass.my_method(
+            a,
+            b
+        ) -> Unknown
         ```
         ---
         ```text
@@ -601,10 +622,16 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        def foo(a, b) -> Unknown
+        def foo(
+            a,
+            b
+        ) -> Unknown
         ---------------------------------------------
         ```python
-        def foo(a, b) -> Unknown
+        def foo(
+            a,
+            b
+        ) -> Unknown
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -761,6 +788,128 @@ mod tests {
            |             source
            |
         ");
+    }
+
+    #[test]
+    fn hover_overload() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def foo(a: int, b):
+                """The first overload"""
+                return 0
+
+            @overload
+            def foo(a: str, b):
+                """The second overload"""
+                return 1
+
+            if random.choice([True, False]):
+                a = 1
+            else:
+                a = "hello"
+
+            foo<CURSOR>(a, 2)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (
+            a: int,
+            b
+        ) -> Unknown
+        (
+            a: str,
+            b
+        ) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:13
+           |
+        17 |                 a = "hello"
+        18 |
+        19 |             foo(a, 2)
+           |             ^^^- Cursor offset
+           |             |
+           |             source
+           |
+        "#);
+    }
+
+    #[test]
+    fn hover_overload_compact() {
+        let test = cursor_test(
+            r#"
+            from typing import overload
+
+            @overload
+            def foo(a: int):
+                """The first overload"""
+                return 0
+
+            @overload
+            def foo(a: str):
+                """The second overload"""
+                return 1
+
+            if random.choice([True, False]):
+                a = 1
+            else:
+                a = "hello"
+
+            foo<CURSOR>(a)
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ---------------------------------------------
+        The first overload
+
+        ---------------------------------------------
+        ```python
+        (a: int) -> Unknown
+        (a: str) -> Unknown
+        ```
+        ---
+        ```text
+        The first overload
+
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:19:13
+           |
+        17 |                 a = "hello"
+        18 |
+        19 |             foo(a)
+           |             ^^^- Cursor offset
+           |             |
+           |             source
+           |
+        "#);
     }
 
     #[test]
@@ -1229,6 +1378,110 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_complex_type1() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Any, List
+        def ab(x: int, y: Callable[[int, int], Any], z: List[int]) -> int: ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def ab(
+            x: int,
+            y: (int, int, /) -> Any,
+            z: list[int]
+        ) -> int
+        ---------------------------------------------
+        ```python
+        def ab(
+            x: int,
+            y: (int, int, /) -> Any,
+            z: list[int]
+        ) -> int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         def ab(x: int, y: Callable[[int, int], Any], z: List[int]) -> int: ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_complex_type2() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Tuple, Any
+        ab: Tuple[Any, int, Callable[[int, int], Any]] = ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        tuple[Any, int, (int, int, /) -> Any]
+        ---------------------------------------------
+        ```python
+        tuple[Any, int, (int, int, /) -> Any]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         ab: Tuple[Any, int, Callable[[int, int], Any]] = ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_complex_type3() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Any
+        ab:  Callable[[int, int], Any] | None  = ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        ((int, int, /) -> Any) | None
+        ---------------------------------------------
+        ```python
+        ((int, int, /) -> Any) | None
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         ab:  Callable[[int, int], Any] | None  = ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
     }
 
     #[test]
