@@ -490,11 +490,19 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        self.when_subclass_of(db, other)
+    }
+
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
         self.has_relation_to_impl(
             db,
             other,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::new(true),
+            &HasRelationToVisitor::new(C::always(db)),
         )
     }
 
@@ -1562,6 +1570,15 @@ impl<'db> ClassLiteral<'db> {
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         self.iter_mro(db, specialization)
             .contains(&ClassBase::Class(other))
+    }
+
+    pub(super) fn when_subclass_of<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, specialization, other))
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -4002,6 +4019,14 @@ impl KnownClass {
     pub(super) fn is_subclass_of<'db>(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.try_to_class_literal_without_logging(db)
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
+    }
+
+    pub(super) fn when_subclass_of<'db, C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> C {
+        C::from_bool(db, self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class

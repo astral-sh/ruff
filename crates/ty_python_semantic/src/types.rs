@@ -2191,7 +2191,7 @@ impl<'db> Type<'db> {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => C::never(db),
                     SubclassOfInner::Class(class_a) => {
-                        C::from_bool(db, !class_b.is_subclass_of(db, None, class_a))
+                        class_b.when_subclass_of::<C>(db, None, class_a).negate(db)
                     }
                 }
             }
@@ -2200,9 +2200,9 @@ impl<'db> Type<'db> {
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => C::never(db),
-                    SubclassOfInner::Class(class_a) => {
-                        C::from_bool(db, !ClassType::from(alias_b).is_subclass_of(db, class_a))
-                    }
+                    SubclassOfInner::Class(class_a) => ClassType::from(alias_b)
+                        .when_subclass_of::<C>(db, class_a)
+                        .negate(db),
                 }
             }
 
@@ -2236,7 +2236,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::BooleanLiteral(..) | Type::TypeIs(_)) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
-                C::from_bool(db, !KnownClass::Bool.is_subclass_of(db, instance.class(db)))
+                KnownClass::Bool
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::BooleanLiteral(..) | Type::TypeIs(_), _)
@@ -2246,7 +2248,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::IntLiteral(..)) => {
                 // A `Type::IntLiteral()` must be an instance of exactly `int`
                 // (it cannot be an instance of an `int` subclass)
-                C::from_bool(db, !KnownClass::Int.is_subclass_of(db, instance.class(db)))
+                KnownClass::Int
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => C::always(db),
@@ -2258,7 +2262,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
                 // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
                 // (it cannot be an instance of a `str` subclass)
-                C::from_bool(db, !KnownClass::Str.is_subclass_of(db, instance.class(db)))
+                KnownClass::Str
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::LiteralString, Type::LiteralString) => C::never(db),
@@ -2268,10 +2274,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::BytesLiteral(..)) => {
                 // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
                 // (it cannot be an instance of a `bytes` subclass)
-                C::from_bool(
-                    db,
-                    !KnownClass::Bytes.is_subclass_of(db, instance.class(db)),
-                )
+                KnownClass::Bytes
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::EnumLiteral(enum_literal), instance @ Type::NominalInstance(_))
@@ -2303,10 +2308,9 @@ impl<'db> Type<'db> {
             | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
-                C::from_bool(
-                    db,
-                    !KnownClass::FunctionType.is_subclass_of(db, instance.class(db)),
-                )
+                KnownClass::FunctionType
+                    .when_subclass_of::<C>(db, instance.class(db))
+                    .negate(db)
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
