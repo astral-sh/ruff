@@ -103,12 +103,13 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         relation: TypeRelation,
+        visitor: &HasRelationToVisitor<'db>,
     ) -> bool {
         protocol
             .inner
             .interface(db)
             .members(db)
-            .all(|member| member.is_satisfied_by(db, self, relation))
+            .all(|member| member.is_satisfied_by(db, self, relation, visitor))
     }
 }
 
@@ -485,7 +486,12 @@ impl<'db> ProtocolInstanceType<'db> {
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         let object = Type::object(db);
-        if object.satisfies_protocol(db, self, TypeRelation::Subtyping) {
+        if object.satisfies_protocol(
+            db,
+            self,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(true),
+        ) {
             return object;
         }
         match self.inner {

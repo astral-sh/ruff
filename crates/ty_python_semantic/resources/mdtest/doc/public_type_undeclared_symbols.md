@@ -98,7 +98,7 @@ o = OptionalInt()
 reveal_type(o.value)
 
 # Incompatible assignments are now caught:
-# error: "Object of type `Literal["a"]` is not assignable to attribute `value` of type `int | None`"
+# error: "Object of type `Literal["a"]` is not assignable to attribute `value` on type `int | None`"
 o.value = "a"
 ```
 
