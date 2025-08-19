@@ -247,6 +247,13 @@ impl PythonEnvironment {
     }
 }
 
+/// Enumeration of the subdirectories of `sys.prefix` that could contain a
+/// `site-packages` directory if the host system is Unix-like.
+///
+/// For example, if `sys.prefix` is `.venv` and the Python version is 3.10,
+/// the `site-packages` directory could be located at `.venv/lib/python3.10/site-packages`,
+/// or at `.venv/lib64/python3.10/site-packages`, or there could indeed be `site-packages`
+/// directories at both of these locations.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::EnumIter)]
 enum UnixLibDir {
     Lib,
