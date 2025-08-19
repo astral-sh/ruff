@@ -54,9 +54,9 @@ partial
 ```pyi
 ```
 
-`/packages/foo-stubs/both.py`:
+`/packages/foo-stubs/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -107,9 +107,9 @@ extra-paths = ["/packages"]
 ```pyi
 ```
 
-`/packages/foo-stubs/both.py`:
+`/packages/foo-stubs/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -165,9 +165,9 @@ extra-paths = ["/packages"]
 ```pyi
 ```
 
-`/packages/foo-stubs/both.py`:
+`/packages/foo-stubs/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -230,9 +230,9 @@ extra-paths = ["/packages"]
 ```pyi
 ```
 
-`/packages/foo-stubs/bar/both.py`:
+`/packages/foo-stubs/bar/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -305,9 +305,9 @@ partial/n
 ```pyi
 ```
 
-`/packages/foo-stubs/bar/both.py`:
+`/packages/foo-stubs/bar/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -380,9 +380,9 @@ pArTiAl\n
 ```pyi
 ```
 
-`/packages/foo-stubs/bar/both.py`:
+`/packages/foo-stubs/bar/both.pyi`:
 
-```py
+```pyi
 class Both:
     both: str
     other: int
@@ -421,5 +421,50 @@ from foo.bar.fake import Fake  # error: "Cannot resolve"
 
 reveal_type(Both().both)  # revealed: str
 reveal_type(Impl().impl)  # revealed: Unknown
+reveal_type(Fake().fake)  # revealed: Unknown
+```
+
+## Namespace stub with missing module
+
+Namespace stubs are always partial.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/520>.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/parent-stubs/foo/both.pyi`:
+
+```pyi
+class Both:
+    both: str
+    other: int
+```
+
+`/packages/parent/foo/both.py`:
+
+```py
+class Both: ...
+```
+
+`/packages/parent/foo/impl.py`:
+
+```py
+class Impl:
+    impl: str
+    other: int
+```
+
+`main.py`:
+
+```py
+from parent.foo.both import Both
+from parent.foo.impl import Impl
+from parent.foo.fake import Fake  # error: "Cannot resolve"
+
+reveal_type(Both().both)  # revealed: str
+reveal_type(Impl().impl)  # revealed: str
 reveal_type(Fake().fake)  # revealed: Unknown
 ```

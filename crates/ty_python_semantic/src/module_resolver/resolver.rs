@@ -723,8 +723,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
                          `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
-                    // keep searching the next search path for a stub package with the same name.
-                    continue;
+                    // fall through to looking for a non-stub package
                 }
             }
         }
