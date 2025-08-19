@@ -1047,7 +1047,7 @@ impl<'db> Type<'db> {
     /// - Converts class-based protocols into synthesized protocols
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     #[must_use]
@@ -1306,7 +1306,7 @@ impl<'db> Type<'db> {
     }
 
     fn has_relation_to(self, db: &'db dyn Db, target: Type<'db>, relation: TypeRelation) -> bool {
-        self.has_relation_to_impl(db, target, relation, &PairVisitor::new(true))
+        self.has_relation_to_impl(db, target, relation, &HasRelationToVisitor::new(true))
     }
 
     fn has_relation_to_impl(
@@ -1749,7 +1749,7 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.is_equivalent_to_impl(db, other, &PairVisitor::new(true))
+        self.is_equivalent_to_impl(db, other, &IsEquivalentVisitor::new(true))
     }
 
     pub(crate) fn is_equivalent_to_impl(
@@ -1835,7 +1835,7 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return
     /// wrong `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.is_disjoint_from_impl(db, other, &PairVisitor::new(false))
+        self.is_disjoint_from_impl(db, other, &IsDisjointVisitor::new(false))
     }
 
     pub(crate) fn is_disjoint_from_impl(
@@ -5795,7 +5795,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
+        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -9227,7 +9227,7 @@ impl<'db> UnionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -9301,7 +9301,7 @@ impl<'db> IntersectionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {

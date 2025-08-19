@@ -47,7 +47,7 @@ use crate::{
     },
     types::{
         CallArguments, CallError, CallErrorKind, MetaclassCandidate, UnionBuilder, UnionType,
-        cyclic::PairVisitor, definition_expression_type,
+        definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -489,7 +489,12 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.has_relation_to_impl(db, other, TypeRelation::Subtyping, &PairVisitor::new(true))
+        self.has_relation_to_impl(
+            db,
+            other,
+            TypeRelation::Subtyping,
+            &HasRelationToVisitor::new(true),
+        )
     }
 
     pub(super) fn has_relation_to_impl(

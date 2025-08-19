@@ -15,7 +15,7 @@ use crate::{
     types::{
         BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, IsDisjointVisitor,
         KnownFunction, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation, TypeTransformer,
+        TypeQualifiers, TypeRelation,
         signatures::{Parameter, Parameters},
     },
 };
@@ -249,7 +249,7 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {

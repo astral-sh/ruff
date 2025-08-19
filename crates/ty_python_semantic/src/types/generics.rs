@@ -15,7 +15,7 @@ use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, HasRelationToVisitor, KnownClass,
-    KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation, TypeTransformer,
+    KnownInstanceType, NormalizedVisitor, Type, TypeMapping, TypeRelation,
     TypeVarBoundOrConstraints, TypeVarInstance, TypeVarVariance, UnionType, binding_type,
     declaration_type,
 };
@@ -471,7 +471,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
     ) -> Self {
-        self.apply_type_mapping_impl(db, type_mapping, &TypeTransformer::default())
+        self.apply_type_mapping_impl(db, type_mapping, &ApplyTypeMappingVisitor::default())
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(

@@ -12,7 +12,7 @@ use crate::types::protocol_class::walk_protocol_interface;
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, DynamicType, HasRelationToVisitor, IsDisjointVisitor,
-    NormalizedVisitor, TypeMapping, TypeRelation, TypeTransformer,
+    NormalizedVisitor, TypeMapping, TypeRelation,
 };
 use crate::{Db, FxOrderSet};
 
@@ -92,7 +92,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
-                &TypeTransformer::default(),
+                &NormalizedVisitor::default(),
             ),
         ))
     }
@@ -473,7 +473,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     /// Return a "normalized" version of this `Protocol` type.

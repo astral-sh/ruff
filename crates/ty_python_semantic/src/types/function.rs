@@ -78,7 +78,7 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType,
     DeprecatedInstance, DynamicType, KnownClass, NormalizedVisitor, Truthiness, Type, TypeMapping,
-    TypeRelation, TypeTransformer, UnionBuilder, all_members, walk_type_mapping,
+    TypeRelation, UnionBuilder, all_members, walk_type_mapping,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -919,7 +919,7 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &TypeTransformer::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {

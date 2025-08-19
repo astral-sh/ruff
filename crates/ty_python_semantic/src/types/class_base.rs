@@ -3,8 +3,7 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, TypeTransformer,
-    todo_type,
+    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -292,7 +291,7 @@ impl<'db> ClassBase<'db> {
             self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::Specialization(specialization),
-                &TypeTransformer::default(),
+                &ApplyTypeMappingVisitor::default(),
             )
         } else {
             self
