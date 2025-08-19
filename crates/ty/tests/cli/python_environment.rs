@@ -354,8 +354,9 @@ import bar",
 /// though they probably shouldn't. We therefore check for both a `lib64` and a `lib` directory,
 /// and add them both as search paths if they both exist.
 ///
-/// See <https://github.com/astral-sh/ty/issues/1043>, and probably also
-/// <https://github.com/astral-sh/ty/issues/257>.
+/// See:
+/// - <https://github.com/astral-sh/ty/issues/1043>
+/// - <https://github.com/astral-sh/ty/issues/257>.
 ///
 /// [the stdlib docs]: https://docs.python.org/3/library/sys.html#sys.platlibdir
 #[cfg(unix)]

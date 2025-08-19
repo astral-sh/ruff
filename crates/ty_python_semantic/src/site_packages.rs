@@ -1061,14 +1061,15 @@ fn site_packages_directories_from_sys_prefix(
     // that we don't need to care about any possible `lib64/site-packages` directories,
     // since [the `sys`-module documentation] states that `sys.platlibdir` is *only* ever
     // used for C extensions, never for pure-Python modules. However, in practice,
-    // poetry appears to do [some strange things on Fedora] that mean that `.py` files
-    // *can* end up in `lib64/site-packages` in some edge cases. And we'll probably need
-    // to start looking in `lib64/site-packages` directories in the future anyway, in
+    // some installers appear to do [some strange things on Fedora] that mean that `.py`
+    // files *can* end up in `lib64/site-packages` in some edge cases. And we'll probably
+    // need to start looking in `lib64/site-packages` directories in the future anyway, in
     // order to distinguish between "unresolved import" and "resolved to an opaque C
     // extension" in diagnostic messages.
     //
     // [the non-Windows branch]: https://github.com/python/cpython/blob/a8be8fc6c4682089be45a87bd5ee1f686040116c/Lib/site.py#L401-L410
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
+    // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
 
     let mut directories = SitePackagesPaths::default();
 
