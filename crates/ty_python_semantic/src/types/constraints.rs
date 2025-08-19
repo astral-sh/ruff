@@ -105,13 +105,12 @@ impl<'db> Constraints<'db> for bool {
     }
 }
 
-pub(crate) trait OptionConstraintExtension<T> {
+pub(crate) trait OptionConstraintsExtension<T> {
     fn when_none_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
-
     fn when_some_and<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C;
 }
 
-impl<T> OptionConstraintExtension<T> for Option<T> {
+impl<T> OptionConstraintsExtension<T> for Option<T> {
     fn when_none_or<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnOnce(T) -> C) -> C {
         match self {
             Some(value) => f(value),
@@ -127,22 +126,21 @@ impl<T> OptionConstraintExtension<T> for Option<T> {
     }
 }
 
-pub(crate) trait IteratorConstraintExtension<T> {
+pub(crate) trait IteratorConstraintsExtension<T> {
     fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnMut(T) -> C) -> C;
     fn when_all<'db, C: Constraints<'db>>(self, db: &'db dyn Db, f: impl FnMut(T) -> C) -> C;
 }
 
-impl<I, T> IteratorConstraintExtension<T> for I
+impl<I, T> IteratorConstraintsExtension<T> for I
 where
     I: Iterator<Item = T>,
 {
     fn when_any<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
         let mut result = C::never(db);
         for child in self {
-            if result.is_always(db) {
-                break;
+            if result.union(db, f(child)) {
+                return result;
             }
-            result.union(db, f(child));
         }
         result
     }
@@ -150,10 +148,9 @@ where
     fn when_all<'db, C: Constraints<'db>>(self, db: &'db dyn Db, mut f: impl FnMut(T) -> C) -> C {
         let mut result = C::always(db);
         for child in self {
-            if result.is_never(db) {
-                break;
+            if result.intersect(db, f(child)) {
+                return result;
             }
-            result.intersect(db, f(child));
         }
         result
     }
