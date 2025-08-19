@@ -6,7 +6,8 @@ use ruff_notebook::NotebookIndex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_annotate_snippets::Renderer as AnnotateRenderer;
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::{Applicability, Fix};
+use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -226,6 +227,34 @@ impl std::fmt::Display for Diff<'_> {
                         }
                     }
                 }
+            }
+        }
+
+        match self.fix.applicability() {
+            Applicability::Safe => {}
+            Applicability::Unsafe => {
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.warning),
+                    msg = fmt_styled(
+                        "This is an unsafe fix and may remove comments or change runtime behavior",
+                        self.stylesheet.emphasis
+                    )
+                )?;
+            }
+            Applicability::DisplayOnly => {
+                // Note that this is still only used in tests. There's no `--display-only-fixes`
+                // analog to `--unsafe-fixes` for users to activate this or see the styling.
+                writeln!(
+                    f,
+                    "{note}: {msg}",
+                    note = fmt_styled("note", self.stylesheet.error),
+                    msg = fmt_styled(
+                        "This is a display-only fix and is likely to be incorrect",
+                        self.stylesheet.emphasis
+                    )
+                )?;
             }
         }
 
