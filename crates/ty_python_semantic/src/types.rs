@@ -4877,6 +4877,10 @@ impl<'db> Type<'db> {
                 // (Same question applies to the `Type::Union()` branch lower down)
                 Some(TypeVarBoundOrConstraints::Constraints(_)) | None => {}
             },
+            Type::TypeVar(_) => unreachable!(
+                "should not be able to iterate over type variable {} in inferable position",
+                self.display(db)
+            ),
             Type::Dynamic(_)
             | Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
@@ -4902,7 +4906,6 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
-            | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {}

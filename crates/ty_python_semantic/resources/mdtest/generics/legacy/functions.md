@@ -458,8 +458,8 @@ def overloaded_outer(t: T | None = None) -> None:
 
 ## Unpacking a TypeVar
 
-We can infer precise heterogeneous types from the result of an unpacking operation applied to a
-type variable if the type variable's upper bound is a type with a precise tuple spec:
+We can infer precise heterogeneous types from the result of an unpacking operation applied to a type
+variable if the type variable's upper bound is a type with a precise tuple spec:
 
 ```py
 from dataclasses import dataclass
