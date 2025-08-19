@@ -117,12 +117,6 @@ impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
     }
 }
 
-impl FromIterator<SystemPathBuf> for SitePackagesPaths {
-    fn from_iter<T: IntoIterator<Item = SystemPathBuf>>(iter: T) -> Self {
-        Self(IndexSet::from_iter(iter))
-    }
-}
-
 impl IntoIterator for SitePackagesPaths {
     type Item = SystemPathBuf;
     type IntoIter = indexmap::set::IntoIter<SystemPathBuf>;
@@ -289,7 +283,7 @@ impl PartialEq<&str> for UnixLibDir {
 
 impl PartialEq<UnixLibDir> for &str {
     fn eq(&self, other: &UnixLibDir) -> bool {
-        *self == other.as_str()
+        other == self
     }
 }
 
