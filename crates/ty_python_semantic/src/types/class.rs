@@ -1231,6 +1231,14 @@ impl<'db> ClassSingletonType<'db> {
         }
     }
 
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+        self.known(db) == Some(known_class)
+    }
+
+    pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Tuple)
+    }
+
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
             Self::Literal(literal) => literal.definition(db),
