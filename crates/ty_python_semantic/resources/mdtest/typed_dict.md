@@ -86,6 +86,92 @@ alice["extra"] = True
 bob["extra"] = True
 ```
 
+## Validation of `TypedDict` construction
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int | None
+
+class House:
+    owner: Person
+
+house = House()
+
+def accepts_person(p: Person) -> None:
+    pass
+```
+
+The following constructions of `Person` are all valid:
+
+```py
+alice1: Person = {"name": "Alice", "age": 30}
+Person(name="Alice", age=30)
+# TODO: this should not emit any errors
+# error: [missing-typed-dict-required-field]
+# error: [missing-typed-dict-required-field]
+Person({"name": "Alice", "age": 30})
+
+accepts_person({"name": "Alice", "age": 30})
+house.owner = {"name": "Alice", "age": 30}
+```
+
+All of these are missing the required `age` field:
+
+```py
+# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+alice2: Person = {"name": "Alice"}
+# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+Person(name="Alice")
+# TODO: this should only emit one error (about the missing `age` field)
+# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+Person({"name": "Alice"})
+
+# TODO: this should be an error, similar to the above
+accepts_person({"name": "Alice"})
+# TODO: this should be an error, similar to the above
+house.owner = {"name": "Alice"}
+```
+
+All of these have an invalid type for the `name` field:
+
+```py
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+alice3: Person = {"name": None, "age": 30}
+# error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Person`: value of type `None`"
+Person(name=None, age=30)
+# TODO: this should show the same error as above
+# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+Person({"name": None, "age": 30})
+
+# TODO: this should be an error, similar to the above
+accepts_person({"name": None, "age": 30})
+# TODO: this should be an error, similar to the above
+house.owner = {"name": None, "age": 30}
+```
+
+All of these have an extra field that is not defined in the `TypedDict`:
+
+```py
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+alice4: Person = {"name": "Alice", "age": 30, "extra": True}
+# error: [invalid-key] "Invalid key access on TypedDict `Person`: Unknown key "extra""
+Person(name="Alice", age=30, extra=True)
+# TODO: this should show the same error as above
+# error: [missing-typed-dict-required-field] "Missing required field 'name' in TypedDict `Person` constructor"
+# error: [missing-typed-dict-required-field] "Missing required field 'age' in TypedDict `Person` constructor"
+Person({"name": None, "age": 30, "extra": True})
+
+# TODO: this should be an error
+accepts_person({"name": "Alice", "age": 30, "extra": True})
+# TODO: this should be an error
+house.owner = {"name": "Alice", "age": 30, "extra": True}
+```
+
 ## Optional fields with `total=False`
 
 By default, all fields in a `TypedDict` are required (`total=True`). You can make all fields
