@@ -1287,6 +1287,7 @@ impl Display for DisplayStringLiteralType<'_> {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
     use ruff_python_ast::name::Name;
 
     use crate::Db;
@@ -1347,31 +1348,41 @@ mod tests {
             .to_string()
     }
 
+    fn display_signature_multiline<'db>(
+        db: &dyn Db,
+        parameters: impl IntoIterator<Item = Parameter<'db>>,
+        return_ty: Option<Type<'db>>,
+    ) -> String {
+        Signature::new(Parameters::new(parameters), return_ty)
+            .display_with(db, super::DisplaySettings::default().multiline())
+            .to_string()
+    }
+
     #[test]
     fn signature_display() {
         let db = setup_db();
 
         // Empty parameters with no return type.
-        assert_eq!(display_signature(&db, [], None), "() -> Unknown");
+        assert_snapshot!(display_signature(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(&db, [], Some(Type::none(&db))),
-            "() -> None"
+            @"() -> None"
         );
 
         // Single parameter type (no name) with a return type.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
-            "(None, /) -> None"
+            @"(None, /) -> None"
         );
 
         // Two parameters where one has annotation and the other doesn't.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1383,11 +1394,11 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            "(x=int, y: str = str) -> None"
+            @"(x=int, y: str = str) -> None"
         );
 
         // All positional only parameters.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1396,11 +1407,11 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            "(x, y, /) -> None"
+            @"(x, y, /) -> None"
         );
 
         // Positional-only parameters mixed with non-positional-only parameters.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1409,11 +1420,11 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            "(x, /, y) -> None"
+            @"(x, /, y) -> None"
         );
 
         // All keyword-only parameters.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1422,11 +1433,11 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            "(*, x, y) -> None"
+            @"(*, x, y) -> None"
         );
 
         // Keyword-only parameters mixed with non-keyword-only parameters.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1435,11 +1446,11 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            "(x, *, y) -> None"
+            @"(x, *, y) -> None"
         );
 
         // A mix of all parameter kinds.
-        assert_eq!(
+        assert_snapshot!(
             display_signature(
                 &db,
                 [
@@ -1468,9 +1479,178 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            "(a, b: int, c=Literal[1], d: int = Literal[2], \
+            @"(a, b: int, c=Literal[1], d: int = Literal[2], \
                 /, e=Literal[3], f: int = Literal[4], *args: object, \
                 *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
+        );
+    }
+
+    #[test]
+    fn signature_display_multiline() {
+        let db = setup_db();
+
+        // Empty parameters with no return type.
+        assert_snapshot!(display_signature_multiline(&db, [], None), @"() -> Unknown");
+
+        // Empty parameters with a return type.
+        assert_snapshot!(
+            display_signature_multiline(&db, [], Some(Type::none(&db))),
+            @"() -> None"
+        );
+
+        // Single parameter type (no name) with a return type.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
+                Some(Type::none(&db))
+            ),
+            @"(None, /) -> None"
+        );
+
+        // Two parameters where one has annotation and the other doesn't.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::positional_or_keyword(Name::new_static("x"))
+                        .with_default_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_or_keyword(Name::new_static("y"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db))
+                        .with_default_type(KnownClass::Str.to_instance(&db)),
+                ],
+                Some(Type::none(&db))
+            ),
+            @r"
+        (
+            x=int,
+            y: str = str
+        ) -> None
+        "
+        );
+
+        // All positional only parameters.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_only(Some(Name::new_static("y"))),
+                ],
+                Some(Type::none(&db))
+            ),
+            @r"
+        (
+            x,
+            y,
+            /
+        ) -> None
+        "
+        );
+
+        // Positional-only parameters mixed with non-positional-only parameters.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_or_keyword(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @r"
+        (
+            x,
+            /,
+            y
+        ) -> None
+        "
+        );
+
+        // All keyword-only parameters.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @r"
+        (
+            *,
+            x,
+            y
+        ) -> None
+        "
+        );
+
+        // Keyword-only parameters mixed with non-keyword-only parameters.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::positional_or_keyword(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
+                ],
+                Some(Type::none(&db))
+            ),
+            @r"
+        (
+            x,
+            *,
+            y
+        ) -> None
+        "
+        );
+
+        // A mix of all parameter kinds.
+        assert_snapshot!(
+            display_signature_multiline(
+                &db,
+                [
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::positional_only(Some(Name::new_static("b")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_only(Some(Name::new_static("c")))
+                        .with_default_type(Type::IntLiteral(1)),
+                    Parameter::positional_only(Some(Name::new_static("d")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(2)),
+                    Parameter::positional_or_keyword(Name::new_static("e"))
+                        .with_default_type(Type::IntLiteral(3)),
+                    Parameter::positional_or_keyword(Name::new_static("f"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(4)),
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::object(&db)),
+                    Parameter::keyword_only(Name::new_static("g"))
+                        .with_default_type(Type::IntLiteral(5)),
+                    Parameter::keyword_only(Name::new_static("h"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(6)),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db)),
+                ],
+                Some(KnownClass::Bytes.to_instance(&db))
+            ),
+            @r"
+        (
+            a,
+            b: int,
+            c=Literal[1],
+            d: int = Literal[2],
+            /,
+            e=Literal[3],
+            f: int = Literal[4],
+            *args: object,
+            *,
+            g=Literal[5],
+            h: int = Literal[6],
+            **kwargs: str
+        ) -> bytes
+        "
         );
     }
 }

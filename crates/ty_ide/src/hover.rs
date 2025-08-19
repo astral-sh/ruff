@@ -1375,6 +1375,110 @@ mod tests {
     }
 
     #[test]
+    fn hover_complex_type1() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Any, List
+        def ab(x: int, y: Callable[[int, int], Any], z: List[int]) -> int: ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        def ab(
+            x: int,
+            y: (int, int, /) -> Any,
+            z: list[int]
+        ) -> int
+        ---------------------------------------------
+        ```python
+        def ab(
+            x: int,
+            y: (int, int, /) -> Any,
+            z: list[int]
+        ) -> int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         def ab(x: int, y: Callable[[int, int], Any], z: List[int]) -> int: ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_complex_type2() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Tuple, Any
+        ab: Tuple[Any, int, Callable[[int, int], Any]] = ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        tuple[Any, int, (int, int, /) -> Any]
+        ---------------------------------------------
+        ```python
+        tuple[Any, int, (int, int, /) -> Any]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         ab: Tuple[Any, int, Callable[[int, int], Any]] = ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_complex_type3() {
+        let test = cursor_test(
+            r#"
+        from typing import Callable, Any
+        ab:  Callable[[int, int], Any] | None  = ...
+
+        a<CURSOR>b
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        ((int, int, /) -> Any) | None
+        ---------------------------------------------
+        ```python
+        ((int, int, /) -> Any) | None
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:5:9
+          |
+        3 |         ab:  Callable[[int, int], Any] | None  = ...
+        4 |
+        5 |         ab
+          |         ^-
+          |         ||
+          |         |Cursor offset
+          |         source
+          |
+        ");
+    }
+
+    #[test]
     fn hover_docstring() {
         let test = cursor_test(
             r#"
