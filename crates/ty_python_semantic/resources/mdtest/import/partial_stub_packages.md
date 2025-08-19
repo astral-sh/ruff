@@ -428,8 +428,7 @@ reveal_type(Fake().fake)  # revealed: Unknown
 
 Namespace stubs are always partial.
 
-Here "both" is found in the stub, while "impl" is found in the implementation. "fake" is found in
-neither.
+This is a regression test for <https://github.com/astral-sh/ty/issues/520>.
 
 ```toml
 [environment]
@@ -462,10 +461,10 @@ class Impl:
 
 ```py
 from parent.foo.both import Both
-from parent.foo.impl import Impl  # error: "Cannot resolve"
+from parent.foo.impl import Impl
 from parent.foo.fake import Fake  # error: "Cannot resolve"
 
 reveal_type(Both().both)  # revealed: str
-reveal_type(Impl().impl)  # revealed: Unknown
+reveal_type(Impl().impl)  # revealed: str
 reveal_type(Fake().fake)  # revealed: Unknown
 ```
