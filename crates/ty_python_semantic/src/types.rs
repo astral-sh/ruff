@@ -4869,6 +4869,14 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => {
                 return alias.value_type(db).try_iterate_with_mode(db, mode);
             }
+            Type::NonInferableTypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    return bound.try_iterate_with_mode(db, mode);
+                }
+                // TODO: could we create a "union of tuple specs"...?
+                // (Same question applies to the `Type::Union()` branch lower down)
+                Some(TypeVarBoundOrConstraints::Constraints(_)) | None => {}
+            },
             Type::Dynamic(_)
             | Type::FunctionLiteral(_)
             | Type::GenericAlias(_)
@@ -4895,7 +4903,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::TypeVar(_)
-            | Type::NonInferableTypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_)
             | Type::TypedDict(_) => {}
