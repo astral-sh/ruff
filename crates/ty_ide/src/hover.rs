@@ -1243,6 +1243,216 @@ mod tests {
         assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
+    #[test]
+    fn hover_overloaded_function() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        @overload
+        def f(v: int) -> int: ...
+        @overload
+        def f(v: str) -> str: ...
+
+        def f(v: int | str) -> int | str: ...
+
+        <CURSOR>f
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Overload[(v: int) -> int, (v: str) -> str]
+        ---------------------------------------------
+        ```python
+        @overload
+        def f(v: int) -> int: ...
+        @overload
+        def f(v: str) -> str: ...
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:9
+           |
+         9 |         def f(v: int | str) -> int | str: ...
+        10 |
+        11 |         f
+           |         -
+           |         |
+           |         source
+           |         Cursor offset
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_function_in_union() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        def _(flag: bool) -> None:
+            if flag:
+                @overload
+                def f(v: int) -> int: ...
+                @overload
+                def f(v: str) -> str: ...
+
+                def f(v: int | str) -> int | str: ...
+            else:
+                f = 1
+
+            <CURSOR>f
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        (Overload[(v: int) -> int, (v: str) -> str]) | Literal[1]
+        ---------------------------------------------
+        ```python
+        (Overload[(v: int) -> int, (v: str) -> str]) | Literal[1]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:15:13
+           |
+        13 |                 f = 1
+        14 |
+        15 |             f
+           |             -
+           |             |
+           |             source
+           |             Cursor offset
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_unbound_method() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class C:
+            @overload
+            def f(self, v: int) -> int: ...
+            @overload
+            def f(self, v: str) -> str: ...
+
+            def f(self, v: int | str) -> int | str: ...
+
+        C.<CURSOR>f
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Overload[(self, v: int) -> int, (self, v: str) -> str]
+        ---------------------------------------------
+        ```python
+        @overload
+        def f(self, v: int) -> int: ...
+        @overload
+        def f(self, v: str) -> str: ...
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        10 |             def f(self, v: int | str) -> int | str: ...
+        11 |
+        12 |         C.f
+           |         ^^-
+           |         | |
+           |         | Cursor offset
+           |         source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_bound_method() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+
+        class C:
+            @overload
+            def f(self, v: int) -> int: ...
+            @overload
+            def f(self, v: str) -> str: ...
+
+            def f(self, v: int | str) -> int | str: ...
+
+        C().<CURSOR>f
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Overload[(v: int) -> int, (v: str) -> str]
+        ---------------------------------------------
+        ```python
+        (bound method)
+        @overload
+        def C.f(v: int) -> int: ...
+        @overload
+        def C.f(v: str) -> str: ...
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:12:9
+           |
+        10 |             def f(self, v: int | str) -> int | str: ...
+        11 |
+        12 |         C().f
+           |         ^^^^-
+           |         |   |
+           |         |   Cursor offset
+           |         source
+           |
+        ");
+    }
+
+    #[test]
+    fn hover_overloaded_callable() {
+        let test = cursor_test(
+            r#"
+        from typing import overload
+        from ty_extensions import CallableTypeOf
+
+        @overload
+        def f(self, v: int) -> int: ...
+        @overload
+        def f(self, v: str) -> str: ...
+
+        def f(self, v: int | str) -> int | str: ...
+
+        def _(g: CallableTypeOf[f]):
+            <CURSOR>g
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Overload[(self, v: int) -> int, (self, v: str) -> str]
+        ---------------------------------------------
+        ```python
+        @overload
+        def <anonymous>(self, v: int) -> int: ...
+        @overload
+        def <anonymous>(self, v: str) -> str: ...
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:13:13
+           |
+        12 |         def _(g: CallableTypeOf[f]):
+        13 |             g
+           |             -
+           |             |
+           |             source
+           |             Cursor offset
+           |
+        ");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

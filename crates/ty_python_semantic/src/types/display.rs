@@ -126,8 +126,17 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::SpecialForm(special_form) => special_form.fmt(f),
             Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
+
+            Type::FunctionLiteral(function) if f.alternate() => {
+                write!(f, "{:#}", function.display(self.db))
+            }
             Type::FunctionLiteral(function) => function.display(self.db).fmt(f),
+
+            Type::Callable(callable) if f.alternate() => {
+                write!(f, "{:#}", callable.display(self.db))
+            }
             Type::Callable(callable) => callable.display(self.db).fmt(f),
+
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
@@ -151,8 +160,21 @@ impl Display for DisplayRepresentation<'_> {
                                 .display(self.db)
                         )
                     }
+                    signatures if f.alternate() => {
+                        f.write_str("(bound method)\n")?;
+                        let mut join = f.join("\n");
+                        for signature in signatures {
+                            join.entry(&format!(
+                                "@overload\n\
+                                def {instance}.{method}{signature}: ...",
+                                method = function.name(self.db),
+                                instance = bound_method.self_instance(self.db).display(self.db),
+                                signature = signature.bind_self().display(self.db)
+                            ));
+                        }
+                        Ok(())
+                    }
                     signatures => {
-                        // TODO: How to display overloads?
                         f.write_str("Overload[")?;
                         let mut join = f.join(", ");
                         for signature in signatures {
@@ -377,8 +399,19 @@ impl Display for DisplayFunctionType<'_> {
                     signature = signature.display(self.db)
                 )
             }
+            signatures if f.alternate() => {
+                let mut join = f.join("\n");
+                for signature in signatures {
+                    join.entry(&format!(
+                        "@overload\n\
+                        def {name}{signature}: ...",
+                        name = self.ty.name(self.db),
+                        signature = signature.display(self.db)
+                    ));
+                }
+                Ok(())
+            }
             signatures => {
-                // TODO: How to display overloads?
                 f.write_str("Overload[")?;
                 let mut join = f.join(", ");
                 for signature in signatures {
@@ -556,8 +589,18 @@ impl Display for DisplayCallableType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.signatures.overloads.as_slice() {
             [signature] => signature.display(self.db).fmt(f),
+            signatures if f.alternate() => {
+                let mut join = f.join("\n");
+                for signature in signatures {
+                    join.entry(&format!(
+                        "@overload\n\
+                        def <anonymous>{signature}: ...",
+                        signature = signature.display(self.db)
+                    ));
+                }
+                Ok(())
+            }
             signatures => {
-                // TODO: How to display overloads?
                 f.write_str("Overload[")?;
                 let mut join = f.join(", ");
                 for signature in signatures {

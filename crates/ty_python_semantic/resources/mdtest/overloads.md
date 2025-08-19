@@ -96,6 +96,23 @@ reveal_type(foo())  # revealed: None
 reveal_type(foo(b""))  # revealed: bytes
 ```
 
+## Callables
+
+```py
+from typing import overload
+from ty_extensions import CallableTypeOf
+
+@overload
+def f(v: int) -> int: ...
+@overload
+def f(v: str) -> str: ...
+def f(v: int | str) -> int | str:
+    return ""
+
+def _(g: CallableTypeOf[f]):
+    reveal_type(g)  # revealed: Overload[(v: int) -> int, (v: str) -> str]
+```
+
 ## Methods
 
 ```py
