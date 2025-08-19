@@ -353,8 +353,6 @@ pub(crate) fn infer_expression_if_definitely_bound<'db>(
     let node = expression.node_ref(db, &module);
     let b = inference.definitely_bound();
 
-    eprintln!("node {:?} is fully bound: {}", node, b);
-
     if b {
         inference.expression_type(node)
     } else {
@@ -6726,7 +6724,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place = self.infer_place_load(place_expr, expr_ref);
         if !place.0.place.is_definitely_bound() {
             self.all_definitely_bound = false;
-            eprintln!("expr_ref: {:?} was not bound", expr_ref);
         }
 
         place
@@ -7164,11 +7161,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
-
         let fallback_place = value_type.member(db, &attr.id);
         if !fallback_place.place.is_definitely_bound() {
             self.all_definitely_bound = false;
-            eprintln!("attribute: {:?} was not bound", attribute);
         }
 
         let resolved_type =
@@ -9327,11 +9322,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         expressions.shrink_to_fit();
-
-        // eprintln!(
-        //     "finished inference id {:?} and definitely bound {:?}",
-        //     scope, all_definitely_bound
-        // );
 
         ExpressionInference {
             expressions,
