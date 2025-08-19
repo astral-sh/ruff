@@ -150,6 +150,14 @@ class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
 # revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(AlsoInvalid.__mro__)
+
+class NotAGenericProtocol[T]: ...
+
+# error: [invalid-protocol] "Protocol class `StillInvalid` cannot inherit from non-protocol class `NotAGenericProtocol`"
+class StillInvalid(NotAGenericProtocol[int], Protocol): ...
+
+# revealed: tuple[<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_type(StillInvalid.__mro__)
 ```
 
 But two exceptions to this rule are `object` and `Generic`:
@@ -347,8 +355,8 @@ And as a corollary, `type[MyProtocol]` can also be called:
 
 ```py
 def f(x: type[MyProtocol]):
-    # TODO: add a reveal_type call once it's no longer a `Todo` type
-    # (which plays badly with snapshot testing)
+    # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
+    # (which doesn't work well with snapshots)
     x()
 ```
 
@@ -411,7 +419,7 @@ reveal_protocol_interface(SupportsAbs[int])
 class BaseProto(Protocol):
     def member(self) -> int: ...
 
-class SubProto(Protocol):
+class SubProto(BaseProto, Protocol):
     def member(self) -> bool: ...
 
 # error: [revealed-type] "Revealed protocol interface: `{"member": MethodMember(`(self) -> int`)}`"
@@ -425,6 +433,15 @@ class ProtoWithClassVar(Protocol):
 
 # error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
 reveal_protocol_interface(ProtoWithClassVar)
+
+class ProtocolWithDefault(Protocol):
+    x: int = 0
+
+# We used to incorrectly report this as having an `x: Literal[0]` member;
+# declared types should take priority over inferred types for protocol interfaces!
+#
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`)}`"
+reveal_protocol_interface(ProtocolWithDefault)
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -635,10 +652,24 @@ class FooWithZero:
 
 static_assert(is_subtype_of(FooWithZero, HasXWithDefault))
 static_assert(is_assignable_to(FooWithZero, HasXWithDefault))
+
+# TODO: whether or not any of these four assertions should pass is not clearly specified.
+#
+# A test in the typing conformance suite implies that they all should:
+# that a nominal class with an instance attribute `x`
+# (*without* a default value on the class body)
+# should be understood as satisfying a protocol that has an attribute member `x`
+# even if the protocol's `x` member has a default value on the class body.
+#
+# See <https://github.com/python/typing/blob/d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc/conformance/tests/protocols_definition.py#L56-L79>.
+#
+# The implications of this for meta-protocols are not clearly spelled out, however,
+# and the fact that attribute members on protocols can have defaults is only mentioned
+# in a throwaway comment in the spec's prose.
 static_assert(is_subtype_of(Foo, HasXWithDefault))
 static_assert(is_assignable_to(Foo, HasXWithDefault))
-static_assert(not is_subtype_of(Qux, HasXWithDefault))
-static_assert(not is_assignable_to(Qux, HasXWithDefault))
+static_assert(is_subtype_of(Qux, HasXWithDefault))  # error: [static-assert-error]
+static_assert(is_assignable_to(Qux, HasXWithDefault))  # error: [static-assert-error]
 
 class HasClassVarX(Protocol):
     x: ClassVar[int]
@@ -2088,6 +2119,86 @@ class Iterator[T](Protocol):
 
 def f(value: Iterator):
     cast(Iterator, value)  # error: [redundant-cast]
+```
+
+## Meta-protocols
+
+Where `P` is a protocol type, a class object `N` can be said to inhabit the type `type[P]` if:
+
+- All `ClassVar` members on `P` exist on the class object `N`
+- All method members on `P` exist on the class object `N`
+- Instantiating `N` creates an object that would satisfy the protocol `P`
+
+Currently meta-protocols are not fully supported by ty, but we try to keep false positives to a
+minimum in the meantime.
+
+```py
+from typing import Protocol, ClassVar
+from ty_extensions import static_assert, is_assignable_to, TypeOf, is_subtype_of
+
+class Foo(Protocol):
+    x: int
+    y: ClassVar[str]
+    def method(self) -> bytes: ...
+
+def _(f: type[Foo]):
+    reveal_type(f)  # revealed: type[@Todo(type[T] for protocols)]
+
+    # TODO: we should emit `unresolved-attribute` here: although we would accept this for a
+    # nominal class, we would see any class `N` as inhabiting `Foo` if it had an implicit
+    # instance attribute `x`, and implicit instance attributes are rarely bound on the class
+    # object.
+    reveal_type(f.x)  # revealed: @Todo(type[T] for protocols)
+
+    # TODO: should be `str`
+    reveal_type(f.y)  # revealed: @Todo(type[T] for protocols)
+    f.y = "foo"  # fine
+
+    # TODO: should be `Callable[[Foo], bytes]`
+    reveal_type(f.method)  # revealed: @Todo(type[T] for protocols)
+
+class Bar: ...
+
+# TODO: these should pass
+static_assert(not is_assignable_to(type[Bar], type[Foo]))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [static-assert-error]
+
+class Baz:
+    x: int
+    y: ClassVar[str] = "foo"
+    def method(self) -> bytes:
+        return b"foo"
+
+static_assert(is_assignable_to(type[Baz], type[Foo]))
+static_assert(is_assignable_to(TypeOf[Baz], type[Foo]))
+
+# TODO: these should pass
+static_assert(is_subtype_of(type[Baz], type[Foo]))  # error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[Baz], type[Foo]))  # error: [static-assert-error]
+```
+
+## Regression test for `ClassVar` members in stubs
+
+In an early version of our protocol implementation, we didn't retain the `ClassVar` qualifier for
+protocols defined in stub files.
+
+`stub.pyi`:
+
+```pyi
+from typing import ClassVar, Protocol
+
+class Foo(Protocol):
+    x: ClassVar[int]
+```
+
+`main.py`:
+
+```py
+from stub import Foo
+from ty_extensions import reveal_protocol_interface
+
+# error: [revealed-type] "Revealed protocol interface: `{"x": AttributeMember(`int`; ClassVar)}`"
+reveal_protocol_interface(Foo)
 ```
 
 ## TODO

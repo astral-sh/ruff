@@ -64,7 +64,7 @@ use super::string_annotation::{
 use super::subclass_of::SubclassOfInner;
 use super::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::resolve_module;
+use crate::module_resolver::{KnownModule, file_to_module, resolve_module};
 use crate::node_key::NodeKey;
 use crate::place::{
     Boundness, ConsideredDefinitions, LookupError, Place, PlaceAndQualifiers,
@@ -95,16 +95,18 @@ use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_PARAMETER_DEFAULT,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL, POSSIBLY_UNBOUND_IMPORT,
-    TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_annotated, report_invalid_arguments_to_callable,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_return_type, report_possibly_unbound_attribute,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_NAMED_TUPLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, POSSIBLY_UNBOUND_IMPLICIT_CALL,
+    POSSIBLY_UNBOUND_IMPORT, TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    report_implicit_return_type, report_instance_layout_conflict,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_annotated,
+    report_invalid_arguments_to_callable, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_return_type,
+    report_namedtuple_field_without_default_after_field_with_default,
+    report_possibly_unbound_attribute,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -119,11 +121,11 @@ use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     AttributeAssignmentError, CallDunderError, CallableType, ClassLiteral, ClassType,
     DataclassParams, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, MetaclassCandidate, PEP695TypeAliasType, Parameter,
-    ParameterForm, Parameters, SpecialFormType, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeIsType, TypeQualifiers, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder,
-    UnionType, binding_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, Parameter, ParameterForm, Parameters, SpecialFormType, SubclassOfType,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeIsType, TypeQualifiers,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionBuilder, UnionType, binding_type, todo_type,
 };
 use crate::unpack::{EvaluationMode, Unpack, UnpackPosition};
 use crate::util::diagnostics::format_enumeration;
@@ -1109,19 +1111,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
+            let is_named_tuple = CodeGeneratorKind::NamedTuple.matches(self.db(), class);
+
+            // (2) If it's a `NamedTuple` class, check that no field without a default value
+            // appears after a field with a default value.
+            if is_named_tuple {
+                let mut field_with_default_encountered = None;
+
+                for (field_name, field) in class.own_fields(self.db(), None) {
+                    if field.default_ty.is_some() {
+                        field_with_default_encountered = Some(field_name);
+                    } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
+                    {
+                        report_namedtuple_field_without_default_after_field_with_default(
+                            &self.context,
+                            class,
+                            self.index,
+                            &field_name,
+                            field_with_default,
+                        );
+                    }
+                }
+            }
+
             let is_protocol = class.is_protocol(self.db());
+
             let mut solid_bases = IncompatibleBases::default();
 
-            // (2) Iterate through the class's explicit bases to check for various possible errors:
+            // (3) Iterate through the class's explicit bases to check for various possible errors:
             //     - Check for inheritance from plain `Generic`,
             //     - Check for inheritance from a `@final` classes
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
+            //     - If the class is a NamedTuple class: check for multiple inheritance that isn't `Generic[]`
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                if let Some((class, solid_base)) = base_class
-                    .to_class_type(self.db())
-                    .and_then(|class| Some((class, class.nearest_solid_base(self.db())?)))
+                if is_named_tuple
+                    && !matches!(
+                        base_class,
+                        Type::SpecialForm(SpecialFormType::NamedTuple)
+                            | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                    )
                 {
-                    solid_bases.insert(solid_base, i, class.class_literal(self.db()).0);
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_NAMED_TUPLE, &class_node.bases()[i])
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "NamedTuple class `{}` cannot use multiple inheritance except with `Generic[]`",
+                            class.name(self.db()),
+                        ));
+                    }
                 }
 
                 let base_class = match base_class {
@@ -1155,13 +1193,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                         continue;
                     }
-                    Type::ClassLiteral(class) => class,
-                    // dynamic/unknown bases are never `@final`
+                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
+                    Type::GenericAlias(class) => ClassType::Generic(*class),
                     _ => continue,
                 };
 
+                if let Some(solid_base) = base_class.nearest_solid_base(self.db()) {
+                    solid_bases.insert(solid_base, i, base_class.class_literal(self.db()).0);
+                }
+
                 if is_protocol
-                    && !(base_class.is_protocol(self.db())
+                    && !(base_class.class_literal(self.db()).0.is_protocol(self.db())
                         || base_class.is_known(self.db(), KnownClass::Object))
                 {
                     if let Some(builder) = self
@@ -1190,7 +1232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (3) Check that the class's MRO is resolvable
+            // (4) Check that the class's MRO is resolvable
             match class.try_mro(self.db(), None) {
                 Err(mro_error) => match mro_error.reason() {
                     MroErrorKind::DuplicateBases(duplicates) => {
@@ -1261,7 +1303,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (4) Check that the class's metaclass can be determined without error.
+            // (5) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -1358,7 +1400,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (6) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike) =
                 CodeGeneratorKind::from_class(self.db(), class)
             {
@@ -1851,7 +1893,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut bound_ty = ty;
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let nonlocal_use_def_map;
         let place_id = binding.place(self.db());
         let place = place_table.place(place_id);
 
@@ -1911,9 +1952,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     // We found the closest definition. Note that (as in `infer_place_load`) this does
                     // *not* need to be a binding. It could be just a declaration, e.g. `x: int`.
-                    nonlocal_use_def_map = self.index.use_def_map(enclosing_scope_file_id);
-                    declarations =
-                        nonlocal_use_def_map.end_of_scope_symbol_declarations(enclosing_symbol_id);
+                    declarations = self
+                        .index
+                        .use_def_map(enclosing_scope_file_id)
+                        .end_of_scope_symbol_declarations(enclosing_symbol_id);
                     is_local = false;
                     break;
                 }
@@ -2110,8 +2152,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .or_fall_back_to(self.db(), || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
                 let scope = self.scope().file_scope_id(self.db());
-                let place_table = self.index.place_table(scope);
-                let place = place_table.place(declaration.place(self.db()));
+                let place = self
+                    .index
+                    .place_table(scope)
+                    .place(declaration.place(self.db()));
                 if let PlaceExprRef::Symbol(symbol) = &place {
                     if scope.is_global() {
                         module_type_implicit_global_symbol(self.db(), symbol.name())
@@ -2504,8 +2548,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     invalid.ty,
                 );
             }
-            let use_def = self.index.use_def_map(scope_id);
-            if use_def.can_implicitly_return_none(self.db())
+            if self
+                .index
+                .use_def_map(scope_id)
+                .can_implicitly_return_none(self.db())
                 && !Type::none(self.db()).is_assignable_to(self.db(), expected_ty)
             {
                 let no_return = self.return_types_and_ranges.is_empty();
@@ -3034,20 +3080,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class_ty = Type::from(ClassLiteral::new(
-            self.db(),
-            name.id.clone(),
-            body_scope,
-            maybe_known_class,
-            deprecated,
-            dataclass_params,
-            dataclass_transformer_params,
-        ));
+        let ty = if maybe_known_class.is_none()
+            && &name.id == "NamedTuple"
+            && matches!(
+                file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
+                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+            ) {
+            Type::SpecialForm(SpecialFormType::NamedTuple)
+        } else {
+            Type::from(ClassLiteral::new(
+                self.db(),
+                name.id.clone(),
+                body_scope,
+                maybe_known_class,
+                deprecated,
+                dataclass_params,
+                dataclass_transformer_params,
+            ))
+        };
 
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(class_ty),
+            &DeclaredAndInferredType::are_the_same_type(ty),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope
@@ -4747,20 +4802,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let module_ty = Type::module_literal(self.db(), self.file(), module);
 
-        // The indirection of having `star_import_info` as a separate variable
-        // is required in order to make the borrow checker happy.
-        let star_import_info = definition
-            .kind(self.db())
-            .as_star_import()
-            .map(|star_import| {
-                let place_table = self
-                    .index
-                    .place_table(self.scope().file_scope_id(self.db()));
-                (star_import, place_table)
-            });
-
-        let name = if let Some((star_import, symbol_table)) = star_import_info.as_ref() {
-            symbol_table.symbol(star_import.symbol_id()).name()
+        let name = if let Some(star_import) = definition.kind(self.db()).as_star_import() {
+            self.index
+                .place_table(self.scope().file_scope_id(self.db()))
+                .symbol(star_import.symbol_id())
+                .name()
         } else {
             &alias.name.id
         };
@@ -5791,7 +5837,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         | KnownClass::Property
                         | KnownClass::Super
                         | KnownClass::TypeVar
-                        | KnownClass::NamedTuple
                         | KnownClass::TypeAliasType
                         | KnownClass::Deprecated
                 )
@@ -6811,6 +6856,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7152,6 +7198,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7181,6 +7228,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::NonInferableTypeVar(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypedDict(_),
@@ -7579,6 +7627,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // language spec.
         // - `[ast::CompOp::Is]`: return `false` if unequal, `bool` if equal
         // - `[ast::CompOp::IsNot]`: return `true` if unequal, `bool` if equal
+        let db = self.db();
+        let try_dunder = |inference: &mut TypeInferenceBuilder<'db, '_>,
+                          policy: MemberLookupPolicy| {
+            let rich_comparison = |op| inference.infer_rich_comparison(left, right, op, policy);
+            let membership_test_comparison = |op, range: TextRange| {
+                inference.infer_membership_test_comparison(left, right, op, range)
+            };
+
+            match op {
+                ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
+                ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
+                ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
+                ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
+                ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
+                ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
+                ast::CmpOp::In => {
+                    membership_test_comparison(MembershipTestCompareOperator::In, range)
+                }
+                ast::CmpOp::NotIn => {
+                    membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
+                }
+                ast::CmpOp::Is => {
+                    if left.is_disjoint_from(db, right) {
+                        Ok(Type::BooleanLiteral(false))
+                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                        Ok(Type::BooleanLiteral(true))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(db))
+                    }
+                }
+                ast::CmpOp::IsNot => {
+                    if left.is_disjoint_from(db, right) {
+                        Ok(Type::BooleanLiteral(true))
+                    } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
+                        Ok(Type::BooleanLiteral(false))
+                    } else {
+                        Ok(KnownClass::Bool.to_instance(db))
+                    }
+                }
+            }
+        };
+
         let comparison_result = match (left, right) {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
@@ -7793,12 +7883,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::Eq =>
             {
-                Some(Ok(Type::BooleanLiteral(literal_1 == literal_2)))
+                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => ty,
+                    Err(_) => Type::BooleanLiteral(literal_1 == literal_2),
+                }))
             }
             (Type::EnumLiteral(literal_1), Type::EnumLiteral(literal_2))
                 if op == ast::CmpOp::NotEq =>
             {
-                Some(Ok(Type::BooleanLiteral(literal_1 != literal_2)))
+                Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                    Ok(ty) => ty,
+                    Err(_) => Type::BooleanLiteral(literal_1 != literal_2),
+                }))
             }
 
             (
@@ -7880,39 +7976,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Final generalized fallback: lookup the rich comparison `__dunder__` methods
-        let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
-        let membership_test_comparison =
-            |op, range: TextRange| self.infer_membership_test_comparison(left, right, op, range);
-        match op {
-            ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
-            ast::CmpOp::NotEq => rich_comparison(RichCompareOperator::Ne),
-            ast::CmpOp::Lt => rich_comparison(RichCompareOperator::Lt),
-            ast::CmpOp::LtE => rich_comparison(RichCompareOperator::Le),
-            ast::CmpOp::Gt => rich_comparison(RichCompareOperator::Gt),
-            ast::CmpOp::GtE => rich_comparison(RichCompareOperator::Ge),
-            ast::CmpOp::In => membership_test_comparison(MembershipTestCompareOperator::In, range),
-            ast::CmpOp::NotIn => {
-                membership_test_comparison(MembershipTestCompareOperator::NotIn, range)
-            }
-            ast::CmpOp::Is => {
-                if left.is_disjoint_from(self.db(), right) {
-                    Ok(Type::BooleanLiteral(false))
-                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
-                    Ok(Type::BooleanLiteral(true))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(self.db()))
-                }
-            }
-            ast::CmpOp::IsNot => {
-                if left.is_disjoint_from(self.db(), right) {
-                    Ok(Type::BooleanLiteral(true))
-                } else if left.is_singleton(self.db()) && left.is_equivalent_to(self.db(), right) {
-                    Ok(Type::BooleanLiteral(false))
-                } else {
-                    Ok(KnownClass::Bool.to_instance(self.db()))
-                }
-            }
-        }
+        try_dunder(self, MemberLookupPolicy::default())
     }
 
     /// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
@@ -7924,14 +7988,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         left: Type<'db>,
         right: Type<'db>,
         op: RichCompareOperator,
+        policy: MemberLookupPolicy,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
         let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
-            left.try_call_dunder(db, op.dunder(), CallArguments::positional([right]))
-                .map(|outcome| outcome.return_type(db))
-                .ok()
+            left.try_call_dunder_with_policy(
+                db,
+                op.dunder(),
+                &mut CallArguments::positional([right]),
+                policy,
+            )
+            .map(|outcome| outcome.return_type(db))
+            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
@@ -7944,7 +8014,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // When no appropriate method returns any value other than NotImplemented,
             // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
             // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) {
+            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+                // This branch implements specific behavior of the `__eq__` and `__ne__` methods
+                // on `object`, so it does not apply if we skip looking up attributes on `object`.
+                && !policy.mro_no_object_fallback()
+            {
                 Some(KnownClass::Bool.to_instance(db))
             } else {
                 None
@@ -8232,7 +8306,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .next()
             .expect("valid bindings should have matching overload");
         Type::from(generic_class.apply_specialization(self.db(), |_| {
-            generic_context.specialize_partial(self.db(), overload.parameter_types())
+            generic_context
+                .specialize_partial(self.db(), overload.parameter_types().iter().copied())
         }))
     }
 
@@ -10189,7 +10264,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut signature_iter = callable_binding.into_iter().map(|binding| {
                     if argument_type.is_bound_method() {
-                        binding.signature.bind_self()
+                        binding.signature.bind_self(self.db(), Some(argument_type))
                     } else {
                         binding.signature.clone()
                     }
@@ -10365,7 +10440,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SpecialFormType::TypingSelf
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypedDict
-            | SpecialFormType::Unknown => {
+            | SpecialFormType::Unknown
+            | SpecialFormType::NamedTuple => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

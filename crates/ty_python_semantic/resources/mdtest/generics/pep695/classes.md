@@ -438,6 +438,19 @@ class A[T]:
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Class typevar has another typevar as a default
+
+```py
+class C[T, U = T]: ...
+
+reveal_type(C())  # revealed: C[Unknown, Unknown]
+
+class D[T, U = T]:
+    def __init__(self) -> None: ...
+
+reveal_type(D())  # revealed: D[Unknown, Unknown]
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
@@ -615,6 +628,35 @@ class C[T](C): ...
 
 # error: [cyclic-class-definition]
 class D[T](D[int]): ...
+```
+
+## Tuple as a PEP-695 generic class
+
+Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in
+typeshed:
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class tuple[T]: ...
+```
+
+`/typeshed/stdlib/typing_extensions.pyi`:
+
+```pyi
+def reveal_type(obj, /): ...
+```
+
+`main.py`:
+
+```py
+reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

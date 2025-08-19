@@ -181,6 +181,49 @@ def other_function(): ...
         "#);
     }
 
+    /// goto-definition on a function definition in a .pyi should go to the .py
+    #[test]
+    fn goto_definition_stub_map_function_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mymodule.py",
+                r#"
+def my_function():
+    return "hello"
+
+def other_function():
+    return "other"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+def my_fun<CURSOR>ction(): ...
+
+def other_function(): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:5
+          |
+        2 | def my_function():
+          |     ^^^^^^^^^^^
+        3 |     return "hello"
+          |
+        info: Source
+         --> mymodule.pyi:2:5
+          |
+        2 | def my_function(): ...
+          |     ^^^^^^^^^^^
+        3 |
+        4 | def other_function(): ...
+          |
+        "#);
+    }
+
     /// goto-definition on a function that's redefined many times in the impl .py
     ///
     /// Currently this yields all instances. There's an argument for only yielding
@@ -324,6 +367,53 @@ class MyOtherClass:
         2 | from mymodule import MyClass
         3 | x = MyClass
           |     ^^^^^^^
+          |
+        ");
+    }
+
+    /// goto-definition on a class def in a .pyi should go to the .py
+    #[test]
+    fn goto_definition_stub_map_class_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+class MyOtherClass:
+    def __init__(self, val):
+        self.val = val + 1
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyCl<CURSOR>ass:
+    def __init__(self, val: bool): ...
+
+class MyOtherClass:
+    def __init__(self, val: bool): ...
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Definition
+         --> mymodule.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val):
+        4 |         self.val = val
+          |
+        info: Source
+         --> mymodule.pyi:2:7
+          |
+        2 | class MyClass:
+          |       ^^^^^^^
+        3 |     def __init__(self, val: bool): ...
           |
         ");
     }

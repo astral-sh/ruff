@@ -23,6 +23,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange};
+use strum::IntoEnumIterator;
 use ty_static::EnvVars;
 
 type SitePackagesDiscoveryResult<T> = Result<T, SitePackagesDiscoveryError>;
@@ -49,8 +50,8 @@ type StdlibDiscoveryResult<T> = Result<T, StdlibDiscoveryError>;
 pub struct SitePackagesPaths(IndexSet<SystemPathBuf>);
 
 impl SitePackagesPaths {
-    fn single(path: SystemPathBuf) -> Self {
-        Self(IndexSet::from([path]))
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     fn insert(&mut self, path: SystemPathBuf) {
@@ -88,7 +89,7 @@ impl SitePackagesPaths {
 
         let parent_component = site_packages_ancestor_components.next()?;
 
-        if site_packages_ancestor_components.next()? != "lib" {
+        if site_packages_ancestor_components.next()? != UnixLibDir::Lib {
             return None;
         }
 
@@ -110,9 +111,9 @@ impl SitePackagesPaths {
     }
 }
 
-impl FromIterator<SystemPathBuf> for SitePackagesPaths {
-    fn from_iter<T: IntoIterator<Item = SystemPathBuf>>(iter: T) -> Self {
-        Self(IndexSet::from_iter(iter))
+impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
+    fn from(paths: [SystemPathBuf; N]) -> Self {
+        Self(IndexSet::from(paths))
     }
 }
 
@@ -240,6 +241,52 @@ impl PythonEnvironment {
     }
 }
 
+/// Enumeration of the subdirectories of `sys.prefix` that could contain a
+/// `site-packages` directory if the host system is Unix-like.
+///
+/// For example, if `sys.prefix` is `.venv` and the Python version is 3.10,
+/// the `site-packages` directory could be located at `.venv/lib/python3.10/site-packages`,
+/// or at `.venv/lib64/python3.10/site-packages`, or there could indeed be `site-packages`
+/// directories at both of these locations.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, strum_macros::EnumIter)]
+enum UnixLibDir {
+    Lib,
+    Lib64,
+}
+
+impl UnixLibDir {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Lib => "lib",
+            Self::Lib64 => "lib64",
+        }
+    }
+}
+
+impl std::fmt::Display for UnixLibDir {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl AsRef<SystemPath> for UnixLibDir {
+    fn as_ref(&self) -> &SystemPath {
+        SystemPath::new(self.as_str())
+    }
+}
+
+impl PartialEq<&str> for UnixLibDir {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<UnixLibDir> for &str {
+    fn eq(&self, other: &UnixLibDir) -> bool {
+        other == self
+    }
+}
+
 /// The Python runtime that produced the venv.
 ///
 /// We only need to distinguish cases that change the on-disk layout.
@@ -258,12 +305,16 @@ pub(crate) enum PythonImplementation {
 impl PythonImplementation {
     /// Return the relative path from `sys.prefix` to the `site-packages` directory
     /// if this is a known implementation. Return `None` if this is an unknown implementation.
-    fn relative_site_packages_path(self, version: Option<PythonVersion>) -> Option<String> {
+    fn relative_site_packages_path(
+        self,
+        lib_dir: UnixLibDir,
+        version: Option<PythonVersion>,
+    ) -> Option<String> {
         match self {
             Self::CPython | Self::GraalPy => {
-                version.map(|version| format!("lib/python{version}/site-packages"))
+                version.map(|version| format!("{lib_dir}/python{version}/site-packages"))
             }
-            Self::PyPy => version.map(|version| format!("lib/pypy{version}/site-packages")),
+            Self::PyPy => version.map(|version| format!("{lib_dir}/pypy{version}/site-packages")),
             Self::Unknown => None,
         }
     }
@@ -413,7 +464,7 @@ impl VirtualEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
@@ -429,9 +480,8 @@ impl VirtualEnvironment {
 
         let version = version.as_ref().map(|v| v.version);
 
-        let mut site_packages_directories = SitePackagesPaths::single(
-            site_packages_directory_from_sys_prefix(root_path, version, *implementation, system)?,
-        );
+        let mut site_packages_directories =
+            site_packages_directories_from_sys_prefix(root_path, version, *implementation, system)?;
 
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_paths(system) {
@@ -456,14 +506,14 @@ impl VirtualEnvironment {
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
             // we should probably print a warning but *not* abort type checking
             if let Some(sys_prefix_path) = system_sys_prefix {
-                match site_packages_directory_from_sys_prefix(
+                match site_packages_directories_from_sys_prefix(
                     &sys_prefix_path,
                     version,
                     *implementation,
                     system,
                 ) {
-                    Ok(site_packages_directory) => {
-                        site_packages_directories.insert(site_packages_directory);
+                    Ok(system_directories) => {
+                        site_packages_directories.extend(system_directories);
                     }
                     Err(error) => tracing::warn!(
                         "{error}. System site-packages will not be used for module resolution."
@@ -665,7 +715,7 @@ impl SystemEnvironment {
     /// Create a new system environment from the given path.
     ///
     /// At this time, there is no eager validation and this is infallible. Instead, validation
-    /// will occur in [`site_packages_directory_from_sys_prefix`] — which will fail if there is not
+    /// will occur in [`site_packages_directories_from_sys_prefix`] — which will fail if there is not
     /// a Python environment at the given path.
     pub(crate) fn new(path: SysPrefixPath) -> Self {
         Self { root_path: path }
@@ -673,20 +723,19 @@ impl SystemEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
         let SystemEnvironment { root_path } = self;
 
-        let site_packages_directories =
-            SitePackagesPaths::single(site_packages_directory_from_sys_prefix(
-                root_path,
-                None,
-                PythonImplementation::Unknown,
-                system,
-            )?);
+        let site_packages_directories = site_packages_directories_from_sys_prefix(
+            root_path,
+            None,
+            PythonImplementation::Unknown,
+            system,
+        )?;
 
         tracing::debug!(
             "Resolved site-packages directories for this environment are: {site_packages_directories:?}"
@@ -696,7 +745,7 @@ impl SystemEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn real_stdlib_directory(
         &self,
         system: &dyn System,
@@ -740,7 +789,7 @@ pub enum SitePackagesDiscoveryError {
     /// would be relative to the `sys.prefix` path, and we tried to fallback to iterating
     /// through the `<sys.prefix>/lib` directory looking for a `site-packages` directory,
     /// but we came across some I/O error while trying to do so.
-    CouldNotReadLibDirectory(SysPrefixPath, io::Error),
+    CouldNotReadLibDirectory(SysPrefixPath),
 
     /// We looked everywhere we could think of for the `site-packages` directory,
     /// but none could be found despite our best endeavours.
@@ -771,9 +820,9 @@ impl std::error::Error for SitePackagesDiscoveryError {
                 io_err.as_ref().map(|e| e as &dyn std::error::Error)
             }
             Self::NoPyvenvCfgFile(_, io_err) => Some(io_err),
-            Self::PyvenvCfgParseError(_, _) => None,
-            Self::CouldNotReadLibDirectory(_, io_err) => Some(io_err),
-            Self::NoSitePackagesDirFound(_) => None,
+            Self::PyvenvCfgParseError(_, _)
+            | Self::CouldNotReadLibDirectory(_)
+            | Self::NoSitePackagesDirFound(_) => None,
         }
     }
 }
@@ -811,11 +860,11 @@ impl std::fmt::Display for SitePackagesDiscoveryError {
                     "Failed to parse the `pyvenv.cfg` file at `{path}` because {kind}"
                 )
             }
-            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }, _) => display_error(
+            Self::CouldNotReadLibDirectory(SysPrefixPath { inner, origin }) => display_error(
                 f,
                 origin,
                 inner,
-                "Failed to iterate over the contents of the `lib` directory of the Python installation",
+                "Failed to iterate over the contents of the `lib`/`lib64` directories of the Python installation",
                 None,
             ),
             Self::NoSitePackagesDirFound(SysPrefixPath { inner, origin }) => display_error(
@@ -963,19 +1012,19 @@ when trying to resolve the `home` value to a directory on disk: {io_err}"
     }
 }
 
-/// Attempt to retrieve the `site-packages` directory
+/// Attempt to retrieve the `site-packages` directories
 /// associated with a given Python installation.
 ///
-/// The location of the `site-packages` directory can vary according to the
+/// The location of the `site-packages` directories can vary according to the
 /// Python version that this installation represents. The Python version may
 /// or may not be known at this point, which is why the `python_version`
 /// parameter is an `Option`.
-fn site_packages_directory_from_sys_prefix(
+fn site_packages_directories_from_sys_prefix(
     sys_prefix_path: &SysPrefixPath,
     python_version: Option<PythonVersion>,
     implementation: PythonImplementation,
     system: &dyn System,
-) -> SitePackagesDiscoveryResult<SystemPathBuf> {
+) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
     tracing::debug!(
         "Searching for site-packages directory in sys.prefix {}",
         sys_prefix_path.inner
@@ -985,10 +1034,10 @@ fn site_packages_directory_from_sys_prefix(
         let site_packages = sys_prefix_path.join(r"Lib\site-packages");
         return system
             .is_directory(&site_packages)
-            .then_some(site_packages)
-            .ok_or(SitePackagesDiscoveryError::NoSitePackagesDirFound(
-                sys_prefix_path.to_owned(),
-            ));
+            .then(|| SitePackagesPaths::from([site_packages]))
+            .ok_or_else(|| {
+                SitePackagesDiscoveryError::NoSitePackagesDirFound(sys_prefix_path.to_owned())
+            });
     }
 
     // In the Python standard library's `site.py` module (used for finding `site-packages`
@@ -1000,41 +1049,50 @@ fn site_packages_directory_from_sys_prefix(
     //     libdirs.append("lib")
     // ```
     //
-    // Pyright therefore searches for both a `lib/python3.X/site-packages` directory
-    // and a `lib64/python3.X/site-packages` directory on non-MacOS Unix systems,
-    // since `sys.platlibdir` can sometimes be equal to `"lib64"`.
-    //
-    // However, we only care about the `site-packages` directory insofar as it allows
+    // We generally only care about the `site-packages` directory insofar as it allows
     // us to discover Python source code that can be used for inferring type
-    // information regarding third-party dependencies. That means that we don't need
-    // to care about any possible `lib64/site-packages` directories, since
-    // [the `sys`-module documentation] states that `sys.platlibdir` is *only* ever
-    // used for C extensions, never for pure-Python modules.
+    // information regarding third-party dependencies. In theory, therefore, that means
+    // that we don't need to care about any possible `lib64/site-packages` directories,
+    // since [the `sys`-module documentation] states that `sys.platlibdir` is *only* ever
+    // used for C extensions, never for pure-Python modules. However, in practice,
+    // some installers appear to do [some strange things on Fedora] that mean that `.py`
+    // files *can* end up in `lib64/site-packages` in some edge cases. And we'll probably
+    // need to start looking in `lib64/site-packages` directories in the future anyway, in
+    // order to distinguish between "unresolved import" and "resolved to an opaque C
+    // extension" in diagnostic messages.
     //
     // [the non-Windows branch]: https://github.com/python/cpython/blob/a8be8fc6c4682089be45a87bd5ee1f686040116c/Lib/site.py#L401-L410
     // [the `sys`-module documentation]: https://docs.python.org/3/library/sys.html#sys.platlibdir
+    // [some strange things on Fedora]: https://github.com/astral-sh/ty/issues/1043
+
+    let mut directories = SitePackagesPaths::default();
 
     // If we were able to figure out what Python version this installation is,
-    // we should be able to avoid iterating through all items in the `lib/` directory:
-    if let Some(expected_relative_path) = implementation.relative_site_packages_path(python_version)
-    {
-        let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
-        if system.is_directory(&expected_absolute_path) {
-            return Ok(expected_absolute_path);
-        }
-
-        // CPython free-threaded (3.13+) variant: pythonXYt
-        if matches!(implementation, PythonImplementation::CPython)
-            && python_version.is_some_and(PythonVersion::free_threaded_build_available)
+    // we should be able to avoid iterating through all items in the `lib/` and `lib64/` directories:
+    for lib_dir in UnixLibDir::iter() {
+        if let Some(expected_relative_path) =
+            implementation.relative_site_packages_path(lib_dir, python_version)
         {
-            let alternative_path = sys_prefix_path.join(format!(
-                "lib/python{}t/site-packages",
-                python_version.unwrap()
-            ));
-            if system.is_directory(&alternative_path) {
-                return Ok(alternative_path);
+            let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
+            if system.is_directory(&expected_absolute_path) {
+                directories.insert(expected_absolute_path);
+            } else if matches!(implementation, PythonImplementation::CPython)
+                && python_version.is_some_and(PythonVersion::free_threaded_build_available)
+            {
+                // CPython free-threaded (3.13+) variant: pythonX.Yt
+                let alternative_path = sys_prefix_path.join(format!(
+                    "{lib_dir}/python{}t/site-packages",
+                    python_version.unwrap()
+                ));
+                if system.is_directory(&alternative_path) {
+                    directories.insert(alternative_path);
+                }
             }
         }
+    }
+
+    if !directories.is_empty() {
+        return Ok(directories);
     }
 
     // Either we couldn't figure out the version before calling this function
@@ -1045,38 +1103,55 @@ fn site_packages_directory_from_sys_prefix(
     // Note: the `python3.x` part of the `site-packages` path can't be computed from
     // the `--python-version` the user has passed, as they might be running Python 3.12 locally
     // even if they've requested that we type check their code "as if" they're running 3.8.
-    for entry_result in system
-        .read_directory(&sys_prefix_path.join("lib"))
-        .map_err(|io_err| {
-            SitePackagesDiscoveryError::CouldNotReadLibDirectory(sys_prefix_path.to_owned(), io_err)
-        })?
-    {
-        let Ok(entry) = entry_result else {
+    let mut found_at_least_one_lib_dir = false;
+
+    for lib_dir in UnixLibDir::iter() {
+        let Ok(directory_iterator) = system.read_directory(&sys_prefix_path.join(lib_dir)) else {
+            tracing::debug!("Could not find a `<sys.prefix>/{lib_dir}` directory; continuing");
             continue;
         };
 
-        if !entry.file_type().is_directory() {
-            continue;
-        }
+        found_at_least_one_lib_dir = true;
 
-        let mut path = entry.into_path();
+        for entry_result in directory_iterator {
+            let Ok(entry) = entry_result else {
+                continue;
+            };
 
-        let name = path
-            .file_name()
-            .expect("File name to be non-null because path is guaranteed to be a child of `lib`");
+            if !entry.file_type().is_directory() {
+                continue;
+            }
 
-        if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
-            continue;
-        }
+            let mut path = entry.into_path();
 
-        path.push("site-packages");
-        if system.is_directory(&path) {
-            return Ok(path);
+            let name = path.file_name().unwrap_or_else(|| panic!(
+                "File name should be non-null because path is guaranteed to be a child of `{lib_dir}`",
+            ));
+
+            if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
+                continue;
+            }
+
+            path.push("site-packages");
+            if system.is_directory(&path) {
+                directories.insert(path);
+            }
         }
     }
-    Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
-        sys_prefix_path.to_owned(),
-    ))
+
+    if directories.is_empty() {
+        if found_at_least_one_lib_dir {
+            Err(SitePackagesDiscoveryError::NoSitePackagesDirFound(
+                sys_prefix_path.to_owned(),
+            ))
+        } else {
+            Err(SitePackagesDiscoveryError::CouldNotReadLibDirectory(
+                sys_prefix_path.to_owned(),
+            ))
+        }
+    } else {
+        Ok(directories)
+    }
 }
 
 /// Attempt to retrieve the real stdlib directory
@@ -1133,7 +1208,8 @@ fn real_stdlib_directory_from_sys_prefix(
     // the `--python-version` the user has passed, as they might be running Python 3.12 locally
     // even if they've requested that we type check their code "as if" they're running 3.8.
     for entry_result in system
-        .read_directory(&sys_prefix_path.join("lib"))
+        // must be `lib`, not `lib64`, for the stdlib
+        .read_directory(&sys_prefix_path.join(UnixLibDir::Lib))
         .map_err(|io_err| {
             StdlibDiscoveryError::CouldNotReadLibDirectory(sys_prefix_path.to_owned(), io_err)
         })?
@@ -1148,9 +1224,9 @@ fn real_stdlib_directory_from_sys_prefix(
 
         let path = entry.into_path();
 
-        let name = path
-            .file_name()
-            .expect("File name to be non-null because path is guaranteed to be a child of `lib`");
+        let name = path.file_name().expect(
+            "File name should be non-null because path is guaranteed to be a child of `lib`",
+        );
 
         if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {
             continue;
@@ -1314,7 +1390,7 @@ impl SysPrefixPath {
                 let path = entry.into_path();
 
                 let name = path.file_name().expect(
-                    "File name to be non-null because path is guaranteed to be a child of `lib`",
+                    "File name should be non-null because path is guaranteed to be a child of `lib`",
                 );
 
                 if !(name.starts_with("python3.") || name.starts_with("pypy3.")) {

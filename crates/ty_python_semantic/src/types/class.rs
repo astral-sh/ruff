@@ -11,8 +11,11 @@ use super::{
 use crate::FxOrderMap;
 use crate::module_resolver::KnownModule;
 use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::NodeWithScopeKind;
-use crate::semantic_index::{DeclarationWithConstraint, SemanticIndex, attribute_declarations};
+use crate::semantic_index::{
+    BindingWithConstraints, DeclarationWithConstraint, SemanticIndex, attribute_declarations,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_LEGACY_TYPE_VARIABLE, INVALID_TYPE_ALIAS_TYPE};
 use crate::types::enums::enum_metadata;
@@ -197,10 +200,7 @@ impl CodeGeneratorKind {
                 Some(CodeGeneratorKind::DataclassLike)
             } else if class
                 .explicit_bases(db)
-                .iter()
-                .copied()
-                .filter_map(Type::into_class_literal)
-                .any(|class| class.is_known(db, KnownClass::NamedTuple))
+                .contains(&Type::SpecialForm(SpecialFormType::NamedTuple))
             {
                 Some(CodeGeneratorKind::NamedTuple)
             } else if class.is_typed_dict(db) {
@@ -230,7 +230,7 @@ impl CodeGeneratorKind {
         code_generator_of_class(db, class)
     }
 
-    fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    pub(super) fn matches(self, db: &dyn Db, class: ClassLiteral<'_>) -> bool {
         CodeGeneratorKind::from_class(db, class) == Some(self)
     }
 }
@@ -969,6 +969,7 @@ impl<'db> ClassType<'db> {
 
     /// Return a callable type (or union of callable types) that represents the callable
     /// constructor signature of this class.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1020,9 +1021,10 @@ impl<'db> ClassType<'db> {
                 })
             });
 
+            let instance_ty = Type::instance(db, self);
             let dunder_new_bound_method = Type::Callable(CallableType::new(
                 db,
-                dunder_new_signature.bind_self(),
+                dunder_new_signature.bind_self(db, Some(instance_ty)),
                 true,
             ));
 
@@ -1060,9 +1062,10 @@ impl<'db> ClassType<'db> {
 
                 if let Some(signature) = signature {
                     let synthesized_signature = |signature: &Signature<'db>| {
+                        let instance_ty = Type::instance(db, self);
                         Signature::new(signature.parameters().clone(), Some(correct_return_type))
                             .with_definition(signature.definition())
-                            .bind_self()
+                            .bind_self(db, Some(instance_ty))
                     };
 
                     let synthesized_dunder_init_signature = CallableSignature::from_overloads(
@@ -2982,6 +2985,54 @@ impl<'db> ClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+
+    pub(super) fn declarations_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = DeclarationWithConstraint<'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_declarations(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_declaration_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<DeclarationWithConstraint<'db>> {
+        self.declarations_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
+
+    pub(super) fn bindings_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<impl Iterator<Item = BindingWithConstraints<'db, 'db>>> {
+        let class_body_scope = self.body_scope(db).file_scope_id(db);
+        let symbol_id = index.place_table(class_body_scope).symbol_id(name)?;
+        let use_def = index.use_def_map(class_body_scope);
+        Some(use_def.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id)))
+    }
+
+    pub(super) fn first_binding_of_name(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        index: &'db SemanticIndex<'db>,
+    ) -> Option<BindingWithConstraints<'db, 'db>> {
+        self.bindings_of_name(db, name, index)
+            .into_iter()
+            .flatten()
+            .next()
+    }
 }
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
@@ -3137,7 +3188,6 @@ pub enum KnownClass {
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
-    NamedTuple,
     NewType,
     SupportsIndex,
     Iterable,
@@ -3160,6 +3210,7 @@ pub enum KnownClass {
     InitVar,
     // _typeshed._type_checker_internals
     NamedTupleFallback,
+    NamedTupleLike,
     TypedDictFallback,
 }
 
@@ -3245,8 +3296,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Iterable
             | Self::Iterator
-            // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
-            | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -3260,6 +3309,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::InitVar
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -3342,8 +3392,8 @@ impl KnownClass {
             | Self::ExceptionGroup
             | Self::Field
             | Self::SupportsIndex
-            | Self::NamedTuple
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback
             | Self::Counter
             | Self::DefaultDict
@@ -3412,7 +3462,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3429,6 +3478,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3489,7 +3539,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3506,6 +3555,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::NamedTupleFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::TypedDictFallback => false,
         }
     }
@@ -3566,7 +3616,6 @@ impl KnownClass {
             | KnownClass::TypeVarTuple
             | KnownClass::TypeAliasType
             | KnownClass::NoDefaultType
-            | KnownClass::NamedTuple
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
@@ -3582,6 +3631,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::InitVar
             | KnownClass::TypedDictFallback
+            | KnownClass::NamedTupleLike
             | KnownClass::NamedTupleFallback => false,
         }
     }
@@ -3604,6 +3654,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Awaitable
+            | Self::NamedTupleLike
             | Self::Generator => true,
 
             Self::Any
@@ -3648,7 +3699,6 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::NoDefaultType
-            | Self::NamedTuple
             | Self::NewType
             | Self::ChainMap
             | Self::Counter
@@ -3713,7 +3763,6 @@ impl KnownClass {
             Self::GeneratorType => "GeneratorType",
             Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::CoroutineType => "CoroutineType",
-            Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
@@ -3767,6 +3816,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::InitVar => "InitVar",
             Self::NamedTupleFallback => "NamedTupleFallback",
+            Self::NamedTupleLike => "NamedTupleLike",
             Self::TypedDictFallback => "TypedDictFallback",
         }
     }
@@ -3984,7 +4034,6 @@ impl KnownClass {
             | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
-            | Self::NamedTuple
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
@@ -4025,6 +4074,7 @@ impl KnownClass {
             | Self::OrderedDict => KnownModule::Collections,
             Self::Field | Self::KwOnly | Self::InitVar => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
+            Self::NamedTupleLike => KnownModule::TyExtensions,
         }
     }
 
@@ -4095,7 +4145,6 @@ impl KnownClass {
             | Self::Nonmember
             | Self::ABCMeta
             | Self::Super
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4103,6 +4152,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => Some(false),
 
             Self::Tuple => None,
@@ -4177,7 +4227,6 @@ impl KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
-            | Self::NamedTuple
             | Self::NewType
             | Self::Field
             | Self::KwOnly
@@ -4185,6 +4234,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::NamedTupleFallback
+            | Self::NamedTupleLike
             | Self::TypedDictFallback => false,
         }
     }
@@ -4234,7 +4284,6 @@ impl KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
-            "NamedTuple" => Self::NamedTuple,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -4275,6 +4324,7 @@ impl KnownClass {
             "KW_ONLY" => Self::KwOnly,
             "InitVar" => Self::InitVar,
             "NamedTupleFallback" => Self::NamedTupleFallback,
+            "NamedTupleLike" => Self::NamedTupleLike,
             "TypedDictFallback" => Self::TypedDictFallback,
             _ => return None,
         };
@@ -4341,6 +4391,7 @@ impl KnownClass {
             | Self::InitVar
             | Self::NamedTupleFallback
             | Self::TypedDictFallback
+            | Self::NamedTupleLike
             | Self::Awaitable
             | Self::Generator => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
@@ -4353,7 +4404,6 @@ impl KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::NamedTuple
             | Self::Iterable
             | Self::Iterator
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),

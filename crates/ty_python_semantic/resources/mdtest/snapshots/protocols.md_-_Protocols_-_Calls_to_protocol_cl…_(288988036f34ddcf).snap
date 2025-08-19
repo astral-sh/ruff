@@ -36,8 +36,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 22 | 
 23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
 24 | def f(x: type[MyProtocol]):
-25 |     # TODO: add a reveal_type call once it's no longer a `Todo` type
-26 |     # (which plays badly with snapshot testing)
+25 |     # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
+26 |     # (which doesn't work well with snapshots)
 27 |     x()
 ```
 
@@ -163,7 +163,7 @@ info[revealed-type]: Revealed type
 23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SubclassOfGenericProtocol[int]`
 24 | def f(x: type[MyProtocol]):
-25 |     # TODO: add a reveal_type call once it's no longer a `Todo` type
+25 |     # TODO: add a `reveal_type` call here once it's no longer a `Todo` type
    |
 
 ```

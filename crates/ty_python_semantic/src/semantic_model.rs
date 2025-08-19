@@ -7,6 +7,7 @@ use ruff_source_file::LineIndex;
 use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, resolve_module};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::ide_support::all_declarations_and_bindings;
@@ -232,7 +233,7 @@ impl<'db> Completion<'db> {
                 | Type::BytesLiteral(_) => CompletionKind::Value,
                 Type::EnumLiteral(_) => CompletionKind::Enum,
                 Type::ProtocolInstance(_) => CompletionKind::Interface,
-                Type::TypeVar(_) => CompletionKind::TypeParameter,
+                Type::NonInferableTypeVar(_) | Type::TypeVar(_) => CompletionKind::TypeParameter,
                 Type::Union(union) => union.elements(db).iter().find_map(|&ty| imp(db, ty))?,
                 Type::Intersection(intersection) => {
                     intersection.iter_positive(db).find_map(|ty| imp(db, ty))?
@@ -294,6 +295,14 @@ pub trait HasType {
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+}
+
+pub trait HasDefinition {
+    /// Returns the inferred type of `self`.
+    ///
+    /// ## Panics
+    /// May panic if `self` is from another file than `model`.
+    fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
 impl HasType for ast::ExprRef<'_> {
@@ -392,24 +401,31 @@ impl HasType for ast::Expr {
     }
 }
 
-macro_rules! impl_binding_has_ty {
+macro_rules! impl_binding_has_ty_def {
     ($ty: ty) => {
+        impl HasDefinition for $ty {
+            #[inline]
+            fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db> {
+                let index = semantic_index(model.db, model.file);
+                index.expect_single_definition(self)
+            }
+        }
+
         impl HasType for $ty {
             #[inline]
             fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
-                let index = semantic_index(model.db, model.file);
-                let binding = index.expect_single_definition(self);
+                let binding = HasDefinition::definition(self, model);
                 binding_type(model.db, binding)
             }
         }
     };
 }
 
-impl_binding_has_ty!(ast::StmtFunctionDef);
-impl_binding_has_ty!(ast::StmtClassDef);
-impl_binding_has_ty!(ast::Parameter);
-impl_binding_has_ty!(ast::ParameterWithDefault);
-impl_binding_has_ty!(ast::ExceptHandlerExceptHandler);
+impl_binding_has_ty_def!(ast::StmtFunctionDef);
+impl_binding_has_ty_def!(ast::StmtClassDef);
+impl_binding_has_ty_def!(ast::Parameter);
+impl_binding_has_ty_def!(ast::ParameterWithDefault);
+impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {

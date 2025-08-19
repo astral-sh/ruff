@@ -151,6 +151,7 @@ impl<'db> AllMembers<'db> {
             | Type::ProtocolInstance(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
+            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::TypeIs(_) => match ty.to_meta_type(db) {
@@ -306,8 +307,7 @@ impl<'db> AllMembers<'db> {
             let file = class_body_scope.file(db);
             let index = semantic_index(db, file);
             for function_scope_id in attribute_scopes(db, class_body_scope) {
-                let place_table = index.place_table(function_scope_id);
-                for place_expr in place_table.members() {
+                for place_expr in index.place_table(function_scope_id).members() {
                     let Some(name) = place_expr.as_instance_attribute() else {
                         continue;
                     };
@@ -410,8 +410,9 @@ pub fn definition_kind_for_name<'db>(
     let symbol_id = place_table.symbol_id(name_str)?;
 
     // Get the use-def map and look up definitions for this place
-    let use_def_map = index.use_def_map(file_scope);
-    let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+    let declarations = index
+        .use_def_map(file_scope)
+        .all_reachable_symbol_declarations(symbol_id);
 
     // Find the first valid definition and return its kind
     for declaration in declarations {
@@ -661,9 +662,10 @@ pub fn definitions_for_attribute<'db>(
             let index = semantic_index(db, file);
 
             for function_scope_id in attribute_scopes(db, class_scope) {
-                let place_table = index.place_table(function_scope_id);
-
-                if let Some(place_id) = place_table.member_id_by_instance_attribute_name(name_str) {
+                if let Some(place_id) = index
+                    .place_table(function_scope_id)
+                    .member_id_by_instance_attribute_name(name_str)
+                {
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first

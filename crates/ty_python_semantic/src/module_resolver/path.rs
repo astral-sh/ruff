@@ -11,7 +11,7 @@ use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::resolver::ResolverContext;
+use crate::module_resolver::resolver::{PyTyped, ResolverContext};
 use crate::site_packages::SitePackagesDiscoveryError;
 
 /// A path that points to a Python module.
@@ -145,6 +145,31 @@ impl ModulePath {
                         .exists(search_path.join(relative_path).join("__init__.pyi")),
                 }
             }
+        }
+    }
+
+    /// Get the `py.typed` info for this package (not considering parent packages)
+    pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
+        let Some(py_typed_contents) = self.to_system_path().and_then(|path| {
+            let py_typed_path = path.join("py.typed");
+            let py_typed_file = system_path_to_file(resolver.db, py_typed_path).ok()?;
+            // If we fail to read it let's say that's like it doesn't exist
+            // (right now the difference between Untyped and Full is academic)
+            py_typed_file.read_to_string(resolver.db).ok()
+        }) else {
+            return PyTyped::Untyped;
+        };
+        // The python typing spec says to look for "partial\n" but in the wild we've seen:
+        //
+        // * PARTIAL\n
+        // * partial\\n (as in they typed "\n")
+        // * partial/n
+        //
+        // since the py.typed file never really grew any other contents, let's be permissive
+        if py_typed_contents.to_ascii_lowercase().contains("partial") {
+            PyTyped::Partial
+        } else {
+            PyTyped::Full
         }
     }
 

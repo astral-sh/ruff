@@ -257,7 +257,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(union.iter(db).copied().collect()),
+        Type::Union(union) => Some(union.elements(db).to_vec()),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
         _ => None,
