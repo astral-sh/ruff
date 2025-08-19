@@ -646,6 +646,17 @@ impl<'db> ClassType<'db> {
         singleton.class_member_inner(db, specialization, name, policy)
     }
 
+    pub(super) fn class_member_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        let (singleton, specialization) = self.singleton_specialized(db, specialization);
+        singleton.class_member_inner(db, specialization, name, policy)
+    }
+
     /// Returns the inferred type of the class member named `name`. Only bound members
     /// or those marked as `ClassVars` are considered.
     ///
@@ -1265,6 +1276,48 @@ impl<'db> ClassSingletonType<'db> {
         match self {
             Self::Literal(literal) => literal.metaclass(db),
             Self::NewType(new_type) => new_type.metaclass(db),
+        }
+    }
+
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        self.class_member_inner(db, None, name, policy)
+    }
+
+    fn class_member_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        if name == "__mro__" {
+            let tuple_elements = self.iter_mro(db, specialization);
+            return Place::bound(Type::heterogeneous_tuple(db, tuple_elements)).into();
+        }
+
+        self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
+    }
+
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        match self {
+            Self::Literal(literal) => {
+                literal.own_class_member(db, inherited_generic_context, specialization, name)
+            }
+            Self::NewType(new_type) => {
+                // A NewType can't be specialized.
+                new_type.own_class_member(db, inherited_generic_context, name)
+            }
         }
     }
 }
@@ -3133,6 +3186,36 @@ impl<'db> NewTypeClass<'db> {
 
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.parent(db).metaclass(db)
+    }
+
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        self.class_member_inner(db, None, name, policy)
+    }
+
+    fn class_member_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        self.parent(db)
+            .class_member_inner(db, specialization, name, policy)
+    }
+
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        name: &str,
+    ) -> PlaceAndQualifiers<'db> {
+        self.parent(db)
+            .own_class_member(db, inherited_generic_context, name)
     }
 }
 
