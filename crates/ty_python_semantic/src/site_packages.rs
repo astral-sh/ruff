@@ -463,7 +463,7 @@ impl VirtualEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this virtual environment
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
@@ -714,7 +714,7 @@ impl SystemEnvironment {
     /// Create a new system environment from the given path.
     ///
     /// At this time, there is no eager validation and this is infallible. Instead, validation
-    /// will occur in [`site_packages_directory_from_sys_prefix`] — which will fail if there is not
+    /// will occur in [`site_packages_directories_from_sys_prefix`] — which will fail if there is not
     /// a Python environment at the given path.
     pub(crate) fn new(path: SysPrefixPath) -> Self {
         Self { root_path: path }
@@ -722,7 +722,7 @@ impl SystemEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn site_packages_directories(
         &self,
         system: &dyn System,
@@ -744,7 +744,7 @@ impl SystemEnvironment {
 
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
-    /// See the documentation for [`site_packages_directory_from_sys_prefix`] for more details.
+    /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
     pub(crate) fn real_stdlib_directory(
         &self,
         system: &dyn System,
