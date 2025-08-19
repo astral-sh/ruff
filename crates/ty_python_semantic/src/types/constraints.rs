@@ -1,5 +1,4 @@
 // XXX
-#![expect(dead_code)]
 
 use crate::Db;
 
@@ -28,28 +27,6 @@ pub(crate) trait Constraints<'db>: Clone + Sized {
             self.union(db, other());
         }
         self
-    }
-
-    fn distributed_union(db: &'db dyn Db, iter: impl IntoIterator<Item = Self>) -> Self {
-        let mut result = Self::never(db);
-        for child in iter {
-            if result.is_always(db) {
-                break;
-            }
-            result.union(db, child);
-        }
-        result
-    }
-
-    fn distributed_intersection(db: &'db dyn Db, iter: impl IntoIterator<Item = Self>) -> Self {
-        let mut result = Self::always(db);
-        for child in iter {
-            if result.is_never(db) {
-                break;
-            }
-            result.intersect(db, child);
-        }
-        result
     }
 }
 
