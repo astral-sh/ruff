@@ -180,10 +180,10 @@ pub(crate) fn logging_call(checker: &Checker, call: &ast::ExprCall) {
         // Check if any positional args for log message values are calls to pre-format as a string
         call.arguments.args.iter().skip(skip).for_each(|arg| {
             if let Expr::Call(ast::ExprCall { func, .. }) = arg {
-                if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id == "str" || id == "repr" {
-                        checker.report_diagnostic(LoggingPreFormat, arg.range());
-                    }
+                if checker.semantic().match_builtin_expr(func.as_ref(), "str")
+                    || checker.semantic().match_builtin_expr(func.as_ref(), "repr")
+                {
+                    checker.report_diagnostic(LoggingPreFormat, arg.range());
                 }
             }
         });

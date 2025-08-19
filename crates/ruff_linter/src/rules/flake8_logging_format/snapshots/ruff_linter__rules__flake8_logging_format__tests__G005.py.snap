@@ -82,4 +82,6 @@ G005 Logging statement pre-formats parameters as strings
 12 | log(logging.INFO, "Hello %s", str("World!"))
 13 | log(logging.INFO, "Hello %s", repr("World!"))
    |                               ^^^^^^^^^^^^^^
+14 |
+15 | def str(s): return f"str = {s}"
    |

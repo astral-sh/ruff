@@ -11,3 +11,7 @@ info("Hello %s", str("World!"))
 info("Hello %s", repr("World!"))
 log(logging.INFO, "Hello %s", str("World!"))
 log(logging.INFO, "Hello %s", repr("World!"))
+
+def str(s): return f"str = {s}"
+# Don't flag this
+logging.info("Hello %s", str("World!"))
