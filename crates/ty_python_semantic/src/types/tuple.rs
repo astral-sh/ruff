@@ -1109,84 +1109,76 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: &Self,
-        visitor: &IsDisjointVisitor<'db>,
-    ) -> bool {
+        visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = self.len().size_hint();
         let (other_min, other_max) = other.len().size_hint();
         if self_max.is_some_and(|max| max < other_min) {
-            return true;
+            return C::always(db);
         }
         if other_max.is_some_and(|max| max < self_min) {
-            return true;
+            return C::always(db);
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         #[allow(clippy::items_after_statements)]
-        fn any_disjoint<'s, 'db>(
+        fn any_disjoint<'s, 'db, C: Constraints<'db>>(
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'s Type<'db>>,
             b: impl IntoIterator<Item = &'s Type<'db>>,
-            visitor: &IsDisjointVisitor<'db>,
-        ) -> bool
+            visitor: &IsDisjointVisitor<'db, C>,
+        ) -> C
         where
             'db: 's,
         {
-            a.into_iter().zip(b).any(|(self_element, other_element)| {
+            (a.into_iter().zip(b)).when_any(db, |(self_element, other_element)| {
                 self_element.is_disjoint_from_impl(db, *other_element, visitor)
             })
         }
 
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                if any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor) {
-                    return true;
-                }
+                any_disjoint(db, self_tuple.elements(), other_tuple.elements(), visitor)
             }
 
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                if any_disjoint(
-                    db,
-                    self_tuple.prefix_elements(),
-                    other_tuple.prefix_elements(),
-                    visitor,
-                ) {
-                    return true;
-                }
-                if any_disjoint(
+            // Note that we don't compare the variable-length portions; two pure homogeneous tuples
+            // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
+            // disjoint, because `tuple[()]` would be assignable to both.
+            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => any_disjoint(
+                db,
+                self_tuple.prefix_elements(),
+                other_tuple.prefix_elements(),
+                visitor,
+            )
+            .or(db, || {
+                any_disjoint(
                     db,
                     self_tuple.suffix_elements().rev(),
                     other_tuple.suffix_elements().rev(),
                     visitor,
-                ) {
-                    return true;
-                }
-            }
+                )
+            }),
 
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                if any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor) {
-                    return true;
-                }
-                if any_disjoint(
+                any_disjoint(db, fixed.elements(), variable.prefix_elements(), visitor).or(
                     db,
-                    fixed.elements().rev(),
-                    variable.suffix_elements().rev(),
-                    visitor,
-                ) {
-                    return true;
-                }
+                    || {
+                        any_disjoint(
+                            db,
+                            fixed.elements().rev(),
+                            variable.suffix_elements().rev(),
+                            visitor,
+                        )
+                    },
+                )
             }
         }
-
-        // Two pure homogeneous tuples `tuple[A, ...]` and `tuple[B, ...]` can never be
-        // disjoint even if A and B are disjoint, because `tuple[()]` would be assignable to
-        // both.
-        false
     }
 
     pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {

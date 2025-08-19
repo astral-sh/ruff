@@ -5,8 +5,8 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::Constraints;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassType, DynamicType,
-    HasRelationToVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor, Type, TypeMapping,
-    TypeRelation, TypeVarInstance,
+    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MemberLookupPolicy, NormalizedVisitor,
+    Type, TypeMapping, TypeRelation, TypeVarInstance,
 };
 use crate::{Db, FxOrderSet};
 
@@ -189,11 +189,16 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_disjoint_from_impl<C: Constraints<'db>>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        _visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => C::never(db),
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                !self_class.could_coexist_in_mro_with(db, other_class)
+                C::from_bool(db, !self_class.could_coexist_in_mro_with(db, other_class))
             }
         }
     }

@@ -304,22 +304,27 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
         db: &'db dyn Db,
         other: Self,
-        visitor: &IsDisjointVisitor<'db>,
-    ) -> bool {
+        visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
+        let mut result = C::never(db);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
-                if self_spec.is_disjoint_from_impl(db, &other_spec, visitor) {
-                    return true;
+                let compatible = self_spec.is_disjoint_from_impl(db, &other_spec, visitor);
+                if result.union(db, compatible) {
+                    return result;
                 }
             }
         }
-        !self
-            .class(db)
-            .could_coexist_in_mro_with(db, other.class(db))
+        result.or(db, || {
+            C::from_bool(
+                db,
+                !(self.class(db)).could_coexist_in_mro_with(db, other.class(db)),
+            )
+        })
     }
 
     pub(super) fn is_singleton(self, db: &'db dyn Db) -> bool {
@@ -550,13 +555,13 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<C: Constraints<'db>>(
         self,
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         _other: Self,
-        _visitor: &IsDisjointVisitor<'db>,
-    ) -> bool {
-        false
+        _visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
+        C::never(db)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

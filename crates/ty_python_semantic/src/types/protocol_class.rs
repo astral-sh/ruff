@@ -443,15 +443,15 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn has_disjoint_type_from(
+    pub(super) fn has_disjoint_type_from<C: Constraints<'db>>(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
-        visitor: &IsDisjointVisitor<'db>,
-    ) -> bool {
+        visitor: &IsDisjointVisitor<'db, C>,
+    ) -> C {
         match &self.kind {
             // TODO: implement disjointness for property/method members as well as attribute members
-            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => false,
+            ProtocolMemberKind::Property(_) | ProtocolMemberKind::Method(_) => C::never(db),
             ProtocolMemberKind::Other(ty) => ty.is_disjoint_from_impl(db, other, visitor),
         }
     }
